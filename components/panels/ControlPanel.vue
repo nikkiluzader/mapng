@@ -379,7 +379,8 @@ import { ref, shallowRef, computed, onMounted, onUnmounted, watch, toRaw } from 
 import { provideSectionGroup } from '../../composables/useSectionGroup.js';
 // Expand all / Collapse all for every section in this panel
 provideSectionGroup();
-import { CUSTOM_OVERPASS_STORAGE_KEY, OVERTURE_BUILDINGS_STORAGE_KEY, OSM_TILES_FIRST_STORAGE_KEY } from '../../services/osm.js';
+import { CUSTOM_OVERPASS_STORAGE_KEY, OVERTURE_BUILDINGS_STORAGE_KEY } from '../../services/osm.js';
+import { useOsmSource } from '../../composables/useOsmSource.js';
 import { useI18n } from 'vue-i18n';
 import { MapPin, Box, Trees, AlertTriangle, Download, CheckCircle2 } from 'lucide-vue-next';
 import { desktopApp, DESKTOP_DOWNLOAD_URL } from '../../services/platform/desktop.js';
@@ -483,11 +484,8 @@ watch(fetchOSM, (newVal) => {
 });
 
 // On unless turned off; read by fetchOSMData (single tile and batch alike).
-const osmTilesFirst = ref(localStorage.getItem(OSM_TILES_FIRST_STORAGE_KEY) !== 'false');
-watch(osmTilesFirst, (newVal) => {
-  if (newVal) localStorage.removeItem(OSM_TILES_FIRST_STORAGE_KEY);
-  else localStorage.setItem(OSM_TILES_FIRST_STORAGE_KEY, 'false');
-});
+// (shared with the note in the view bar: composables/useOsmSource.js keeps it)
+const { tilesFirst: osmTilesFirst } = useOsmSource();
 const overtureBuildings = ref(localStorage.getItem(OVERTURE_BUILDINGS_STORAGE_KEY) !== 'false');
 watch(overtureBuildings, (newVal) => {
   localStorage.setItem(OVERTURE_BUILDINGS_STORAGE_KEY, String(newVal));

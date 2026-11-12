@@ -176,6 +176,20 @@
           </div>
           <Switch :on="decalSidewalks && roadsBuilt" :label="t('exportPanel.ui.decalSidewalks')" :disabled="!roadsBuilt || !hasOsmData" @toggle="$emit('update:decalSidewalks', !decalSidewalks)" />
         </div>
+        <!-- the raised sidewalks' height over the road (beamngSidewalks.js CURB_HEIGHTS_M); nothing to set for decals -->
+        <div :class="decalSidewalks ? 'opacity-50' : ''">
+          <span class="text-xs font-medium text-gray-800 dark:text-gray-100">{{ t('exportPanel.ui.curbHeight') }}</span>
+          <div role="radiogroup" :aria-label="t('exportPanel.ui.curbHeight')" class="mt-1 grid grid-cols-3 rounded border border-gray-300 dark:border-gray-600 overflow-hidden">
+            <button
+              v-for="k in CURB_HEIGHT_KEYS" :key="k" type="button" role="radio"
+              :aria-checked="curbHeight === k" :disabled="!roadsBuilt || !hasOsmData || decalSidewalks"
+              @click="$emit('update:curbHeight', k)"
+              class="py-1 text-caption border-r last:border-r-0 border-gray-200 dark:border-gray-600 transition-colors disabled:cursor-not-allowed"
+              :class="curbHeight === k ? 'bg-brand text-white font-semibold' : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'"
+            >{{ t(`exportPanel.ui.curbHeight_${k}`) }}</button>
+          </div>
+          <p class="mt-1 text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.curbHeightHint') }}</p>
+        </div>
       </section>
       <section class="space-y-1.5 pt-1" :class="bridgesBuilt ? '' : 'opacity-50'">
         <h4 class="text-micro font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('build.group_structures') }}</h4>
@@ -228,11 +242,13 @@ const props = defineProps({
   safeCaps: { type: Boolean, default: true },
   assumeParking: { type: Boolean, default: true },
   decalSidewalks: { type: Boolean, default: false },
+  curbHeight: { type: String, default: 'standard' },
   treeKindsOff: { type: Array, default: () => [] },
   treeSwaps: { type: Array, default: () => [] },
   treeModelsOff: { type: Array, default: () => [] },
 });
-const emit = defineEmits(['update:forestDensity', 'update:lidarDecks', 'update:safeCaps', 'update:assumeParking', 'update:decalSidewalks', 'update:treeKindsOff', 'update:treeSwaps', 'update:treeModelsOff']);
+const CURB_HEIGHT_KEYS = ['standard', 'low', 'flush'];
+const emit = defineEmits(['update:forestDensity', 'update:lidarDecks', 'update:safeCaps', 'update:assumeParking', 'update:decalSidewalks', 'update:curbHeight', 'update:treeKindsOff', 'update:treeSwaps', 'update:treeModelsOff']);
 const { t, te } = useI18n();
 const store = useMainStore();
 // (a feature's small hint, where it has one: asking for a missing key logs a warning)
@@ -323,7 +339,7 @@ const footer = computed(() => {
     props.lidarDecks ? t('build.measuredDecks') : null,
     props.safeCaps ? t('build.capped') : t('build.noCaps'),
     props.assumeParking ? null : t('build.noAssumedParking'),
-    props.decalSidewalks ? t('build.decalSidewalks') : null,
+    props.decalSidewalks ? t('build.decalSidewalks') : props.curbHeight !== 'standard' ? `${t('exportPanel.ui.curbHeight').toLowerCase()}: ${t(`exportPanel.ui.curbHeight_${props.curbHeight}`).toLowerCase()}` : null,
   ].filter(Boolean).join(' · ');
   return contentTab.value === 'features'
     ? t('build.footerFeatures', { on, of: all.length, tuned })

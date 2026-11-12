@@ -1,11 +1,4 @@
 {
-  "overpassStatus": {
-    "title": "OpenStreetMap está caído, pero MapNG sigue funcionando.",
-    "body": "Los datos del mapa vienen de Overture Maps, una copia de respaldo mensual de OpenStreetMap. Pueden faltar algunos detalles, como el número de carriles. Los datos en vivo vuelven cuando vuelva OpenStreetMap.",
-    "dismiss": "Minimizar",
-    "reopen": "Usando datos de mapa de respaldo. Haz clic para ver detalles",
-    "chip": "Datos de respaldo"
-  },
   "common": {
     "cancel": "Cancelar",
     "close": "Cerrar"
@@ -45,7 +38,19 @@
     "location": "Ubicación",
     "preview2d": "Vista previa 2D",
     "preview3d": "Vista previa 3D",
-    "needsData": "Genera primero"
+    "needsData": "Genera primero",
+    "sourceTiles": "Datos OSM de MapNG",
+    "sourceTilesHint": "Primero se consulta la copia de OpenStreetMap de MapNG; los servidores en vivo de OpenStreetMap son la reserva. Cámbialo en Datos del mapa.",
+    "sourceTilesUsedHint": "Leído de la copia de OpenStreetMap de MapNG, tal como estaba el {date}.",
+    "sourceLive": "Servidores OSM en vivo",
+    "sourceLiveHint": "Primero se consultan los servidores en vivo de OpenStreetMap; la copia de MapNG es la reserva. Cámbialo en Datos del mapa.",
+    "sourceLiveUsedHint": "Leído de los servidores en vivo de OpenStreetMap.",
+    "sourceLiveDown": "Servidores OSM caídos",
+    "sourceLiveDownHint": "Los servidores en vivo de OpenStreetMap no responden: se usará la copia de OpenStreetMap de MapNG.",
+    "sourceBackup": "Datos de reserva",
+    "sourceBackupHint": "No se pudieron leer los datos de OpenStreetMap, así que las carreteras y los edificios vienen de Overture Maps, una copia mensual con menos detalle. Genera de nuevo para reintentar.",
+    "sourceFile": "Tu archivo OSM",
+    "sourceFileHint": "Leído del archivo de OpenStreetMap que cargaste."
   },
   "preview2d": {
     "texture": "Textura",
@@ -575,7 +580,12 @@
       "assumeParking": "Suponer aparcamiento en la calle",
       "assumeParkingHint": "Activado: las calles urbanas sin etiquetas de aparcamiento reciben un carril de aparcamiento a cada lado (unos 2,3 m), como muchas calles reales. Desactivado: solo el aparcamiento cartografiado; esas calles salen más estrechas.",
       "decalSidewalks": "Aceras como calcomanías",
-      "decalSidewalksHint": "Activado: las aceras y los senderos son franjas planas pintadas en el suelo, sin bordillos. Mucho más ligero en el juego y más rápido de exportar, y se puede conducir sobre ellas. Desactivado: losas elevadas con bordillos."
+      "decalSidewalksHint": "Activado: las aceras y los senderos son franjas planas pintadas en el suelo, sin bordillos. Mucho más ligero en el juego y más rápido de exportar, y se puede conducir sobre ellas. Desactivado: losas elevadas con bordillos.",
+      "curbHeight": "Altura del bordillo",
+      "curbHeight_standard": "Estándar (15 cm)",
+      "curbHeight_low": "Bajo (8 cm)",
+      "curbHeight_flush": "A ras (3 cm)",
+      "curbHeightHint": "Cuánto sobresalen las aceras elevadas sobre la calzada. Estándar es un bordillo real; Bajo y A ras son más amables con los coches bajos y fáciles de subir."
     },
     "weight": {
       "title": "¿Cuánto pesa este nivel?",
@@ -1377,7 +1387,10 @@
     "treeKindsOff": "Tipos de árbol omitidos",
     "treeSwaps": "Tipos de árbol sustituidos",
     "treeModelsOff": "Modelos de árbol omitidos",
-    "decalSidewalks": "Aceras como calcomanías"
+    "decalSidewalks": "Aceras como calcomanías",
+    "curbHeight": "Altura del bordillo",
+    "curbHeight_low": "Bajo (8 cm)",
+    "curbHeight_flush": "A ras (3 cm)"
   },
   "usage": {
     "askTitle": "¿Compartir qué ajustes usas?",
@@ -1574,7 +1587,10 @@
     "treeKindsOff": "Tipos de árbol omitidos",
     "treeSwaps": "Tipos de árbol sustituidos",
     "treeModelsOff": "Modelos de árbol omitidos",
-    "decalSidewalks": "Aceras como calcomanías"
+    "decalSidewalks": "Aceras como calcomanías",
+    "curbHeight": "Altura del bordillo",
+    "curbHeight_low": "Bajo (8 cm)",
+    "curbHeight_flush": "A ras (3 cm)"
   },
   "spawnPoints": {
     "title": "Puntos de inicio y Quicktravel",

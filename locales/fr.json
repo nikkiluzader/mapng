@@ -1,11 +1,4 @@
 {
-  "overpassStatus": {
-    "title": "OpenStreetMap est en panne, mais MapNG fonctionne toujours.",
-    "body": "Les données cartographiques viennent d'Overture Maps, une copie de secours mensuelle d'OpenStreetMap. Quelques détails, comme le nombre de voies, peuvent manquer. Les données en direct reviendront avec OpenStreetMap.",
-    "dismiss": "Réduire",
-    "reopen": "Données cartographiques de secours utilisées. Cliquez pour en savoir plus",
-    "chip": "Données de secours"
-  },
   "common": {
     "cancel": "Annuler",
     "close": "Fermer"
@@ -45,7 +38,19 @@
     "location": "Lieu",
     "preview2d": "Aperçu 2D",
     "preview3d": "Aperçu 3D",
-    "needsData": "Générez d'abord"
+    "needsData": "Générez d'abord",
+    "sourceTiles": "Données OSM de MapNG",
+    "sourceTilesHint": "La copie d'OpenStreetMap de MapNG est interrogée d'abord ; les serveurs en direct d'OpenStreetMap servent de secours. À changer dans Données cartographiques.",
+    "sourceTilesUsedHint": "Lu dans la copie d'OpenStreetMap de MapNG, telle qu'elle était le {date}.",
+    "sourceLive": "Serveurs OSM en direct",
+    "sourceLiveHint": "Les serveurs en direct d'OpenStreetMap sont interrogés d'abord ; la copie de MapNG sert de secours. À changer dans Données cartographiques.",
+    "sourceLiveUsedHint": "Lu sur les serveurs en direct d'OpenStreetMap.",
+    "sourceLiveDown": "Serveurs OSM indisponibles",
+    "sourceLiveDownHint": "Les serveurs en direct d'OpenStreetMap ne répondent pas : la copie d'OpenStreetMap de MapNG sera utilisée.",
+    "sourceBackup": "Données de secours",
+    "sourceBackupHint": "Les données d'OpenStreetMap n'ont pas pu être lues : les routes et les bâtiments viennent d'Overture Maps, une copie mensuelle moins détaillée. Générez à nouveau pour réessayer.",
+    "sourceFile": "Votre fichier OSM",
+    "sourceFileHint": "Lu dans le fichier OpenStreetMap que vous avez chargé."
   },
   "preview2d": {
     "texture": "Texture",
@@ -575,7 +580,12 @@
       "assumeParking": "Supposer du stationnement sur rue",
       "assumeParkingHint": "Activé : les rues de ville sans balises de stationnement reçoivent une bande de stationnement de chaque côté (environ 2,3 m), comme beaucoup de rues réelles. Désactivé : seul le stationnement cartographié ; ces rues sont plus étroites.",
       "decalSidewalks": "Trottoirs en décalques",
-      "decalSidewalksHint": "Activé : les trottoirs et les chemins sont des bandes plates peintes au sol, sans bordures. Bien plus léger en jeu et plus rapide à exporter, et on peut rouler dessus. Désactivé : dalles surélevées avec bordures."
+      "decalSidewalksHint": "Activé : les trottoirs et les chemins sont des bandes plates peintes au sol, sans bordures. Bien plus léger en jeu et plus rapide à exporter, et on peut rouler dessus. Désactivé : dalles surélevées avec bordures.",
+      "curbHeight": "Hauteur des bordures",
+      "curbHeight_standard": "Standard (15 cm)",
+      "curbHeight_low": "Basse (8 cm)",
+      "curbHeight_flush": "À ras (3 cm)",
+      "curbHeightHint": "La hauteur des trottoirs surélevés au-dessus de la chaussée. Standard est une vraie bordure ; Basse et À ras ménagent les voitures basses et se franchissent facilement."
     },
     "weight": {
       "title": "Quel est le poids de ce niveau ?",
@@ -1377,7 +1387,10 @@
     "treeKindsOff": "Types d'arbres écartés",
     "treeSwaps": "Types d'arbres remplacés",
     "treeModelsOff": "Modèles d'arbres écartés",
-    "decalSidewalks": "Trottoirs en décalques"
+    "decalSidewalks": "Trottoirs en décalques",
+    "curbHeight": "Hauteur des bordures",
+    "curbHeight_low": "Basse (8 cm)",
+    "curbHeight_flush": "À ras (3 cm)"
   },
   "usage": {
     "askTitle": "Partager les réglages que vous utilisez ?",
@@ -1574,7 +1587,10 @@
     "treeKindsOff": "Types d'arbres écartés",
     "treeSwaps": "Types d'arbres remplacés",
     "treeModelsOff": "Modèles d'arbres écartés",
-    "decalSidewalks": "Trottoirs en décalques"
+    "decalSidewalks": "Trottoirs en décalques",
+    "curbHeight": "Hauteur des bordures",
+    "curbHeight_low": "Basse (8 cm)",
+    "curbHeight_flush": "À ras (3 cm)"
   },
   "spawnPoints": {
     "title": "Points de départ et Quicktravel",

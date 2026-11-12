@@ -4,7 +4,6 @@
 
   <!-- Main Application - Hidden on Mobile -->
   <div class="hidden md:flex h-screen w-full flex-col overflow-hidden bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
-  <OverpassStatusBanner />
   <BackupDataNotice />
   <div class="flex flex-1 min-h-0 w-full flex-row overflow-hidden">
     <AppSidebar
@@ -255,7 +254,6 @@ import HotspotsPrivacy from './components/modals/HotspotsPrivacy.vue';
 import ReportDialog from './components/modals/ReportDialog.vue';
 import { openReportDialog, logPathFrom } from './composables/useReportDialog.js';
 import ViewTabs from './components/ui/ViewTabs.vue';
-import OverpassStatusBanner from './components/ui/OverpassStatusBanner.vue';
 import BackupDataNotice from './components/ui/BackupDataNotice.vue';
 import { createGenerationProgress, GENERATION_STEP_GROUPS } from './services/generationProgress.js';
 import { terrainGenerationOptions } from './composables/useTerrainMode.js';

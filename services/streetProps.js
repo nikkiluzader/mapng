@@ -11,6 +11,7 @@
 // curb line, `side` the sidewalk's side, `width`). Deterministic: every spacing
 // phase is hashed from the way id, so re-exports put props in the same places.
 
+import { curbHeight } from './beamngSidewalks.js';
 import { buildCarriagewayIndex, isOnCrossingCarriageway, isOnOtherCarriageway } from './roadMarkingCuts.js';
 import { isLitRoad } from './streetLamps.js';
 
@@ -19,7 +20,7 @@ const BENCH_SPACING_M = 140;
 const BENCH_BACK_M = 0.45;         // from the back of the sidewalk
 const END_CLEAR_M = 4;             // kept clear of a run's ends (corners, ramps)
 const MAPPED_CLEAR_M = { hydrant: 60, bin: 45, bench: 70 };
-const CURB_H = 0.15;               // sidewalk top over the road (beamngSidewalks.js)
+// (sidewalk top over the road: beamngSidewalks.js curbHeight(), the Curb height choice)
 
 const POLE_SPACING_M = 45;         // country roads
 const TOWN_POLE_SPACING_M = 40;
@@ -226,7 +227,7 @@ export function sidewalkHeightLookup(runs) {
       for (let dy = -1; dy <= 1; dy++) {
         for (const [px, py, pz, w] of cells.get(`${cx + dx},${cy + dy}`) || []) {
           const d = Math.hypot(px - x, py - y);
-          if (d < bestD && d <= w + 0.5) { bestD = d; best = pz + CURB_H; }
+          if (d < bestD && d <= w + 0.5) { bestD = d; best = pz + curbHeight(); }
         }
       }
     }
@@ -420,7 +421,7 @@ export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, he
         const x = st.x + out[0] * offset;
         const y = st.y + out[1] * offset;
         if (taken[kind].near(x, y, MAPPED_CLEAR_M[kind])) continue;
-        list.push({ x, y, z: st.z + CURB_H, yaw: yawFn(out, x, y) });
+        list.push({ x, y, z: st.z + curbHeight(), yaw: yawFn(out, x, y) });
       }
     };
     // (benches stand on a sidewalk, not behind a bare curb)

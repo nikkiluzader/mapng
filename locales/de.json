@@ -1,11 +1,4 @@
 {
-  "overpassStatus": {
-    "title": "OpenStreetMap ist ausgefallen, aber MapNG funktioniert weiter.",
-    "body": "Die Kartendaten kommen von Overture Maps, einer monatlichen Sicherungskopie von OpenStreetMap. Einige Details wie die Anzahl der Fahrstreifen können fehlen. Live-Daten kommen zurück, sobald OpenStreetMap wieder läuft.",
-    "dismiss": "Minimieren",
-    "reopen": "Ersatz-Kartendaten aktiv. Für Details klicken",
-    "chip": "Ersatz-Kartendaten"
-  },
   "common": {
     "cancel": "Abbrechen",
     "close": "Schließen"
@@ -45,7 +38,19 @@
     "location": "Ort",
     "preview2d": "2D-Vorschau",
     "preview3d": "3D-Vorschau",
-    "needsData": "Zuerst generieren"
+    "needsData": "Zuerst generieren",
+    "sourceTiles": "MapNG-OSM-Daten",
+    "sourceTilesHint": "MapNGs eigene Kopie von OpenStreetMap wird zuerst gefragt; die Live-Server von OpenStreetMap sind die Reserve. Änderbar unter Kartendaten.",
+    "sourceTilesUsedHint": "Aus MapNGs eigener Kopie von OpenStreetMap gelesen, Stand {date}.",
+    "sourceLive": "Live-OSM-Server",
+    "sourceLiveHint": "Die Live-Server von OpenStreetMap werden zuerst gefragt; MapNGs eigene Kopie ist die Reserve. Änderbar unter Kartendaten.",
+    "sourceLiveUsedHint": "Von den Live-Servern von OpenStreetMap gelesen.",
+    "sourceLiveDown": "Live-OSM-Server nicht erreichbar",
+    "sourceLiveDownHint": "Die Live-Server von OpenStreetMap antworten nicht: MapNGs eigene Kopie von OpenStreetMap wird verwendet.",
+    "sourceBackup": "Ersatz-Kartendaten",
+    "sourceBackupHint": "OpenStreetMap-Daten konnten nicht gelesen werden, daher stammen Straßen und Gebäude von Overture Maps, einer monatlichen Kopie mit weniger Details. Erneut generieren, um es noch einmal zu versuchen.",
+    "sourceFile": "Deine OSM-Datei",
+    "sourceFileHint": "Aus der von dir geladenen OpenStreetMap-Datei gelesen."
   },
   "preview2d": {
     "texture": "Textur",
@@ -575,7 +580,12 @@
       "assumeParking": "Straßenparken annehmen",
       "assumeParkingHint": "Ein: Ortsstraßen ohne Park-Tags erhalten je Seite einen Parkstreifen (ca. 2,3 m), wie viele echte Straßen. Aus: nur kartiertes Parken, diese Straßen werden schmaler.",
       "decalSidewalks": "Gehwege als Decals",
-      "decalSidewalksHint": "An: Gehwege und Fußwege sind flache Streifen auf dem Boden, ohne Bordsteine. Deutlich leichter im Spiel und schneller im Export, und man kann darüber fahren. Aus: erhöhte Platten mit Bordsteinen."
+      "decalSidewalksHint": "An: Gehwege und Fußwege sind flache Streifen auf dem Boden, ohne Bordsteine. Deutlich leichter im Spiel und schneller im Export, und man kann darüber fahren. Aus: erhöhte Platten mit Bordsteinen.",
+      "curbHeight": "Bordsteinhöhe",
+      "curbHeight_standard": "Standard (15 cm)",
+      "curbHeight_low": "Niedrig (8 cm)",
+      "curbHeight_flush": "Bündig (3 cm)",
+      "curbHeightHint": "Wie weit die erhöhten Gehwege über der Straße stehen. Standard ist ein echter Bordstein; Niedrig und Bündig schonen tiefe Autos und lassen sich leicht befahren."
     },
     "weight": {
       "title": "Wie schwer ist dieses Level?",
@@ -1377,7 +1387,10 @@
     "treeKindsOff": "Weggelassene Baumarten",
     "treeSwaps": "Ersetzte Baumarten",
     "treeModelsOff": "Weggelassene Baummodelle",
-    "decalSidewalks": "Gehwege als Decals"
+    "decalSidewalks": "Gehwege als Decals",
+    "curbHeight": "Bordsteinhöhe",
+    "curbHeight_low": "Niedrig (8 cm)",
+    "curbHeight_flush": "Bündig (3 cm)"
   },
   "usage": {
     "askTitle": "Teilen, welche Einstellungen du nutzt?",
@@ -1574,7 +1587,10 @@
     "treeKindsOff": "Weggelassene Baumarten",
     "treeSwaps": "Ersetzte Baumarten",
     "treeModelsOff": "Weggelassene Baummodelle",
-    "decalSidewalks": "Gehwege als Decals"
+    "decalSidewalks": "Gehwege als Decals",
+    "curbHeight": "Bordsteinhöhe",
+    "curbHeight_low": "Niedrig (8 cm)",
+    "curbHeight_flush": "Bündig (3 cm)"
   },
   "spawnPoints": {
     "title": "Start- & Quicktravel-Punkte",

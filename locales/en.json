@@ -1,11 +1,4 @@
 {
-  "overpassStatus": {
-    "title": "OpenStreetMap is down, but MapNG still works.",
-    "body": "Map data is coming from Overture Maps, a monthly backup copy of OpenStreetMap. A few details, like lane counts, may be missing. Live data comes back when OpenStreetMap does.",
-    "dismiss": "Minimize",
-    "reopen": "Using backup map data. Click for details",
-    "chip": "Backup map data"
-  },
   "backupData": {
     "title": "This map was built from backup data.",
     "body": "OpenStreetMap's servers did not answer, so the roads and buildings came from Overture Maps. It has no lane counts (wide roads can come out as two lanes) and marks bridges only roughly (some come out short or missing). Generate again later for the full detail.",
@@ -50,7 +43,19 @@
     "location": "Location",
     "preview2d": "2D preview",
     "preview3d": "3D preview",
-    "needsData": "Generate first"
+    "needsData": "Generate first",
+    "sourceTiles": "MapNG OSM data",
+    "sourceTilesHint": "MapNG's own copy of OpenStreetMap is asked first; the live OpenStreetMap servers are the fallback. Change it under Map data.",
+    "sourceTilesUsedHint": "Read from MapNG's own copy of OpenStreetMap, as it was on {date}.",
+    "sourceLive": "Live OSM servers",
+    "sourceLiveHint": "The live OpenStreetMap servers are asked first; MapNG's own copy is the fallback. Change it under Map data.",
+    "sourceLiveUsedHint": "Read from the live OpenStreetMap servers.",
+    "sourceLiveDown": "Live OSM servers down",
+    "sourceLiveDownHint": "The live OpenStreetMap servers are not answering: MapNG's own copy of OpenStreetMap will be used.",
+    "sourceBackup": "Backup map data",
+    "sourceBackupHint": "OpenStreetMap's data could not be read, so the roads and buildings came from Overture Maps, a monthly copy with less detail. Generate again to retry.",
+    "sourceFile": "Your OSM file",
+    "sourceFileHint": "Read from the OpenStreetMap file you loaded."
   },
   "preview2d": {
     "texture": "Texture",
@@ -580,7 +585,12 @@
       "assumeParking": "Assume street parking",
       "assumeParkingHint": "On: town streets with no parking tags get a parking lane each side (about 2.3 m), as many real streets have. Off: only mapped parking, so those streets come out narrower.",
       "decalSidewalks": "Sidewalks as decals",
-      "decalSidewalksHint": "On: sidewalks and footpaths are flat strips painted on the ground, with no curbs. Much lighter in the game and quicker to export, and you can drive over them. Off: raised slabs with curbs."
+      "decalSidewalksHint": "On: sidewalks and footpaths are flat strips painted on the ground, with no curbs. Much lighter in the game and quicker to export, and you can drive over them. Off: raised slabs with curbs.",
+      "curbHeight": "Curb height",
+      "curbHeight_standard": "Standard (15 cm)",
+      "curbHeight_low": "Low (8 cm)",
+      "curbHeight_flush": "Flush (3 cm)",
+      "curbHeightHint": "How far the raised sidewalks stand over the road. Standard is a real curb; Low and Flush are kinder to low cars and easy to drive onto."
     },
     "weight": {
       "title": "How heavy is this level?",
@@ -1382,7 +1392,10 @@
     "treeKindsOff": "Tree kinds left out",
     "treeSwaps": "Tree kinds swapped",
     "treeModelsOff": "Tree models left out",
-    "decalSidewalks": "Sidewalks as decals"
+    "decalSidewalks": "Sidewalks as decals",
+    "curbHeight": "Curb height",
+    "curbHeight_low": "Low (8 cm)",
+    "curbHeight_flush": "Flush (3 cm)"
   },
   "usage": {
     "askTitle": "Share which settings you use?",
@@ -1579,7 +1592,10 @@
     "treeKindsOff": "Tree kinds left out",
     "treeSwaps": "Tree kinds swapped",
     "treeModelsOff": "Tree models left out",
-    "decalSidewalks": "Sidewalks as decals"
+    "decalSidewalks": "Sidewalks as decals",
+    "curbHeight": "Curb height",
+    "curbHeight_low": "Low (8 cm)",
+    "curbHeight_flush": "Flush (3 cm)"
   },
   "spawnPoints": {
     "title": "Spawn & quicktravel points",

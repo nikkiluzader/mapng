@@ -1,7 +1,7 @@
 <template>
   <!-- The map just generated was built from Overture, the backup (services/osm.js: no MapNG tiles
        for the area, no Overpass server answering). Said once per Generate, where it matters: on
-       the result, not as a standing alarm (OverpassStatusBanner stays a chip). An overlay over the
+       the result, not as a standing alarm (the view bar names the source: ViewTabs.vue). An overlay over the
        foot of the map (clear of the previews' panels top left, the view tabs top right and the
        memory readout under it), not part of the layout. -->
   <div

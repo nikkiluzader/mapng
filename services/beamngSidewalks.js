@@ -28,7 +28,7 @@ import { isOneWayRoad } from './roadWidth.js';
 import { PLAZA_MATERIAL, plazaTileM, pavedWalkSurface } from './plazas.js';
 import { smoothLine } from './lineSmoothing.js';
 
-const CURB_H = 0.15;          // m above the road
+let CURB_H = 0.15;            // m above the road (setCurbHeight: the Curb height choice)
 const SINK = 0.10;            // m the faces reach below the road
 const BATTER = 0.02;          // m the face leans back over its height
 const NOSE = 0.025;           // bevelled nose: down from the top ...
@@ -83,7 +83,19 @@ const DEFAULT_WIDTH_M = 2.0;
 const MAX_WIDTH_M = 6.0;
 const CUT_MARGIN_M = 0.5;     // runs stop this far outside other carriageways
 const MIN_RUN_M = 8;
-const WALK_H = 0.1;           // a walkway away from the curb, over the ground
+let WALK_H = 0.1;             // a walkway away from the curb, over the ground (two thirds of the curb's height)
+
+// The Curb height choice (Fine-tuning): a sidewalk's top over its road. 15 cm is a real
+// curb; lower ones are kinder to low cars and to driving up onto the sidewalk.
+export const CURB_HEIGHTS_M = { standard: 0.15, low: 0.08, flush: 0.03 };
+/** Set the height sidewalks are built at for the export that follows; returns it in metres. */
+export function setCurbHeight(choice = 'standard') {
+  CURB_H = CURB_HEIGHTS_M[choice] ?? CURB_HEIGHTS_M.standard;
+  WALK_H = Math.round((CURB_H * 2 / 3) * 1000) / 1000;
+  return CURB_H;
+}
+/** The sidewalk top's height over its road, as set (for what stands on sidewalks). */
+export const curbHeight = () => CURB_H;
 const WALK_RAMP_UP_M = 0.35;  // a walkway's end climbs to a road no more than this
 const WALK_MIN_M = 3;
 const WALK_LANDING_M = 0.8;

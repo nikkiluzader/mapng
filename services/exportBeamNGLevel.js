@@ -84,7 +84,8 @@ import { generateRoadLamps } from './streetLamps.js';
 import { buildIngameProbes } from './ingameProbes.js';
 import { smoothLine } from './lineSmoothing.js';
 import { buildPlazaMeshes, courtyardPathHalf, courtyardPaved, getPlazaMaterialDefs, isCourtyard, isPlaza, plazaSurface } from './plazas.js';
-import { buildSidewalkMeshesParallel, cornerPatches, inferCrossingSidewalks, buildWallDeckMesh, gutterLines, isCurbedClass, lowerUnderWallDecks, checkSidewalkGround, CURB_ONLY_M, ZEBRA_CROSSING_MATERIAL, gradeSidewalkGround, getSidewalkMaterialDefs, SIDEWALK_MATERIALS, sidewalkFootways, streetSides, DEFAULT_SIDEWALK_LOOK } from './beamngSidewalks.js';
+import { buildSidewalkMeshesParallel, cornerPatches, inferCrossingSidewalks, buildWallDeckMesh, gutterLines, isCurbedClass, lowerUnderWallDecks, checkSidewalkGround, CURB_ONLY_M, ZEBRA_CROSSING_MATERIAL, gradeSidewalkGround, getSidewalkMaterialDefs, SIDEWALK_MATERIALS, sidewalkFootways, streetSides, DEFAULT_SIDEWALK_LOOK, setCurbHeight, CURB_HEIGHTS_M,
+} from './beamngSidewalks.js';
 import { buildRoadNameZones } from './roadNameZones.js';
 import { placeStreetProps, POLE_LAMP_REACH_M, POLE_TYPES, hash01 as propHash, roadsidePolesRegion } from './streetProps.js';
 import {
@@ -8097,7 +8098,7 @@ function buildBeamNGExportReport({
     `- Include rocks: ${formatBool(options?.includeRocks)}`,
     `- Street parking assumed where none is mapped: ${formatBool(options?.assumeParking !== false)}`,
     `- View distance: ${viewDistanceChoice(options?.viewDistance) === 'auto' ? 'auto (the map\'s width, 4 km at least, 16 km at most)' : `${viewDistanceChoice(options?.viewDistance)} m`} (LevelInfo visibleDistance)`,
-    `- Include sidewalks: ${formatBool(options?.includeSidewalks !== false)}${options?.includeSidewalks !== false ? ` (${options?.sidewalkStyle === 'decal' ? 'as decals: flat strips on the ground, no curbs' : 'as meshes: raised slabs with curbs'})` : ''}`,
+    `- Include sidewalks: ${formatBool(options?.includeSidewalks !== false)}${options?.includeSidewalks !== false ? ` (${options?.sidewalkStyle === 'decal' ? 'as decals: flat strips on the ground, no curbs' : `as meshes: raised slabs with curbs, ${Math.round((CURB_HEIGHTS_M[options?.curbHeight] ?? CURB_HEIGHTS_M.standard) * 100)} cm high`})` : ''}`,
     ...(() => {
       // What to build (services/buildContent.js): the features switched off and the OSM left out for them
       const cf = options?.contentFilter;
@@ -12128,6 +12129,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     // 'mesh': raised slabs with curbs (the default). 'decal': flat strips on the ground, and every
     // footpath a decal (buildPedestrianStreetDecals): far lighter to build and to render.
     sidewalkStyle = 'mesh',
+    // the raised sidewalks' height over the road: 'standard' (15 cm), 'low' (8 cm), 'flush' (3 cm)
+    curbHeight: curbHeightChoice = 'standard',
     // the local tree mix (treeSpecies.js) when already known; undefined: fetched
     treeSpeciesMix: requestedTreeMix = undefined,
     // the slabs' concrete: a key of SIDEWALK_LOOKS (beamngSidewalks.js)
@@ -12163,6 +12166,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // (raised sidewalks are built only in the mesh style; the decal style draws strips instead)
   const includeSidewalks = sidewalksWanted && sidewalkStyle !== 'decal';
   const sidewalkStrips = sidewalksWanted && sidewalkStyle === 'decal';
+  // (set for this export: the sidewalk builder and what stands on sidewalks read it)
+  const curbHeightM = setCurbHeight(curbHeightChoice);
   // Terrain shaping at export (advanced mode): a master switch and one per
   // kind of road. Off, the export leaves those heights exactly as generated.
   const shapingOptions = {
@@ -14533,6 +14538,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     ingameProbes = buildIngameProbes({
       carriageways: roadLinesFromDecals(decalRoads),
       sidewalkRuns: sidewalks.runs,
+      curbHeight: curbHeightM,
       underStructure: underDeck,
       inTunnel: (x, y, z, zTop) => tunnelList.length > 0 && hitsTunnel(tunnelList, x, y, z, zTop),
       spawn: spawnPosition,

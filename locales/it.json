@@ -1,11 +1,4 @@
 {
-  "overpassStatus": {
-    "title": "OpenStreetMap non è disponibile, ma MapNG continua a funzionare.",
-    "body": "I dati cartografici provengono da Overture Maps, che crea una copia di backup mensile di OpenStreetMap. Alcuni dettagli, come le carreggiate, potrebbero non essere presenti. I dati in tempo reale sono disponibili quando OpenStreetMap è online.",
-    "dismiss": "Riduci",
-    "reopen": "Dati cartografici di backup in uso. Clicca per i dettagli.",
-    "chip": "Dati cartografici di backup"
-  },
   "common": {
     "cancel": "Annulla",
     "close": "Chiudi"
@@ -45,7 +38,19 @@
     "location": "Posizione",
     "preview2d": "Anteprima 2D",
     "preview3d": "Anteprima 3D",
-    "needsData": "Prima genera"
+    "needsData": "Prima genera",
+    "sourceTiles": "Dati OSM di MapNG",
+    "sourceTilesHint": "Prima viene interrogata la copia di OpenStreetMap di MapNG; i server live di OpenStreetMap sono la riserva. Si cambia in Dati della mappa.",
+    "sourceTilesUsedHint": "Letto dalla copia di OpenStreetMap di MapNG, com'era il {date}.",
+    "sourceLive": "Server OSM live",
+    "sourceLiveHint": "Prima vengono interrogati i server live di OpenStreetMap; la copia di MapNG è la riserva. Si cambia in Dati della mappa.",
+    "sourceLiveUsedHint": "Letto dai server live di OpenStreetMap.",
+    "sourceLiveDown": "Server OSM non raggiungibili",
+    "sourceLiveDownHint": "I server live di OpenStreetMap non rispondono: verrà usata la copia di OpenStreetMap di MapNG.",
+    "sourceBackup": "Dati di riserva",
+    "sourceBackupHint": "Non è stato possibile leggere i dati di OpenStreetMap: strade ed edifici vengono da Overture Maps, una copia mensile meno dettagliata. Genera di nuovo per riprovare.",
+    "sourceFile": "Il tuo file OSM",
+    "sourceFileHint": "Letto dal file OpenStreetMap che hai caricato."
   },
   "preview2d": {
     "texture": "Texture",
@@ -575,7 +580,12 @@
       "assumeParking": "Presumi parcheggio su strada",
       "assumeParkingHint": "Attivo: le strade urbane senza tag di parcheggio ricevono una corsia di sosta per lato (circa 2,3 m), come molte strade reali. Disattivo: solo la sosta mappata; quelle strade risultano più strette.",
       "decalSidewalks": "Marciapiedi come decal",
-      "decalSidewalksHint": "Attivo: marciapiedi e sentieri sono strisce piatte dipinte sul terreno, senza cordoli. Molto più leggero nel gioco e più veloce da esportare, e ci si può guidare sopra. Disattivo: lastre rialzate con cordoli."
+      "decalSidewalksHint": "Attivo: marciapiedi e sentieri sono strisce piatte dipinte sul terreno, senza cordoli. Molto più leggero nel gioco e più veloce da esportare, e ci si può guidare sopra. Disattivo: lastre rialzate con cordoli.",
+      "curbHeight": "Altezza del cordolo",
+      "curbHeight_standard": "Standard (15 cm)",
+      "curbHeight_low": "Basso (8 cm)",
+      "curbHeight_flush": "A raso (3 cm)",
+      "curbHeightHint": "Di quanto i marciapiedi rialzati sporgono sulla strada. Standard è un vero cordolo; Basso e A raso sono più gentili con le auto basse e facili da salire."
     },
     "weight": {
       "title": "Quanto è pesante questo livello?",
@@ -1377,7 +1387,10 @@
     "treeKindsOff": "Tipi di albero esclusi",
     "treeSwaps": "Tipi di albero sostituiti",
     "treeModelsOff": "Modelli di albero esclusi",
-    "decalSidewalks": "Marciapiedi come decal"
+    "decalSidewalks": "Marciapiedi come decal",
+    "curbHeight": "Altezza del cordolo",
+    "curbHeight_low": "Basso (8 cm)",
+    "curbHeight_flush": "A raso (3 cm)"
   },
   "usage": {
     "askTitle": "Condividere quali impostazioni usi?",
@@ -1574,7 +1587,10 @@
     "treeKindsOff": "Tipi di albero esclusi",
     "treeSwaps": "Tipi di albero sostituiti",
     "treeModelsOff": "Modelli di albero esclusi",
-    "decalSidewalks": "Marciapiedi come decal"
+    "decalSidewalks": "Marciapiedi come decal",
+    "curbHeight": "Altezza del cordolo",
+    "curbHeight_low": "Basso (8 cm)",
+    "curbHeight_flush": "A raso (3 cm)"
   },
   "spawnPoints": {
     "title": "Punti di partenza e Quicktravel",

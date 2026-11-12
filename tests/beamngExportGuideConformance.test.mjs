@@ -980,6 +980,22 @@ test('sidewalks: tagged street gets a curb mesh with collision, materials and a 
     assert.ok(strips.every((o) => o.nodes.length >= 2 && o.nodes.every((n) => n[3] > 0.5 && n[3] < 4)), 'each a sidewalk\'s width');
     assert.equal((await stripsIn(zip)).length, 0, 'none in the mesh style');
     assert.match(await readText(decal, 'export_report.txt'), /Sidewalks drawn as decals[^\n]*strip\(s\)/);
+    // the Curb height choice: the same slabs, 7 cm lower at 'low' (8 cm against 15)
+    const topOf = async (z) => {
+      let top = -Infinity;
+      for (const f of Object.keys(z.files).filter((n) => /\/sidewalks\/sidewalks_[\w]+\.dae$/.test(n))) {
+        const m = /<float_array id="[^"]*position[^"]*-array" count="\d+">([^<]+)</.exec(await z.files[f].async('string'));
+        const v = m[1].trim().split(/\s+/).map(Number);
+        for (let i = 2; i < v.length; i += 3) top = Math.max(top, v[i]);
+      }
+      return top;
+    };
+    const low = await run({ curbHeight: 'low' });
+    const drop = (await topOf(zip)) - (await topOf(low));
+    assert.ok(Math.abs(drop - 0.07) < 0.01, `low curbs stand 7 cm lower (got ${drop.toFixed(3)} m)`);
+    assert.match(await readText(low, 'export_report.txt'), /raised slabs with curbs, 8 cm high/);
+    // (and the standard height is back for the next export)
+    assert.ok(Math.abs((await topOf(await run())) - (await topOf(zip))) < 1e-6);
     // switched off altogether: neither
     assert.equal((await stripsIn(await run({ includeSidewalks: false, sidewalkStyle: 'decal' }))).length, 0);
   } finally {

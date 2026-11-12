@@ -1,11 +1,4 @@
 {
-  "overpassStatus": {
-    "title": "Serwery OpenStreetMap nie odpowiadają, ale MapNG nadal działa.",
-    "body": "Dane mapy pochodzą z Overture Maps, comiesięcznej kopii zapasowej OpenStreetMap. Może brakować niektórych szczegółów, np. liczby pasów. Dane na żywo wrócą, gdy OpenStreetMap znów zacznie działać.",
-    "dismiss": "Zminimalizuj",
-    "reopen": "Używane są zapasowe dane mapy. Kliknij, aby zobaczyć szczegóły",
-    "chip": "Zapasowe dane mapy"
-  },
   "common": {
     "cancel": "Anuluj",
     "close": "Zamknij"
@@ -45,7 +38,19 @@
     "location": "Lokalizacja",
     "preview2d": "Podgląd 2D",
     "preview3d": "Podgląd 3D",
-    "needsData": "Najpierw wygeneruj"
+    "needsData": "Najpierw wygeneruj",
+    "sourceTiles": "Dane OSM MapNG",
+    "sourceTilesHint": "Najpierw pytana jest własna kopia OpenStreetMap w MapNG; serwery OpenStreetMap na żywo są rezerwą. Zmienisz to w Danych mapy.",
+    "sourceTilesUsedHint": "Odczytano z własnej kopii OpenStreetMap w MapNG, stan z {date}.",
+    "sourceLive": "Serwery OSM na żywo",
+    "sourceLiveHint": "Najpierw pytane są serwery OpenStreetMap na żywo; kopia MapNG jest rezerwą. Zmienisz to w Danych mapy.",
+    "sourceLiveUsedHint": "Odczytano z serwerów OpenStreetMap na żywo.",
+    "sourceLiveDown": "Serwery OSM nie odpowiadają",
+    "sourceLiveDownHint": "Serwery OpenStreetMap na żywo nie odpowiadają: zostanie użyta własna kopia OpenStreetMap w MapNG.",
+    "sourceBackup": "Dane zapasowe",
+    "sourceBackupHint": "Nie udało się odczytać danych OpenStreetMap, więc drogi i budynki pochodzą z Overture Maps, comiesięcznej kopii o mniejszej szczegółowości. Wygeneruj ponownie, aby spróbować jeszcze raz.",
+    "sourceFile": "Twój plik OSM",
+    "sourceFileHint": "Odczytano z wczytanego przez ciebie pliku OpenStreetMap."
   },
   "preview2d": {
     "texture": "Tekstura",
@@ -575,7 +580,12 @@
       "assumeParking": "Zakładaj parkowanie przy ulicy",
       "assumeParkingHint": "Włączone: ulice miejskie bez tagów parkowania dostają pas postojowy z każdej strony (ok. 2,3 m), jak wiele prawdziwych ulic. Wyłączone: tylko zmapowane parkowanie; te ulice wychodzą węższe.",
       "decalSidewalks": "Chodniki jako decale",
-      "decalSidewalksHint": "Włączone: chodniki i ścieżki to płaskie pasy namalowane na ziemi, bez krawężników. Znacznie lżejsze w grze i szybsze w eksporcie, można po nich jeździć. Wyłączone: podniesione płyty z krawężnikami."
+      "decalSidewalksHint": "Włączone: chodniki i ścieżki to płaskie pasy namalowane na ziemi, bez krawężników. Znacznie lżejsze w grze i szybsze w eksporcie, można po nich jeździć. Wyłączone: podniesione płyty z krawężnikami.",
+      "curbHeight": "Wysokość krawężnika",
+      "curbHeight_standard": "Standardowa (15 cm)",
+      "curbHeight_low": "Niska (8 cm)",
+      "curbHeight_flush": "Na równo (3 cm)",
+      "curbHeightHint": "Jak wysoko podniesione chodniki wystają nad jezdnię. Standardowa to prawdziwy krawężnik; Niska i Na równo są łagodniejsze dla niskich aut i łatwe do wjechania."
     },
     "weight": {
       "title": "Jak ciężki jest ten poziom?",
@@ -1377,7 +1387,10 @@
     "treeKindsOff": "Pominięte rodzaje drzew",
     "treeSwaps": "Zastąpione rodzaje drzew",
     "treeModelsOff": "Pominięte modele drzew",
-    "decalSidewalks": "Chodniki jako decale"
+    "decalSidewalks": "Chodniki jako decale",
+    "curbHeight": "Wysokość krawężnika",
+    "curbHeight_low": "Niska (8 cm)",
+    "curbHeight_flush": "Na równo (3 cm)"
   },
   "usage": {
     "askTitle": "Udostępniać, jakich ustawień używasz?",
@@ -1574,7 +1587,10 @@
     "treeKindsOff": "Pominięte rodzaje drzew",
     "treeSwaps": "Zastąpione rodzaje drzew",
     "treeModelsOff": "Pominięte modele drzew",
-    "decalSidewalks": "Chodniki jako decale"
+    "decalSidewalks": "Chodniki jako decale",
+    "curbHeight": "Wysokość krawężnika",
+    "curbHeight_low": "Niska (8 cm)",
+    "curbHeight_flush": "Na równo (3 cm)"
   },
   "spawnPoints": {
     "title": "Punkty startu i Quicktravel",

@@ -37,6 +37,7 @@ export function exportSettingsFor(options = {}) {
     mapng_beamNGSafeCaps: on(options.safeCaps),
     mapng_beamNGAssumeParking: on(options.assumeParking),
     mapng_beamNGDecalSidewalks: String(options.sidewalkStyle === 'decal'),
+    mapng_beamNGCurbHeight: ['standard', 'low', 'flush'].includes(options.curbHeight) ? options.curbHeight : 'standard',
     mapng_beamNGIncludeBridges: on(options.includeBridges),
     mapng_beamNGIncludeTunnels: on(options.includeTunnels),
     mapng_beamNGLidarDecks: on(options.lidarDecks),

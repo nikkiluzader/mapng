@@ -1,5 +1,6 @@
 import { ref, watch } from 'vue';
 import { OVERPASS_STATUS_EVENT, probePublicOverpassMirrors, publicOverpassMirrorsDown } from '../services/osm.js';
+import { useOsmSource } from './useOsmSource.js';
 
 // Shared outage state for the banner and its chip.
 //
@@ -18,8 +19,10 @@ export const useOverpassStatus = () => {
     started = true;
     refresh();
     window.addEventListener(OVERPASS_STATUS_EVENT, refresh);
-    // Pre-flight check on each visit (throttled inside the probe).
-    probePublicOverpassMirrors().catch(() => {});
+    // Pre-flight check on each visit (throttled inside the probe), only for those who ask the live
+    // servers first: with MapNG's own copy first nothing is asked of them until it is needed.
+    if (!useOsmSource().tilesFirst.value) probePublicOverpassMirrors().catch(() => {});
+    watch(useOsmSource().tilesFirst, (first) => { if (!first) probePublicOverpassMirrors().catch(() => {}); });
     // Cool-downs expire on their own, so re-check now and then.
     setInterval(refresh, 60000);
     // Recovery folds an opened notice back: the next outage starts minimized.
