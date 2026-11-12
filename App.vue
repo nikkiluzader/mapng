@@ -92,6 +92,20 @@
       <!-- Memory widget: centred on the map area (not the window, where it covered
            the elevation minimap's legend), above the map, below dialogs -->
       <div class="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
+        <!-- the site was deployed while this page stayed open: its older parts stop working (services/appUpdate.js) -->
+        <div
+          v-if="appUpdated && !updateNoticeHidden" data-testid="app-updated" role="alert"
+          class="fixed left-1/2 top-3 z-[100000] flex w-[min(92vw,34rem)] -translate-x-1/2 items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-lg dark:border-amber-600 dark:bg-amber-950 dark:text-amber-50"
+        >
+          <div class="min-w-0 flex-1">
+            <p class="font-semibold">{{ t('app.updated.title') }}</p>
+            <p class="mt-0.5 leading-snug">{{ t('app.updated.body') }}</p>
+          </div>
+          <div class="flex shrink-0 flex-col gap-1.5">
+            <button type="button" class="rounded bg-brand px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90" @click="reloadForUpdate">{{ t('app.updated.reload') }}</button>
+            <button type="button" class="rounded px-3 py-1 text-xs underline" @click="updateNoticeHidden = true">{{ t('app.updated.later') }}</button>
+          </div>
+        </div>
         <MemoryWidget />
       </div>
       <ViewTabs
@@ -223,6 +237,7 @@ import { useMainStore } from './stores/mainStore';
 import { Loader2, AlertTriangle } from 'lucide-vue-next';
 import MobileRestrictionOverlay from './components/modals/MobileRestrictionOverlay.vue';
 import MemoryWidget from './components/ui/MemoryWidget.vue';
+import { appUpdated } from './services/appUpdate.js';
 import AboutModal from './components/modals/AboutModal.vue';
 import DisclaimerModal from './components/modals/DisclaimerModal.vue';
 import TechStackModal from './components/modals/TechStackModal.vue';
@@ -274,6 +289,9 @@ if (import.meta.env.DEV) {
 
 const store = useMainStore();
 const { t } = useI18n({ useScope: 'global' });
+// (the "MapNG was updated" notice: services/appUpdate.js)
+const updateNoticeHidden = ref(false);
+const reloadForUpdate = () => { window.location.reload(); };
 const {
   center,
   zoom,

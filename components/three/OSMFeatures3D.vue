@@ -1,4 +1,5 @@
 <script setup>
+import { codeFailed } from '../../services/appUpdate.js';
 import { shallowRef, watch, toRaw, onUnmounted } from 'vue';
 import { createOSMGroup } from '../../services/export3d';
 import { sceneFromDescription } from '../../services/daeWorker.js';
@@ -89,6 +90,7 @@ const getWorker = () => {
   if (worker || workerBroken || typeof Worker === 'undefined') return worker;
   try {
     worker = new Worker(new URL('../../services/previewOsmWorker.js', import.meta.url), { type: 'module' });
+    worker.addEventListener('error', () => { codeFailed(); });   // (its file may be gone: the site was updated under this page)
   } catch {
     workerBroken = true;
     worker = null;

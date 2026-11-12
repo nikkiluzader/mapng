@@ -1113,6 +1113,12 @@
       "fetchTerrain": "Failed to fetch terrain data. The requested area might be too large or service is down.",
       "usgsFallback": "USGS 1m data for this area was missing or corrupt. Falling back to the global 30 m dataset.\n\nOutput remains on the app's current processing grid.",
       "kron86Fallback": "NMT EVRF2007 data is only available for supported Poland tiles. Falling back to the global 30 m dataset."
+    },
+    "updated": {
+      "title": "MapNG was updated",
+      "body": "This page is from the earlier version, and parts of it will stop working (Generate, uploads, the 3D preview). Reload to get the new one. A terrain you have generated but not exported will need generating again.",
+      "reload": "Reload now",
+      "later": "Later"
     }
   },
   "support": {

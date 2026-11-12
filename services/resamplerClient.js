@@ -2,6 +2,7 @@
  * Manages a resampler Web Worker and provides a Promise-based API.
  * Falls back to main-thread resampling if workers are unavailable.
  */
+import { codeFailed } from './appUpdate.js';
 import proj4 from 'proj4';
 import { geoTiffCellIsPoint } from './rasterCells.js';
 import { resampleToMeterGrid, resampleImageToMeterGrid } from './terrainResampler.js';
@@ -34,6 +35,8 @@ const getWorker = () => {
             else pending.resolve(data);
         };
         worker.onerror = (e) => {
+            // (its file may be gone: the site was updated under this page)
+            codeFailed();
             console.error('[ResamplerClient] Uncaught error:', e);
             // Reject all pending, force recreation on next call
             for (const [, p] of pendingMessages) p.reject(new Error('Worker error'));

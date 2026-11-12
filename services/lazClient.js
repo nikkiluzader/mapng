@@ -1,6 +1,7 @@
 /**
  * Manages the lazWorker and provides a Promise-based API for point cloud rasterization.
  */
+import { codeFailed } from './appUpdate.js';
 import proj4 from 'proj4';
 import { getBuiltInProj4 } from './uploadGeoMetadata.js';
 
@@ -66,6 +67,7 @@ const getWorker = () => {
       else p.resolve(data);
     };
     worker.onerror = (e) => {
+      codeFailed();   // (its file may be gone: the site was updated under this page)
       console.error('[LazClient] Worker error:', e);
       const detail = e.message || (e.filename ? `${e.filename}:${e.lineno}` : 'unknown');
       for (const p of pending.values()) p.reject(new Error('LAZ worker error: ' + detail));

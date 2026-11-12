@@ -11,10 +11,13 @@ import '@fontsource-variable/overpass-mono';
 import 'leaflet/dist/leaflet.css';
 import './style.css';
 import { installDataCache } from './services/dataCache.js';
+import { watchForUpdates } from './services/appUpdate.js';
 
 // map data downloads kept in the browser (services/dataCache.js): a second
 // Generate, Preview or Export of an area reads them instead of the network
 installDataCache();
+// a page left open across a deploy is told so, before its missing parts fail (services/appUpdate.js)
+watchForUpdates();
 
 const originalConsoleWarn = console.warn.bind(console);
 console.warn = (...args) => {

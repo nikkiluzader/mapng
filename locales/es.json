@@ -1108,6 +1108,12 @@
       "fetchTerrain": "No se pudieron obtener los datos del terreno. El área solicitada puede ser demasiado grande o el servicio no está disponible.",
       "usgsFallback": "Los datos USGS 1m de esta zona faltan o están corruptos. Se usará el conjunto global de 30 m.\n\nLa salida se mantiene en la cuadrícula de procesamiento actual de la app.",
       "kron86Fallback": "Los datos NMT EVRF2007 solo están disponibles para teselas compatibles de Polonia. Se usará el conjunto global de 30 m."
+    },
+    "updated": {
+      "title": "MapNG se ha actualizado",
+      "body": "Esta página es de la versión anterior y algunas partes dejarán de funcionar (Generar, subidas, la vista 3D). Recarga para obtener la nueva. Un terreno generado y aún no exportado tendrá que generarse de nuevo.",
+      "reload": "Recargar ahora",
+      "later": "Más tarde"
     }
   },
   "support": {

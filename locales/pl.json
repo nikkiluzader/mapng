@@ -1108,6 +1108,12 @@
       "fetchTerrain": "Nie udało się pobrać danych terenu. Żądany obszar może być zbyt duży lub usługa jest niedostępna.",
       "usgsFallback": "Dla tego obszaru brakowało danych USGS 1m lub były uszkodzone. Używany jest globalny zestaw danych 30 m.\n\nWyjście pozostaje na obecnej siatce przetwarzania aplikacji.",
       "kron86Fallback": "Dane NMT EVRF2007 są dostępne tylko dla obsługiwanych kafli w Polsce. Powrót do globalnego zestawu danych 30 m."
+    },
+    "updated": {
+      "title": "MapNG został zaktualizowany",
+      "body": "Ta strona pochodzi z wcześniejszej wersji i jej części przestaną działać (Generuj, przesyłanie, podgląd 3D). Odśwież, aby pobrać nową. Wygenerowany, ale niewyeksportowany teren trzeba będzie wygenerować ponownie.",
+      "reload": "Odśwież teraz",
+      "later": "Później"
     }
   },
   "support": {
