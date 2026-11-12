@@ -58,3 +58,20 @@ test('the switch is saved, shared and shown only when off, and not counted', asy
   assert.ok(describeSessionConfig({ advancedMode: true, export: { assumeParking: false } }).some((r) => r.label === 'config.assumeParking'));
   assert.ok(!describeSessionConfig({ advancedMode: true, export: { assumeParking: true } }).some((r) => r.label === 'config.assumeParking'));
 });
+
+test('sidewalks as decals: saved with the level, shared and shown only when on, and not counted', async () => {
+  globalThis.localStorage ??= { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+  const { exportSettingsFor } = await import('../services/exportSettings.js');
+  const { EXPORT_FIELDS, describeSessionConfig, isCountedField } = await import('../services/sessionConfig.js');
+  const { summarizeExportSettings } = await import('../services/exportSettingsSummary.js');
+  assert.equal(exportSettingsFor({ sidewalkStyle: 'decal' }).mapng_beamNGDecalSidewalks, 'true');
+  assert.equal(exportSettingsFor({}).mapng_beamNGDecalSidewalks, 'false');
+  const field = EXPORT_FIELDS.find((f) => f[1] === 'mapng_beamNGDecalSidewalks');
+  assert.ok(field && field[3] === false);
+  assert.equal(isCountedField(field), false);
+  const keys = (o) => summarizeExportSettings(o).flatMap((g) => g.rows).map((r) => r.key);
+  assert.ok(keys({ sidewalkStyle: 'decal' }).includes('decalSidewalks'));
+  assert.ok(!keys({}).includes('decalSidewalks'));
+  assert.ok(describeSessionConfig({ advancedMode: true, export: { decalSidewalks: true } }).some((r) => r.label === 'config.decalSidewalks'));
+  assert.ok(!describeSessionConfig({ advancedMode: true, export: { decalSidewalks: false } }).some((r) => r.label === 'config.decalSidewalks'));
+});

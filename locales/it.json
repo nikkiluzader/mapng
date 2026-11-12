@@ -573,7 +573,9 @@
       "viewDistanceHint": "Fin dove il gioco disegna il livello. Auto segue le dimensioni della mappa (da 4 a 16 km). Una distanza minore è più leggera su un PC meno potente.",
       "viewDistanceAuto": "Auto ({km} km)",
       "assumeParking": "Presumi parcheggio su strada",
-      "assumeParkingHint": "Attivo: le strade urbane senza tag di parcheggio ricevono una corsia di sosta per lato (circa 2,3 m), come molte strade reali. Disattivo: solo la sosta mappata; quelle strade risultano più strette."
+      "assumeParkingHint": "Attivo: le strade urbane senza tag di parcheggio ricevono una corsia di sosta per lato (circa 2,3 m), come molte strade reali. Disattivo: solo la sosta mappata; quelle strade risultano più strette.",
+      "decalSidewalks": "Marciapiedi come decal",
+      "decalSidewalksHint": "Attivo: marciapiedi e sentieri sono strisce piatte dipinte sul terreno, senza cordoli. Molto più leggero nel gioco e più veloce da esportare, e ci si può guidare sopra. Disattivo: lastre rialzate con cordoli."
     },
     "weight": {
       "title": "Quanto è pesante questo livello?",
@@ -1374,7 +1376,8 @@
     "assumeParking": "Presumi parcheggio su strada",
     "treeKindsOff": "Tipi di albero esclusi",
     "treeSwaps": "Tipi di albero sostituiti",
-    "treeModelsOff": "Modelli di albero esclusi"
+    "treeModelsOff": "Modelli di albero esclusi",
+    "decalSidewalks": "Marciapiedi come decal"
   },
   "usage": {
     "askTitle": "Condividere quali impostazioni usi?",
@@ -1570,7 +1573,8 @@
     "assumeParking": "Presumi parcheggio su strada",
     "treeKindsOff": "Tipi di albero esclusi",
     "treeSwaps": "Tipi di albero sostituiti",
-    "treeModelsOff": "Modelli di albero esclusi"
+    "treeModelsOff": "Modelli di albero esclusi",
+    "decalSidewalks": "Marciapiedi come decal"
   },
   "spawnPoints": {
     "title": "Punti di partenza e Quicktravel",
@@ -1808,6 +1812,7 @@
       "reset": "Ripristina",
       "resetHint": "Riporta ogni tipo a Mantieni e riattiva ogni modello",
       "takesIn": "Piantato anche al posto di: {kinds}"
-    }
+    },
+    "decalSidewalks": "marciapiedi piatti"
   }
 }

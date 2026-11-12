@@ -963,6 +963,25 @@ test('sidewalks: tagged street gets a curb mesh with collision, materials and a 
 
     const off = await run({ includeSidewalks: false });
     assert.ok(!Object.keys(off.files).some((f) => /\/sidewalks\/sidewalks_[\w]+\.dae$/.test(f)));
+
+    // the decal style: no mesh at all; the tagged street's two sidewalks are flat strips beside its lanes
+    const stripsIn = async (z) => {
+      const out = [];
+      for (const f of Object.keys(z.files).filter((n) => n.endsWith('items.level.json'))) {
+        for (const o of parseNDJSON(await z.files[f].async('string'))) if (o.class === 'DecalRoad' && /_sw\d+_[lr]\d+$/.test(o.name)) out.push(o);
+      }
+      return out;
+    };
+    const decal = await run({ sidewalkStyle: 'decal' });
+    assert.ok(!Object.keys(decal.files).some((f) => /\/sidewalks\/sidewalks_[\w]+\.dae$/.test(f)), 'no sidewalk mesh in the decal style');
+    const strips = await stripsIn(decal);
+    assert.ok(strips.some((o) => /_l1$/.test(o.name)) && strips.some((o) => /_r1$/.test(o.name)), 'a strip on each side');
+    assert.ok(strips.every((o) => /walk_st/.test(o.name)), 'only the street tagged with sidewalks (sidewalk=separate has none of its own)');
+    assert.ok(strips.every((o) => o.nodes.length >= 2 && o.nodes.every((n) => n[3] > 0.5 && n[3] < 4)), 'each a sidewalk\'s width');
+    assert.equal((await stripsIn(zip)).length, 0, 'none in the mesh style');
+    assert.match(await readText(decal, 'export_report.txt'), /Sidewalks drawn as decals[^\n]*strip\(s\)/);
+    // switched off altogether: neither
+    assert.equal((await stripsIn(await run({ includeSidewalks: false, sidewalkStyle: 'decal' }))).length, 0);
   } finally {
     restore();
   }

@@ -573,7 +573,9 @@
       "viewDistanceHint": "Jak daleko gra rysuje poziom. Auto dopasowuje się do rozmiaru mapy (od 4 do 16 km). Mniejszy zasięg odciąża słabszy komputer.",
       "viewDistanceAuto": "Auto ({km} km)",
       "assumeParking": "Zakładaj parkowanie przy ulicy",
-      "assumeParkingHint": "Włączone: ulice miejskie bez tagów parkowania dostają pas postojowy z każdej strony (ok. 2,3 m), jak wiele prawdziwych ulic. Wyłączone: tylko zmapowane parkowanie; te ulice wychodzą węższe."
+      "assumeParkingHint": "Włączone: ulice miejskie bez tagów parkowania dostają pas postojowy z każdej strony (ok. 2,3 m), jak wiele prawdziwych ulic. Wyłączone: tylko zmapowane parkowanie; te ulice wychodzą węższe.",
+      "decalSidewalks": "Chodniki jako decale",
+      "decalSidewalksHint": "Włączone: chodniki i ścieżki to płaskie pasy namalowane na ziemi, bez krawężników. Znacznie lżejsze w grze i szybsze w eksporcie, można po nich jeździć. Wyłączone: podniesione płyty z krawężnikami."
     },
     "weight": {
       "title": "Jak ciężki jest ten poziom?",
@@ -1374,7 +1376,8 @@
     "assumeParking": "Zakładaj parkowanie przy ulicy",
     "treeKindsOff": "Pominięte rodzaje drzew",
     "treeSwaps": "Zastąpione rodzaje drzew",
-    "treeModelsOff": "Pominięte modele drzew"
+    "treeModelsOff": "Pominięte modele drzew",
+    "decalSidewalks": "Chodniki jako decale"
   },
   "usage": {
     "askTitle": "Udostępniać, jakich ustawień używasz?",
@@ -1570,7 +1573,8 @@
     "assumeParking": "Zakładaj parkowanie przy ulicy",
     "treeKindsOff": "Pominięte rodzaje drzew",
     "treeSwaps": "Zastąpione rodzaje drzew",
-    "treeModelsOff": "Pominięte modele drzew"
+    "treeModelsOff": "Pominięte modele drzew",
+    "decalSidewalks": "Chodniki jako decale"
   },
   "spawnPoints": {
     "title": "Punkty startu i Quicktravel",
@@ -1808,6 +1812,7 @@
       "reset": "Resetuj",
       "resetHint": "Przywróć wszystkie rodzaje na Zachowaj i włącz wszystkie modele",
       "takesIn": "Sadzone także zamiast: {kinds}"
-    }
+    },
+    "decalSidewalks": "płaskie chodniki"
   }
 }

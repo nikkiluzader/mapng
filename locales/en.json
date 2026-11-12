@@ -578,7 +578,9 @@
       "viewDistanceHint": "How far the game draws the level. Auto follows the map's size (4 to 16 km). A shorter distance is lighter on a weaker PC.",
       "viewDistanceAuto": "Auto ({km} km)",
       "assumeParking": "Assume street parking",
-      "assumeParkingHint": "On: town streets with no parking tags get a parking lane each side (about 2.3 m), as many real streets have. Off: only mapped parking, so those streets come out narrower."
+      "assumeParkingHint": "On: town streets with no parking tags get a parking lane each side (about 2.3 m), as many real streets have. Off: only mapped parking, so those streets come out narrower.",
+      "decalSidewalks": "Sidewalks as decals",
+      "decalSidewalksHint": "On: sidewalks and footpaths are flat strips painted on the ground, with no curbs. Much lighter in the game and quicker to export, and you can drive over them. Off: raised slabs with curbs."
     },
     "weight": {
       "title": "How heavy is this level?",
@@ -1379,7 +1381,8 @@
     "assumeParking": "Assume street parking",
     "treeKindsOff": "Tree kinds left out",
     "treeSwaps": "Tree kinds swapped",
-    "treeModelsOff": "Tree models left out"
+    "treeModelsOff": "Tree models left out",
+    "decalSidewalks": "Sidewalks as decals"
   },
   "usage": {
     "askTitle": "Share which settings you use?",
@@ -1575,7 +1578,8 @@
     "assumeParking": "Assume street parking",
     "treeKindsOff": "Tree kinds left out",
     "treeSwaps": "Tree kinds swapped",
-    "treeModelsOff": "Tree models left out"
+    "treeModelsOff": "Tree models left out",
+    "decalSidewalks": "Sidewalks as decals"
   },
   "spawnPoints": {
     "title": "Spawn & quicktravel points",
@@ -1813,6 +1817,7 @@
       "reset": "Reset",
       "resetHint": "Put every kind back to Keep and every model back on",
       "takesIn": "Also planted in place of: {kinds}"
-    }
+    },
+    "decalSidewalks": "flat sidewalks"
   }
 }

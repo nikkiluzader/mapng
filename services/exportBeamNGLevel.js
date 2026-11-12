@@ -5596,7 +5596,13 @@ export function pedestrianSurfaceLayers(surface, fullWidth, { americas = false }
  * DecalRoads for the pedestrian streets: { decals: [{ decal, street }] (street:
  * its spline group's name), ways: [{ nodes, half }] (for keeping trees off) }.
  */
-function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = [], { raisedFootways = false } = {}) {
+// Sidewalks as decals (the Sidewalk style choice): a street's sidewalk is a flat strip of its
+// paving beside the lanes, on the ground, with no curb. Nothing to build or to render as a
+// mesh (a 2 km town centre's raised sidewalks are 730,000 triangles), and it can be driven on.
+const SIDEWALK_STRIP_RENDER_PRIORITY = 17;   // (under the footpaths and squares it meets, and under every road)
+const SIDEWALK_STRIP_GAP_M = 0.15;           // from the lanes' edge: where the curb's face would stand
+
+function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = [], { raisedFootways = false, sidewalkStrips = false } = {}) {
   const decals = [];
   const ways = [];
   const footpaths = [];
@@ -5772,7 +5778,36 @@ function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = [],
       }
     }
   }
-  return { decals, ways, footpaths, services: { count: serviceCount, length: serviceLength } };
+  // the streets' own sidewalks, as strips (where a raised one would have been built: tagged on
+  // the street, or mapped as a footway along it, which is left out above as that sidewalk)
+  let stripCount = 0; let stripLength = 0;
+  if (sidewalkStrips) {
+    for (const cw of streets) {
+      if (!(cw.nodes?.length >= 2)) continue;
+      const street = sanitizeBeamNGObjectName(cw.tags?.name || `street_${cw.wayId ?? cw.owner}`, `street_${cw.owner}`);
+      for (const [side, sign] of [['left', 1], ['right', -1]]) {
+        const width = cw[side];
+        if (!(width > CURB_ONLY_M)) continue;
+        const surface = cw.tags?.[`sidewalk:${side}:surface`] || cw.tags?.['sidewalk:both:surface'] || cw.tags?.['sidewalk:surface'] || (americas ? 'concrete' : 'paving_stones');
+        const halfOf = (i) => (cw.halfAt?.[i] ?? cw.half) + (side === 'left' ? cw.leftExtra || 0 : cw.rightExtra || 0);
+        const base = cw.nodes.map((n) => [n[0], n[1], n[2], width / 2]);
+        const n = (perStreet.get(street) || 0) + 1;
+        perStreet.set(street, n);
+        pedestrianSurfaceLayers(surface, width, { americas }).forEach((layer, k) => {
+          const nodes = offsetNodes(base, (i) => sign * (halfOf(i) + SIDEWALK_STRIP_GAP_M + width / 2) + layer.offset, layer.width);
+          const decal = makeRoadDecal(nodes, 'Base', street, {
+            material: layer.material, renderPriority: SIDEWALK_STRIP_RENDER_PRIORITY, breakAngle: layer.breakAngle,
+            textureLength: layer.textureLength, startEndFade: [0, 0], distanceFade: layer.distanceFade,
+          });
+          if (!decal) return;
+          decal.name = sanitizeBeamNGObjectName(`dr_${street}_sw${n}_${side[0]}${k + 1}`);
+          decals.push({ decal, street });
+          if (k === 0) { ways.push({ nodes: nodes.map((q) => [q[0], q[1], q[2]]), half: width / 2 }); stripCount++; stripLength += pathLength(nodes); }
+        });
+      }
+    }
+  }
+  return { decals, ways, footpaths, services: { count: serviceCount, length: serviceLength }, sidewalkStrips: { count: stripCount, length: stripLength } };
 }
 
 /** The paving materials the decal groups use, by name (for main.materials.json). */
@@ -6389,7 +6424,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   }
 
   yield;
-  const pedestrianStreets = buildPedestrianStreetDecals(terrainData, squareSize, carriageways, { raisedFootways: !!opts.raisedFootways });
+  const pedestrianStreets = buildPedestrianStreetDecals(terrainData, squareSize, carriageways, { raisedFootways: !!opts.raisedFootways, sidewalkStrips: !!opts.sidewalkStrips });
   yield;
   for (const { decal, street } of pedestrianStreets.decals) getOrCreateSplineGroup(street).__items.push(decal);
 
@@ -6446,6 +6481,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   Object.defineProperty(groups, 'pedestrianStreets', { value: pedestrianStreets.ways, enumerable: false });
   Object.defineProperty(groups, 'footpaths', { value: pedestrianStreets.footpaths, enumerable: false });
   Object.defineProperty(groups, 'serviceRoads', { value: pedestrianStreets.services, enumerable: false });
+  Object.defineProperty(groups, 'sidewalkStrips', { value: pedestrianStreets.sidewalkStrips, enumerable: false });
   Object.defineProperty(groups, 'bridges', { value: bridges, enumerable: false });
   Object.defineProperty(groups, 'tunnels', { value: tunnels, enumerable: false });
   Object.defineProperty(groups, 'crosswalkZones', { value: junctionMarkings.zones || [], enumerable: false });
@@ -7587,6 +7623,7 @@ function buildDetailedReportSections(d) {
   const serviceCount = groups.serviceRoads?.count || 0;
   lines.push(`- Pedestrian streets drawn (highway=pedestrian, no traffic): ${(groups.pedestrianStreets || []).length - footpathCount - serviceCount} piece(s)`);
   lines.push(`- Service roads drawn (driveways, parking aisles, alleys; no traffic): ${serviceCount} piece(s), ${formatNumber((groups.serviceRoads?.length || 0) / 1000, 2)} km`);
+  if (groups.sidewalkStrips?.count) lines.push(`- Sidewalks drawn as decals (flat strips beside the lanes, no curbs): ${groups.sidewalkStrips.count} strip(s), ${formatNumber(groups.sidewalkStrips.length / 1000, 2)} km`);
   lines.push(`- Footpaths, cycleways and trails drawn (beside a street's raised sidewalk left out): ${footpathCount} piece(s), ${formatNumber((groups.footpaths || []).reduce((n, f) => n + pathLength(f.nodes), 0) / 1000, 2)} km`);
   lines.push('- Stone and brick paving (surface=sett/cobblestone/unhewn_cobblestone/paving_stones/bricks) is laid in strips about one texture tile wide: mapng_road_* materials, art/roads/main.materials.json.');
 
@@ -8060,7 +8097,7 @@ function buildBeamNGExportReport({
     `- Include rocks: ${formatBool(options?.includeRocks)}`,
     `- Street parking assumed where none is mapped: ${formatBool(options?.assumeParking !== false)}`,
     `- View distance: ${viewDistanceChoice(options?.viewDistance) === 'auto' ? 'auto (the map\'s width, 4 km at least, 16 km at most)' : `${viewDistanceChoice(options?.viewDistance)} m`} (LevelInfo visibleDistance)`,
-    `- Include sidewalks: ${formatBool(options?.includeSidewalks !== false)}`,
+    `- Include sidewalks: ${formatBool(options?.includeSidewalks !== false)}${options?.includeSidewalks !== false ? ` (${options?.sidewalkStyle === 'decal' ? 'as decals: flat strips on the ground, no curbs' : 'as meshes: raised slabs with curbs'})` : ''}`,
     ...(() => {
       // What to build (services/buildContent.js): the features switched off and the OSM left out for them
       const cf = options?.contentFilter;
@@ -12087,7 +12124,10 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const {
     baseTexture = 'hybrid',
     includeBuildings = true,
-    includeSidewalks = true,
+    includeSidewalks: sidewalksWanted = true,
+    // 'mesh': raised slabs with curbs (the default). 'decal': flat strips on the ground, and every
+    // footpath a decal (buildPedestrianStreetDecals): far lighter to build and to render.
+    sidewalkStyle = 'mesh',
     // the local tree mix (treeSpecies.js) when already known; undefined: fetched
     treeSpeciesMix: requestedTreeMix = undefined,
     // the slabs' concrete: a key of SIDEWALK_LOOKS (beamngSidewalks.js)
@@ -12120,6 +12160,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     rightHandDrive,
     onProgress,
   } = options;
+  // (raised sidewalks are built only in the mesh style; the decal style draws strips instead)
+  const includeSidewalks = sidewalksWanted && sidewalkStyle !== 'decal';
+  const sidewalkStrips = sidewalksWanted && sidewalkStyle === 'decal';
   // Terrain shaping at export (advanced mode): a master switch and one per
   // kind of road. Off, the export leaves those heights exactly as generated.
   const shapingOptions = {
@@ -12330,7 +12373,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Background areas: ${Math.round(bgLook.fraction * 100)}% of the map; ${before - boundedFeatures.length} map feature(s) left out there.`);
   }
   // sidewalks OSM leaves unmapped where it maps a crossing onto them
-  if (includeSidewalks && boundedFeatures?.length) {
+  if (sidewalksWanted && boundedFeatures?.length) {
     const b = td.bounds; const ws = td.width * computeSquareSize(td);
     const before = boundedFeatures;
     boundedFeatures = inferCrossingSidewalks(boundedFeatures, (p) => [((p.lng - b.west) / (b.east - b.west) - 0.5) * ws, (0.5 - (b.north - p.lat) / (b.north - b.south)) * ws]);
@@ -12468,7 +12511,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const sourceHeightMap = exportTerrainData.heightMap;
 
   const decalRoads = includeRoads
-    ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_, { raisedFootways: includeSidewalks, structureSolver: options.structureSolver, includeBridges, includeTunnels, includeDams: includeBuildings && options.includeDams !== false, includeRailways: options.includeRailways !== false, shaping: shapingOptions, lidar: lidar?.grid ? lidar : null, rawAt: rawAtWorld })
+    ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_, { raisedFootways: includeSidewalks, sidewalkStrips, structureSolver: options.structureSolver, includeBridges, includeTunnels, includeDams: includeBuildings && options.includeDams !== false, includeRailways: options.includeRailways !== false, shaping: shapingOptions, lidar: lidar?.grid ? lidar : null, rawAt: rawAtWorld })
     : [];
   // Bridges: decks for the bridge roads; nothing ground-bound (sidewalks,
   // props, lamps) is built along them, nothing tall stands up into them.

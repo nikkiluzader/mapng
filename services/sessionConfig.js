@@ -23,6 +23,7 @@ export const EXPORT_FIELDS = [
   ['viewDistance', 'mapng_beamNGViewDistance', ['auto', '2000', '4000', '8000', '12000', '16000'], 'auto'],   // metres: services/viewDistance.js
   ['rocks', 'mapng_beamNGIncludeRocks', 'bool', true],
   ['safeCaps', 'mapng_beamNGSafeCaps', 'bool', true],
+  ['decalSidewalks', 'mapng_beamNGDecalSidewalks', 'bool', false],   // (on: sidewalks as flat decals, exportBeamNGLevel.js sidewalkStyle)
   ['assumeParking', 'mapng_beamNGAssumeParking', 'bool', true],   // (off: only mapped street parking, services/roadWidth.js)
   ['bridges', 'mapng_beamNGIncludeBridges', 'bool', true],
   ['tunnels', 'mapng_beamNGIncludeTunnels', 'bool', true],
@@ -50,7 +51,7 @@ const LIST_KINDS = { contentList: sanitizeContentOff, tagList: sanitizeExcludeTa
 /** Whether a field holds a list (stored as JSON; not counted in the settings stats). */
 export const isListField = ([, , kind]) => Object.hasOwn(LIST_KINDS, kind);
 // (not counted in the settings stats: public/data.html lists every counted setting)
-const NOT_COUNTED = new Set(['contentOff', 'excludeTags', 'basicPreset', 'viewDistance', 'assumeParking']);
+const NOT_COUNTED = new Set(['contentOff', 'excludeTags', 'basicPreset', 'viewDistance', 'assumeParking', 'decalSidewalks']);
 export const isCountedField = (field) => !NOT_COUNTED.has(field[0]) && !isListField(field);
 
 /** Data-part settings kept outside the run configuration: [name, key, kind, default]. */
@@ -259,6 +260,7 @@ export function describeSessionConfig(config, { hasGpxzKey = false } = {}) {
     if (advanced && tagList.length) add('export', 'config.excludeTags', { value: tagList.slice(0, 6).join(', ') + (tagList.length > 6 ? ` +${tagList.length - 6}` : '') });
     if (advanced && e.trees !== false && e.forestDensity && e.forestDensity !== 'normal') add('export', 'config.forestDensity', { valueKey: `exportPanel.ui.forestDensity_${e.forestDensity}` });
     if (advanced && e.assumeParking === false) add('export', 'config.assumeParking', { valueKey: 'config.off' });
+    if (advanced && e.decalSidewalks === true) add('export', 'config.decalSidewalks', { valueKey: 'config.on' });
     if (advanced && e.viewDistance && String(e.viewDistance) !== 'auto') add('export', 'config.viewDistance', { value: `${Number(e.viewDistance) / 1000} km` });
     const structures = ['bridges', 'tunnels', 'measuredBridgeHeights'].filter((k) => e[k] !== false);
     if (advanced) add('export', 'config.structures', { valueKey: 'config.list', params: { list: structures.length ? structures.map((k) => `config.c_${k}`) : ['config.nothing'] } });

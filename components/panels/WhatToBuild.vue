@@ -168,6 +168,14 @@
           </div>
           <Switch :on="assumeParking && roadsBuilt" :label="t('exportPanel.ui.assumeParking')" :disabled="!roadsBuilt || !hasOsmData" @toggle="$emit('update:assumeParking', !assumeParking)" />
         </div>
+        <!-- sidewalks as flat decals on the ground instead of raised meshes (exportBeamNGLevel.js sidewalkStyle) -->
+        <div class="flex items-start gap-2">
+          <div class="flex-1 min-w-0">
+            <div class="text-xs font-medium text-gray-800 dark:text-gray-100">{{ t('exportPanel.ui.decalSidewalks') }}</div>
+            <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ roadsBuilt ? t('exportPanel.ui.decalSidewalksHint') : t('build.offInFeatures', { what: t('build.item_roadSurfaces') }) }}</p>
+          </div>
+          <Switch :on="decalSidewalks && roadsBuilt" :label="t('exportPanel.ui.decalSidewalks')" :disabled="!roadsBuilt || !hasOsmData" @toggle="$emit('update:decalSidewalks', !decalSidewalks)" />
+        </div>
       </section>
       <section class="space-y-1.5 pt-1" :class="bridgesBuilt ? '' : 'opacity-50'">
         <h4 class="text-micro font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('build.group_structures') }}</h4>
@@ -219,11 +227,12 @@ const props = defineProps({
   lidarDecks: { type: Boolean, default: true },
   safeCaps: { type: Boolean, default: true },
   assumeParking: { type: Boolean, default: true },
+  decalSidewalks: { type: Boolean, default: false },
   treeKindsOff: { type: Array, default: () => [] },
   treeSwaps: { type: Array, default: () => [] },
   treeModelsOff: { type: Array, default: () => [] },
 });
-const emit = defineEmits(['update:forestDensity', 'update:lidarDecks', 'update:safeCaps', 'update:assumeParking', 'update:treeKindsOff', 'update:treeSwaps', 'update:treeModelsOff']);
+const emit = defineEmits(['update:forestDensity', 'update:lidarDecks', 'update:safeCaps', 'update:assumeParking', 'update:decalSidewalks', 'update:treeKindsOff', 'update:treeSwaps', 'update:treeModelsOff']);
 const { t, te } = useI18n();
 const store = useMainStore();
 // (a feature's small hint, where it has one: asking for a missing key logs a warning)
@@ -314,6 +323,7 @@ const footer = computed(() => {
     props.lidarDecks ? t('build.measuredDecks') : null,
     props.safeCaps ? t('build.capped') : t('build.noCaps'),
     props.assumeParking ? null : t('build.noAssumedParking'),
+    props.decalSidewalks ? t('build.decalSidewalks') : null,
   ].filter(Boolean).join(' · ');
   return contentTab.value === 'features'
     ? t('build.footerFeatures', { on, of: all.length, tuned })

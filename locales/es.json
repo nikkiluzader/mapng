@@ -573,7 +573,9 @@
       "viewDistanceHint": "Hasta dónde dibuja el juego el nivel. Auto sigue el tamaño del mapa (de 4 a 16 km). Una distancia menor es más ligera en un PC modesto.",
       "viewDistanceAuto": "Auto ({km} km)",
       "assumeParking": "Suponer aparcamiento en la calle",
-      "assumeParkingHint": "Activado: las calles urbanas sin etiquetas de aparcamiento reciben un carril de aparcamiento a cada lado (unos 2,3 m), como muchas calles reales. Desactivado: solo el aparcamiento cartografiado; esas calles salen más estrechas."
+      "assumeParkingHint": "Activado: las calles urbanas sin etiquetas de aparcamiento reciben un carril de aparcamiento a cada lado (unos 2,3 m), como muchas calles reales. Desactivado: solo el aparcamiento cartografiado; esas calles salen más estrechas.",
+      "decalSidewalks": "Aceras como calcomanías",
+      "decalSidewalksHint": "Activado: las aceras y los senderos son franjas planas pintadas en el suelo, sin bordillos. Mucho más ligero en el juego y más rápido de exportar, y se puede conducir sobre ellas. Desactivado: losas elevadas con bordillos."
     },
     "weight": {
       "title": "¿Cuánto pesa este nivel?",
@@ -1374,7 +1376,8 @@
     "assumeParking": "Suponer aparcamiento en la calle",
     "treeKindsOff": "Tipos de árbol omitidos",
     "treeSwaps": "Tipos de árbol sustituidos",
-    "treeModelsOff": "Modelos de árbol omitidos"
+    "treeModelsOff": "Modelos de árbol omitidos",
+    "decalSidewalks": "Aceras como calcomanías"
   },
   "usage": {
     "askTitle": "¿Compartir qué ajustes usas?",
@@ -1570,7 +1573,8 @@
     "assumeParking": "Suponer aparcamiento en la calle",
     "treeKindsOff": "Tipos de árbol omitidos",
     "treeSwaps": "Tipos de árbol sustituidos",
-    "treeModelsOff": "Modelos de árbol omitidos"
+    "treeModelsOff": "Modelos de árbol omitidos",
+    "decalSidewalks": "Aceras como calcomanías"
   },
   "spawnPoints": {
     "title": "Puntos de inicio y Quicktravel",
@@ -1808,6 +1812,7 @@
       "reset": "Restablecer",
       "resetHint": "Volver a Mantener todos los tipos y activar todos los modelos",
       "takesIn": "También se planta en lugar de: {kinds}"
-    }
+    },
+    "decalSidewalks": "aceras planas"
   }
 }
