@@ -85,6 +85,9 @@ test('desktop reports drop keys, home folders and (if asked) the location', asyn
 test('a report keeps a session code, and only a session code, in config', () => {
   assert.equal(reportSummary({ kind: 'export', config: 'mapng:1:abc' }, 'MR-AAAAAA', 't').config, 'mapng:1:abc');
   assert.equal(reportSummary({ kind: 'export', config: '<script>' }, 'MR-AAAAAA', 't').config, '');
+  // (a code with background areas is long: kept whole, a code cut short cannot be pasted back)
+  const long = `mapng:1:${'a'.repeat(60000)}`;
+  assert.equal(reportSummary({ kind: 'export', config: long }, 'MR-AAAAAA', 't').config, long);
 });
 
 test('a level report keeps the level\'s export report as its own file, read back only with the token', async () => {

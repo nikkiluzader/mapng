@@ -8,6 +8,11 @@
 const PREFIX = 'crash-reports/';
 const MAX_BODY_BYTES = 12 * 1024 * 1024;      // a report with its log and crash dump
 const MAX_LOG_CHARS = 2 * 1024 * 1024;
+// The session code of the job (settings, area, background areas, points). One with
+// background areas painted over half a 20 km map is far longer than its settings
+// alone: cut at 8,000 characters it could not be pasted back into the app
+// ("invalid code", report MR-TWEP2B). Kept whole up to this.
+const MAX_CONFIG_CHARS = 512 * 1024;
 const MAX_EXPORT_REPORT_CHARS = 2 * 1024 * 1024;   // a level's export_report.txt, sent from the levels list
 const LIMIT_PER_HOUR = 10;                    // per address, in this isolate's memory only
 const recent = new Map();                     // address hash -> { hour, count }
@@ -40,7 +45,7 @@ export function reportSummary(body, id, receivedAt) {
     description: clip(body.description, 4000),
     options: body.options && typeof body.options === 'object' ? body.options : null,
     area: body.area && typeof body.area === 'object' ? body.area : null,
-    config: typeof body.config === 'string' && body.config.startsWith('mapng:') ? clip(body.config, 8000) : '',
+    config: typeof body.config === 'string' && body.config.startsWith('mapng:') ? clip(body.config, MAX_CONFIG_CHARS) : '',
     memory: body.memory && typeof body.memory === 'object' ? body.memory : null,
     hasLog: typeof body.log === 'string' && body.log.length > 0,
     hasDump: typeof body.minidump === 'string' && body.minidump.length > 0,

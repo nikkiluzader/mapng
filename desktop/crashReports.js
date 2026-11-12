@@ -12,6 +12,9 @@ import { cleanOptions, scrubText } from './reportScrub.js';
 
 const MAX_LOG_CHARS = 1500 * 1024;          // the end of a job's log
 const MAX_EXPORT_REPORT_CHARS = 2 * 1024 * 1024;
+// (the job's session code, whole: with background areas it runs to tens of thousands of
+// characters, and a code cut short cannot be pasted back into the app)
+const MAX_CONFIG_CHARS = 512 * 1024;
 const MAX_DUMP_BYTES = 8 * 1024 * 1024;
 
 /** Before the app is ready: crash dumps kept locally, never uploaded by Electron. */
@@ -65,7 +68,7 @@ export function prepareReport(kind, ctx = {}, { build = '', settings = {} } = {}
     options: cleanOptions(ctx.options),
     area: ctx.area && typeof ctx.area === 'object' ? ctx.area : null,
     // (the settings as a session code; holds the location, so it goes with it)
-    config: typeof ctx.config === 'string' && ctx.config.startsWith('mapng:') ? ctx.config.slice(0, 8000) : '',
+    config: typeof ctx.config === 'string' && ctx.config.startsWith('mapng:') ? ctx.config.slice(0, MAX_CONFIG_CHARS) : '',
     memory: { totalGB: +(os.totalmem() / 2 ** 30).toFixed(1), freeGB: +(os.freemem() / 2 ** 30).toFixed(1), cpus: os.cpus().length },
     log: ctx.logPath ? scrubText(readTail(ctx.logPath, MAX_LOG_CHARS)) : '',
     // (a level's own export_report.txt, read from its zip by the main process: kind 'level')
