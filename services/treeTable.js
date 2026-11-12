@@ -9,7 +9,7 @@
 // there are none, and the mountains' conifer line, as the export does.
 // Not counted: trees whose species OSM names, a biome's own signature models
 // that join a group at export, and the forest floor (ferns, bushes).
-import { chooseTreeGroup, chooseTreeGroupAllowed, chooseTreeItem } from './beamngTrees.js';
+import { chooseTreeGroup, chooseTreeGroupAllowed, chooseTreeItem, treeModelsOf, treeSwapMap } from './beamngTrees.js';
 
 const DEFAULT_SAMPLES = 2000;
 const MIN_SHARE = 0.005;          // kinds under half a percent are left out of the table
@@ -37,11 +37,15 @@ export function sampleElevations(heightMap, count = 256) {
  * @param {object|null} p.mix        terrainData.treeSpeciesMix ({ shares, records }) or null
  * @param {number[]} [p.elevations]  ground heights to draw the trees at (none: the lowland rule)
  * @param {string[]} [p.off]         kinds the user leaves out (beamngTrees.TREE_KIND_IDS)
+ * @param {string[]} [p.swaps]       kinds swapped for another, "from>to"
+ * @param {string[]} [p.modelsOff]   single models left out
  * @returns {{ source: 'records'|'climate', records: number,
  *            rows: { group: string, share: number, models: { type: string, share: number }[] }[] }}
  */
-export function treeTable({ lat, lon, mix = null, elevations = [], samples = DEFAULT_SAMPLES, off = [] } = {}) {
+export function treeTable({ lat, lon, mix = null, elevations = [], samples = DEFAULT_SAMPLES, off = [], swaps = [], modelsOff = [] } = {}) {
   const offSet = new Set(off || []);
+  const swapMap = treeSwapMap(swaps);
+  const modelsOffSet = new Set(modelsOff || []);
   // (the kinds the data picks before anything is left out, so a kind switched off stays in the list to switch back on)
   const natural = new Set();
   const usable = mix && mix.shares && Object.keys(mix.shares).length ? mix : null;
@@ -52,9 +56,9 @@ export function treeTable({ lat, lon, mix = null, elevations = [], samples = DEF
       const seed = `table:${i}`;
       const elevation = elevations.length ? elevations[i % elevations.length] : null;
       const params = { kind: 'tree', lat, lon, area: true, seed, mix: usable, elevation };
-      if (offSet.size) natural.add(chooseTreeGroup(params));
-      const group = chooseTreeGroupAllowed(params, offSet);
-      const item = chooseTreeItem(group, { lat, lon, seed });
+      if (offSet.size || swapMap.size) natural.add(chooseTreeGroup(params));
+      const group = chooseTreeGroupAllowed(params, offSet, swapMap);
+      const item = chooseTreeItem(group, { lat, lon, seed, modelsOff: modelsOffSet });
       if (!item) continue;
       if (!groups.has(group)) groups.set(group, { n: 0, models: new Map() });
       const g = groups.get(group);
@@ -67,11 +71,17 @@ export function treeTable({ lat, lon, mix = null, elevations = [], samples = DEF
     .map(([group, g]) => ({
       group,
       share: g.n / total,
-      models: [...g.models.entries()].map(([type, n]) => ({ type, share: n / total })).sort((a, b) => b.share - a.share || a.type.localeCompare(b.type)),
+      // (every model of the kind: the ones left out stay listed, to switch back on)
+      models: [
+        ...[...g.models.entries()].map(([type, n]) => ({ type, share: n / total })).sort((a, b) => b.share - a.share || a.type.localeCompare(b.type)),
+        ...treeModelsOf(group, { lat, lon }).filter(({ type }) => !g.models.has(type)).map(({ type }) => ({ type, share: 0, off: modelsOffSet.has(type) })),
+      ],
     }))
     .filter((r) => r.share >= MIN_SHARE)
     .sort((a, b) => b.share - a.share || a.group.localeCompare(b.group));
   // (left out by the user, and picked by the data here: listed after the rest, with no share)
-  const leftOut = [...natural].filter((g) => offSet.has(g)).sort().map((group) => ({ group, share: 0, models: [], off: true }));
+  const shown = new Set(rows.map((r) => r.group));
+  const leftOut = [...natural].filter((g) => !shown.has(g) && (offSet.has(g) || swapMap.has(g))).sort()
+    .map((group) => (swapMap.has(group) && !offSet.has(swapMap.get(group)) ? { group, share: 0, models: [], swappedTo: swapMap.get(group) } : { group, share: 0, models: [], off: true }));
   return { source: usable ? 'records' : 'climate', records: usable ? Number(usable.records) || 0 : 0, rows: [...rows, ...leftOut] };
 }

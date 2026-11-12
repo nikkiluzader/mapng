@@ -1359,7 +1359,9 @@
     "basicPreset": "Co budować",
     "viewDistance": "Zasięg widzenia",
     "assumeParking": "Zakładaj parkowanie przy ulicy",
-    "treeKindsOff": "Pominięte rodzaje drzew"
+    "treeKindsOff": "Pominięte rodzaje drzew",
+    "treeSwaps": "Zastąpione rodzaje drzew",
+    "treeModelsOff": "Pominięte modele drzew"
   },
   "usage": {
     "askTitle": "Udostępniać, jakich ustawień używasz?",
@@ -1553,7 +1555,9 @@
     "forest_veryDense": "Bardzo gęsty",
     "viewDistance": "Zasięg widzenia",
     "assumeParking": "Zakładaj parkowanie przy ulicy",
-    "treeKindsOff": "Pominięte rodzaje drzew"
+    "treeKindsOff": "Pominięte rodzaje drzew",
+    "treeSwaps": "Zastąpione rodzaje drzew",
+    "treeModelsOff": "Pominięte modele drzew"
   },
   "spawnPoints": {
     "title": "Punkty startu i Quicktravel",
@@ -1777,9 +1781,17 @@
       "group_cypress": "Cyprysy",
       "group_olive": "Oliwki",
       "leftOut": "pominięte",
-      "keep": "Zachowaj: {kind}",
       "leftOutLabel": "Pominięte rodzaje drzew",
-      "switchHint": "Wyłącz rodzaj, aby go pominąć: jego drzewa zostaną posadzone jako pozostałe rodzaje."
+      "switchHint": "Dla każdego rodzaju: zachowaj go, pomiń (jego drzewa zostaną posadzone jako pozostałe rodzaje) albo posadź w jego miejsce inny rodzaj. Kliknij model, aby pominąć tylko ten jeden.",
+      "keepIt": "Zachowaj",
+      "leaveOut": "Pomiń",
+      "replaceWith": "Zastąp przez",
+      "choiceFor": "Co sadzić zamiast: {kind}",
+      "plantedAs": "Sadzone jako: {kind}",
+      "modelOn": "Sadzony: kliknij, aby pominąć ten model",
+      "modelOff": "Pominięty: kliknij, aby znów go sadzić",
+      "swapsLabel": "Zastąpione rodzaje drzew",
+      "modelsOffLabel": "Pominięte modele drzew"
     }
   }
 }

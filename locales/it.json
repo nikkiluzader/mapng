@@ -1359,7 +1359,9 @@
     "basicPreset": "Cosa costruire",
     "viewDistance": "Distanza visiva",
     "assumeParking": "Presumi parcheggio su strada",
-    "treeKindsOff": "Tipi di albero esclusi"
+    "treeKindsOff": "Tipi di albero esclusi",
+    "treeSwaps": "Tipi di albero sostituiti",
+    "treeModelsOff": "Modelli di albero esclusi"
   },
   "usage": {
     "askTitle": "Condividere quali impostazioni usi?",
@@ -1553,7 +1555,9 @@
     "forest_veryDense": "Molto fitta",
     "viewDistance": "Distanza visiva",
     "assumeParking": "Presumi parcheggio su strada",
-    "treeKindsOff": "Tipi di albero esclusi"
+    "treeKindsOff": "Tipi di albero esclusi",
+    "treeSwaps": "Tipi di albero sostituiti",
+    "treeModelsOff": "Modelli di albero esclusi"
   },
   "spawnPoints": {
     "title": "Punti di partenza e Quicktravel",
@@ -1777,9 +1781,17 @@
       "group_cypress": "Cipressi",
       "group_olive": "Ulivi",
       "leftOut": "escluso",
-      "keep": "Mantieni {kind}",
       "leftOutLabel": "Tipi di albero esclusi",
-      "switchHint": "Disattiva un tipo per escluderlo: i suoi alberi vengono piantati come gli altri tipi."
+      "switchHint": "Per ogni tipo: mantenerlo, escluderlo (i suoi alberi vengono piantati come gli altri tipi) o piantare un altro tipo al suo posto. Clicca su un modello per escludere solo quello.",
+      "keepIt": "Mantieni",
+      "leaveOut": "Escludi",
+      "replaceWith": "Sostituisci con",
+      "choiceFor": "Cosa piantare per {kind}",
+      "plantedAs": "Piantato come {kind}",
+      "modelOn": "Piantato: clicca per escludere questo modello",
+      "modelOff": "Escluso: clicca per piantarlo di nuovo",
+      "swapsLabel": "Tipi di albero sostituiti",
+      "modelsOffLabel": "Modelli di albero esclusi"
     }
   }
 }

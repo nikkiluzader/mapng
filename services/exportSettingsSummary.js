@@ -49,6 +49,8 @@ export function summarizeExportSettings(opts = {}, ctx = {}) {
       ? [row('forestDensity', { t: `forest_${opts.forestDensity}` })] : []),
     // (tree kinds left out in Fine-tuning, by their ids: the page names them)
     ...(opts.includeTrees && Array.isArray(opts.treeKindsOff) && opts.treeKindsOff.length ? [row('treeKindsOff', { text: opts.treeKindsOff.join(', '), kinds: [...opts.treeKindsOff] })] : []),
+    ...(opts.includeTrees && Array.isArray(opts.treeSwaps) && opts.treeSwaps.length ? [row('treeSwaps', { text: opts.treeSwaps.map((s) => String(s).replace('>', ' → ')).join(', ') })] : []),
+    ...(opts.includeTrees && Array.isArray(opts.treeModelsOff) && opts.treeModelsOff.length ? [row('treeModelsOff', { text: String(opts.treeModelsOff.length) })] : []),
     toggle('rocks', !!opts.includeRocks),
     toggle('water', !!opts.includeWater),
     row('backdrop', opts.includeBackdrop ? { t: SOURCE_KEYS[opts.backdropElevationSource] || 'on' } : { t: 'off' }, !opts.includeBackdrop),

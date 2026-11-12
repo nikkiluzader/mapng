@@ -241,6 +241,19 @@ export const sanitizeTreeKindsOff = (list) => {
   const off = [...new Set((Array.isArray(list) ? list : []).filter((id) => TREE_KIND_IDS.includes(id)))];
   return off.length >= TREE_KIND_IDS.length ? [] : off;
 };
+/** Stored swaps, "from>to": known kinds, a kind swapped once, never for itself. As a Map with asMap. */
+export const sanitizeTreeSwaps = (list) => {
+  const out = new Map();
+  for (const item of Array.isArray(list) ? list : []) {
+    const [from, to] = String(item).split('>');
+    if (TREE_KIND_IDS.includes(from) && TREE_KIND_IDS.includes(to) && from !== to && !out.has(from)) out.set(from, to);
+  }
+  return [...out].map(([from, to]) => `${from}>${to}`);
+};
+export const treeSwapMap = (list) => new Map(sanitizeTreeSwaps(list).map((s) => s.split('>')));
+/** Stored tree models left out: plain model names, at most 300. */
+export const sanitizeTreeModelsOff = (list) => [...new Set((Array.isArray(list) ? list : []).map(String).filter((t) => /^[\w.-]{1,80}$/.test(t)))].slice(0, 300);
+
 const KIND_FALLBACK = ['deciduous', 'conifer', 'oak', 'pine_west', 'juniper', 'palm'];
 
 /**
@@ -250,9 +263,13 @@ const KIND_FALLBACK = ['deciduous', 'conifer', 'oak', 'pine_west', 'juniper', 'p
  * first kind still allowed. A tree whose species the map names is not
  * redrawn: it keeps its species.
  */
-export function chooseTreeGroupAllowed(params, off = null) {
+export function chooseTreeGroupAllowed(params, off = null, swaps = null) {
   const first = chooseTreeGroup(params);
-  if (!off || !off.size || !off.has(first) || (params.kind || 'tree') !== 'tree' || treeHintFromTags(params.tags || {})) return first;
+  if ((params.kind || 'tree') !== 'tree' || treeHintFromTags(params.tags || {})) return first;
+  // (a kind swapped for another: every tree of it is the other, whatever grows here)
+  const to = swaps?.get?.(first);
+  if (to && !(off && off.has(to))) return to;
+  if (!off || !off.size || !off.has(first)) return first;
   for (let k = 1; k <= 8; k++) {
     const again = chooseTreeGroup({ ...params, seed: `${params.seed}:alt${k}` });
     if (!off.has(again)) return again;
@@ -289,8 +306,10 @@ function candidates(group, { lat, lon, extra = [] }) {
  * else a hashed model with a small scale jitter.
  * extra: biome signature models [{ type, height }] joining the candidates.
  */
-export function chooseTreeItem(group, { tags = {}, lat, lon, seed = '', extra = [] } = {}) {
-  const list = candidates(group, { lat, lon, extra });
+export function chooseTreeItem(group, { tags = {}, lat, lon, seed = '', extra = [], modelsOff = null } = {}) {
+  let list = candidates(group, { lat, lon, extra });
+  // (models the user leaves out in Fine-tuning; a kind is never left with none)
+  if (modelsOff?.size) { const kept = list.filter(({ type }) => !modelsOff.has(type)); if (kept.length) list = kept; }
   if (list.length === 0) return null;
   const height = parseHeight(tags);
   if (height != null) {
@@ -302,6 +321,9 @@ export function chooseTreeItem(group, { tags = {}, lat, lon, seed = '', extra = 
   const pick = list[Math.min(list.length - 1, Math.floor(hash01(seed, 'item') * list.length))];
   return { type: pick.type, scale: 0.85 + 0.3 * hash01(seed, 'scale') };
 }
+
+/** Every model a kind can be drawn as here: [{ type, height }] (Fine-tuning lists them to switch on and off). */
+export const treeModelsOf = (group, { lat, lon } = {}) => candidates(group, { lat, lon });
 
 /** Height of a library item (m), or null. */
 export const treeItemHeight = (type) => {

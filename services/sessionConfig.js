@@ -9,7 +9,7 @@
 import { PERSONAL_STORAGE_KEYS, withoutPersonal } from './personalKeys.js';
 import { sanitizePoints, pointLabel } from './spawnPoints.js';
 import { sanitizeContentOff, sanitizeExcludeTags, PRESET_IDS } from './buildContent.js';
-import { sanitizeTreeKindsOff } from './beamngTrees.js';
+import { sanitizeTreeKindsOff, sanitizeTreeModelsOff, sanitizeTreeSwaps } from './beamngTrees.js';
 
 /** Export-panel settings: [name in the config, localStorage key, kind, default]. */
 export const EXPORT_FIELDS = [
@@ -41,10 +41,12 @@ export const EXPORT_FIELDS = [
   // above, OSM tags left out one by one, and the preset basic mode builds
   ['contentOff', 'mapng_beamNGContentOff', 'contentList', []],
   ['excludeTags', 'mapng_beamNGExcludeTags', 'tagList', []],
-  ['treeKindsOff', 'mapng_beamNGTreeKindsOff', 'treeKindList', []],   // tree kinds left out in Fine-tuning (services/beamngTrees.js)
+  ['treeKindsOff', 'mapng_beamNGTreeKindsOff', 'treeKindList', []],
+  ['treeSwaps', 'mapng_beamNGTreeSwaps', 'treeSwapList', []],           // "from>to"
+  ['treeModelsOff', 'mapng_beamNGTreeModelsOff', 'treeModelList', []],   // tree kinds left out in Fine-tuning (services/beamngTrees.js)
   ['basicPreset', 'mapng_beamNGBasicPreset', PRESET_IDS, 'all'],
 ];
-const LIST_KINDS = { contentList: sanitizeContentOff, tagList: sanitizeExcludeTags, treeKindList: sanitizeTreeKindsOff };
+const LIST_KINDS = { contentList: sanitizeContentOff, tagList: sanitizeExcludeTags, treeKindList: sanitizeTreeKindsOff, treeSwapList: sanitizeTreeSwaps, treeModelList: sanitizeTreeModelsOff };
 /** Whether a field holds a list (stored as JSON; not counted in the settings stats). */
 export const isListField = ([, , kind]) => Object.hasOwn(LIST_KINDS, kind);
 // (not counted in the settings stats: public/data.html lists every counted setting)

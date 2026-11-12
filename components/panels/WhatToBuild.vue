@@ -113,16 +113,37 @@
             {{ trees.source === 'records' ? t('build.trees.fromRecords', { count: trees.records }) : t('build.trees.fromClimate') }}
           </p>
           <ul class="rounded border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-700">
-            <li v-for="row in trees.rows" :key="row.group" class="px-2 py-1" :class="row.off ? 'opacity-60' : ''" :data-tree-kind="row.group">
+            <li v-for="row in trees.rows" :key="row.group" class="px-2 py-1" :class="row.off || row.swappedTo ? 'opacity-70' : ''" :data-tree-kind="row.group">
               <div class="flex items-center justify-between gap-2 text-caption">
-                <span class="font-medium text-gray-800 dark:text-gray-100">{{ treeGroupName(row.group) }}</span>
-                <span class="flex items-center gap-2">
-                  <span class="tabular-nums text-gray-600 dark:text-gray-300">{{ row.off ? t('build.trees.leftOut') : treeShare(row.share) }}</span>
-                  <!-- (a kind switched off: its trees are drawn again as the others; the last kind left stays on) -->
-                  <Switch :on="!row.off" :label="t('build.trees.keep', { kind: treeGroupName(row.group) })" :disabled="!treesBuilt || (!row.off && treeKindsOn <= 1)" @toggle="toggleTreeKind(row.group)" />
+                <span class="font-medium text-gray-800 dark:text-gray-100 truncate">{{ treeGroupName(row.group) }}</span>
+                <span class="flex items-center gap-2 shrink-0">
+                  <span v-if="!row.off && !row.swappedTo" class="tabular-nums text-gray-600 dark:text-gray-300">{{ treeShare(row.share) }}</span>
+                  <!-- keep the kind, leave it out (its trees become the others), or plant another kind in its place -->
+                  <select
+                    :value="row.off ? 'off' : row.swappedTo ? `to:${row.swappedTo}` : 'keep'"
+                    :disabled="!treesBuilt" :aria-label="t('build.trees.choiceFor', { kind: treeGroupName(row.group) })"
+                    class="max-w-[9.5rem] rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-micro py-0.5 pl-1 pr-5"
+                    @change="setTreeChoice(row.group, $event.target.value)"
+                  >
+                    <option value="keep">{{ t('build.trees.keepIt') }}</option>
+                    <option value="off" :disabled="!row.off && !row.swappedTo && treeKindsOn <= 1">{{ t('build.trees.leaveOut') }}</option>
+                    <optgroup :label="t('build.trees.replaceWith')">
+                      <option v-for="k in TREE_KIND_IDS.filter((id) => id !== row.group)" :key="k" :value="`to:${k}`">{{ treeGroupName(k) }}</option>
+                    </optgroup>
+                  </select>
                 </span>
               </div>
-              <div v-if="!row.off" class="text-micro leading-snug text-gray-500 dark:text-gray-400">{{ row.models.map((m) => treeModelLabel(m.type)).join(', ') }}</div>
+              <!-- its models, each to switch off (the last one stays) -->
+              <div v-if="!row.off && !row.swappedTo" class="mt-0.5 flex flex-wrap gap-1">
+                <button
+                  v-for="m in row.models" :key="m.type" type="button" :disabled="!treesBuilt || (!m.off && row.models.filter((x) => !x.off).length <= 1)"
+                  :aria-pressed="!m.off" :title="m.off ? t('build.trees.modelOff') : t('build.trees.modelOn')" :data-tree-model="m.type"
+                  class="px-1 rounded border text-micro leading-snug transition-colors disabled:cursor-not-allowed"
+                  :class="m.off ? 'border-gray-200 dark:border-gray-700 text-gray-400 line-through' : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-brand'"
+                  @click="toggleTreeModel(m.type)"
+                >{{ treeModelLabel(m.type) }}</button>
+              </div>
+              <div v-else-if="row.swappedTo" class="text-micro leading-snug text-gray-500 dark:text-gray-400">{{ t('build.trees.plantedAs', { kind: treeGroupName(row.swappedTo) }) }}</div>
             </li>
           </ul>
           <p class="text-micro leading-snug text-gray-500 dark:text-gray-400">{{ t('build.trees.switchHint') }} {{ t('build.trees.note') }}</p>
@@ -167,6 +188,7 @@
 <script setup>
 import { computed, reactive, defineComponent, h, toRaw } from 'vue';
 import { treeTable, treeModelLabel, sampleElevations } from '../../services/treeTable.js';
+import { TREE_KIND_IDS } from '../../services/beamngTrees.js';
 import { useI18n } from 'vue-i18n';
 import { ChevronRight } from 'lucide-vue-next';
 import SettingCard from '../base/SettingCard.vue';
@@ -188,8 +210,10 @@ const props = defineProps({
   safeCaps: { type: Boolean, default: true },
   assumeParking: { type: Boolean, default: true },
   treeKindsOff: { type: Array, default: () => [] },
+  treeSwaps: { type: Array, default: () => [] },
+  treeModelsOff: { type: Array, default: () => [] },
 });
-const emit = defineEmits(['update:forestDensity', 'update:lidarDecks', 'update:safeCaps', 'update:assumeParking', 'update:treeKindsOff']);
+const emit = defineEmits(['update:forestDensity', 'update:lidarDecks', 'update:safeCaps', 'update:assumeParking', 'update:treeKindsOff', 'update:treeSwaps', 'update:treeModelsOff']);
 const { t, te } = useI18n();
 const store = useMainStore();
 // (a feature's small hint, where it has one: asking for a missing key logs a warning)
@@ -203,15 +227,24 @@ const trees = computed(() => {
   if (!b || !props.hasOsmData) return null;
   return treeTable({
     lat: (b.north + b.south) / 2, lon: (b.east + b.west) / 2,
-    mix: td.treeSpeciesMix ?? null, elevations: sampleElevations(td.heightMap), off: props.treeKindsOff,
+    mix: td.treeSpeciesMix ?? null, elevations: sampleElevations(td.heightMap), off: props.treeKindsOff, swaps: props.treeSwaps, modelsOff: props.treeModelsOff,
   });
 });
 const treeGroupName = (g) => { const k = `build.trees.group_${g}`; return te(k) || te(k, 'en') ? t(k) : g.replace(/_/g, ' '); };
-const treeKindsOn = computed(() => (trees.value?.rows || []).filter((r) => !r.off).length);
-const toggleTreeKind = (group) => {
-  const off = new Set(props.treeKindsOff);
-  if (off.has(group)) off.delete(group); else off.add(group);
+const treeKindsOn = computed(() => (trees.value?.rows || []).filter((r) => !r.off && !r.swappedTo).length);
+// (keep / 'off' / 'to:<kind>' for one kind: a kind is in one list at most)
+const setTreeChoice = (group, choice) => {
+  const off = new Set(props.treeKindsOff); off.delete(group);
+  const swaps = props.treeSwaps.filter((x) => !String(x).startsWith(`${group}>`));
+  if (choice === 'off') off.add(group);
+  else if (choice.startsWith('to:')) swaps.push(`${group}>${choice.slice(3)}`);
   emit('update:treeKindsOff', [...off]);
+  emit('update:treeSwaps', swaps);
+};
+const toggleTreeModel = (type) => {
+  const off = new Set(props.treeModelsOff);
+  if (off.has(type)) off.delete(type); else off.add(type);
+  emit('update:treeModelsOff', [...off]);
 };
 const treeShare = (s) => (s < 0.01 ? '<1%' : `${Math.round(s * 100)}%`);
 

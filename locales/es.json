@@ -1359,7 +1359,9 @@
     "basicPreset": "Qué crear",
     "viewDistance": "Distancia de visión",
     "assumeParking": "Suponer aparcamiento en la calle",
-    "treeKindsOff": "Tipos de árbol omitidos"
+    "treeKindsOff": "Tipos de árbol omitidos",
+    "treeSwaps": "Tipos de árbol sustituidos",
+    "treeModelsOff": "Modelos de árbol omitidos"
   },
   "usage": {
     "askTitle": "¿Compartir qué ajustes usas?",
@@ -1553,7 +1555,9 @@
     "forest_veryDense": "Muy densa",
     "viewDistance": "Distancia de visión",
     "assumeParking": "Suponer aparcamiento en la calle",
-    "treeKindsOff": "Tipos de árbol omitidos"
+    "treeKindsOff": "Tipos de árbol omitidos",
+    "treeSwaps": "Tipos de árbol sustituidos",
+    "treeModelsOff": "Modelos de árbol omitidos"
   },
   "spawnPoints": {
     "title": "Puntos de inicio y Quicktravel",
@@ -1777,9 +1781,17 @@
       "group_cypress": "Cipreses",
       "group_olive": "Olivos",
       "leftOut": "omitido",
-      "keep": "Mantener {kind}",
       "leftOutLabel": "Tipos de árbol omitidos",
-      "switchHint": "Desactiva un tipo para omitirlo: sus árboles se plantan como los demás tipos."
+      "switchHint": "Para cada tipo: mantenerlo, omitirlo (sus árboles se plantan como los demás tipos) o plantar otro tipo en su lugar. Haz clic en un modelo para omitir solo ese.",
+      "keepIt": "Mantener",
+      "leaveOut": "Omitir",
+      "replaceWith": "Sustituir por",
+      "choiceFor": "Qué plantar en lugar de {kind}",
+      "plantedAs": "Plantado como {kind}",
+      "modelOn": "Plantado: haz clic para omitir este modelo",
+      "modelOff": "Omitido: haz clic para plantarlo de nuevo",
+      "swapsLabel": "Tipos de árbol sustituidos",
+      "modelsOffLabel": "Modelos de árbol omitidos"
     }
   }
 }

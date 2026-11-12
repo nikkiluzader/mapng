@@ -8,7 +8,7 @@ import { reloadTerrainSettings } from '../composables/useTerrainMode.js';
 import { reloadContentSettings } from '../composables/useBuildContent.js';
 import { sanitizeContentOff, sanitizeExcludeTags } from './buildContent.js';
 import { viewDistanceChoice } from './viewDistance.js';
-import { sanitizeTreeKindsOff } from './beamngTrees.js';
+import { sanitizeTreeKindsOff, sanitizeTreeModelsOff, sanitizeTreeSwaps } from './beamngTrees.js';
 
 export const PENDING_LEVEL_NAME_KEY = 'mapng_pendingLevelName';
 
@@ -45,6 +45,8 @@ export function exportSettingsFor(options = {}) {
   out.mapng_beamNGContentOff = JSON.stringify(sanitizeContentOff(options.contentOff).filter((id) => !OWN_KEYS.has(id)));
   out.mapng_beamNGExcludeTags = JSON.stringify(sanitizeExcludeTags(options.excludeTags));
   out.mapng_beamNGTreeKindsOff = JSON.stringify(sanitizeTreeKindsOff(options.treeKindsOff));
+  out.mapng_beamNGTreeSwaps = JSON.stringify(sanitizeTreeSwaps(options.treeSwaps));
+  out.mapng_beamNGTreeModelsOff = JSON.stringify(sanitizeTreeModelsOff(options.treeModelsOff));
   if (Number.isFinite(Number(options.seaLevelOffset))) out.mapng_beamNGSeaLevelOffset = String(Number(options.seaLevelOffset));
   // Terrain edits: none, all, or the chosen ones
   const edits = SHAPE_EDITS.map(([k]) => options[k] !== false);

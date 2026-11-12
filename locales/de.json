@@ -1359,7 +1359,9 @@
     "basicPreset": "Was gebaut wird",
     "viewDistance": "Sichtweite",
     "assumeParking": "Straßenparken annehmen",
-    "treeKindsOff": "Weggelassene Baumarten"
+    "treeKindsOff": "Weggelassene Baumarten",
+    "treeSwaps": "Ersetzte Baumarten",
+    "treeModelsOff": "Weggelassene Baummodelle"
   },
   "usage": {
     "askTitle": "Teilen, welche Einstellungen du nutzt?",
@@ -1553,7 +1555,9 @@
     "forest_veryDense": "Sehr dicht",
     "viewDistance": "Sichtweite",
     "assumeParking": "Straßenparken annehmen",
-    "treeKindsOff": "Weggelassene Baumarten"
+    "treeKindsOff": "Weggelassene Baumarten",
+    "treeSwaps": "Ersetzte Baumarten",
+    "treeModelsOff": "Weggelassene Baummodelle"
   },
   "spawnPoints": {
     "title": "Start- & Quicktravel-Punkte",
@@ -1777,9 +1781,17 @@
       "group_cypress": "Zypressen",
       "group_olive": "Olivenbäume",
       "leftOut": "weggelassen",
-      "keep": "{kind} behalten",
       "leftOutLabel": "Weggelassene Baumarten",
-      "switchHint": "Schalte eine Art aus, um sie wegzulassen: Ihre Bäume werden als die anderen Arten gepflanzt."
+      "switchHint": "Für jede Art: behalten, weglassen (ihre Bäume werden als die anderen Arten gepflanzt) oder eine andere Art an ihrer Stelle pflanzen. Klicke auf ein Modell, um nur dieses wegzulassen.",
+      "keepIt": "Behalten",
+      "leaveOut": "Weglassen",
+      "replaceWith": "Ersetzen durch",
+      "choiceFor": "Was für {kind} gepflanzt wird",
+      "plantedAs": "Gepflanzt als {kind}",
+      "modelOn": "Gepflanzt: Klicken, um dieses Modell wegzulassen",
+      "modelOff": "Weggelassen: Klicken, um es wieder zu pflanzen",
+      "swapsLabel": "Ersetzte Baumarten",
+      "modelsOffLabel": "Weggelassene Baummodelle"
     }
   }
 }

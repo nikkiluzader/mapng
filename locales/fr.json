@@ -1359,7 +1359,9 @@
     "basicPreset": "Que construire",
     "viewDistance": "Distance d'affichage",
     "assumeParking": "Supposer du stationnement sur rue",
-    "treeKindsOff": "Types d'arbres écartés"
+    "treeKindsOff": "Types d'arbres écartés",
+    "treeSwaps": "Types d'arbres remplacés",
+    "treeModelsOff": "Modèles d'arbres écartés"
   },
   "usage": {
     "askTitle": "Partager les réglages que vous utilisez ?",
@@ -1553,7 +1555,9 @@
     "forest_veryDense": "Très dense",
     "viewDistance": "Distance d'affichage",
     "assumeParking": "Supposer du stationnement sur rue",
-    "treeKindsOff": "Types d'arbres écartés"
+    "treeKindsOff": "Types d'arbres écartés",
+    "treeSwaps": "Types d'arbres remplacés",
+    "treeModelsOff": "Modèles d'arbres écartés"
   },
   "spawnPoints": {
     "title": "Points de départ et Quicktravel",
@@ -1777,9 +1781,17 @@
       "group_cypress": "Cyprès",
       "group_olive": "Oliviers",
       "leftOut": "écarté",
-      "keep": "Garder {kind}",
       "leftOutLabel": "Types d'arbres écartés",
-      "switchHint": "Désactivez un type pour l'écarter : ses arbres sont plantés comme les autres types."
+      "switchHint": "Pour chaque type : le garder, l'écarter (ses arbres sont plantés comme les autres types) ou planter un autre type à sa place. Cliquez sur un modèle pour n'écarter que celui-là.",
+      "keepIt": "Garder",
+      "leaveOut": "Écarter",
+      "replaceWith": "Remplacer par",
+      "choiceFor": "Que planter pour {kind}",
+      "plantedAs": "Planté comme {kind}",
+      "modelOn": "Planté : cliquez pour écarter ce modèle",
+      "modelOff": "Écarté : cliquez pour le replanter",
+      "swapsLabel": "Types d'arbres remplacés",
+      "modelsOffLabel": "Modèles d'arbres écartés"
     }
   }
 }

@@ -96,3 +96,58 @@ test('tree kinds left out are saved with the level, go into codes and the summar
   assert.equal(rows({ includeTrees: true, treeKindsOff: ['juniper'] }).find((r) => r.key === 'treeKindsOff')?.value.text, 'juniper');
   assert.ok(!rows({ includeTrees: true, treeKindsOff: [] }).some((r) => r.key === 'treeKindsOff'));
 });
+
+test('a kind swapped for another is planted as the other, whatever grows here; single models can be left out', async () => {
+  const { chooseTreeGroupAllowed, chooseTreeItem, sanitizeTreeSwaps, sanitizeTreeModelsOff, treeSwapMap, treeModelsOf } = await import('../services/beamngTrees.js');
+  const mix = { shares: { broadleaf: 0.4, palm: 0.3, live_oak: 0.3 }, records: 100 };
+  const p = { lat: 29.89, lon: -81.31, mix, elevations: [3] };
+  const share = (t, g) => t.rows.find((r) => r.group === g)?.share ?? 0;
+  const all = treeTable(p);
+  // palms for live oaks: the live oaks take the palms' share, the rest stay
+  const swapped = treeTable({ ...p, swaps: ['palm>live_oak'] });
+  assert.ok(Math.abs(share(swapped, 'live_oak') - (share(all, 'live_oak') + share(all, 'palm'))) < 1e-9);
+  assert.ok(Math.abs(share(swapped, 'deciduous') - share(all, 'deciduous')) < 1e-9);
+  assert.deepEqual(swapped.rows.at(-1), { group: 'palm', share: 0, models: [], swappedTo: 'live_oak' });
+  // for a kind the data did not pick here at all
+  const olive = treeTable({ ...p, swaps: ['palm>olive'] });
+  assert.ok(Math.abs(share(olive, 'olive') - share(all, 'palm')) < 1e-9);
+  // swapped for a kind that is itself left out: the swap does nothing, the palms stay palms
+  const dead = treeTable({ ...p, swaps: ['palm>live_oak'], off: ['live_oak'] });
+  assert.equal(share(dead, 'live_oak'), 0);
+  assert.ok(share(dead, 'palm') > share(all, 'palm'));
+  assert.deepEqual(dead.rows.filter((r) => !r.off && !r.swappedTo).map((r) => r.group).sort(), ['deciduous', 'palm']);
+  // a mapped species is not swapped
+  assert.equal(chooseTreeGroupAllowed({ kind: 'tree', tags: { species: 'Sabal palmetto' }, lat: 29.9, lon: -81.3, seed: 'a' }, null, treeSwapMap(['palm>oak'])), 'palm');
+  // stored swaps: known kinds, one per kind, never for itself
+  assert.deepEqual(sanitizeTreeSwaps(['palm>oak', 'palm>olive', 'oak>oak', 'x>oak', 'oak>nope', 'juniper>palm']), ['palm>oak', 'juniper>palm']);
+
+  // single models
+  const models = treeModelsOf('deciduous', { lat: 29.89, lon: -81.31 }).map((m) => m.type);
+  assert.ok(models.length > 3);
+  const gone = new Set(models.slice(1));
+  for (let i = 0; i < 40; i++) assert.equal(chooseTreeItem('deciduous', { lat: 29.89, lon: -81.31, seed: `s${i}`, modelsOff: gone }).type, models[0]);
+  // (every model of a kind left out: the kind keeps them all, never none)
+  assert.ok(chooseTreeItem('deciduous', { lat: 29.89, lon: -81.31, seed: 's', modelsOff: new Set(models) }));
+  const t = treeTable({ ...p, modelsOff: [models[1]] });
+  const row = t.rows.find((r) => r.group === 'deciduous');
+  assert.deepEqual(row.models.find((m) => m.type === models[1]), { type: models[1], share: 0, off: true });
+  assert.ok(Math.abs(row.models.reduce((s, m) => s + m.share, 0) - row.share) < 1e-9);
+  assert.deepEqual(sanitizeTreeModelsOff(['a_b', 'a_b', 'bad name!', 3]), ['a_b', '3']);
+});
+
+test('swaps and models left out are saved with the level and in codes; not counted in the stats', async () => {
+  const { exportSettingsFor } = await import('../services/exportSettings.js');
+  const { EXPORT_FIELDS, isCountedField } = await import('../services/sessionConfig.js');
+  const { summarizeExportSettings } = await import('../services/exportSettingsSummary.js');
+  const s = exportSettingsFor({ treeSwaps: ['palm>oak', 'junk'], treeModelsOff: ['m1'] });
+  assert.equal(s.mapng_beamNGTreeSwaps, '["palm>oak"]');
+  assert.equal(s.mapng_beamNGTreeModelsOff, '["m1"]');
+  for (const key of ['mapng_beamNGTreeSwaps', 'mapng_beamNGTreeModelsOff']) {
+    const field = EXPORT_FIELDS.find((f) => f[1] === key);
+    assert.ok(field, key);
+    assert.equal(isCountedField(field), false);
+  }
+  const rows = summarizeExportSettings({ includeTrees: true, treeSwaps: ['palm>oak'], treeModelsOff: ['m1', 'm2'] }).flatMap((g) => g.rows);
+  assert.equal(rows.find((r) => r.key === 'treeSwaps')?.value.text, 'palm → oak');
+  assert.equal(rows.find((r) => r.key === 'treeModelsOff')?.value.text, '2');
+});

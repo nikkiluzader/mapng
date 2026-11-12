@@ -1364,7 +1364,9 @@
     "basicPreset": "What to build",
     "viewDistance": "View distance",
     "assumeParking": "Assume street parking",
-    "treeKindsOff": "Tree kinds left out"
+    "treeKindsOff": "Tree kinds left out",
+    "treeSwaps": "Tree kinds swapped",
+    "treeModelsOff": "Tree models left out"
   },
   "usage": {
     "askTitle": "Share which settings you use?",
@@ -1558,7 +1560,9 @@
     "forest_veryDense": "Very dense",
     "viewDistance": "View distance",
     "assumeParking": "Assume street parking",
-    "treeKindsOff": "Tree kinds left out"
+    "treeKindsOff": "Tree kinds left out",
+    "treeSwaps": "Tree kinds swapped",
+    "treeModelsOff": "Tree models left out"
   },
   "spawnPoints": {
     "title": "Spawn & quicktravel points",
@@ -1782,9 +1786,17 @@
       "group_cypress": "Cypresses",
       "group_olive": "Olives",
       "leftOut": "left out",
-      "keep": "Keep {kind}",
       "leftOutLabel": "Tree kinds left out",
-      "switchHint": "Switch a kind off to leave it out: its trees are planted as the other kinds."
+      "switchHint": "For each kind: keep it, leave it out (its trees are planted as the other kinds) or plant another kind in its place. Click a model to leave just that one out.",
+      "keepIt": "Keep",
+      "leaveOut": "Leave out",
+      "replaceWith": "Replace with",
+      "choiceFor": "What to plant for {kind}",
+      "plantedAs": "Planted as {kind}",
+      "modelOn": "Planted: click to leave this model out",
+      "modelOff": "Left out: click to plant it again",
+      "swapsLabel": "Tree kinds swapped",
+      "modelsOffLabel": "Tree models left out"
     }
   }
 }

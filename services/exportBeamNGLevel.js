@@ -23,7 +23,7 @@ import { planGates, gateLeaves, splitAtCuts, isGateBarrier } from './gates.js';
 import { carveLakeBeds, carveWaterUnderDecks, fillRemnants, levelUnderDecks, lowerSeabed, planLakes, planRivers } from './beamngWater.js';
 import { tunnelDryZones, tunnelsBelow, planSeaBlocks, clipRiverNodes, clipLakeTile, splitLakeTile, hasInlandBelowSea } from './beamngWaterClip.js';
 import { placeCurveWarnings } from './curveWarningSigns.js';
-import { chooseTreeGroupAllowed, chooseTreeItem, sanitizeTreeKindsOff, treeHintFromTags, treeItemHeight, understoryGroup } from './beamngTrees.js';
+import { chooseTreeGroupAllowed, chooseTreeItem, sanitizeTreeKindsOff, sanitizeTreeModelsOff, sanitizeTreeSwaps, treeHintFromTags, treeItemHeight, treeSwapMap, understoryGroup } from './beamngTrees.js';
 import { openWaterAtEdge, plantAllowed, WORLDCOVER_ATTRIBUTION } from './worldCover.js';
 import { TREE_MIX_CREDIT } from './treeSpecies.js';
 import { placeBoats } from './boats.js';
@@ -8024,6 +8024,8 @@ function buildBeamNGExportReport({
     `- Include trees/bushes: ${formatBool(options?.includeTrees)}`,
     `- Forest density: ${options?.forestDensity || 'normal'} (×${forestDensityMultiplier(options?.forestDensity)} the base tree rates; woods ~${Math.round(36 * forestDensityMultiplier(options?.forestDensity))} trees/ha)`,
     ...(sanitizeTreeKindsOff(options?.treeKindsOff).length ? [`- Tree kinds left out (Fine-tuning): ${sanitizeTreeKindsOff(options.treeKindsOff).join(', ')} (trees with a species in the map keep it)`] : []),
+    ...(sanitizeTreeSwaps(options?.treeSwaps).length ? [`- Tree kinds swapped (Fine-tuning): ${sanitizeTreeSwaps(options.treeSwaps).map((s) => s.replace('>', ' planted as ')).join('; ')}`] : []),
+    ...(sanitizeTreeModelsOff(options?.treeModelsOff).length ? [`- Tree models left out (Fine-tuning): ${sanitizeTreeModelsOff(options.treeModelsOff).join(', ')}`] : []),
     `- Include rocks: ${formatBool(options?.includeRocks)}`,
     `- Street parking assumed where none is mapped: ${formatBool(options?.assumeParking !== false)}`,
     `- View distance: ${viewDistanceChoice(options?.viewDistance) === 'auto' ? 'auto (the map\'s width, 4 km at least, 16 km at most)' : `${viewDistanceChoice(options?.viewDistance)} m`} (LevelInfo visibleDistance)`,
@@ -10933,9 +10935,11 @@ const TREELESS_GOLF = new Set(['bunker', 'green', 'tee', 'fairway', 'driving_ran
 const UNDERWATER_KEEP = 30;
 const UNDERWATER_ROAD_M = 25;
 
-async function buildForestPlacements(terrainData, squareSize, { includeTrees, includeRocks, treeMix = null, water = null, forestDensity = 'normal', treeKindsOff = [] }, biome, tick = async () => {}) {
-  // (tree kinds the user leaves out in Fine-tuning: drawn again as one of the others)
+async function buildForestPlacements(terrainData, squareSize, { includeTrees, includeRocks, treeMix = null, water = null, forestDensity = 'normal', treeKindsOff = [], treeSwaps = [], treeModelsOff = [] }, biome, tick = async () => {}) {
+  // (Fine-tuning's tree choices: kinds left out are drawn again as the others, a kind swapped is the other, single models left out)
   const kindsOff = new Set(sanitizeTreeKindsOff(treeKindsOff));
+  const kindSwaps = treeSwapMap(treeSwaps);
+  const modelsOff = new Set(sanitizeTreeModelsOff(treeModelsOff));
   // (what the land cover left out, for the report: set when trees are planted)
   let landCover = null;
   // Buildings, water and open playing ground, for the scattered and canopy
@@ -11094,13 +11098,13 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
         const type = getOwnVegetationSelector(biome, hint);
         if (type) return { type, scale: 0.85 + 0.3 * seededRandom(hashString(`${seed}:s`)) };
       }
-      const group = chooseTreeGroupAllowed({ kind, tags, lat: point.lat, lon: point.lng, urban, area, seed, mix: treeMix, elevation }, kindsOff);
+      const group = chooseTreeGroupAllowed({ kind, tags, lat: point.lat, lon: point.lng, urban, area, seed, mix: treeMix, elevation }, kindsOff, kindSwaps);
       // (an olive or cypress drawn from the local mix: the biome's own, if it ships one)
       if (kind === 'tree' && (group === 'olive' || group === 'cypress')) {
         const type = getOwnVegetationSelector(biome, group);
         if (type) return { type, scale: 0.85 + 0.3 * seededRandom(hashString(`${seed}:s`)) };
       }
-      return chooseTreeItem(group, { tags, lat: point.lat, lon: point.lng, seed, extra: signature(group) });
+      return chooseTreeItem(group, { tags, lat: point.lat, lon: point.lng, seed, extra: signature(group), modelsOff });
     };
     const ground = terrainData.groundClasses?.cls?.length === terrainData.groundClasses?.w * terrainData.groundClasses?.h
       ? terrainData.groundClasses : null;
@@ -13750,7 +13754,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   }
   const forestPlacements = (includeTrees || includeRocks)
     ? await buildForestPlacements(exportTerrainData, squareSize, {
-      includeTrees, includeRocks, treeMix, forestDensity, treeKindsOff: options?.treeKindsOff,
+      includeTrees, includeRocks, treeMix, forestDensity, treeKindsOff: options?.treeKindsOff, treeSwaps: options?.treeSwaps, treeModelsOff: options?.treeModelsOff,
       // (below the sea plane or a lake's water: left out, but for a sparse few seen from a road)
       water: (() => {
         const seaZ = -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0);
