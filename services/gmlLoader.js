@@ -697,6 +697,8 @@ const parseGridCoverageNode = async (coverageNode, fileSize = 0) => {
       resY: yVector[1],
       noData: GML_NO_DATA,
       epsgCode,
+      // (a rectified grid's origin is its first post: the values are points, rasterCells.js)
+      cellIsPoint: true,
     };
   } else if (envelopeInfo?.bounds) {
     bounds = envelopeInfo.bounds;
@@ -712,8 +714,8 @@ const parseGridCoverageNode = async (coverageNode, fileSize = 0) => {
     const coverageHm = Math.abs(bounds.north - bounds.south) * mPerDegLat;
     nativeWidth = Math.max(1, Math.round(coverageWm));
     nativeHeight = Math.max(1, Math.round(coverageHm));
-    const mppX = coverageWm / Math.max(1, sourceWidth - 1);
-    const mppY = coverageHm / Math.max(1, sourceHeight - 1);
+    const mppX = coverageWm / Math.max(1, sourceWidth);
+    const mppY = coverageHm / Math.max(1, sourceHeight);
     const mppAvg = (mppX + mppY) / 2;
     nativeMetersPerPixel = Number.isFinite(mppAvg) && mppAvg > 0 ? mppAvg : null;
     const minCoverage = Math.min(coverageWm, coverageHm);
@@ -722,8 +724,12 @@ const parseGridCoverageNode = async (coverageNode, fileSize = 0) => {
 
     const srsName = grid?.['@_srsName'] || envelopeInfo.srsName || null;
     epsgCode = parseEpsgCode(srsName);
-    const resX = sourceWidth > 1 ? (bounds.east - bounds.west) / (sourceWidth - 1) : 0;
-    const resY = sourceHeight > 1 ? -(bounds.north - bounds.south) / (sourceHeight - 1) : 0;
+    // (the envelope is the tile's outer edge and each value a cell of it: the
+    // cells divide the envelope, they are not spread from edge to edge.
+    // Spread, a tile was a cell too wide and its edge column landed on its
+    // neighbour's: 0.6 m apart on average on Mikurajima, 17 m on its cliffs.)
+    const resX = sourceWidth > 0 ? (bounds.east - bounds.west) / sourceWidth : 0;
+    const resY = sourceHeight > 0 ? -(bounds.north - bounds.south) / sourceHeight : 0;
     gridTile = {
       raster,
       width: sourceWidth,

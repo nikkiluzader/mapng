@@ -1,4 +1,5 @@
 import proj4 from 'proj4';
+import { cellIndex, geoTiffCellIsPoint, sampleOrigin } from './rasterCells.js';
 import * as GeoTIFF from 'geotiff';
 import { createLocalToWGS84 } from './geoUtils.js';
 import { getBuiltInProj4 } from './uploadGeoMetadata.js';
@@ -292,8 +293,8 @@ export const resampleToMeterGrid = async (
                         raster: item.raster,
                         width: item.width,
                         height: item.height,
-                        originX: item.originX,
-                        originY: item.originY,
+                        originX: sampleOrigin(item.originX, item.resX, item.cellIsPoint),
+                        originY: sampleOrigin(item.originY, item.resY, item.cellIsPoint),
                         resX: item.resX,
                         resY: item.resY,
                         noData: Number.isFinite(item.noData) ? item.noData : -99999,
@@ -361,8 +362,9 @@ export const resampleToMeterGrid = async (
                     raster,
                     width,
                     height,
-                    originX,
-                    originY,
+                    // (the first sample's position: rasterCells.js)
+                    originX: sampleOrigin(originX, resX, geoTiffCellIsPoint(image.getGeoKeys())),
+                    originY: sampleOrigin(originY, resY, geoTiffCellIsPoint(image.getGeoKeys())),
                     resX,
                     resY,
                     noData,
@@ -420,10 +422,10 @@ export const resampleToMeterGrid = async (
                     const [tx, ty] = tile.converter.forward([lng, lat]);
                     
                     // Map to TIFF pixel space
-                    const px = (tx - tile.originX) / tile.resX;
-                    const py = (ty - tile.originY) / tile.resY;
+                    const px = cellIndex((tx - tile.originX) / tile.resX, tile.width);
+                    const py = cellIndex((ty - tile.originY) / tile.resY, tile.height);
 
-                    if (px >= 0 && px < tile.width - 1 && py >= 0 && py < tile.height - 1) {
+                    if (px !== null && py !== null) {
                         const val = bilinear(tile.raster, tile.width, px, py, tile.noData);
                         if (val !== tile.noData) {
                             h = val;

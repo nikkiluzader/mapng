@@ -3,6 +3,7 @@
  * Falls back to main-thread resampling if workers are unavailable.
  */
 import proj4 from 'proj4';
+import { geoTiffCellIsPoint } from './rasterCells.js';
 import { resampleToMeterGrid, resampleImageToMeterGrid } from './terrainResampler.js';
 import { getBuiltInProj4 } from './uploadGeoMetadata.js';
 
@@ -274,6 +275,7 @@ const prepareTiles = (sourceData) => {
             // survey layers (see elevationLayers.js).
             layerIndex: Number.isFinite(item.layerIndex) ? item.layerIndex : 0,
             epsgCode,
+            cellIsPoint: geoTiffCellIsPoint(geoKeys),
         });
     }
 
@@ -336,6 +338,7 @@ const prepareGridTiles = (sourceData) => {
                 noData,
                 epsgCode,
                 layerIndex,
+                cellIsPoint: !!tile?.cellIsPoint,
             };
         })
         .filter(Boolean);

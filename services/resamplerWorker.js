@@ -9,6 +9,7 @@
  * All data is passed as transferable ArrayBuffers where possible.
  */
 import proj4 from 'proj4';
+import { cellIndex, sampleOrigin } from './rasterCells.js';
 import { getBuiltInProj4 } from './uploadGeoMetadata.js';
 import { sampleSatelliteTexture, satelliteLatticeRows } from './satelliteImageSampler.js';
 import { decodeTerrariumPixels, blendTerrariumTileSeams, sampleTerrariumHeights, wrapMosaicX } from './terrariumSampling.js';
@@ -254,8 +255,9 @@ const buildPreparedTileGroups = async (tiles, epsgDefs, noDataValue) => {
             raster: tile.raster,
             width: tile.width,
             height: tile.height,
-            originX: tile.originX,
-            originY: tile.originY,
+            // (the first sample's position: half a cell in from the corner, rasterCells.js)
+            originX: sampleOrigin(tile.originX, tile.resX, tile.cellIsPoint),
+            originY: sampleOrigin(tile.originY, tile.resY, tile.cellIsPoint),
             resX: tile.resX,
             resY: tile.resY,
             noData: Number.isFinite(tile.noData) ? tile.noData : noDataValue,
@@ -266,11 +268,9 @@ const buildPreparedTileGroups = async (tiles, epsgDefs, noDataValue) => {
 };
 
 const samplePreparedTile = (tile, projectedX, projectedY) => {
-    const px = (projectedX - tile.originX) / tile.resX;
-    const py = (projectedY - tile.originY) / tile.resY;
-    if (px < 0 || px >= tile.width - 1 || py < 0 || py >= tile.height - 1) {
-        return tile.noData;
-    }
+    const px = cellIndex((projectedX - tile.originX) / tile.resX, tile.width);
+    const py = cellIndex((projectedY - tile.originY) / tile.resY, tile.height);
+    if (px === null || py === null) return tile.noData;
     return bilinear(tile.raster, tile.width, px, py, tile.noData);
 };
 
