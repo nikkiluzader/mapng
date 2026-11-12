@@ -840,7 +840,53 @@ const OUTLINE_MAX_TILES = 48;       // and at most this many extra tiles for it,
  * The whole segment is looked for in the tile over the piece at lower zooms
  * (simplified there, but whole) and kept as rec.outline, lon/lat.
  */
-const findOutlines = async (records, archive, z, minZoom, signal) => {
+const EDGE_EPS = 3e-5;              // (tile units: a clipped end lies on the tile's edge to rounding)
+/** The tiles (at zoom z) a line's end leads into when it lies on a tile edge: [] for an end inside a tile. */
+const tilesBeyond = (pt, z) => {
+  const n = 2 ** z;
+  const fx = ((pt.lon + 180) / 360) * n;
+  const fy = ((1 - Math.asinh(Math.tan((pt.lat * Math.PI) / 180)) / Math.PI) / 2) * n;
+  const onX = Math.abs(fx - Math.round(fx)) < EDGE_EPS; const onY = Math.abs(fy - Math.round(fy)) < EDGE_EPS;
+  if (!onX && !onY) return [];
+  const xs = onX ? [Math.round(fx) - 1, Math.round(fx)] : [Math.floor(fx)];
+  const ys = onY ? [Math.round(fy) - 1, Math.round(fy)] : [Math.floor(fy)];
+  return xs.flatMap((x) => ys.map((y) => ({ x, y }))).filter((t) => t.x >= 0 && t.y >= 0 && t.x < n && t.y < n);
+};
+const OUTLINE_HOPS = 3;             // a minor road is followed this many tiles past the ones asked for
+
+/**
+ * A cut road's whole line from its own pieces: joined across the tiles
+ * already read, and followed into the neighbouring tiles where it leaves
+ * them (a minor road is short: a tile or two). null when it does not come
+ * out as one line with both ends inside a tile.
+ */
+const stitchOutline = async (rec, z, have, more) => {
+  const pieces = rec.pieces.map((p) => [...p]);
+  const tried = new Set();
+  for (let hop = 0; hop <= OUTLINE_HOPS; hop++) {
+    const lines = joinPieces(pieces);
+    if (lines.length !== 1) return null;
+    const line = lines[0];
+    const beyond = [line[0], line[line.length - 1]].flatMap((pt) => tilesBeyond(pt, z)).filter((t) => !have.has(`${t.x}/${t.y}`) && !tried.has(`${t.x}/${t.y}`));
+    if (!beyond.length) {
+      // (an end still on an edge: the road goes on into a tile that could not be read)
+      const open = [line[0], line[line.length - 1]].some((pt) => tilesBeyond(pt, z).some((t) => !have.has(`${t.x}/${t.y}`)));
+      return open ? null : line;
+    }
+    if (hop === OUTLINE_HOPS) return null;
+    let grew = false;
+    for (const t of beyond) {
+      tried.add(`${t.x}/${t.y}`);
+      const found = await more(t.x, t.y);
+      if (found === undefined) return null;                    // (out of extra tiles)
+      for (const piece of found?.get(rec.id) || []) { pieces.push(piece); grew = true; }
+    }
+    if (!grew) return line;                                    // (the neighbours hold none of it: it ends on the edge)
+  }
+  return null;
+};
+
+const findOutlines = async (records, archive, z, minZoom, signal, haveTiles = []) => {
   const need = records.filter((r) => r.kind === 'line' && r.layer === 'segment' && r.props?.subtype === 'road'
     && r.whole?.length !== 1 && r.pieces.length && breakpoints(r.props).length);
   if (!need.length) return;
@@ -866,7 +912,35 @@ const findOutlines = async (records, archive, z, minZoom, signal) => {
     tiles.set(key, found);
     return found;
   };
+  // (a neighbouring tile's pieces of each road, for stitching: Map(id -> pieces), null for an empty tile, undefined when out of budget)
+  const pieceTiles = new Map();
+  const piecesIn = async (tx, ty) => {
+    const key = `${tx}/${ty}`;
+    if (pieceTiles.has(key)) return pieceTiles.get(key);
+    if (fetched >= OUTLINE_MAX_TILES) return undefined;
+    fetched++;
+    let found = null;
+    try {
+      const tile = await archive.getZxy(z, tx, ty, signal);
+      if (tile?.data) {
+        found = new Map();
+        for (const rec of collectFeatures([{ z, x: tx, y: ty, layers: decodeMvt(new Uint8Array(tile.data)) }])) {
+          if (rec.kind === 'line' && rec.pieces.length) found.set(rec.id, rec.pieces);
+        }
+      }
+    } catch (err) {
+      if (err?.name === 'AbortError' || signal?.aborted) throw err;
+    }
+    pieceTiles.set(key, found);
+    return found;
+  };
+  const have = new Set(haveTiles.map((t) => `${t.x}/${t.y}`));
+  const none = async () => undefined;
+  // 1. roads that lie whole across the tiles already read: no download
+  for (const rec of need) rec.outline = await stitchOutline(rec, z, have, none) || undefined;
+  // 2. long roads: the whole line from a lower zoom
   for (const rec of need) {
+    if (rec.outline) continue;
     const piece = rec.pieces[0];
     const mid = piece[Math.floor(piece.length / 2)];
     for (let tz = z - 1; tz >= Math.max(minZoom || 0, z - OUTLINE_ZOOMS_DOWN) && !rec.outline; tz--) {
@@ -875,6 +949,12 @@ const findOutlines = async (records, archive, z, minZoom, signal) => {
       const line = (await wholeIn(tz, tx, ty))?.get(rec.id);
       if (line?.length > 1) rec.outline = line;
     }
+  }
+  // 3. minor roads leaving the tiles read (they are not in the lower zooms): followed into the neighbours
+  for (const rec of need) {
+    if (rec.outline) continue;
+    signal?.throwIfAborted?.();
+    rec.outline = await stitchOutline(rec, z, have, piecesIn) || undefined;
   }
   const got = need.filter((r) => r.outline).length;
   if (need.length) console.log(`[OSM] Overture: ${got} of ${need.length} road(s) cut by the tile edge placed along their whole line (bridges, tunnels and levels on part of a road kept).`);
@@ -900,7 +980,7 @@ export const fetchOsmFromOverture = async (bounds, { signal, onStatus } = {}) =>
       const present = decoded.filter(Boolean);
       tileCount += present.length;
       recordsByTheme[theme] = collectFeatures(present);
-      if (theme === 'transportation') await findOutlines(recordsByTheme[theme], archive, z, header.minZoom, signal);
+      if (theme === 'transportation') await findOutlines(recordsByTheme[theme], archive, z, header.minZoom, signal, tiles);
     } catch (err) {
       if (err?.name === 'AbortError' || signal?.aborted) throw err;
       failures++;

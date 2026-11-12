@@ -360,3 +360,40 @@ test('the whole line of a cut road is looked for at lower zooms, a bounded numbe
     setOvertureArchiveFactory(null);
   }
 });
+
+test('a minor road leaving the tiles read is followed into the next tile, and its bridge kept', async () => {
+  const { fetchOsmFromOverture } = await import('../services/overtureTiles.js');
+  // the road: 2,096 tile units long, from x 3000 of this tile to x 1000 of the next; a bridge over 45 to 55 % of it,
+  // which is x 3943 of this tile to x 57 of the next (across the edge between them). It is in no lower zoom.
+  const props = { ...ROAD_PROPS, id: 'minor-1', class: 'residential', road_flags: JSON.stringify([{ values: ['is_bridge'], between: [0.45, 0.55] }]) };
+  const edge = (id) => ({ type: 2, props: { id, subtype: 'road', class: 'service' }, parts: [[[-200, 100], [4296, 100]]] });
+  const here = encodeMvt({ segment: [edge('e1'), { type: 2, props, parts: [[[3000, 2000], [4296, 2000]]] }] });
+  const next = encodeMvt({ segment: [edge('e2'), { type: 2, props, parts: [[[-200, 2000], [1000, 2000]]] }] });
+  const asked = [];
+  const data = (b) => ({ data: b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) });
+  setOvertureArchiveFactory((theme) => ({
+    getHeader: async () => ({ maxZoom: Z, minZoom: 0 }),
+    getZxy: async (z, x, y) => {
+      if (theme !== 'transportation') return null;
+      asked.push(`${z}/${x}/${y}`);
+      if (z === Z && x === X && y === Y) return data(here);
+      if (z === Z && x === X + 1 && y === Y) return data(next);
+      return null;
+    },
+  }));
+  try {
+    const n = 2 ** Z;
+    const lonOf = (x) => (x / n) * 360 - 180;
+    const latOf = (y) => (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / n))) * 180) / Math.PI;
+    const out = await fetchOsmFromOverture({ west: lonOf(X + 0.1), east: lonOf(X + 0.9), north: latOf(Y + 0.1), south: latOf(Y + 0.9) });
+    const ways = out.elements.filter((e) => e.tags?.name === 'Route 66');
+    assert.deepEqual(ways.map((w) => w.tags.bridge ?? null), [null, 'yes']);
+    // the bridge starts 943 units after the road does: 86 % of this tile's 1,096 units of it
+    const len = (w) => Math.abs(w.geometry[w.geometry.length - 1].lon - w.geometry[0].lon);
+    assert.ok(Math.abs(len(ways[0]) / (len(ways[0]) + len(ways[1])) - 943 / 1096) < 0.01);
+    assert.equal(asked.filter((a) => a === `${Z}/${X + 1}/${Y}`).length, 1, 'the neighbour is read once');
+    assert.ok(asked.length <= 12, asked.join(' '));
+  } finally {
+    setOvertureArchiveFactory(null);
+  }
+});
