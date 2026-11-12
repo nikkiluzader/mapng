@@ -170,7 +170,12 @@
     "lockSelection": "Ausgewählten Bereich fixieren",
     "unlockSelection": "Ausgewählten Bereich freigeben",
     "lockedByBackground": "Durch Hintergrundbereiche gesperrt",
-    "lockedField": "Der Bereich ist fixiert: zum Ändern auf der Karte freigeben"
+    "lockedField": "Der Bereich ist fixiert: zum Ändern auf der Karte freigeben",
+    "recommendLabel": "Empfohlen hier:",
+    "recommendBestFree": "Bestes kostenloses",
+    "recommendFinest": "{source}: die feinste der verglichenen Quellen.",
+    "recommendNoLidar": "{source}: hier gibt es kein freies Lidar.",
+    "recommendLidarLevel": "{source}. Das freie Lidar liegt auf {percent}% dieses Quadrats eben, wo die 30-m-Daten ein Gefälle zeigen, etwa {metres} m davon entfernt: Es könnte hier falsch sein."
   },
   "status": {
     "runConfigCopied": "Run-Konfiguration in die Zwischenablage kopiert (GPXZ-Schlüssel maskiert).",

@@ -170,7 +170,12 @@
     "lockSelection": "Zablokuj wybrany obszar w miejscu",
     "unlockSelection": "Odblokuj wybrany obszar",
     "lockedByBackground": "Zablokowane przez obszary tła",
-    "lockedField": "Obszar jest zablokowany: odblokuj go na mapie, aby go zmienić"
+    "lockedField": "Obszar jest zablokowany: odblokuj go na mapie, aby go zmienić",
+    "recommendLabel": "Zalecane tutaj:",
+    "recommendBestFree": "Najlepsze darmowe",
+    "recommendFinest": "{source}: najdokładniejsze z porównanych źródeł.",
+    "recommendNoLidar": "{source}: nie ma tu darmowego lidaru.",
+    "recommendLidarLevel": "{source}. Darmowy lidar jest płaski na {percent}% tego kwadratu tam, gdzie dane 30 m mają spadek, około {metres} m od nich: może być tu błędny."
   },
   "status": {
     "runConfigCopied": "Konfiguracja uruchomienia skopiowana do schowka (klucz GPXZ maskowany).",

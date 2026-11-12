@@ -51,6 +51,10 @@
             </figure>
           </div>
           <!-- the comparison as a page to keep or share: each source scored on this square's roads -->
+          <!-- which of the loaded sources to use here (services/sourceRecommend.js): light, from the pictures' own heights -->
+          <p v-if="compareOpen && recommendText" data-testid="compare-recommend" class="mt-1.5 leading-snug" :class="recommend?.why === 'lidarLevel' ? 'text-amber-700 dark:text-amber-400' : 'text-gray-600 dark:text-gray-300'">
+            <span class="font-semibold">{{ t('map.recommendLabel') }}</span> {{ recommendText }}
+          </p>
           <div v-if="compareOpen && canReport" class="mt-1.5 flex items-center gap-2">
             <button type="button" data-testid="compare-report" class="text-brand hover:underline disabled:opacity-50" :disabled="reportBusy" @click="saveQualityReport">
               {{ reportBusy ? t('map.compareReportBusy') : t('map.compareReport') }}
@@ -155,6 +159,7 @@ import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Mountain, ChevronDown, AlertTriangle, Sparkles } from 'lucide-vue-next';
 import { boxAround, probeMapterhorn, probeGpxz } from '../../services/sourceAdvisor.js';
+import { recommendSource } from '../../services/sourceRecommend.js';
 import { mapterhornZoomFor, mapterhornMosaicBudget, mapterhornMetersPerPixel } from '../../services/mapterhorn.js';
 import { desktopApp } from '../../services/platform/desktop.js';
 import { standardPatch, mapterhornPatch, gpxzPatch, hillshadeDataUrl } from '../../services/sourceCompare.js';
@@ -335,10 +340,22 @@ const compareCells = computed(() => [
   { key: 'gpxz', label: 'GPXZ', ...(compare.value.gpxz || { state: localGpxzApiKey.value ? 'ask' : 'none', note: t('map.compareNeedsKey') }) },
 ]);
 const centerPoint = () => ({ lat: Number(props.center?.lat), lng: Number(props.center?.lng) });
-const setCell = (key, v) => { compare.value = { ...compare.value, [key]: v }; };
+const recommend = ref(null);       // { pick, why, share, apartM } once every picture asked for has loaded
+const updateRecommend = () => {
+  const loading = ['standard', 'mapterhorn', 'gpxz'].some((k) => compare.value[k]?.state === 'loading');
+  try { recommend.value = loading ? null : recommendSource(compareHeights, COMPARE_PX, COMPARE_SIDE_M / COMPARE_PX); } catch { recommend.value = null; }
+};
+const recommendText = computed(() => {
+  const r = recommend.value; if (!r) return '';
+  const name = { standard: t('map.compareGlobal30'), mapterhorn: t('map.recommendBestFree'), gpxz: 'GPXZ' }[r.pick];
+  if (r.why === 'lidarLevel') return t('map.recommendLidarLevel', { source: name, percent: Math.round(r.share * 100), metres: Math.round(r.apartM) });
+  if (r.why === 'noLidar') return t('map.recommendNoLidar', { source: name });
+  return t('map.recommendFinest', { source: name });
+});
+const setCell = (key, v) => { compare.value = { ...compare.value, [key]: v }; updateRecommend(); };
 const loadCompare = async () => {
   compareAbort?.abort(); compareAbort = new AbortController(); const signal = compareAbort.signal;
-  const c = centerPoint(); compare.value = {}; for (const k of Object.keys(compareHeights)) delete compareHeights[k]; reportNote.value = '';
+  const c = centerPoint(); compare.value = {}; recommend.value = null; for (const k of Object.keys(compareHeights)) delete compareHeights[k]; reportNote.value = '';
   const cell = COMPARE_SIDE_M / COMPARE_PX;
   setCell('standard', { state: 'loading' }); setCell('mapterhorn', { state: 'loading' });
   standardPatch(c, { sideM: COMPARE_SIDE_M, px: COMPARE_PX, signal })

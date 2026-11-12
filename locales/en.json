@@ -175,7 +175,12 @@
     "lockSelection": "Lock the selected area in place",
     "unlockSelection": "Unlock the selected area",
     "lockedByBackground": "Locked by background areas",
-    "lockedField": "The area is locked: unlock it on the map to change it"
+    "lockedField": "The area is locked: unlock it on the map to change it",
+    "recommendLabel": "Suggested here:",
+    "recommendBestFree": "Best free",
+    "recommendFinest": "{source}: the finest of the sources compared.",
+    "recommendNoLidar": "{source}: there is no free lidar here.",
+    "recommendLidarLevel": "{source}. The free lidar lies level over {percent}% of this square where the 30 m data slopes, about {metres} m away from it: it may be wrong here."
   },
   "status": {
     "runConfigCopied": "Run configuration copied to clipboard (GPXZ key masked).",

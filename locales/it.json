@@ -170,7 +170,12 @@
     "lockSelection": "Blocca l'area selezionata",
     "unlockSelection": "Sblocca l'area selezionata",
     "lockedByBackground": "Bloccata dalle aree di sfondo",
-    "lockedField": "L'area è bloccata: sbloccala sulla mappa per modificarla"
+    "lockedField": "L'area è bloccata: sbloccala sulla mappa per modificarla",
+    "recommendLabel": "Consigliata qui:",
+    "recommendBestFree": "Miglior gratuito",
+    "recommendFinest": "{source}: la più fine tra le fonti confrontate.",
+    "recommendNoLidar": "{source}: qui non c'è lidar gratuito.",
+    "recommendLidarLevel": "{source}. Il lidar gratuito è piatto sul {percent}% di questo riquadro dove i dati a 30 m sono in pendenza, a circa {metres} m da essi: qui potrebbe essere sbagliato."
   },
   "status": {
     "runConfigCopied": "Configurazione di esecuzione copiata negli appunti (chiave GPXZ oscurata).",

@@ -170,7 +170,12 @@
     "lockSelection": "Verrouiller la zone sélectionnée",
     "unlockSelection": "Déverrouiller la zone sélectionnée",
     "lockedByBackground": "Verrouillée par les zones d'arrière-plan",
-    "lockedField": "La zone est verrouillée : déverrouillez-la sur la carte pour la modifier"
+    "lockedField": "La zone est verrouillée : déverrouillez-la sur la carte pour la modifier",
+    "recommendLabel": "Conseillée ici :",
+    "recommendBestFree": "Meilleur gratuit",
+    "recommendFinest": "{source} : la plus fine des sources comparées.",
+    "recommendNoLidar": "{source} : pas de lidar gratuit ici.",
+    "recommendLidarLevel": "{source}. Le lidar gratuit est plat sur {percent} % de ce carré là où les données 30 m sont en pente, à environ {metres} m d'elles : il est peut-être faux ici."
   },
   "status": {
     "runConfigCopied": "Configuration d'exécution copiée dans le presse-papiers (clé GPXZ masquée).",
