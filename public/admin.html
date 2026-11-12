@@ -37,18 +37,35 @@
   body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   a { color: var(--brand-ink); }
   h1, h2, h3 { font-family: "Overpass", "Noto Sans", system-ui, sans-serif; letter-spacing: -0.01em; margin: 0; }
-  .wrap { max-width: 1280px; margin: 0 auto; padding: 0 16px 60px; }
+  /* a side menu with a page per topic; on a phone the menu stacks above the page */
+  .shell { display: flex; flex-wrap: wrap; min-height: 100vh; }
+  nav.side { flex: 1 1 220px; max-width: 100%; background: #1a1a1f; color: #ececf0; padding: 18px 12px; display: flex; flex-direction: column; gap: 4px; }
+  nav.side .brand { font: italic 700 20px/1.2 "Overpass", sans-serif; padding: 0 10px 12px; display: flex; align-items: center; gap: 8px; color: #fff; }
+  nav.side .brand img { width: 22px; height: 22px; }
+  nav.side button { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: 8px; background: none; color: #ececf0; text-align: left; font-weight: 500; }
+  nav.side button:hover { background: #2a2a32; }
+  nav.side button[aria-selected="true"] { background: #d95400; color: #fff; font-weight: 700; }
+  nav.side .badge { background: #fff; color: #1a1a1f; border-radius: 999px; padding: 0 8px; font-size: 13px; font-weight: 700; }
+  nav.side .foot { margin-top: 14px; padding: 12px; border-top: 1px solid #34343c; color: #b9b9c4; font-size: 13px; overflow-wrap: anywhere; }
+  @media (max-width: 720px) { nav.side { flex-direction: row; flex-wrap: wrap; } nav.side .brand, nav.side .foot { flex: 1 1 100%; } nav.side button { width: auto; flex: 1 1 auto; } }
+  .wrap { flex: 999 1 560px; min-width: 0; padding: 0 24px 60px; }
+  .lead h2 { font-size: 30px; line-height: 1.15; margin: 4px 0 6px; }
+  .lead p { margin: 0 0 16px; color: var(--text-2); font-size: 16px; max-width: 720px; }
+  .todo { display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px; }
+  .todo .item { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .todo .mark { flex: 0 0 auto; width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font: 700 20px "Overpass", sans-serif; background: var(--brand-tint); color: var(--brand-ink); }
+  .todo .item.info .mark { background: color-mix(in srgb, var(--info) 14%, transparent); color: var(--info); }
+  .todo .body { flex: 1 1 300px; min-width: 0; } .todo .body b { display: block; } .todo .body span { color: var(--text-2); }
+  .todo button { min-height: 44px; font-weight: 600; }
+  .sys { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 16px; } .sys dt { color: var(--muted); } .sys dd { margin: 0; overflow-wrap: anywhere; }
   header.top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 14px 0; }
-  header.top h1 { font-size: 22px; font-style: italic; display: flex; align-items: center; gap: 8px; }
+  header.top h1 { font-size: 26px; }
   header.top img { width: 22px; height: 22px; }
   header.top .who { color: var(--muted); font-size: 13px; margin-left: auto; }
   button, select, input, textarea { font: inherit; color: inherit; }
   button { cursor: pointer; border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 6px 12px; }
   button:hover { border-color: var(--brand); }
   button.primary { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 700; }
-  nav.tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
-  nav.tabs button { border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 8px 12px; font-weight: 600; color: var(--text-2); }
-  nav.tabs button[aria-selected="true"] { border-bottom-color: var(--brand); color: var(--text); }
   .notice { background: var(--brand-tint); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin: 12px 0; }
   .notice.bad { border-color: var(--bad); }
   .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 18px; }
@@ -95,28 +112,39 @@
 </style>
 </head>
 <body>
+<div class="shell">
+<nav class="side" id="tabs" role="tablist" aria-label="Sections">
+  <div class="brand"><img src="/favicon.svg" alt="">MapNG admin</div>
+  <button role="tab" type="button" data-tab="overview" aria-selected="true">Overview</button>
+  <button role="tab" type="button" data-tab="reports" aria-selected="false">Reports <span class="badge" id="nav-open" hidden></span></button>
+  <button role="tab" type="button" data-tab="traffic" aria-selected="false">Traffic</button>
+  <button role="tab" type="button" data-tab="security" aria-selected="false">Security</button>
+  <button role="tab" type="button" data-tab="app" aria-selected="false">Desktop app</button>
+  <button role="tab" type="button" data-tab="usage" aria-selected="false">Exports and settings</button>
+  <button role="tab" type="button" data-tab="system" aria-selected="false">Builds and planet</button>
+  <div class="foot"><span id="who"></span><br><span id="updated"></span></div>
+</nav>
 <div class="wrap">
   <header class="top">
-    <h1><img src="/favicon.svg" alt="">MapNG admin</h1>
-    <button id="refresh" type="button">Refresh</button>
-    <span class="muted" id="updated"></span>
-    <span class="who" id="who"></span>
+    <h1 id="page-title">Overview</h1>
+    <button id="refresh" type="button" style="margin-left:auto">Refresh</button>
   </header>
 
   <div class="notice bad" id="gate" hidden></div>
 
   <div id="app" hidden>
-    <div class="tiles" id="tiles"></div>
+    <section data-panel="overview">
+      <div class="lead"><h2 id="lead-title">Loading…</h2><p id="lead-sub"></p></div>
+      <div class="todo" id="todo"></div>
+      <div class="tiles" id="tiles"></div>
+      <div class="grid2">
+        <div class="card"><h2>Newest reports</h2><div id="ov-reports"></div><button type="button" data-goto="reports" style="margin-top:10px">All reports</button></div>
+        <div class="card"><h2>Requests per day</h2><p class="sub" id="ov-requests-sub">Last 14 days, from Cloudflare.</p><div id="ov-requests"></div></div>
+        <div class="card"><h2>System</h2><dl class="sys" id="ov-system"></dl></div>
+      </div>
+    </section>
 
-    <nav class="tabs" role="tablist" id="tabs">
-      <button role="tab" data-tab="reports" aria-selected="true">Reports</button>
-      <button role="tab" data-tab="traffic" aria-selected="false">Traffic and security</button>
-      <button role="tab" data-tab="app" aria-selected="false">Desktop app</button>
-      <button role="tab" data-tab="usage" aria-selected="false">Exports and settings</button>
-      <button role="tab" data-tab="system" aria-selected="false">Builds and planet</button>
-    </nav>
-
-    <section data-panel="reports">
+    <section data-panel="reports" hidden>
       <div class="split">
         <div class="card">
           <h2>Problem reports</h2>
@@ -142,16 +170,26 @@
       <div class="grid2">
         <div class="card"><h2>Requests per day</h2><p class="sub" id="cf-traffic-sub">Last 14 days, from Cloudflare.</p><div id="cf-traffic"></div></div>
         <div class="card"><h2>Visitors and data per day</h2><p class="sub">Unique visitors (bars) with pages viewed and data served.</p><div id="cf-visitors"></div></div>
+      </div>
+    </section>
+
+    <section data-panel="security" hidden>
+      <div class="grid2">
         <div class="card"><h2>Security events, last 24 hours</h2><p class="sub">What Cloudflare challenged, blocked or let through by rule.</p><div class="scroll" id="cf-sec-action"></div></div>
         <div class="card"><h2>Where they were aimed</h2><p class="sub">Paths with the most security events.</p><div class="scroll" id="cf-sec-path"></div></div>
         <div class="card"><h2>From where</h2><p class="sub">Countries with the most security events.</p><div class="scroll" id="cf-sec-country"></div></div>
         <div class="card"><h2>By which client</h2><p class="sub">User agents with the most security events.</p><div class="scroll" id="cf-sec-agent"></div></div>
+        <div class="card" id="rules-card"><h2>Security rules in force</h2><p class="sub">Your own rules on mapng.com, as Cloudflare has them now.</p><div class="scroll" id="cf-rules"></div></div>
+      </div>
+    </section>
+
+    <section data-panel="traffic" hidden>
+      <div class="grid2">
         <div class="card"><h2>Responses, last 24 hours</h2><p class="sub">Status codes the site answered with. A large 504 count is expected: the app asks the cache for map tiles "only if cached", and a miss answers 504.</p><div class="scroll" id="cf-status"></div></div>
         <div class="card"><h2>Busiest paths, last 24 hours</h2><p class="sub">Requests by path.</p><div class="scroll" id="cf-paths"></div></div>
         <div class="card"><h2>Not found (404), last 24 hours</h2><p class="sub">By part of the site, then the single paths asked for most. Elevation tiles outside a source's coverage answer 404 by design; one tile asked for hundreds of times is a client retrying.</p><div class="scroll" id="cf-404"></div></div>
         <div class="card"><h2>Too many requests (429), last 24 hours</h2><p class="sub">Where a limit was hit: MapNG's own, or the service behind it (GPXZ keys, the address search).</p><div class="scroll" id="cf-429"></div></div>
         <div class="card"><h2>Errors from behind the site (500, 502, 503)</h2><p class="sub">Mostly the public map servers MapNG asks on people's behalf not answering.</p><div class="scroll" id="cf-5xx"></div></div>
-        <div class="card"><h2>Security rules in force</h2><p class="sub">Your own rules on mapng.com, as Cloudflare has them now.</p><div class="scroll" id="cf-rules"></div></div>
       </div>
     </section>
 
@@ -179,6 +217,7 @@
       </div>
     </section>
   </div>
+</div>
 </div>
 
 <script>
@@ -233,7 +272,28 @@
   // ── tiles ──
   const tiles = new Map();
   const tile = (key, value, label, sub = '') => { tiles.set(key, { value, label, sub }); drawTiles(); };
-  const TILE_ORDER = ['open', 'today', 'mail', 'downloads', 'latest', 'stars', 'requests', 'threats', 'exports', 'main'];
+  // (the Overview shows four; the rest of the numbers live on their own pages)
+  const TILE_ORDER = ['visitors', 'latest', 'security', 'planet'];
+
+  // ── what needs the developer today: each loader adds or clears its own lines ──
+  const attention = new Map();
+  const TODO_ORDER = ['reports', 'builds', 'rules', 'mail', 'retry', 'servers', 'cloudflare'];
+  function need(key, item) { if (item) attention.set(key, item); else attention.delete(key); drawAttention(); }
+  function drawAttention() {
+    const items = TODO_ORDER.filter((k) => attention.has(k)).map((k) => attention.get(k));
+    const urgent = items.filter((i) => !i.info).length;
+    $('lead-title').textContent = urgent ? `${urgent} thing${urgent === 1 ? '' : 's'} need${urgent === 1 ? 's' : ''} you today.` : 'Nothing needs you right now.';
+    $('lead-sub').textContent = urgent ? 'The rest is below, and on its own page in the menu.' : (items.length ? 'A couple of things worth knowing are below.' : 'No open reports, the builds passed and the rules are on.');
+    put('todo', el('div', { style: 'display:contents' }, items.map((i) => el('div', { class: `item${i.info ? ' info' : ''}` },
+      el('div', { class: 'mark', 'aria-hidden': 'true', text: i.mark }),
+      el('div', { class: 'body' }, el('b', { text: i.title }), el('span', { text: i.text })),
+      el('button', { type: 'button', text: i.action, onclick: () => goTo(i.tab) })))));
+  }
+  const system = new Map();
+  const SYS_ORDER = ['main', 'dev', 'rules', 'mail', 'reportsToday', 'planet'];
+  function sys(key, label, value) { system.set(key, [label, value]); put('ov-system', el('div', { style: 'display:contents' }, SYS_ORDER.filter((k) => system.has(k)).flatMap((k) => [el('dt', { text: system.get(k)[0] }), el('dd', {}, system.get(k)[1] instanceof Node ? system.get(k)[1] : document.createTextNode(system.get(k)[1]))]))); }
+  const TITLES = { overview: 'Overview', reports: 'Reports', traffic: 'Traffic', security: 'Security', app: 'Desktop app', usage: 'Exports and settings', system: 'Builds and planet' };
+  function goTo(tab) { const b = $('tabs').querySelector(`button[data-tab="${CSS.escape(tab)}"]`); if (b) b.click(); window.scrollTo({ top: 0 }); }
   function drawTiles() {
     put('tiles', el('div', { style: 'display:contents' }, TILE_ORDER.filter((k) => tiles.has(k)).map((k) => {
       const t = tiles.get(k);
@@ -339,7 +399,13 @@
   }
   function countOpen() {
     const open = state.reports.filter((r) => !r.admin?.handled).length;
-    tile('open', fmt(open), 'open problem reports', state.total > state.reports.length ? `of the newest ${fmt(state.reports.length)}` : `of ${fmt(state.total)} in all`);
+    const badge = $('nav-open'); badge.hidden = !open; badge.textContent = String(open);
+    const newest = state.reports.find((r) => !r.admin?.handled);
+    need('reports', open ? { mark: String(open), title: `Open problem report${open === 1 ? '' : 's'}`, text: newest ? `Newest: ${whatOf(newest).slice(0, 140)} (${newest.kind}, ${newest.appVersion || '?'}, ${ago(newest.receivedAt)}).` : '', action: 'Open reports', tab: 'reports' } : null);
+    const top = state.reports.slice(0, 4);
+    put('ov-reports', top.length ? el('div', {}, top.map((r) => el('div', { style: 'display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)' },
+      el('span', { class: `pill ${r.admin?.handled ? 'ok' : r.kind}`, style: 'align-self:flex-start', text: r.admin?.handled ? 'handled' : r.kind }),
+      el('div', { style: 'min-width:0' }, el('div', { style: r.admin?.handled ? 'color:var(--muted)' : 'font-weight:600', text: whatOf(r).slice(0, 120) }), el('div', { class: 'muted', style: 'font-size:13px', text: `${r.appVersion || '?'} · ${ago(r.receivedAt)}` }))))) : el('p', { class: 'muted', text: 'No reports yet.' }));
   }
   async function loadReports() {
     const d = await (await api('/reports?limit=200')).json();
@@ -356,8 +422,9 @@
   // ── overview: counters and caps ──
   async function loadOverview() {
     const o = await (await api('/overview')).json(); state.overview = o;
-    tile('today', fmt(o.today.reports), 'reports today (UTC)', `cap ${fmt(o.caps.reportsPerDay)} a day`);
-    tile('mail', `${fmt(o.today.mails)} / ${fmt(o.caps.mailPerDay)}`, 'alert emails today', o.mailOn ? `${fmt(o.today.mailsThisHour)} of ${fmt(o.caps.mailPerHour)} this hour` : 'email alerts are off');
+    sys('reportsToday', 'Reports today', `${fmt(o.today.reports)} (cap ${fmt(o.caps.reportsPerDay)})`);
+    sys('mail', 'Alert emails', o.mailOn ? `${fmt(o.today.mails)} of ${fmt(o.caps.mailPerDay)} today` : 'off');
+    need('mail', o.today.mails >= o.caps.mailPerDay * 0.8 ? { mark: '!', title: 'Alert emails are close to today\'s cap', text: `${fmt(o.today.mails)} of ${fmt(o.caps.mailPerDay)} sent. Past the cap, new reports still arrive here but no longer by email.`, action: 'See the limits', tab: 'system' } : null);
     const meter = (n, cap) => el('div', { class: 'meter' }, el('span', { style: `width:${Math.min(100, (n / Math.max(1, cap)) * 100)}%` }));
     put('caps', el('div', {},
       el('div', { text: `Alert emails today: ${fmt(o.today.mails)} of ${fmt(o.caps.mailPerDay)}` }), meter(o.today.mails, o.caps.mailPerDay),
@@ -377,20 +444,25 @@
     try { put(id, draw(s.rows)); } catch (e) { fail(id, `Could not draw this (${e.message}).`); }
   }
   async function loadCloudflare() {
-    try { state.cf = await (await api('/cloudflare')).json(); $('cf-setup').hidden = true; } catch (e) {
+    try { state.cf = await (await api('/cloudflare')).json(); $('cf-setup').hidden = true; need('cloudflare', null); } catch (e) {
       state.cf = null;
       const box = $('cf-setup'); box.hidden = false;
       box.textContent = e.status === 503
         ? 'Cloudflare\'s traffic and security numbers are not connected yet. They need a read-only analytics token (the CF_ANALYTICS_TOKEN secret) and the zone id (CF_ZONE_ID).'
         : `Could not load Cloudflare's numbers (${e.message}).`;
-      for (const id of ['cf-traffic', 'cf-visitors', 'cf-sec-action', 'cf-sec-path', 'cf-sec-country', 'cf-sec-agent', 'cf-status', 'cf-paths', 'cf-versions', 'cf-404', 'cf-429', 'cf-5xx', 'cf-rules']) fail(id, 'Not connected.');
+      need('cloudflare', { info: true, mark: 'i', title: 'Cloudflare\'s numbers are not loading', text: box.textContent, action: 'Open traffic', tab: 'traffic' });
+      for (const id of ['ov-requests', 'cf-traffic', 'cf-visitors', 'cf-sec-action', 'cf-sec-path', 'cf-sec-country', 'cf-sec-agent', 'cf-status', 'cf-paths', 'cf-versions', 'cf-404', 'cf-429', 'cf-5xx', 'cf-rules']) fail(id, 'Not connected.');
       return;
     }
     drawSection('traffic', 'cf-traffic', (rows) => {
       const total = rows.reduce((a, r) => a + r.sum.requests, 0); const cached = rows.reduce((a, r) => a + r.sum.cachedRequests, 0);
       const last = rows[rows.length - 1];
-      tile('requests', fmt(last.sum.requests), `requests on ${last.dimensions.date.slice(5)}`, `${fmt(total)} in ${rows.length} days`);
-      tile('threats', fmt(rows.reduce((a, r) => a + r.sum.threats, 0)), `threats stopped, ${rows.length} days`, 'as Cloudflare counts them');
+      // (the newest whole day: today's row is still filling)
+      const day = rows.length > 1 ? rows[rows.length - 2] : last; const before = rows.length > 2 ? rows[rows.length - 3] : null;
+      const change = before && before.uniq.uniques ? Math.round(((day.uniq.uniques - before.uniq.uniques) / before.uniq.uniques) * 100) : null;
+      tile('visitors', fmt(day.uniq.uniques), `visitors on ${day.dimensions.date.slice(5)}`, `${fmt(day.sum.requests)} requests${change === null ? '' : ` · ${change >= 0 ? 'up' : 'down'} ${Math.abs(change)}% on the day before`}`);
+      $('ov-requests-sub').textContent = `${fmt(total)} requests in ${rows.length} days. The last bar is today so far.`;
+      put('ov-requests', bars(rows.map((r) => r.sum.requests), rows.map((r) => r.dimensions.date.slice(5))));
       $('cf-traffic-sub').textContent = `${fmt(total)} requests in ${rows.length} days; ${Math.round((cached / Math.max(1, total)) * 100)}% served from Cloudflare's cache.`;
       return bars(rows.map((r) => r.sum.requests), rows.map((r) => r.dimensions.date.slice(5)));
     });
@@ -398,7 +470,12 @@
       bars(rows.map((r) => r.uniq.uniques), rows.map((r) => r.dimensions.date.slice(5)), { alt: true }),
       el('div', { class: 'scroll', style: 'margin-top:10px' }, table([{ label: 'Day' }, { label: 'Visitors', num: true }, { label: 'Page views', num: true }, { label: 'Data', num: true }, { label: 'Threats', num: true }],
         [...rows].reverse().slice(0, 7).map((r) => [r.dimensions.date, fmt(r.uniq.uniques), fmt(r.sum.pageViews), bytes(r.sum.bytes), fmt(r.sum.threats)])))));
-    drawSection('securityByAction', 'cf-sec-action', (rows) => table([{ label: 'Action' }, { label: 'By' }, { label: 'Events', num: true }], rows.map((r) => [r.dimensions.action, r.dimensions.source, fmt(r.count)])), 'No security events in the last 24 hours.');
+    drawSection('securityByAction', 'cf-sec-action', (rows) => {
+      const stopped = rows.filter((r) => /challenge|block/.test(r.dimensions.action)).reduce((a, r) => a + r.count, 0);
+      const blocked = rows.filter((r) => r.dimensions.action === 'block').reduce((a, r) => a + r.count, 0);
+      tile('security', fmt(stopped), 'challenged or blocked, 24 hours', `${fmt(blocked)} blocked outright`);
+      return table([{ label: 'Action' }, { label: 'By' }, { label: 'Events', num: true }], rows.map((r) => [r.dimensions.action, r.dimensions.source, fmt(r.count)]));
+    }, 'No security events in the last 24 hours.');
     drawSection('securityByPath', 'cf-sec-path', (rows) => table([{ label: 'Path', mono: true }, { label: 'Action' }, { label: 'Events', num: true }], rows.map((r) => [r.dimensions.clientRequestPath, r.dimensions.action, fmt(r.count)])), 'No security events in the last 24 hours.');
     drawSection('securityByCountry', 'cf-sec-country', (rows) => table([{ label: 'Country' }, { label: 'Events', num: true }], rows.map((r) => [r.dimensions.clientCountryName, fmt(r.count)])), 'No security events in the last 24 hours.');
     drawSection('securityByAgent', 'cf-sec-agent', (rows) => table([{ label: 'User agent', mono: true }, { label: 'Action' }, { label: 'Events', num: true }], rows.map((r) => [String(r.dimensions.userAgent || '(none)').slice(0, 110), r.dimensions.action, fmt(r.count)])), 'No security events in the last 24 hours.');
@@ -411,11 +488,22 @@
       table([{ label: 'Part of the site', mono: true }, { label: 'Among the top paths', num: true }], byPart(rows).map(([k, n]) => [k, fmt(n)])),
       el('div', { style: 'margin-top:10px' }, table([{ label: 'Path', mono: true }, { label: 'Requests', num: true }], rows.slice(0, 8).map((r) => [String(r.dimensions.clientRequestPath).slice(0, 80), fmt(r.count)]))));
     drawSection('notFoundPaths', 'cf-404', pathTables, 'No 404 answers in the last 24 hours.');
+    {
+      const worst = (section('notFoundPaths')?.rows || [])[0];
+      need('retry', worst && worst.count >= 500 ? { info: true, mark: '!', title: `One missing address was asked for ${fmt(worst.count)} times`, text: `${String(worst.dimensions.clientRequestPath).slice(0, 80)} answered "not found" every time: something is retrying it.`, action: 'See the 404s', tab: 'traffic' } : null);
+      const down = (section('serverErrorPaths')?.rows || []).reduce((a, r) => a + r.count, 0);
+      need('servers', down >= 1000 ? { info: true, mark: '!', title: `${fmt(down)} requests failed behind the site`, text: 'Mostly the public map servers not answering. People get the backup map data when that happens.', action: 'See the errors', tab: 'traffic' } : null);
+    }
     drawSection('limitedPaths', 'cf-429', pathTables, 'No 429 answers in the last 24 hours.');
     drawSection('serverErrorPaths', 'cf-5xx', (rows) => table([{ label: 'Path', mono: true }, { label: 'Status' }, { label: 'Requests', num: true }], rows.map((r) => [String(r.dimensions.clientRequestPath).slice(0, 70), r.dimensions.edgeResponseStatus, fmt(r.count)])), 'None in the last 24 hours.');
     const rules = state.cf.rules;
     if (!rules || rules.error) fail('cf-rules', `Cloudflare did not list the rules${rules?.error ? `: ${rules.error}` : '.'}`);
-    else put('cf-rules', table([{ label: 'Rule' }, { label: 'Action' }, { label: 'State' }], rules.rows.map((r) => [r.name, r.action, el('span', { class: `pill ${r.enabled ? 'ok' : 'crash'}`, text: r.enabled ? 'on' : 'OFF' })]), { empty: 'No custom rules.' }));
+    else {
+      const off = rules.rows.filter((r) => !r.enabled);
+      sys('rules', 'Security rules', `${rules.rows.length - off.length} of ${rules.rows.length} on`);
+      need('rules', off.length ? { mark: '!', title: `${off.length} security rule${off.length === 1 ? ' is' : 's are'} switched off`, text: `${off.map((r) => r.name).join(', ')}. If that was not on purpose, switch it back on in Cloudflare (the desktop app's rule keeps apps from being challenged).`, action: 'Open security', tab: 'security' } : null);
+      put('cf-rules', table([{ label: 'Rule' }, { label: 'Action' }, { label: 'State' }], rules.rows.map((r) => [r.name, r.action, el('span', { class: `pill ${r.enabled ? 'ok' : 'crash'}`, text: r.enabled ? 'on' : 'OFF' })]), { empty: 'No custom rules.' }));
+    }
     drawSection('appVersions', 'cf-versions', (rows) => {
       const by = new Map();
       for (const r of rows) { const v = (/MapNG-Desktop\/([0-9][^\s;)]*)/.exec(r.dimensions.userAgent) || [])[1] || r.dimensions.userAgent; by.set(v, (by.get(v) || 0) + r.count); }
@@ -434,21 +522,19 @@
       });
       const total = rows.reduce((n, r) => n + r.win + r.zip + r.linux, 0);
       const latest = rows.find((r) => !r.draft);
-      tile('downloads', fmt(total), 'desktop downloads', `last ${rows.length} releases`);
-      if (latest) tile('latest', latest.tag, 'latest release', `${latest.day} · ${fmt(latest.win + latest.zip + latest.linux)} downloads`);
+      if (latest) tile('latest', fmt(latest.win + latest.zip + latest.linux), `downloads of ${latest.tag}`, `${fmt(total)} across the last ${rows.length} releases`);
       put('gh-releases', table([{ label: 'Release' }, { label: 'Published' }, { label: 'Windows installer', num: true }, { label: 'Portable', num: true }, { label: 'Linux', num: true }, { label: 'Update checks', num: true }],
         rows.map((r) => [r.draft ? `${r.tag} (draft)` : r.tag, r.day, fmt(r.win), fmt(r.zip), fmt(r.linux), fmt(r.checks)])));
     } catch (e) { fail('gh-releases', `GitHub did not answer (${e.message}). It allows 60 questions an hour from one address.`); }
     try {
       const repo = await getJson(`https://api.github.com/repos/${REPO}`);
-      tile('stars', fmt(repo.stargazers_count), 'GitHub stars', `${fmt(repo.forks_count)} forks · ${fmt(repo.open_issues_count)} open issues and pull requests`);
       put('gh-repo', el('p', {}, `${fmt(repo.stargazers_count)} stars, ${fmt(repo.forks_count)} forks, ${fmt(repo.subscribers_count)} watching. Last push ${ago(repo.pushed_at)}.`));
       const issues = await getJson(`https://api.github.com/repos/${REPO}/issues?state=open&per_page=20`);
       put('gh-issues', table([{ label: 'Open' }, { label: 'Title' }, { label: 'Opened' }, { label: 'Comments', num: true }],
         issues.map((i) => [el('a', { href: i.html_url, target: '_blank', rel: 'noopener noreferrer', text: `${i.pull_request ? 'PR' : 'Issue'} #${i.number}` }), String(i.title).slice(0, 90), ago(i.created_at), fmt(i.comments)]), { empty: 'No open issues or pull requests.' }));
     } catch (e) { fail('gh-repo', `GitHub did not answer (${e.message}).`); }
     try {
-      const rows = [];
+      const rows = []; const failedBuilds = [];
       for (const branch of ['main', 'dev']) {
         const c = await getJson(`https://api.github.com/repos/${REPO}/commits/${branch}`);
         let checks = '';
@@ -457,8 +543,10 @@
           checks = cr.check_runs.map((x) => `${x.name.replace('Workers Builds: ', '')}: ${x.status === 'completed' ? x.conclusion : x.status}`).join(', ');
         } catch { checks = '(checks not available)'; }
         rows.push([branch, c.sha.slice(0, 7), c.commit.message.split('\n')[0].slice(0, 90), ago(c.commit.committer.date), checks]);
-        if (branch === 'main') tile('main', c.sha.slice(0, 7), 'on main', `${ago(c.commit.committer.date)} · ${checks.includes('failure') ? 'a build FAILED' : 'builds ok'}`);
+        sys(branch, branch, `${c.sha.slice(0, 7)} · ${checks.includes('failure') ? 'a build FAILED' : checks.includes('in_progress') || checks.includes('queued') ? 'building' : 'built'} · ${ago(c.commit.committer.date)}`);
+        if (checks.includes('failure')) failedBuilds.push(branch);
       }
+      need('builds', failedBuilds.length ? { mark: '!', title: `The build of ${failedBuilds.join(' and ')} failed`, text: 'The site keeps serving the last build that worked until this is fixed.', action: 'Open builds', tab: 'system' } : null);
       put('gh-branches', table([{ label: 'Branch' }, { label: 'Commit', mono: true }, { label: 'Message' }, { label: 'When' }, { label: 'Builds' }], rows));
     } catch (e) { fail('gh-branches', `GitHub did not answer (${e.message}).`); }
   }
@@ -469,7 +557,6 @@
       const h = await getJson('/api/hotspots');
       const cells = h.cells || [];
       const exports = (h.totals?.web || 0) + (h.totals?.desktop || 0);
-      tile('exports', fmt(exports), 'shared exports counted', `${fmt(h.totals?.desktop || 0)} desktop · ${fmt(h.totals?.web || 0)} web`);
       put('hot-summary', el('p', {}, `${fmt(exports)} exports in ${fmt(cells.length)} cells: ${fmt(h.totals?.web || 0)} from the website, ${fmt(h.totals?.desktop || 0)} from the desktop app.`));
       const top = [...cells].sort((a, b) => (b[2] + b[3]) - (a[2] + a[3])).slice(0, 15);
       put('hot-top', table([{ label: 'Cell centre', mono: true }, { label: 'Web', num: true }, { label: 'Desktop', num: true }, { label: 'Last day' }], top.map(([y, x, web, desktop, last]) => {
@@ -496,6 +583,8 @@
       const built = p.blocks.filter((b) => b[3] === 'b').length; const real = p.blocks.filter((b) => b[3] !== 'e').length;
       const up = p.upload;
       const sent = up ? up.groups.filter((g) => g[2] === 'u').length : 0;
+      tile('planet', up ? `${fmt(sent)} / ${fmt(up.groups.length)}` : (p.phase === 'done' ? 'Built' : p.phase), up ? 'planet archives uploaded' : 'planet build', up ? `${gb(up.done_mb)} of ${gb(up.total_mb)}` : `${fmt(built)} of ${fmt(real)} blocks`);
+      sys('planet', 'Planet', up ? `built · upload ${fmt(sent)} of ${fmt(up.groups.length)} archives` : `${p.phase}, ${fmt(built)} of ${fmt(real)} blocks`);
       put('planet', el('div', {},
         el('div', { text: `Build: ${p.phase === 'done' ? 'done' : p.phase}, ${fmt(built)} of ${fmt(real)} blocks, ${gb(p.done_mb)} of ${gb(p.total_mb)} of source data.` }),
         el('div', { class: 'meter' }, el('span', { style: `width:${Math.min(100, (p.done_mb / Math.max(1, p.total_mb)) * 100)}%` })),
@@ -510,8 +599,10 @@
     const b = e.target.closest('button[data-tab]'); if (!b) return;
     for (const t of $('tabs').querySelectorAll('button')) t.setAttribute('aria-selected', String(t === b));
     for (const p of document.querySelectorAll('[data-panel]')) p.hidden = p.dataset.panel !== b.dataset.tab;
+    $('page-title').textContent = TITLES[b.dataset.tab] || '';
     try { localStorage.setItem('mapng_admin_tab', b.dataset.tab); } catch { /* fine without */ }
   });
+  document.addEventListener('click', (e) => { const g = e.target.closest('button[data-goto]'); if (g) goTo(g.dataset.goto); });
   for (const id of ['f-text', 'f-kind', 'f-version', 'f-state', 'f-group']) $(id).addEventListener('input', drawReports);
 
   async function refresh() {
@@ -528,6 +619,7 @@
     try {
       const me = await (await api('/me')).json();
       $('who').textContent = `Signed in as ${me.email}`;
+      drawAttention();
       $('app').hidden = false;
       try { const t = localStorage.getItem('mapng_admin_tab'); const b = t && $('tabs').querySelector(`button[data-tab="${CSS.escape(t)}"]`); if (b) b.click(); } catch { /* fine without */ }
       await refresh();
