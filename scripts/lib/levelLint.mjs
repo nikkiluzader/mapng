@@ -328,7 +328,15 @@ export async function lintLevelZip(bytes, { gameHas = null, gameMaterials = null
 
   // ── tunnels (zone culling: a Zone and Portals for every tunnel) ──
   const tunnelShapes = byClass('TSStatic').filter((o) => /\/tunnels?\//.test(String(o.shapeName)));
-  if (tunnelShapes.length && !byClass('Zone').length) add('error', 'tunnels', `${tunnelShapes.length} tunnel object(s) but no Zone`);
+  // (a gallery, open to the daylight on its valley side, has no Zone by design: when the
+  // export report says every tunnel built is one, none is missing)
+  let onlyGalleries = false;
+  const reportName = names.find((n) => n.endsWith('export_report.txt'));
+  if (reportName && tunnelShapes.length) {
+    const m = /Tunnels built: (\d+) \(\d+ cut and cover, (\d+) galler/.exec(await text(reportName));
+    onlyGalleries = !!m && Number(m[1]) > 0 && Number(m[2]) === Number(m[1]);
+  }
+  if (tunnelShapes.length && !byClass('Zone').length && !onlyGalleries) add('error', 'tunnels', `${tunnelShapes.length} tunnel object(s) but no Zone`);
   if (byClass('Zone').length && !byClass('Portal').length) add('error', 'tunnels', 'Zones without Portals: the world goes dark through every opening');
 
   // ── spawn ──

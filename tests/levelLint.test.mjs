@@ -56,3 +56,21 @@ test('level lint: catches each kind of fault in a broken level', async () => {
   assert.ok(has('shapes', /none\.dae/), 'missing shape');
   assert.ok(findings.every((f) => ['error', 'warn'].includes(f.level)));
 });
+
+test('level lint: tunnels need a Zone, galleries do not', async () => {
+  const level = async (report) => {
+    const zip = new JSZip();
+    const L = 'levels/lint_tunnels';
+    zip.file(`${L}/main/items.level.json`, [
+      { name: 'MissionGroup', class: 'SimGroup' },
+      { name: 'tunnel_t001_tube1', class: 'TSStatic', __parent: 'MissionGroup', persistentId: 't1', shapeName: `/${L}/map_assets/custom_assets/tunnels/tunnel_t001_tube1.dae`, position: [0, 0, 0] },
+    ].map((o) => JSON.stringify(o)).join('\n'));
+    zip.file(`${L}/map_assets/custom_assets/tunnels/tunnel_t001_tube1.dae`, '<COLLADA/>');
+    if (report) zip.file(`${L}/export_report.txt`, report);
+    return zip.generateAsync({ type: 'uint8array' });
+  };
+  const noZone = (r) => r.findings.some((f) => f.check === 'tunnels' && /no Zone/.test(f.msg));
+  assert.equal(noZone(await lintLevelZip(await level(null))), true);
+  assert.equal(noZone(await lintLevelZip(await level('- Tunnels built: 1 (0 cut and cover, 0 galleries); tunnel=yes roads left on the ground: 0'))), true);
+  assert.equal(noZone(await lintLevelZip(await level('- Tunnels built: 1 (0 cut and cover, 1 galleries); tunnel=yes roads left on the ground: 0'))), false);
+});
