@@ -1791,7 +1791,10 @@
       "modelOn": "Sadzony: kliknij, aby pominąć ten model",
       "modelOff": "Pominięty: kliknij, aby znów go sadzić",
       "swapsLabel": "Zastąpione rodzaje drzew",
-      "modelsOffLabel": "Pominięte modele drzew"
+      "modelsOffLabel": "Pominięte modele drzew",
+      "reset": "Resetuj",
+      "resetHint": "Przywróć wszystkie rodzaje na Zachowaj i włącz wszystkie modele",
+      "takesIn": "Sadzone także zamiast: {kinds}"
     }
   }
 }

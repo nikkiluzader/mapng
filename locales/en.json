@@ -1796,7 +1796,10 @@
       "modelOn": "Planted: click to leave this model out",
       "modelOff": "Left out: click to plant it again",
       "swapsLabel": "Tree kinds swapped",
-      "modelsOffLabel": "Tree models left out"
+      "modelsOffLabel": "Tree models left out",
+      "reset": "Reset",
+      "resetHint": "Put every kind back to Keep and every model back on",
+      "takesIn": "Also planted in place of: {kinds}"
     }
   }
 }

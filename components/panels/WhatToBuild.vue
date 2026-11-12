@@ -108,7 +108,15 @@
         <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t(`exportPanel.ui.forestDensityHint_${forestDensity}`) }}</p>
         <!-- Which trees this area gets (services/treeTable.js): shown, not yet chosen -->
         <div v-if="trees && trees.rows.length" class="space-y-1 pt-1" data-testid="tree-table">
-          <div class="text-xs font-medium text-gray-800 dark:text-gray-100">{{ t('build.trees.title') }}</div>
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-medium text-gray-800 dark:text-gray-100">{{ t('build.trees.title') }}</span>
+            <!-- every kind back to Keep, every model back on: what the data picked -->
+            <button
+              v-if="treeChoicesMade" type="button" data-testid="tree-reset"
+              class="text-micro text-brand hover:underline" :title="t('build.trees.resetHint')"
+              @click="resetTreeChoices"
+            >{{ t('build.trees.reset') }}</button>
+          </div>
           <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">
             {{ trees.source === 'records' ? t('build.trees.fromRecords', { count: trees.records }) : t('build.trees.fromClimate') }}
           </p>
@@ -144,6 +152,8 @@
                 >{{ treeModelLabel(m.type) }}</button>
               </div>
               <div v-else-if="row.swappedTo" class="text-micro leading-snug text-gray-500 dark:text-gray-400">{{ t('build.trees.plantedAs', { kind: treeGroupName(row.swappedTo) }) }}</div>
+              <!-- (a kind others were swapped into says so: its share is not only its own) -->
+              <div v-if="!row.off && !row.swappedTo && treeTakesIn(row.group).length" class="mt-0.5 text-micro leading-snug text-amber-700 dark:text-amber-300" data-tree-takes-in>{{ t('build.trees.takesIn', { kinds: treeTakesIn(row.group).map(treeGroupName).join(', ') }) }}</div>
             </li>
           </ul>
           <p class="text-micro leading-snug text-gray-500 dark:text-gray-400">{{ t('build.trees.switchHint') }} {{ t('build.trees.note') }}</p>
@@ -241,6 +251,10 @@ const setTreeChoice = (group, choice) => {
   emit('update:treeKindsOff', [...off]);
   emit('update:treeSwaps', swaps);
 };
+const treeChoicesMade = computed(() => props.treeKindsOff.length + props.treeSwaps.length + props.treeModelsOff.length > 0);
+const resetTreeChoices = () => { emit('update:treeKindsOff', []); emit('update:treeSwaps', []); emit('update:treeModelsOff', []); };
+// (the kinds swapped into this one)
+const treeTakesIn = (group) => props.treeSwaps.map((x) => String(x).split('>')).filter(([, to]) => to === group).map(([from]) => from);
 const toggleTreeModel = (type) => {
   const off = new Set(props.treeModelsOff);
   if (off.has(type)) off.delete(type); else off.add(type);

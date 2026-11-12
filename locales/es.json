@@ -1791,7 +1791,10 @@
       "modelOn": "Plantado: haz clic para omitir este modelo",
       "modelOff": "Omitido: haz clic para plantarlo de nuevo",
       "swapsLabel": "Tipos de árbol sustituidos",
-      "modelsOffLabel": "Modelos de árbol omitidos"
+      "modelsOffLabel": "Modelos de árbol omitidos",
+      "reset": "Restablecer",
+      "resetHint": "Volver a Mantener todos los tipos y activar todos los modelos",
+      "takesIn": "También se planta en lugar de: {kinds}"
     }
   }
 }

@@ -116,6 +116,10 @@ test('a kind swapped for another is planted as the other, whatever grows here; s
   assert.equal(share(dead, 'live_oak'), 0);
   assert.ok(share(dead, 'palm') > share(all, 'palm'));
   assert.deepEqual(dead.rows.filter((r) => !r.off && !r.swappedTo).map((r) => r.group).sort(), ['deciduous', 'palm']);
+  // a swap holds for the trees drawn again when another kind is left out: no palm comes back that way
+  const both = treeTable({ ...p, swaps: ['palm>live_oak'], off: ['deciduous'] });
+  assert.equal(share(both, 'palm'), 0);
+  assert.deepEqual(both.rows.filter((r) => !r.off && !r.swappedTo).map((r) => r.group), ['live_oak']);
   // a mapped species is not swapped
   assert.equal(chooseTreeGroupAllowed({ kind: 'tree', tags: { species: 'Sabal palmetto' }, lat: 29.9, lon: -81.3, seed: 'a' }, null, treeSwapMap(['palm>oak'])), 'palm');
   // stored swaps: known kinds, one per kind, never for itself

@@ -1791,7 +1791,10 @@
       "modelOn": "Planté : cliquez pour écarter ce modèle",
       "modelOff": "Écarté : cliquez pour le replanter",
       "swapsLabel": "Types d'arbres remplacés",
-      "modelsOffLabel": "Modèles d'arbres écartés"
+      "modelsOffLabel": "Modèles d'arbres écartés",
+      "reset": "Réinitialiser",
+      "resetHint": "Remettre chaque type sur Garder et réactiver chaque modèle",
+      "takesIn": "Aussi planté à la place de : {kinds}"
     }
   }
 }

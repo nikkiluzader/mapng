@@ -271,7 +271,9 @@ export function chooseTreeGroupAllowed(params, off = null, swaps = null) {
   if (to && !(off && off.has(to))) return to;
   if (!off || !off.size || !off.has(first)) return first;
   for (let k = 1; k <= 8; k++) {
-    const again = chooseTreeGroup({ ...params, seed: `${params.seed}:alt${k}` });
+    // (a tree drawn again can come out as a kind that is swapped: it is the other kind too)
+    const drawn = chooseTreeGroup({ ...params, seed: `${params.seed}:alt${k}` });
+    const again = swaps?.get?.(drawn) || drawn;
     if (!off.has(again)) return again;
   }
   return KIND_FALLBACK.find((g) => !off.has(g)) || TREE_KIND_IDS.find((g) => !off.has(g)) || first;

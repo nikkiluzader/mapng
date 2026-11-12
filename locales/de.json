@@ -1791,7 +1791,10 @@
       "modelOn": "Gepflanzt: Klicken, um dieses Modell wegzulassen",
       "modelOff": "Weggelassen: Klicken, um es wieder zu pflanzen",
       "swapsLabel": "Ersetzte Baumarten",
-      "modelsOffLabel": "Weggelassene Baummodelle"
+      "modelsOffLabel": "Weggelassene Baummodelle",
+      "reset": "Zurücksetzen",
+      "resetHint": "Alle Arten wieder auf Behalten und alle Modelle wieder an",
+      "takesIn": "Wird auch gepflanzt anstelle von: {kinds}"
     }
   }
 }

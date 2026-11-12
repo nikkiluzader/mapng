@@ -1791,7 +1791,10 @@
       "modelOn": "Piantato: clicca per escludere questo modello",
       "modelOff": "Escluso: clicca per piantarlo di nuovo",
       "swapsLabel": "Tipi di albero sostituiti",
-      "modelsOffLabel": "Modelli di albero esclusi"
+      "modelsOffLabel": "Modelli di albero esclusi",
+      "reset": "Ripristina",
+      "resetHint": "Riporta ogni tipo a Mantieni e riattiva ogni modello",
+      "takesIn": "Piantato anche al posto di: {kinds}"
     }
   }
 }
