@@ -12761,6 +12761,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
     })
     : { meshes: [], runs: [], triangles: 0 };
+  // (the grid points graded for a sidewalk's slab: later passes that raise the
+  // ground leave them, or the slab ends up under it)
+  const sidewalkGroundIdx = new Set();
   if (sidewalks.runs.length > 0 && shapeExtras) {
     // the ground under the slabs (they hang at road height + the curb)
     const graded = gradeSidewalkGround([...sidewalks.runs, ...sidewalks.walkRuns, ...sidewalks.cornerRuns, ...sidewalks.cornerGround], groundCarriageways, {
@@ -12768,7 +12771,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       worldSize: exportTerrainData.width * squareSize, minHeight: Number(exportTerrainData.minHeight) || 0,
     }, { overhead: underDeck });
     const hmSide = heightMapEditor(exportTerrainData);
-    graded.apply((idx, v) => hmSide.set(idx, v));
+    graded.apply((idx, v) => { hmSide.set(idx, v); sidewalkGroundIdx.add(idx); });
     lowerUnderWallDecks(sidewalks.wallDecks, {
       heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
       worldSize: exportTerrainData.width * squareSize, minHeight: Number(exportTerrainData.minHeight) || 0,
@@ -13096,7 +13099,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
             const x = (c + 0.5 - W / 2) * squareSize; const y = (Hh / 2 - r - 0.5) * squareSize;
             const corners = [hmap[r * W + c], hmap[r * W + c + 1], hmap[(r - 1) * W + c], hmap[(r - 1) * W + c + 1]];
             const what = lowBoxSquareAt(t, x, y, Math.min(...corners) - mh0);
-            if (what === 'open') { holes.add(idx); opened++; t.holes = (t.holes || 0) + 1; }
+            // (a square with a sidewalk's graded ground at a corner cannot be
+            // raised without burying the slab: opened, as before the lid rule)
+            const cornerIdx = [r * W + c, r * W + c + 1, (r - 1) * W + c, (r - 1) * W + c + 1];
+            const underSidewalk = what?.raise != null && cornerIdx.some((i) => sidewalkGroundIdx.has(i));
+            if (what === 'open' || underSidewalk) { holes.add(idx); opened++; t.holes = (t.holes || 0) + 1; }
             else if (what?.raise != null) { const z = what.raise + mh0; raiseTo(r * W + c, z); raiseTo(r * W + c + 1, z); raiseTo((r - 1) * W + c, z); raiseTo((r - 1) * W + c + 1, z); }
           }
         }
@@ -13104,7 +13111,10 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       if (raises.size) {
         const hmLid = heightMapEditor(exportTerrainData);
         let raised = 0;
-        for (const [i, z] of raises) if (hmLid.at(i) < z) { hmLid.set(i, z); raised++; }
+        // (never over a sidewalk's graded ground: a street running along a low
+        // box, lower than its roof, had 50 m of sidewalk under up to 1.3 m of
+        // ground at Val d'Isère. The squares there stay as they were.)
+        for (const [i, z] of raises) if (!sidewalkGroundIdx.has(i) && hmLid.at(i) < z) { hmLid.set(i, z); raised++; }
         if (raised) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Tunnel lids: ${raised} grid point(s) just under a low box's ceiling raised onto its roof.`);
       }
       if (opened) {
