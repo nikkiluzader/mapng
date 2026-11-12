@@ -66,6 +66,7 @@
   .sw { width: 16px; height: 16px; border-radius: 3px; border: 2px solid; flex: none; }
   .sw.built { border-color: var(--built); background: color-mix(in srgb, var(--built) 45%, transparent); }
   .sw.running { border-color: var(--running); background: color-mix(in srgb, var(--running) 60%, transparent); }
+  .sw.empty { border-color: var(--built); border-style: dashed; background: color-mix(in srgb, var(--built) 12%, transparent); }
   .sw.waiting { border-color: var(--waiting); background: color-mix(in srgb, var(--waiting) 12%, transparent); }
   .sw.live { border-color: var(--live); border-style: dashed; background: transparent; }
   .regions { display: grid; gap: 10px; margin-top: 12px; }
@@ -111,6 +112,7 @@
       <li><span class="sw built"></span>Built</li>
       <li><span class="sw running"></span>Being built now</li>
       <li><span class="sw waiting"></span>Waiting</li>
+      <li><span class="sw empty"></span>Done: no map data there (open ocean)</li>
       <li><span class="sw live"></span>Already in MapNG today (earlier, smaller set)</li>
     </ul>
     <p>Each rectangle is one block of the build. Blocks are small where there is a lot of map data (cities, most of Europe) and large where there is little (oceans, deserts, the far north). Tap a block for its details.</p>
@@ -170,9 +172,11 @@
       w: { color: css('--waiting'), weight: 1, opacity: 0.55, fillOpacity: 0.06 },
       r: { color: css('--running'), weight: 2, opacity: 1, fillOpacity: 0.6, className: 'blk-running' },
       b: { color: css('--built'), weight: 1, opacity: 0.9, fillOpacity: 0.42 },
+      // (checked, and OpenStreetMap has nothing there: open ocean. Drawn, so it does not look forgotten)
+      e: { color: css('--built'), weight: 1, opacity: 0.9, fillOpacity: 0.12, dashArray: '4 4' },
     };
     // (running blocks last, so their outline is never under a neighbour's)
-    const order = { w: 0, b: 1, r: 2 };
+    const order = { w: 0, e: 1, b: 1, r: 2 };
     const blocks = doc.blocks.filter((b) => style[b[3]]).sort((a, b) => order[a[3]] - order[b[3]]);
     for (const [z, x, y, state, region, mb] of blocks) {
       const rect = L.rectangle(tileBounds(z, x, y), style[state]);
