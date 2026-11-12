@@ -63,7 +63,13 @@ const normalizeLongitude = (longitude) => {
   return value;
 };
 
-const toGeographicBounds = (west, east, south, north) => {
+// A grid in degrees has a small cell (1 arc-second is 0.00028, a coarse
+// 10 km grid 0.09). A cell of half a unit or more is metres: a 60 x 60 grid
+// of 1 m cells from 0,0 fits inside ±90 and was read as 60 degrees a side.
+const MAX_DEGREE_CELL = 0.1;
+
+const toGeographicBounds = (west, east, south, north, cellSize = 0) => {
+  if (cellSize > MAX_DEGREE_CELL) return null;
   if (
     !Number.isFinite(west)
     || !Number.isFinite(east)
@@ -220,7 +226,7 @@ export const parseAscText = async (text, options = {}) => {
   const east = maxXCenter + halfCell;
   const south = minYCenter - halfCell;
   const north = maxYCenter + halfCell;
-  const geographicBounds = toGeographicBounds(west, east, south, north);
+  const geographicBounds = toGeographicBounds(west, east, south, north, cellSize);
   const bounds = geographicBounds
     ? {
         north: geographicBounds.north,
@@ -530,6 +536,82 @@ export const applyAscCoordinateSystem = async (meta, epsgCode) => {
           sourceName: meta.gridTiles?.[0]?.sourceName || 'uploaded.asc',
         }]
       : [],
+  };
+};
+
+const PLACED_MIN_M = 8;            // a grid smaller than this, or larger than
+const PLACED_MAX_M = 400000;       // this, is not metres on the ground: left to be fitted
+const M_PER_DEG_LAT = 111320;
+
+/** Whether an ASC upload has no location of its own but a size in its own units (taken as metres). */
+export const ascNeedsPlacing = (meta) => !!meta
+  && (meta.sourceFormat === 'asc' || meta.sourceFormat === 'asc-multi')
+  && !meta.bounds && !meta.epsgCode
+  && ascTileSourcesOf(meta).length > 0;
+
+const ascTileSourcesOf = (meta) => {
+  const ok = (t) => t?.raster && t.width > 0 && t.height > 0 && t.sourceBoundsProjected
+    && ['north', 'south', 'east', 'west'].every((k) => Number.isFinite(t.sourceBoundsProjected[k]));
+  if (meta?.sourceFormat === 'asc-multi') return (meta.ascTileSources || []).filter(ok);
+  const one = { raster: meta?.raster, width: Number(meta?.sourceWidth || 0), height: Number(meta?.sourceHeight || 0), noData: meta?.noData, sourceBoundsProjected: meta?.sourceBoundsProjected, sourceName: 'uploaded.asc' };
+  return ok(one) ? [one] : [];
+};
+
+/** The ground size (m) of an ASC upload with no location: { width, height }, or null when it is not a plausible one. */
+export const ascGroundSize = (meta) => {
+  const tiles = ascTileSourcesOf(meta);
+  if (!tiles.length) return null;
+  const west = Math.min(...tiles.map((t) => t.sourceBoundsProjected.west));
+  const east = Math.max(...tiles.map((t) => t.sourceBoundsProjected.east));
+  const south = Math.min(...tiles.map((t) => t.sourceBoundsProjected.south));
+  const north = Math.max(...tiles.map((t) => t.sourceBoundsProjected.north));
+  const width = east - west; const height = north - south;
+  if (!(width >= PLACED_MIN_M && height >= PLACED_MIN_M && width <= PLACED_MAX_M && height <= PLACED_MAX_M)) return null;
+  return { width, height, west, east, south, north };
+};
+
+/**
+ * An ASC grid with no location (a local grid from 0,0: a game's heightmap, a
+ * CAD export) put on the map at its real size, its middle on `center`, its
+ * cell size taken as metres. It was stretched over whatever square was
+ * selected: a 4 km grid squeezed into 1 km, or a 2:1 grid made square.
+ * Several files keep their places beside each other. Returns the meta with
+ * bounds and grid tiles in degrees (the app's own metres-per-degree), or the
+ * meta unchanged when it has a location or no plausible size.
+ */
+export const placeAscAtCenter = (meta, center) => {
+  if (!ascNeedsPlacing(meta) || !Number.isFinite(center?.lat) || !Number.isFinite(center?.lng)) return meta;
+  const size = ascGroundSize(meta);
+  if (!size) return meta;
+  const mLat = M_PER_DEG_LAT;
+  const mLng = M_PER_DEG_LAT * Math.cos((center.lat * Math.PI) / 180);
+  if (!(mLng > 1)) return meta;
+  const cx = (size.west + size.east) / 2; const cy = (size.south + size.north) / 2;
+  const lng = (x) => center.lng + (x - cx) / mLng;
+  const lat = (y) => center.lat + (y - cy) / mLat;
+  const gridTiles = ascTileSourcesOf(meta).map((t) => {
+    const b = t.sourceBoundsProjected;
+    const bounds = { north: lat(b.north), south: lat(b.south), east: lng(b.east), west: lng(b.west) };
+    return {
+      raster: t.raster, width: t.width, height: t.height,
+      originX: bounds.west, originY: bounds.north,
+      resX: (bounds.east - bounds.west) / t.width, resY: (bounds.south - bounds.north) / t.height,
+      epsgCode: 4326, bounds, noData: t.noData, sourceName: t.sourceName || 'uploaded.asc',
+    };
+  });
+  const bounds = { north: lat(size.north), south: lat(size.south), east: lng(size.east), west: lng(size.west) };
+  if (bounds.north > 90 || bounds.south < -90 || bounds.east > 180 || bounds.west < -180) return meta;
+  const summary = summarizeCoverageBounds(bounds);
+  return {
+    ...meta,
+    bounds,
+    center: summary.center,
+    nativeWidth: summary.nativeWidth,
+    nativeHeight: summary.nativeHeight,
+    suggestedResolution: summary.suggestedResolution,
+    nativeMetersPerPixel: summary.nativeMetersPerPixel,
+    gridTiles,
+    placedAtCenter: true,
   };
 };
 

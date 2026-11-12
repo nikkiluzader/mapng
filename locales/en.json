@@ -323,7 +323,8 @@
     "addFallbackLayer": "Add fallback layer",
     "removeFallbackLayer": "Remove this fallback layer",
     "fallbackBadge": "Fallback {n}",
-    "fallbackLayerLimit": "Maximum of {max} layers reached."
+    "fallbackLayerLimit": "Maximum of {max} layers reached.",
+    "placedAtCenter": "No location in this file: it will be placed at its real size ({w} × {h} m) with its middle on the map's centre. Move the map to where it belongs."
   },
   "preview": {
     "hideSettings": "Hide scene settings",
@@ -589,7 +590,9 @@
       "hugeTerrain": "A {px} px terrain is beyond what most PCs can hold in memory.",
       "manyBuildings": "Build everything is on: all {count} buildings are built. Building meshes are what uses BeamNG's memory: turn Build everything off, or pick a smaller area.",
       "buildingsCapped": "{count} buildings in the area: {built} of them are built (Build everything is off).",
-      "uncapped": "Build everything is on: trees, fences, lamps and props aren't capped either. Dense foliage is what lowers the frame rate most."
+      "uncapped": "Build everything is on: trees, fences, lamps and props aren't capped either. Dense foliage is what lowers the frame rate most.",
+      "squareCrop": "This terrain is {w} × {h} px. A BeamNG level is a square with a power-of-two side, so the level will be the middle {size} × {size} px: {pct}% of the area.",
+      "squareCropTip": "To keep all of it, generate again at {mpp} m/px ({size} px)."
     },
     "downloadReady": "Download ready: {name}",
     "viewDistance": "View distance"

@@ -318,7 +318,8 @@
     "addFallbackLayer": "Dodaj warstwę zapasową",
     "removeFallbackLayer": "Usuń tę warstwę zapasową",
     "fallbackBadge": "Zapas {n}",
-    "fallbackLayerLimit": "Osiągnięto maksimum {max} warstw."
+    "fallbackLayerLimit": "Osiągnięto maksimum {max} warstw.",
+    "placedAtCenter": "Brak położenia w tym pliku: zostanie umieszczony w rzeczywistym rozmiarze ({w} × {h} m), środkiem na środku mapy. Przesuń mapę tam, gdzie powinien się znaleźć."
   },
   "preview": {
     "hideSettings": "Ukryj ustawienia sceny",
@@ -584,7 +585,9 @@
       "hugeTerrain": "Teren {px} px przekracza pamięć większości komputerów.",
       "manyBuildings": "Buduj wszystko jest włączone: powstaną wszystkie budynki ({count}). To siatki budynków zajmują pamięć BeamNG: wyłącz Buduj wszystko albo wybierz mniejszy obszar.",
       "buildingsCapped": "Budynki w obszarze: {count}; powstanie z nich {built} (Buduj wszystko jest wyłączone).",
-      "uncapped": "Buduj wszystko jest włączone: drzewa, ogrodzenia, latarnie i obiekty też nie mają limitu. Gęsta roślinność najbardziej obniża FPS."
+      "uncapped": "Buduj wszystko jest włączone: drzewa, ogrodzenia, latarnie i obiekty też nie mają limitu. Gęsta roślinność najbardziej obniża FPS.",
+      "squareCrop": "Ten teren ma {w} × {h} px. Poziom BeamNG to kwadrat o boku będącym potęgą dwójki, więc poziomem będzie środkowe {size} × {size} px: {pct}% powierzchni.",
+      "squareCropTip": "Aby zachować całość, wygeneruj go ponownie przy {mpp} m/px ({size} px)."
     },
     "downloadReady": "Gotowe do pobrania: {name}",
     "viewDistance": "Zasięg widzenia"

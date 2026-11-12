@@ -10,16 +10,12 @@ export const VALID_UPLOAD_RESOLUTIONS = [512, 1024, 2048, 4096, 8192];
 
 export const detectUnitFromText = (text) => {
   if (!text || typeof text !== 'string') return UNIT_UNKNOWN;
-  const normalized = text.toLowerCase();
-  if (normalized.includes('us survey foot') || normalized.includes('us_survey_foot') || normalized.includes('survey foot')) {
-    return UNIT_US_SURVEY_FEET;
-  }
-  if (normalized.includes('international foot') || normalized.includes('foot') || normalized.includes('feet') || normalized.includes('ft')) {
-    return UNIT_FEET;
-  }
-  if (normalized.includes('metre') || normalized.includes('meter') || normalized.includes('metres') || normalized.includes('meters')) {
-    return UNIT_METERS;
-  }
+  // Whole words only: "ft" anywhere in the text made feet of "software",
+  // "shift" or "Luftbild", and the heights came out at 30 % (too flat).
+  const normalized = text.toLowerCase().replace(/_/g, ' ');
+  if (/\b(us )?survey f(oo|ee)t\b|\bftus\b|\bus ft\b/.test(normalized)) return UNIT_US_SURVEY_FEET;
+  if (/\b(foot|feet|ft)\b/.test(normalized)) return UNIT_FEET;
+  if (/\b(metres?|meters?)\b/.test(normalized)) return UNIT_METERS;
   return UNIT_UNKNOWN;
 };
 
@@ -193,8 +189,12 @@ export const computeGeoMetadata = async ({
   const x1 = originX + xExtent;
   const y1 = originY + yExtent;
 
-  const [west, north] = toWGS84(originX, originY);
-  const [east, south] = toWGS84(x1, y1);
+  // All four corners: a projected grid is turned against the meridians
+  // (grid convergence), so two opposite corners alone leave part of it outside.
+  const corners = [toWGS84(originX, originY), toWGS84(x1, originY), toWGS84(originX, y1), toWGS84(x1, y1)];
+  const lngs = corners.map((c) => c[0]); const lats = corners.map((c) => c[1]);
+  const west = Math.min(...lngs); const east = Math.max(...lngs);
+  const south = Math.min(...lats); const north = Math.max(...lats);
 
   if (![west, north, east, south].every(Number.isFinite)) {
     console.warn(`[${logPrefix}] CRS conversion produced non-finite bounds (likely missing datum grid shift data).`);

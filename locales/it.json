@@ -318,7 +318,8 @@
     "addFallbackLayer": "Aggiungi livello di riserva",
     "removeFallbackLayer": "Rimuovi questo livello di riserva",
     "fallbackBadge": "Alternativa {n}",
-    "fallbackLayerLimit": "Raggiunto il numero massimo di {max} livelli."
+    "fallbackLayerLimit": "Raggiunto il numero massimo di {max} livelli.",
+    "placedAtCenter": "Nessuna posizione in questo file: verrà collocato alle sue dimensioni reali ({w} × {h} m) con il centro sul centro della mappa. Sposta la mappa dove deve trovarsi."
   },
   "preview": {
     "hideSettings": "Nascondi impostazioni scena",
@@ -584,7 +585,9 @@
       "hugeTerrain": "Un terreno da {px} px supera la memoria della maggior parte dei PC.",
       "manyBuildings": "Costruisci tutto è attivo: vengono costruiti tutti i {count} edifici. Sono le mesh degli edifici a occupare la memoria di BeamNG: disattiva Costruisci tutto o scegli un'area più piccola.",
       "buildingsCapped": "{count} edifici nell'area: ne vengono costruiti {built} (Costruisci tutto è disattivato).",
-      "uncapped": "Costruisci tutto è attivo: anche alberi, recinzioni, lampioni e oggetti non hanno limiti. La vegetazione fitta è ciò che abbassa di più gli FPS."
+      "uncapped": "Costruisci tutto è attivo: anche alberi, recinzioni, lampioni e oggetti non hanno limiti. La vegetazione fitta è ciò che abbassa di più gli FPS.",
+      "squareCrop": "Questo terreno misura {w} × {h} px. Un livello di BeamNG è un quadrato con lato potenza di due, quindi il livello sarà la parte centrale di {size} × {size} px: il {pct}% dell'area.",
+      "squareCropTip": "Per conservarlo tutto, generalo di nuovo a {mpp} m/px ({size} px)."
     },
     "downloadReady": "Download pronto: {name}",
     "viewDistance": "Distanza visiva"

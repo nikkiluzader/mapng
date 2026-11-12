@@ -318,7 +318,8 @@
     "addFallbackLayer": "Añadir capa de reserva",
     "removeFallbackLayer": "Quitar esta capa de reserva",
     "fallbackBadge": "Reserva {n}",
-    "fallbackLayerLimit": "Máximo de {max} capas alcanzado."
+    "fallbackLayerLimit": "Máximo de {max} capas alcanzado.",
+    "placedAtCenter": "Este archivo no tiene ubicación: se colocará a su tamaño real ({w} × {h} m) con su centro en el centro del mapa. Mueve el mapa a donde corresponda."
   },
   "preview": {
     "hideSettings": "Ocultar ajustes de escena",
@@ -584,7 +585,9 @@
       "hugeTerrain": "Un terreno de {px} px supera la memoria de la mayoría de PCs.",
       "manyBuildings": "Crear todo está activado: se crean los {count} edificios. Las mallas de edificios son lo que usa la memoria de BeamNG: desactiva Crear todo o elige una zona más pequeña.",
       "buildingsCapped": "{count} edificios en la zona: se crean {built} (Crear todo está desactivado).",
-      "uncapped": "Crear todo está activado: árboles, vallas, farolas y objetos tampoco tienen límite. La vegetación densa es lo que más baja los FPS."
+      "uncapped": "Crear todo está activado: árboles, vallas, farolas y objetos tampoco tienen límite. La vegetación densa es lo que más baja los FPS.",
+      "squareCrop": "Este terreno mide {w} × {h} px. Un nivel de BeamNG es un cuadrado con lado potencia de dos, así que el nivel será la parte central de {size} × {size} px: el {pct}% del área.",
+      "squareCropTip": "Para conservarlo todo, genéralo de nuevo a {mpp} m/px ({size} px)."
     },
     "downloadReady": "Descarga lista: {name}",
     "viewDistance": "Distancia de visión"

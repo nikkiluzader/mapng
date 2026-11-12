@@ -318,7 +318,8 @@
     "addFallbackLayer": "Ajouter une couche de secours",
     "removeFallbackLayer": "Retirer cette couche de secours",
     "fallbackBadge": "Secours {n}",
-    "fallbackLayerLimit": "Maximum de {max} couches atteint."
+    "fallbackLayerLimit": "Maximum de {max} couches atteint.",
+    "placedAtCenter": "Aucune position dans ce fichier : il sera placé à sa taille réelle ({w} × {h} m), son milieu au centre de la carte. Déplacez la carte là où il doit se trouver."
   },
   "preview": {
     "hideSettings": "Masquer les paramètres de scène",
@@ -584,7 +585,9 @@
       "hugeTerrain": "Un terrain de {px} px dépasse la mémoire de la plupart des PC.",
       "manyBuildings": "Tout construire est activé : les {count} bâtiments sont construits. Ce sont les maillages des bâtiments qui occupent la mémoire de BeamNG : désactivez Tout construire ou choisissez une zone plus petite.",
       "buildingsCapped": "{count} bâtiments dans la zone : {built} sont construits (Tout construire est désactivé).",
-      "uncapped": "Tout construire est activé : arbres, clôtures, lampadaires et objets ne sont pas plafonnés non plus. La végétation dense est ce qui fait le plus baisser les images par seconde."
+      "uncapped": "Tout construire est activé : arbres, clôtures, lampadaires et objets ne sont pas plafonnés non plus. La végétation dense est ce qui fait le plus baisser les images par seconde.",
+      "squareCrop": "Ce terrain fait {w} × {h} px. Un niveau BeamNG est un carré dont le côté est une puissance de deux : le niveau sera donc la partie centrale de {size} × {size} px, soit {pct} % de la surface.",
+      "squareCropTip": "Pour tout garder, générez-le à nouveau à {mpp} m/px ({size} px)."
     },
     "downloadReady": "Téléchargement prêt : {name}",
     "viewDistance": "Distance d'affichage"

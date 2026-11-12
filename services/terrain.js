@@ -13,7 +13,7 @@ export { parseRasterOrGridElevationFile };
 export { parseTifFile };
 import { parseLazFile, parseLazFiles } from "./lazLoader.js";
 export { parseLazFile };
-import { parseAscFiles } from './ascLoader.js';
+import { parseAscFiles, placeAscAtCenter } from './ascLoader.js';
 import { rasterizeLazOffThread } from "./lazClient.js";
 import { generateOSMTexture, generateHybridTexture, generateGameTexture } from "./osmTexture.js";
 import * as GeoTIFF from "geotiff";
@@ -131,6 +131,41 @@ const resolveElevationUnitScale = (meta, override = 'auto') => {
  * @param {Float32Array} heightMap
  * @param {number} scale - multiply factor from resolveElevationUnitScale()
  */
+/**
+ * Holes in a file fitted to the map without a location: each takes the
+ * nearest height, ring by ring outwards, till none is left. (No real terrain
+ * can stand in: where the file belongs is not known.) A file of nothing but
+ * no-data becomes flat ground at 0.
+ */
+export const fillFittedNoData = (heightMap, width, height) => {
+  let holes = 0;
+  for (let i = 0; i < heightMap.length; i++) if (heightMap[i] === NO_DATA_VALUE || !Number.isFinite(heightMap[i])) { heightMap[i] = NO_DATA_VALUE; holes++; }
+  if (!holes) return 0;
+  if (holes === heightMap.length) { heightMap.fill(0); return holes; }
+  const total = holes;
+  // (start from the heights that touch a hole, not every height in the file)
+  let frontier = [];
+  for (let i = 0; i < heightMap.length; i++) {
+    if (heightMap[i] === NO_DATA_VALUE) continue;
+    const x = i % width;
+    if ((x > 0 && heightMap[i - 1] === NO_DATA_VALUE) || (x < width - 1 && heightMap[i + 1] === NO_DATA_VALUE)
+      || (i >= width && heightMap[i - width] === NO_DATA_VALUE) || (i + width < heightMap.length && heightMap[i + width] === NO_DATA_VALUE)) frontier.push(i);
+  }
+  while (holes > 0 && frontier.length) {
+    const next = [];
+    for (const i of frontier) {
+      const x = i % width; const y = (i - x) / width;
+      const v = heightMap[i];
+      if (x > 0 && heightMap[i - 1] === NO_DATA_VALUE) { heightMap[i - 1] = v; next.push(i - 1); holes--; }
+      if (x < width - 1 && heightMap[i + 1] === NO_DATA_VALUE) { heightMap[i + 1] = v; next.push(i + 1); holes--; }
+      if (y > 0 && heightMap[i - width] === NO_DATA_VALUE) { heightMap[i - width] = v; next.push(i - width); holes--; }
+      if (y < height - 1 && heightMap[i + width] === NO_DATA_VALUE) { heightMap[i + width] = v; next.push(i + width); holes--; }
+    }
+    frontier = next;
+  }
+  return total;
+};
+
 const convertHeightMapToMeters = (heightMap, scale) => {
   if (!heightMap || !Number.isFinite(scale) || Math.abs(scale - 1) < 1e-9) return;
   for (let i = 0; i < heightMap.length; i++) {
@@ -2568,6 +2603,12 @@ export const loadTerrainFromTif = async (
   if (uploadedRasterData?.isLikelyElevation === false) {
     throw new Error(uploadedRasterData.elevationValidationMessage || '[BYOD] Uploaded GeoTIFF is not a valid elevation raster.');
   }
+  // (an ASC grid with no location: at its real size, its middle on the map's centre: ascLoader.js)
+  uploadedRasterData = placeAscAtCenter(uploadedRasterData, center);
+  if (uploadedRasterData.placedAtCenter) console.info(`[BYOD] ASC grid with no location placed at its real size (${uploadedRasterData.nativeWidth} x ${uploadedRasterData.nativeHeight} m) on the map's centre.`);
+  if (!uploadedRasterData.bounds && !uploadedRasterData.raster) {
+    throw new Error('These files have no location MapNG can read, and more than one file cannot be fitted to the map. Choose their coordinate system in the upload card, or upload one file.');
+  }
 
   const {
     generateOSMTextureAsset = true,
@@ -2772,11 +2813,14 @@ export const loadTerrainFromTif = async (
         const anyNoData = [h00, h10, h01, h11].some(
           h => h === noDataVal || !Number.isFinite(h)
         );
+        // (holes as the app's own no-data, filled below: the file's own value
+        // (-9999) stayed in the heights as ground 10 km down)
         heightMap[oy * width + ox] = anyNoData
-          ? noDataVal
+          ? NO_DATA_VALUE
           : h00 * (1-tx) * (1-ty) + h10 * tx * (1-ty) + h01 * (1-tx) * ty + h11 * tx * ty;
       }
     }
+    fillFittedNoData(heightMap, width, height);
     finalBounds = fetchBounds;
   }
 

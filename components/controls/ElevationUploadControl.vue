@@ -29,6 +29,10 @@
         <p v-else-if="uploadedElevationMeta?.isGeoReferenced" class="text-caption text-amber-600 dark:text-amber-400">
           {{ unsupportedStatusLabel }}
         </p>
+        <!-- (an ASC grid with no location: at its real size on the map's centre, services/ascLoader.js) -->
+        <p v-else-if="placedSize" class="text-caption text-amber-600 dark:text-amber-400" data-testid="upload-placed">
+          {{ t('upload.placedAtCenter', { w: Math.round(placedSize.width).toLocaleString(), h: Math.round(placedSize.height).toLocaleString() }) }}
+        </p>
         <p v-else-if="uploadedElevationMeta" class="text-caption text-amber-600 dark:text-amber-400">
           {{ t('upload.noGeoMetadata') }}
         </p>
@@ -271,6 +275,7 @@ import { ref, computed, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Upload, FileUp, X, CircleHelp, Layers, ChevronUp, ChevronDown, Plus } from 'lucide-vue-next';
 import { NODATA_AUTO, NODATA_NONE } from '../../services/nodataDetect.js';
+import { ascNeedsPlacing, ascGroundSize } from '../../services/ascLoader.js';
 import { applyLayerOrder } from '../../services/elevationLayers.js';
 import { GAP_FILL_STANDARD, GAP_FILL_GPXZ, GAP_FILL_NONE } from '../../services/gapFillSources.js';
 
@@ -325,6 +330,7 @@ const uploadedFileLabel = computed(() => {
 });
 
 const rasterFormatLabel = computed(() => props.uploadedElevationMeta?.formatLabel || 'Raster');
+const placedSize = computed(() => (ascNeedsPlacing(props.uploadedElevationMeta) ? ascGroundSize(props.uploadedElevationMeta) : null));
 
 const detectedStatusLabel = computed(() => `${rasterFormatLabel.value} - ${t('upload.autoDetected')}`);
 

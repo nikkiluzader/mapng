@@ -172,6 +172,14 @@
               {{ t('exportPanel.weight.size', { km: levelWeight.sizeKm < 10 ? levelWeight.sizeKm.toFixed(1) : Math.round(levelWeight.sizeKm), far: levelWeight.farthestKm < 10 ? levelWeight.farthestKm.toFixed(1) : Math.round(levelWeight.farthestKm), buildings: levelWeight.builtBuildings.toLocaleString() }) }}
               {{ t(`exportPanel.weight.summary_${levelWeight.rating}`) }}
             </p>
+            <!-- a terrain that is not a power-of-two square is cut to one (services/squareCrop.js) -->
+            <p v-if="squareCrop" class="flex gap-1.5 text-caption leading-snug text-amber-700 dark:text-amber-300" data-testid="square-crop">
+              <AlertTriangle :size="12" class="shrink-0 mt-px" />
+              <span>
+                {{ t('exportPanel.weight.squareCrop', { w: squareCrop.width, h: squareCrop.height, size: squareCrop.size, pct: Math.round(squareCrop.keptShare * 100) }) }}
+                <template v-if="squareCrop.suggestMpp">{{ ' ' + t('exportPanel.weight.squareCropTip', { mpp: squareCrop.suggestMpp, size: squareCrop.suggestSize }) }}</template>
+              </span>
+            </p>
             <ul v-if="levelWeight.notes.length" class="space-y-1">
               <li
                 v-for="note in levelWeight.notes"
@@ -615,6 +623,7 @@ import { PENDING_LEVEL_NAME_KEY } from '../../services/exportSettings.js';
 import { currentSessionCode, currentSessionConfigValue, openReportDialog } from '../../composables/useReportDialog.js';
 import { reportUsage, useUsageStats } from '../../composables/useUsageStats.js';
 import { estimateLevelWeight } from '../../services/levelWeight.js';
+import { squareCropNotice } from '../../services/squareCrop.js';
 import { CHECKBOX, SELECT_XS } from '../base/controlStyles.js';
 import { prepareCroppedTerrainData } from '../../services/cropTerrain';
 import { reverseLocationName } from '../../services/nominatim';
@@ -871,6 +880,7 @@ const levelWeight = computed(() => estimateLevelWeight({
   safeCaps: !advancedMode.value || beamNGSafeCaps.value,
   includeBuildings: hasOsmData.value && built('buildings'),
 }));
+const squareCrop = computed(() => squareCropNotice(props.terrainData?.width, props.terrainData?.height, resolveProcessingMetersPerPixel(props.terrainData)));
 const isCustomUploadTerrain = computed(() => !!props.terrainData?.elevationUnitApplied);
 const canUseGpxzBackdrop = computed(() => props.elevationSource === 'gpxz' && !!props.gpxzApiKey);
 

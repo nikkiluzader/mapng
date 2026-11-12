@@ -318,7 +318,8 @@
     "addFallbackLayer": "Fallback-Ebene hinzufügen",
     "removeFallbackLayer": "Diese Fallback-Ebene entfernen",
     "fallbackBadge": "Fallback {n}",
-    "fallbackLayerLimit": "Maximal {max} Ebenen erreicht."
+    "fallbackLayerLimit": "Maximal {max} Ebenen erreicht.",
+    "placedAtCenter": "Keine Position in dieser Datei: Sie wird in ihrer echten Größe ({w} × {h} m) mit ihrer Mitte auf der Kartenmitte platziert. Verschiebe die Karte dorthin, wo sie hingehört."
   },
   "preview": {
     "hideSettings": "Szeneneinstellungen ausblenden",
@@ -584,7 +585,9 @@
       "hugeTerrain": "Ein Gelände mit {px} px übersteigt den Speicher der meisten PCs.",
       "manyBuildings": "Alles bauen ist an: alle {count} Gebäude werden gebaut. Gebäude-Meshes belegen BeamNGs Speicher: schalte Alles bauen aus oder wähle ein kleineres Gebiet.",
       "buildingsCapped": "{count} Gebäude im Gebiet: {built} davon werden gebaut (Alles bauen ist aus).",
-      "uncapped": "Alles bauen ist an: Bäume, Zäune, Laternen und Objekte sind auch nicht begrenzt. Dichte Vegetation senkt die FPS am stärksten."
+      "uncapped": "Alles bauen ist an: Bäume, Zäune, Laternen und Objekte sind auch nicht begrenzt. Dichte Vegetation senkt die FPS am stärksten.",
+      "squareCrop": "Dieses Gelände ist {w} × {h} px groß. Ein BeamNG-Level ist ein Quadrat mit einer Zweierpotenz als Seitenlänge, daher wird das Level die mittleren {size} × {size} px: {pct}% der Fläche.",
+      "squareCropTip": "Um alles zu behalten, erzeuge es erneut mit {mpp} m/px ({size} px)."
     },
     "downloadReady": "Download bereit: {name}",
     "viewDistance": "Sichtweite"
