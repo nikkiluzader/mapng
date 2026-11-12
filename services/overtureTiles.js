@@ -408,6 +408,32 @@ const splitAt = (line, cuts) => {
   return out;
 };
 
+// How far along `outline` (the whole segment, lon/lat) a point lies, as a
+// fraction of its length, and how far off it the point is (m).
+const fractionAlong = (outline, pt) => {
+  let total = 0; let best = { d: Infinity, at: 0 };
+  const k = 111320; const kx = k * Math.cos((pt.lat * Math.PI) / 180);
+  for (let i = 0; i + 1 < outline.length; i++) {
+    const a = outline[i]; const b = outline[i + 1];
+    const ax = (a.lon - pt.lon) * kx; const ay = (a.lat - pt.lat) * k;
+    const bx = (b.lon - pt.lon) * kx; const by = (b.lat - pt.lat) * k;
+    const dx = bx - ax; const dy = by - ay; const len = Math.hypot(dx, dy);
+    const t = len > 0 ? Math.min(1, Math.max(0, -(ax * dx + ay * dy) / (len * len))) : 0;
+    const d = Math.hypot(ax + dx * t, ay + dy * t);
+    if (d < best.d) best = { d, at: total + len * t };
+    total += len;
+  }
+  return total > 0 ? { f: best.at / total, off: best.d } : null;
+};
+const OUTLINE_MAX_OFF_M = 40;       // a piece further than this from the outline is not that segment's
+/** The fractions of the whole segment a piece's two ends lie at: [from, to], or null when it does not lie on the outline. */
+export const spanAlong = (outline, line) => {
+  if (!Array.isArray(outline) || outline.length < 2 || !Array.isArray(line) || line.length < 2) return null;
+  const a = fractionAlong(outline, line[0]); const b = fractionAlong(outline, line[line.length - 1]);
+  if (!a || !b || a.off > OUTLINE_MAX_OFF_M || b.off > OUTLINE_MAX_OFF_M || Math.abs(a.f - b.f) < 1e-6) return null;
+  return [a.f, b.f];
+};
+
 const PLACE_AMENITY = { gas_station: 'fuel', fuel_station: 'fuel', ev_charging_station: 'charging_station' };
 const placeTags = (p) => {
   const tax = json(p.taxonomy);
@@ -565,12 +591,32 @@ export const buildElements = (recordsByTheme) => {
         if (rec.layer !== 'segment' || p.subtype !== 'road') continue;
         const whole = rec.whole?.length === 1 ? rec.whole[0] : null;
         const lines = whole ? [whole] : joinPieces(rec.pieces);
-        // Linear references are fractions of the whole segment: only a
-        // segment we hold whole can be split; else rules covering all of it.
-        const cuts = whole ? breakpoints(p) : [];
-        for (const line of lines) {
-          for (const part of splitAt(line, cuts)) {
-            const tags = segmentTags(p, whole ? (part.from + part.to) / 2 : NaN);
+        // Linear references are fractions of the whole segment: a segment we
+        // hold whole is split at them. One cut by the tile edge is placed
+        // along its outline (the whole segment found at a lower zoom,
+        // fetchOsmFromOverture) and split the same way; with no outline,
+        // only the rules covering all of it apply.
+        const cuts = breakpoints(p);
+        for (let line of lines) {
+          if (whole || !cuts.length) {
+            for (const part of splitAt(line, whole ? cuts : [])) {
+              const tags = segmentTags(p, whole ? (part.from + part.to) / 2 : NaN);
+              if (tags && part.geometry.length > 1) addWay(tags, part.geometry);
+            }
+            continue;
+          }
+          const span = rec.outline ? spanAlong(rec.outline, line) : null;
+          if (!span) {
+            const tags = segmentTags(p, NaN);
+            if (tags && line.length > 1) addWay(tags, line);
+            continue;
+          }
+          let [fa, fb] = span;
+          // (drawn the segment's own way round: one-way tags follow the drawn direction)
+          if (fa > fb) { line = [...line].reverse(); [fa, fb] = [fb, fa]; }
+          const local = cuts.filter((c) => c > fa + 1e-6 && c < fb - 1e-6).map((c) => (c - fa) / (fb - fa));
+          for (const part of splitAt(line, local)) {
+            const tags = segmentTags(p, fa + ((part.from + part.to) / 2) * (fb - fa));
             if (tags && part.geometry.length > 1) addWay(tags, part.geometry);
           }
         }
@@ -781,6 +827,59 @@ const pool = async (items, limit, fn) => {
  * Overpass-shaped {elements} for bounds from Overture's tiles, or null when
  * nothing came back (e.g. Overture's CDN unreachable too).
  */
+const OUTLINE_ZOOMS_DOWN = 7;       // how many zooms lower a cut segment's outline is looked for
+const OUTLINE_MAX_TILES = 48;       // and at most this many extra tiles for it, per fetch
+
+/**
+ * Roads cut by the tile edge whose bridge, tunnel, level or surface applies
+ * to part of their length only: Overture gives those as fractions of the
+ * whole segment, so a piece of one could not be placed and the rule was
+ * dropped. A highway is one long segment, so its bridges went: one
+ * carriageway of a dual road came out with a deck the export guessed from
+ * the ground, its twin with none (kreunz, Turku ring road, 2026-11-11).
+ * The whole segment is looked for in the tile over the piece at lower zooms
+ * (simplified there, but whole) and kept as rec.outline, lon/lat.
+ */
+const findOutlines = async (records, archive, z, minZoom, signal) => {
+  const need = records.filter((r) => r.kind === 'line' && r.layer === 'segment' && r.props?.subtype === 'road'
+    && r.whole?.length !== 1 && r.pieces.length && breakpoints(r.props).length);
+  if (!need.length) return;
+  const tiles = new Map();          // "z/x/y" -> Map(id -> whole line) | null
+  let fetched = 0;
+  const wholeIn = async (tz, tx, ty) => {
+    const key = `${tz}/${tx}/${ty}`;
+    if (tiles.has(key)) return tiles.get(key);
+    if (fetched >= OUTLINE_MAX_TILES) return null;
+    fetched++;
+    let found = null;
+    try {
+      const tile = await archive.getZxy(tz, tx, ty, signal);
+      if (tile?.data) {
+        found = new Map();
+        for (const rec of collectFeatures([{ z: tz, x: tx, y: ty, layers: decodeMvt(new Uint8Array(tile.data)) }])) {
+          if (rec.kind === 'line' && rec.whole?.length === 1) found.set(rec.id, rec.whole[0]);
+        }
+      }
+    } catch (err) {
+      if (err?.name === 'AbortError' || signal?.aborted) throw err;
+    }
+    tiles.set(key, found);
+    return found;
+  };
+  for (const rec of need) {
+    const piece = rec.pieces[0];
+    const mid = piece[Math.floor(piece.length / 2)];
+    for (let tz = z - 1; tz >= Math.max(minZoom || 0, z - OUTLINE_ZOOMS_DOWN) && !rec.outline; tz--) {
+      signal?.throwIfAborted?.();
+      const [tx, ty] = tileXY(mid.lat, mid.lon, tz);
+      const line = (await wholeIn(tz, tx, ty))?.get(rec.id);
+      if (line?.length > 1) rec.outline = line;
+    }
+  }
+  const got = need.filter((r) => r.outline).length;
+  if (need.length) console.log(`[OSM] Overture: ${got} of ${need.length} road(s) cut by the tile edge placed along their whole line (bridges, tunnels and levels on part of a road kept).`);
+};
+
 export const fetchOsmFromOverture = async (bounds, { signal, onStatus } = {}) => {
   const recordsByTheme = {};
   let tileCount = 0;
@@ -801,6 +900,7 @@ export const fetchOsmFromOverture = async (bounds, { signal, onStatus } = {}) =>
       const present = decoded.filter(Boolean);
       tileCount += present.length;
       recordsByTheme[theme] = collectFeatures(present);
+      if (theme === 'transportation') await findOutlines(recordsByTheme[theme], archive, z, header.minZoom, signal);
     } catch (err) {
       if (err?.name === 'AbortError' || signal?.aborted) throw err;
       failures++;

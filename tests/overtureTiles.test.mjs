@@ -291,3 +291,72 @@ test('hybrid: fetchOSMData merges Overture buildings into live OSM; toggle off s
     globalThis.localStorage = orig.storage;
   }
 });
+
+test('a road cut by the tile edge keeps a bridge on part of it, placed along its whole line', async () => {
+  const { spanAlong } = await import('../services/overtureTiles.js');
+  // the whole segment: 1 km east along the equator; this piece is its 30 % to 70 %
+  const lon = (m) => m / 111320;
+  const outline = [{ lat: 0, lon: 0 }, { lat: 0, lon: lon(500) }, { lat: 0, lon: lon(1000) }];
+  const piece = [{ lat: 0, lon: lon(300) }, { lat: 0, lon: lon(500) }, { lat: 0, lon: lon(700) }];
+  const span = spanAlong(outline, piece);
+  assert.ok(Math.abs(span[0] - 0.3) < 1e-6 && Math.abs(span[1] - 0.7) < 1e-6);
+  assert.equal(spanAlong(outline, [{ lat: 0.01, lon: 0 }, { lat: 0.01, lon: lon(100) }]), null, 'a line 1 km off the outline');
+  const props = { ...ROAD_PROPS, id: 'cut-1', road_flags: JSON.stringify([{ values: ['is_bridge'], between: [0.45, 0.55] }, { values: ['is_tunnel'], between: [0.9, 0.95] }]), access_restrictions: JSON.stringify([{ access_type: 'denied', when: { heading: 'backward' } }]) };
+  const rec = (extra) => ({ id: 'segment/cut-1', kind: 'line', layer: 'segment', props, whole: null, pieces: [piece], ...extra });
+  const ways = (r) => buildElements({ transportation: [r] }).elements.filter((e) => e.type === 'way');
+  // without the outline: one way, no bridge (as before)
+  assert.deepEqual(ways(rec({})).map((w) => w.tags.bridge ?? null), [null]);
+  // with it: split at 45 % and 55 % of the whole; the tunnel at 90 % is outside this piece
+  const placed = ways(rec({ outline }));
+  assert.deepEqual(placed.map((w) => w.tags.bridge ?? null), [null, 'yes', null]);
+  assert.ok(placed.every((w) => !w.tags.tunnel));
+  const metres = (w) => (w.geometry[w.geometry.length - 1].lon - w.geometry[0].lon) * 111320;
+  assert.ok(Math.abs(metres(placed[1]) - 100) < 0.5, `bridge ${metres(placed[1]).toFixed(1)} m`);
+  assert.ok(Math.abs(placed[1].geometry[0].lon * 111320 - 450) < 0.5);
+  assert.equal(placed[1].tags.layer, '1');
+  // a piece drawn the other way round comes out the segment's own way (its one-way tag holds)
+  const reversed = ways(rec({ outline, pieces: [[...piece].reverse()] }));
+  assert.deepEqual(reversed.map((w) => w.tags.bridge ?? null), [null, 'yes', null]);
+  assert.ok(reversed[0].geometry[0].lon < reversed[2].geometry[0].lon);
+  assert.equal(reversed[1].tags.oneway, 'yes');
+});
+
+test('the whole line of a cut road is looked for at lower zooms, a bounded number of tiles', async () => {
+  const { fetchOsmFromOverture } = await import('../services/overtureTiles.js');
+  // z14 tile: the road enters from the west buffer (cut); z13 parent: the same road whole
+  // (the bridge at 45 to 55 % of the whole road: inside this tile whichever side the road leaves it)
+  const props = { ...ROAD_PROPS, id: 'long-1', road_flags: JSON.stringify([{ values: ['is_bridge'], between: [0.45, 0.55] }]) };
+  const edge = { type: 2, props: { id: 'edge', subtype: 'road', class: 'service' }, parts: [[[-200, 100], [4296, 100]]] };
+  // (the road runs 3,500 tile units along y = 2000 of the z14 tile, out past its east or west
+  // buffer by the tile's place in its parent, so that in the parent it lies whole)
+  const even = X % 2 === 0;
+  const [x0, x1] = even ? [2000, 5500] : [-1500, 2000];
+  const clip = (v) => Math.min(4296, Math.max(-200, v));
+  const ox = even ? 0 : 2048; const oy = Y % 2 === 0 ? 0 : 2048;
+  const z14 = encodeMvt({ segment: [edge, { type: 2, props, parts: [[[clip(x0), 2000], [clip(x1), 2000]]] }] });
+  const z13 = encodeMvt({ segment: [{ ...edge, props: { ...edge.props, id: 'edge13' } }, { type: 2, props, parts: [[[ox + x0 / 2, oy + 1000], [ox + x1 / 2, oy + 1000]]] }] });
+  const asked = [];
+  setOvertureArchiveFactory((theme) => ({
+    getHeader: async () => ({ maxZoom: Z, minZoom: 0 }),
+    getZxy: async (z, x, y) => {
+      asked.push(`${theme} ${z}/${x}/${y}`);
+      if (theme !== 'transportation') return null;
+      if (z === Z && x === X && y === Y) return { data: z14.buffer.slice(z14.byteOffset, z14.byteOffset + z14.byteLength) };
+      if (z === Z - 1 && x === X >> 1 && y === Y >> 1) return { data: z13.buffer.slice(z13.byteOffset, z13.byteOffset + z13.byteLength) };
+      return null;
+    },
+  }));
+  try {
+    const n = 2 ** Z;
+    const lonOf = (x) => (x / n) * 360 - 180;
+    const latOf = (y) => (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / n))) * 180) / Math.PI;
+    const bounds = { west: lonOf(X + 0.1), east: lonOf(X + 0.9), north: latOf(Y + 0.1), south: latOf(Y + 0.9) };
+    const data = await fetchOsmFromOverture(bounds);
+    const route = data.elements.filter((e) => e.tags?.name === 'Route 66');
+    assert.ok(route.some((w) => w.tags.bridge === 'yes'), 'the bridge on part of the cut road is kept');
+    assert.ok(route.some((w) => !w.tags.bridge));
+    assert.ok(asked.filter((a) => a.startsWith('transportation')).length <= 3, asked.join(', '));
+  } finally {
+    setOvertureArchiveFactory(null);
+  }
+});
