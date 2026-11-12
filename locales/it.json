@@ -651,7 +651,9 @@
       "needsOsmOn": "Attiva prima Includi elementi OSM"
     },
     "bigAreaOsm": "Area grande ({km} km di lato). Il terreno va bene a queste dimensioni, ma molti dati OpenStreetMap (paesi, strade fitte) causeranno quasi certamente problemi: generazione ed esportazioni lente o fallite, e un livello pesante. Ideale dove i dati della mappa sono pochi (deserti, montagne); altrimenti disattiva i dati OSM o scegli un'area più piccola.",
-    "farShake": "Parti di questo livello sono a più di 30 km dal centro: in BeamNG gli oggetti così lontani possono iniziare a tremare."
+    "farShake": "Parti di questo livello sono a più di 30 km dal centro: in BeamNG gli oggetti così lontani possono iniziare a tremare.",
+    "osmTilesFirst": "Prima la copia di OpenStreetMap di MapNG",
+    "osmTilesFirstHint": "Veloce e senza limiti di richieste: l'intero pianeta, copiato da OpenStreetMap di tanto in tanto. Disattiva per chiedere prima ai server live di OpenStreetMap (hanno le modifiche di oggi, ma sono più lenti e a volte non rispondono); la copia di MapNG resta come riserva."
   },
   "batchExport": {
     "title": "Opzioni di esportazione",

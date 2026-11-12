@@ -223,6 +223,15 @@
         <!-- OpenStreetMap features, and Overture's buildings where OSM has none -->
         <SettingCard>
           <SettingRow check v-model="fetchOSM" :label="t('controlPanel.includeOsmFeatures')" :hint="t('controlPanel.ui.osmHint')" />
+          <!-- MapNG's own copy of OpenStreetMap first, or the live servers (services/osm.js fetchOsmRaw) -->
+          <SettingRow
+            check
+            v-model="osmTilesFirst"
+            :label="t('controlPanel.osmTilesFirst')"
+            :hint="t('controlPanel.osmTilesFirstHint')"
+            :disabled="!fetchOSM"
+            :disabled-reason="t('controlPanel.ui.needsOsmOn')"
+          />
           <details v-if="fetchOSM" class="pl-4 text-caption text-gray-500 dark:text-gray-400" :open="!!customOverpassUrl">
             <summary class="cursor-pointer select-none hover:text-brand">{{ t('controlPanel.customOverpass') }}</summary>
             <input
@@ -370,7 +379,7 @@ import { ref, shallowRef, computed, onMounted, onUnmounted, watch, toRaw } from 
 import { provideSectionGroup } from '../../composables/useSectionGroup.js';
 // Expand all / Collapse all for every section in this panel
 provideSectionGroup();
-import { CUSTOM_OVERPASS_STORAGE_KEY, OVERTURE_BUILDINGS_STORAGE_KEY } from '../../services/osm.js';
+import { CUSTOM_OVERPASS_STORAGE_KEY, OVERTURE_BUILDINGS_STORAGE_KEY, OSM_TILES_FIRST_STORAGE_KEY } from '../../services/osm.js';
 import { useI18n } from 'vue-i18n';
 import { MapPin, Box, Trees, AlertTriangle, Download, CheckCircle2 } from 'lucide-vue-next';
 import { desktopApp, DESKTOP_DOWNLOAD_URL } from '../../services/platform/desktop.js';
@@ -474,6 +483,11 @@ watch(fetchOSM, (newVal) => {
 });
 
 // On unless turned off; read by fetchOSMData (single tile and batch alike).
+const osmTilesFirst = ref(localStorage.getItem(OSM_TILES_FIRST_STORAGE_KEY) !== 'false');
+watch(osmTilesFirst, (newVal) => {
+  if (newVal) localStorage.removeItem(OSM_TILES_FIRST_STORAGE_KEY);
+  else localStorage.setItem(OSM_TILES_FIRST_STORAGE_KEY, 'false');
+});
 const overtureBuildings = ref(localStorage.getItem(OVERTURE_BUILDINGS_STORAGE_KEY) !== 'false');
 watch(overtureBuildings, (newVal) => {
   localStorage.setItem(OVERTURE_BUILDINGS_STORAGE_KEY, String(newVal));
@@ -523,8 +537,8 @@ watch(() => props.terrainData, (newData) => {
 // Sections that differ from the defaults (a dot by the title) and their Reset
 const elevationChanged = computed(() => elevationSource.value !== 'mapterhorn' || (store.advancedMode && terrainMode.value !== 'ready'));
 const resetElevation = () => { elevationSource.value = 'mapterhorn'; setTerrainMode('ready'); };
-const mapDataChanged = computed(() => !fetchOSM.value || !overtureBuildings.value);
-const resetMapData = () => { fetchOSM.value = true; overtureBuildings.value = true; };
+const mapDataChanged = computed(() => !fetchOSM.value || !overtureBuildings.value || !osmTilesFirst.value);
+const resetMapData = () => { fetchOSM.value = true; overtureBuildings.value = true; osmTilesFirst.value = true; };
 
 // The setup in one line (the wizard's bottom bar) and as the review step's
 // list (components/ui/GenerateSummary.vue); each part goes to its step.

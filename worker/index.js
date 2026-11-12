@@ -154,7 +154,10 @@ async function handleOsm(request, url, ctx) {
 // the manifest only briefly so a new build goes live within minutes.
 const OSM_TILES_PREFIX = '/api/osm-tiles/';
 const OSM_TILES_MANIFEST_KEY = 'osm/manifest.json';
-const OSM_TILES_KEY_RE = /^osm\/[A-Za-z0-9._-]+\.pmtiles$/;
+// (osm-all/: the planet with every tagged object; its own manifest, which only app versions that
+// filter on reading ask for, so earlier versions never see those archives)
+const OSM_TILES_KEY_RE = /^osm(?:-all)?\/[A-Za-z0-9._-]+\.pmtiles$/;
+const OSM_TILES_ALL_MANIFEST_KEY = 'osm-all/manifest.json';
 const OSM_TILES_RANGE_TTL_S = 30 * 24 * 3600;
 const OSM_TILES_MANIFEST_TTL_S = 300;
 // (the planet build's progress, for public/planet.html: scripts/planet/planet.py progress)
@@ -168,8 +171,8 @@ async function handleOsmTiles(request, url, env, ctx) {
   if (!env.OSM_TILES) return jsonResponse({ error: 'OSM tiles bucket not bound' }, 503);
 
   const path = url.pathname.slice(OSM_TILES_PREFIX.length);
-  if (path === 'manifest') {
-    const object = await env.OSM_TILES.get(OSM_TILES_MANIFEST_KEY);
+  if (path === 'manifest' || path === 'manifest-all') {
+    const object = await env.OSM_TILES.get(path === 'manifest' ? OSM_TILES_MANIFEST_KEY : OSM_TILES_ALL_MANIFEST_KEY);
     if (!object) return jsonResponse({ archives: [] }, 200, { 'Cache-Control': `public, max-age=${OSM_TILES_MANIFEST_TTL_S}` });
     return new Response(object.body, {
       headers: {

@@ -656,7 +656,9 @@
       "needsOsmOn": "Turn on Include OSM features first"
     },
     "bigAreaOsm": "Big area ({km} km across). The terrain is fine at this size, but lots of OpenStreetMap data (towns, dense roads) will very likely cause problems: slow or failed generating and exports, and a heavy level. Best where map data is sparse (deserts, mountains); otherwise turn off OSM features or pick a smaller area.",
-    "farShake": "Parts of this level are more than 30 km from its centre: in BeamNG, objects that far out can start to shake."
+    "farShake": "Parts of this level are more than 30 km from its centre: in BeamNG, objects that far out can start to shake.",
+    "osmTilesFirst": "MapNG's own copy of OpenStreetMap first",
+    "osmTilesFirstHint": "Fast and never rate limited: the whole planet, copied from OpenStreetMap every so often. Switch off to ask the live OpenStreetMap servers first (they have today's edits, and are slower and sometimes down); MapNG's copy is then the fallback."
   },
   "batchExport": {
     "title": "Export options",

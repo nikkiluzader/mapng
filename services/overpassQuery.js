@@ -96,6 +96,32 @@ export const OSM_FILTER = {
   ],
 };
 
+/**
+ * Whether the Overpass query above would have returned this element: the same
+ * filter, applied on reading to MapNG's planet tiles, which hold every tagged
+ * object (scripts/build-osm-tiles.py --all).
+ */
+const WAY_KEYS = new Set(OSM_FILTER.wayKeys);
+const RELATION_KEYS = new Set(OSM_FILTER.relationKeys);
+const NODE_TAGS = new Set(OSM_FILTER.nodeTags.map(([k, v]) => `${k}=${v}`));
+export const matchesOsmFilter = (el) => {
+  const tags = el?.tags;
+  if (!tags) return false;
+  if (el.type === 'way') {
+    for (const k in tags) if (WAY_KEYS.has(k)) return true;
+    return OSM_FILTER.wayTags.some(([k, v]) => tags[k] === v);
+  }
+  if (el.type === 'relation') {
+    for (const k in tags) if (RELATION_KEYS.has(k)) return true;
+    return false;
+  }
+  if (el.type === 'node') {
+    for (const k in tags) if (NODE_TAGS.has(`${k}=${tags[k]}`)) return true;
+    return false;
+  }
+  return false;
+};
+
 // (boxes: background areas leave only these parts of the square to ask for;
 // the same filters per box, joined in one union)
 export const buildOverpassQuery = (bounds, boxes = null) => {

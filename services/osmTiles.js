@@ -16,12 +16,22 @@
  * falls back to Overpass.
  */
 import { PMTiles } from 'pmtiles';
+import { matchesOsmFilter } from './overpassQuery.js';
 
 const archives = new Map();   // url -> PMTiles
 
 // The Worker lists the published archives (worker/index.js handleOsmTiles, written
 // by scripts/publish-osm-tiles.py): [{ region, key, bounds: [w, s, e, n], built_at }].
-const MANIFEST_URL = '/api/osm-tiles/manifest';
+// Two lists: the planet (every tagged object, filtered here on reading; only versions that can
+// do that ask for it) and, where it has nothing yet, the earlier one of filtered archives.
+const MANIFEST_URLS = ['/api/osm-tiles/manifest-all', '/api/osm-tiles/manifest'];
+// (tests and the sweep: a manifest and a way to open its archives without the site)
+let manifestOverride = null;
+let archiveSourceFor = null;
+/** Use this manifest ({ archives }) and, per archive key, this pmtiles Source; null puts the site's back. */
+export const setOsmTileManifest = (manifest, sourceFor = null) => {
+  manifestOverride = manifest; archiveSourceFor = sourceFor; manifestPromise = null; manifestFailedAt = 0; archives.clear();
+};
 const MANIFEST_RETRY_MS = 5 * 60 * 1000;
 let manifestPromise = null;
 let manifestFailedAt = 0;
@@ -31,10 +41,16 @@ const loadManifest = () => {
   if (Date.now() - manifestFailedAt < MANIFEST_RETRY_MS) return Promise.resolve(null);
   // (asked twice before giving up for MANIFEST_RETRY_MS: one failed request left every area on
   // Overpass for five minutes)
-  const once = () => fetch(MANIFEST_URL)
+  if (manifestOverride) return Promise.resolve(manifestOverride);
+  const read = (url) => fetch(url)
     .then((r) => (r.ok ? r.json() : null))
     .then((m) => (Array.isArray(m?.archives) ? m : null))
     .catch(() => null);
+  // (both lists as one: each tile is read from the newest archive covering it, planTileSources)
+  const once = async () => {
+    const lists = (await Promise.all(MANIFEST_URLS.map(read))).filter(Boolean);
+    return lists.length ? { archives: lists.flatMap((m) => m.archives) } : null;
+  };
   manifestPromise = once()
     .then((m) => m || new Promise((resolve) => setTimeout(resolve, 800)).then(once))
     .then((m) => {
@@ -134,18 +150,29 @@ export const fetchOsmFromManifest = async (bounds, { signal, skipBox = null } = 
   const manifest = await loadManifest();
   const plan = manifest ? planTileSources(manifest.archives, bounds) : null;
   if (!plan) return null;
+  const entryOf = new Map(manifest.archives.map((a) => [a.key, a]));
   const payloads = await Promise.all(plan.flatMap(({ key, tiles }) => {
-    const archive = getOsmTileArchive(`/api/osm-tiles/${key}`);
+    const archive = archiveSourceFor
+      ? (archives.get(key) || archives.set(key, new PMTiles(archiveSourceFor(key))).get(key))
+      : getOsmTileArchive(`/api/osm-tiles/${key}`);
+    // (a planet archive holds every tagged object: only what the Overpass query asks for is kept)
+    const unfiltered = !!entryOf.get(key)?.all;
     return tiles.map(async ({ x, y }) => {
       signal?.throwIfAborted?.();
       // (wholly inside background areas: nothing there is kept)
       if (skipBox?.(tileCorners(x, y, TILE_ZOOM))) return null;
       const tile = await readTile(archive, x, y, signal);
       // (no tile: nothing of ours there, e.g. open sea; the archive covers it)
-      return tile?.data ? decodeTile(tile.data) : null;
+      if (!tile?.data) return null;
+      const payload = await decodeTile(tile.data);
+      return unfiltered ? { elements: (payload?.elements || []).filter(matchesOsmFilter) } : payload;
     });
   }));
-  return mergeTileElements(payloads.filter(Boolean));
+  const merged = mergeTileElements(payloads.filter(Boolean));
+  // (which snapshot of OpenStreetMap this is, for the status line and the export report)
+  const snapshots = [...new Set(plan.map(({ key }) => entryOf.get(key)?.snapshot).filter(Boolean))].sort();
+  if (snapshots.length) merged.osmSnapshot = snapshots[0];
+  return merged;
 };
 
 /** The PMTiles archive for a URL (or any pmtiles Source), cached per page. */

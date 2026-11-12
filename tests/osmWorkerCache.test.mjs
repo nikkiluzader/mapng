@@ -110,15 +110,16 @@ test('client: on the deployed site, with no tile archive for the area, the Worke
   const urls = [];
   globalThis.fetch = async (url) => {
     urls.push(String(url));
-    if (String(url) === '/api/osm-tiles/manifest') return new Response('{"archives":[]}', { status: 200 });
+    if (/^\/api\/osm-tiles\/manifest(-all)?$/.test(String(url))) return new Response('{"archives":[]}', { status: 200 });
     if (String(url).startsWith('/api/osm?bbox=')) return new Response(GOOD, { status: 200 });
     throw new TypeError('mirror should not be needed');
   };
   try {
     const features = await fetchOSMData({ south: 35.2065, west: -111.4188, north: 35.2158, east: -111.4075 });
-    assert.deepEqual(urls.slice(0, 1), ['/api/osm-tiles/manifest'], 'no archive covers it, so...');
-    assert.equal(urls.length, 2);
-    assert.match(urls[1], /^\/api\/osm\?bbox=35\.2065,-111\.4188,35\.2158,-111\.4075$/);
+    // (the planet's list and the earlier one, asked together)
+    assert.deepEqual(urls.slice(0, 2).sort(), ['/api/osm-tiles/manifest', '/api/osm-tiles/manifest-all'], 'no archive covers it, so...');
+    assert.equal(urls.length, 3);
+    assert.match(urls[2], /^\/api\/osm\?bbox=35\.2065,-111\.4188,35\.2158,-111\.4075$/);
     assert.equal(getLastOSMRequestInfo().endpointUsed, '/api/osm');
     assert.ok(features.some((f) => f.type === 'vegetation'));
   } finally {

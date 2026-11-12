@@ -22,6 +22,18 @@ const isBusinessNode = (tags = {}) => BUSINESS_NODE_KEYS.has(`amenity=${tags.ame
 // "Add missing buildings and heights from Overture" (on unless turned off):
 // live OSM buildings get Overture's heights and the footprints OSM lacks.
 export const OVERTURE_BUILDINGS_STORAGE_KEY = "mapng_overtureBuildings";
+// Which comes first for an area's map data: MapNG's own copy of OpenStreetMap (the planet tiles:
+// fast, never rate limited, a snapshot) or the live OpenStreetMap servers (today's edits, slower,
+// sometimes down). Tiles first unless the user says otherwise (the Map data section).
+export const OSM_TILES_FIRST_STORAGE_KEY = "mapng_osmTilesFirst";
+const osmTilesFirst = () => {
+  try {
+    return globalThis.localStorage?.getItem(OSM_TILES_FIRST_STORAGE_KEY) !== "false";
+  } catch {
+    return true;
+  }
+};
+
 const overtureBuildingsEnabled = () => {
   try {
     return globalThis.localStorage?.getItem(OVERTURE_BUILDINGS_STORAGE_KEY) !== "false";
@@ -42,6 +54,7 @@ export const setOsmTileSource = (source) => { osmTileSource = source || null; };
 let lastOSMRequestInfo = null;
 // why MapNG's own tiles were not the source of the last pull (null: they were, or were never asked)
 let mapngTilesNote = null;
+let osmSnapshotUsed = null;   // the day of the OpenStreetMap snapshot the tiles read hold
 
 export const getOSMQueryParameters = (bounds) => ({
   endpointCandidates: [...OVERPASS_ENDPOINTS],
@@ -1058,12 +1071,26 @@ const fetchOsmRaw = async (bounds, { onStatus, signal, skipBox = null, keptBoxes
     }
     console.warn(`[OSM] ${file.name} doesn't cover this area; fetching as usual.`);
   }
+  // The live servers first, when the user prefers them: their answer is used unless it is only
+  // the backup data (they did not answer), which MapNG's own copy beats where it has the area.
+  let liveBackup = null; let liveError = null;
+  const liveFirst = !osmTilesFirst() && !osmTileSource;
+  if (liveFirst) {
+    try {
+      const live = await fetchOverpassOrOverture({ query: buildOverpassQuery(bounds, keptBoxes), bounds }, { onStatus, signal });
+      if (live.endpoint !== OVERTURE_ENDPOINT) return live;
+      liveBackup = live;
+    } catch (liveFailure) {
+      if (liveFailure?.name === "AbortError" || signal?.aborted) throw liveFailure;
+      liveError = liveFailure;
+    }
+  }
   if (osmTileSource || cacheEndpointAvailable()) {
     try {
       const data = osmTileSource
         ? (onStatus?.("Reading OpenStreetMap data from MapNG tiles..."), await fetchOsmFromTiles(osmTileSource, bounds, { signal, skipBox }))
         : await fetchOsmFromManifestWithStatus(bounds, { onStatus, signal, skipBox });
-      if (data) return { endpoint: "mapng-osm-tiles", data };
+      if (data) { osmSnapshotUsed = data.osmSnapshot || null; return { endpoint: "mapng-osm-tiles", data }; }
       // (why the tiles were passed over goes into the request's record and the export report:
       // a map built from Overture inside the tiles' coverage could not be explained without it)
       mapngTilesNote = "not used: no manifest, or the area is not wholly inside the published archives";
@@ -1073,6 +1100,8 @@ const fetchOsmRaw = async (bounds, { onStatus, signal, skipBox = null, keptBoxes
       console.warn("[OSM] MapNG tiles unavailable, using Overpass:", tileError?.message || tileError);
     }
   }
+  if (liveBackup) return liveBackup;
+  if (liveError) throw liveError;
   return fetchOverpassOrOverture({ query: buildOverpassQuery(bounds, keptBoxes), bounds }, { onStatus, signal });
 };
 
@@ -1139,7 +1168,7 @@ export const mergeAcrossDateLine = (parts, refLng) => {
 };
 
 export const fetchOSMData = async (bounds, { onStatus, signal, skipBox = null, keptBoxes = null } = {}) => {
-  mapngTilesNote = null;
+  mapngTilesNote = null; osmSnapshotUsed = null;
   console.log(`[OSM] Fetching data for bounds: N:${bounds.north}, S:${bounds.south}, E:${bounds.east}, W:${bounds.west}`);
 
   const queryParams = getOSMQueryParameters(bounds);
@@ -1183,6 +1212,8 @@ export const fetchOSMData = async (bounds, { onStatus, signal, skipBox = null, k
       ...queryParams,
       endpointUsed: endpoint,
       ...(mapngTilesNote && endpoint !== "mapng-osm-tiles" ? { mapngTiles: mapngTilesNote } : {}),
+      // (MapNG's tiles are a snapshot of OpenStreetMap: which day's)
+      ...(osmSnapshotUsed && String(endpoint).includes("mapng-osm-tiles") ? { osmSnapshot: osmSnapshotUsed } : {}),
       elementCount: data.elements?.length || 0,
       ...(endpoint === OVERTURE_ENDPOINT
         ? { overtureRelease: OVERTURE_RELEASE, attribution: OVERTURE_ATTRIBUTION }
