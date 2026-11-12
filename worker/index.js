@@ -36,6 +36,7 @@ import { handleAdmin } from './admin.js';
 import { handleShareCodes } from './shareCodes.js';
 import { handleMapterhornTiles } from './mapterhornCache.js';
 import { LATEST_UPDATE } from './updates.js';
+import { readWithRetry } from './retry.js';
 
 export { ExportHotspots } from './hotspots.js';
 
@@ -206,7 +207,9 @@ async function handleOsmTiles(request, url, env, ctx) {
   const cacheKey = new Request(`https://mapng-osm-tiles.internal/${path}?r=${offset}-${length}`);
   let cached = await cache.match(cacheKey);
   if (!cached) {
-    const object = await env.OSM_TILES.get(path, { range: { offset, length } });
+    // (storage now and then fails one read of a burst: a big map asks for a thousand ranges a minute, and about
+    // one in a hundred answered 500 on release day. Two more tries here, so no reader has to notice.)
+    const object = await readWithRetry(() => env.OSM_TILES.get(path, { range: { offset, length } }));
     if (!object) return new Response('Not Found', { status: 404 });
     const total = object.size;
     cached = new Response(object.body, {
