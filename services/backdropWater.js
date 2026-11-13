@@ -58,6 +58,8 @@ export function insidePart(tile, half) {
 // the map's own blocks for it end there: the map's last row of cells along
 // the cut edge was left dry as "shore", a strip with no water at the edge)
 export const EDGE_HANDOVER_M = 70;
+export const BACKDROP_CELL_M = 24;          // the backdrop's lake tiles: no finer than this
+export const BACKDROP_MIN_AREA_M2 = 2500;   // a pond wholly outside the map and smaller than this: not built
 
 /**
  * The backdrop's water. features: the data step's water (lat/lng); bounds,
@@ -73,8 +75,20 @@ export function planBackdropWater({ features = [], bounds, worldSize, groundAt, 
   const heightAt = (x, y) => { const h = groundAt(x, y); return Number.isFinite(h) ? h : 0; };
   // (only water that reaches out past the map's square)
   const outside = (f) => (f.geometry || []).some((p) => { const [x, y] = toWorld(p.lat, p.lng); return Math.abs(x) > half || Math.abs(y) > half; });
-  const wet = features.filter((f) => f?.type === 'water' && outside(f));
-  const lakes = planLakes({ features: wet, toWorld, heightAt, seaZ });
+  // Seen only from the map, kilometres off, over ground known every 30 m: a pond wholly outside the map and
+  // under BACKDROP_MIN_AREA_M2 is left out, and the rest are tiled no finer than BACKDROP_CELL_M. Tiled like
+  // the map's own lakes (2 to 4 m cells) an 8 km map in lake country got 9,171 WaterBlocks round it for 692
+  // lakes, each an object the game draws on its own: a BeamNG developer's level ran at 6 frames a second.
+  const whollyOut = (f) => (f.geometry || []).every((p) => { const [x, y] = toWorld(p.lat, p.lng); return Math.abs(x) > half || Math.abs(y) > half; });
+  const areaOf = (f) => { const q = (f.geometry || []).map((p) => toWorld(p.lat, p.lng)); let a = 0; for (let i = 0; i < q.length; i++) { const r = q[(i + 1) % q.length]; a += q[i][0] * r[1] - r[0] * q[i][1]; } return Math.abs(a) / 2; };
+  const closed = (f) => { const g = f.geometry || []; return g.length > 3 && g[0].lat === g[g.length - 1].lat && g[0].lng === g[g.length - 1].lng; };
+  let smallLeftOut = 0;
+  const wet = features.filter((f) => {
+    if (f?.type !== 'water' || !outside(f)) return false;
+    if (closed(f) && whollyOut(f) && areaOf(f) < BACKDROP_MIN_AREA_M2) { smallLeftOut++; return false; }
+    return true;
+  });
+  const lakes = planLakes({ features: wet, toWorld, heightAt, seaZ, minCell: BACKDROP_CELL_M });
   // a lake running off the map: the map's level for it (no step at the edge)
   const mapLakeOf = lakes.lakes.map((lk) => {
     const k = mapLakes.findIndex((m) => {
@@ -115,9 +129,14 @@ export function planBackdropWater({ features = [], bounds, worldSize, groundAt, 
   // end so the ribbon meets the map's own at the edge
   const riverPlan = planRivers({ features: wet, toWorld, heightAt });
   const rivers = [];
+  let streamsLeftOut = 0;
   for (const r of riverPlan.rivers) {
     let run = [];
     const isOut = (n) => Math.abs(n[0]) > half || Math.abs(n[1]) > half;
+    // (a stream or ditch that never comes onto the map: a metre or two of water kilometres away, one more
+    // object each for the game to draw: 890 of them round the same 8 km map. Rivers and canals are kept, and
+    // any stream that reaches the map, so it does not stop at the edge.)
+    if (r.kind !== 'river' && r.kind !== 'canal' && r.nodes.every(isOut)) { streamsLeftOut++; continue; }
     r.nodes.forEach((n, i) => {
       if (isOut(n)) {
         if (!run.length && i > 0) run.push(r.nodes[i - 1]);
@@ -131,5 +150,5 @@ export function planBackdropWater({ features = [], bounds, worldSize, groundAt, 
     if (run.length > 1) rivers.push({ ...r, nodes: run });
   }
   // mapTrim: the map's lakes whose own blocks end EDGE_HANDOVER_M short of the edge
-  return { tiles, rivers, mapTrim: handedOver, innerHalf: half - EDGE_HANDOVER_M, stats: { lakes: lakes.lakes.length, tiles: tiles.length, rivers: rivers.length } };
+  return { tiles, rivers, mapTrim: handedOver, innerHalf: half - EDGE_HANDOVER_M, stats: { lakes: lakes.lakes.length, tiles: tiles.length, rivers: rivers.length, smallLeftOut, streamsLeftOut } };
 }

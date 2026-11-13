@@ -13665,8 +13665,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       const rivers = buildRiverObjects(exportTerrainData, squareSize, biome, [], {}, [], { rivers: around.rivers, stats: {} })
         .map((o) => ({ ...o, name: `backdrop_${o.name}` }));
       backdropWater = [...blocks, ...rivers];
-      waterStats.backdrop = { lakes: around.stats.lakes, blocks: blocks.length, rivers: rivers.length };
-      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Water over the backdrop: ${blocks.length} lake WaterBlocks (${around.stats.lakes} lakes), ${rivers.length} rivers.`);
+      waterStats.backdrop = { lakes: around.stats.lakes, blocks: blocks.length, rivers: rivers.length, smallLeftOut: around.stats.smallLeftOut };
+      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Water over the backdrop: ${blocks.length} lake WaterBlocks (${around.stats.lakes} lakes; ${around.stats.smallLeftOut} small ponds left out), ${rivers.length} rivers (${around.stats.streamsLeftOut} streams that never reach the map left out).`);
     } catch (err) {
       console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Water over the backdrop skipped: ${err?.message || err}`);
     }

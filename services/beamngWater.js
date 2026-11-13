@@ -435,9 +435,10 @@ function mergeMask(wet, nx, ny, x0, y0, cell, out) {
  * plaza, the fountain basins); rectangles never overlap (two surfaces at one
  * height flicker). Exported for tests.
  */
-export function tileOutline(poly, cell, hidden = () => false) {
+export function tileOutline(poly, cell, hidden = () => false, { minCell = 0 } = {}) {
   const [x0, y0, x1, y1] = poly.box;
-  const c = Math.min(cell, Math.max(SHORE_CELL_M[0], Math.min(SHORE_CELL_M[1], cell / 4), Math.max(x1 - x0, y1 - y0) / SHORE_GRID_MAX));
+  // (minCell: no finer than this, for water seen only from far off: the backdrop's)
+  const c = Math.max(minCell, Math.min(cell, Math.max(SHORE_CELL_M[0], Math.min(SHORE_CELL_M[1], cell / 4), Math.max(x1 - x0, y1 - y0) / SHORE_GRID_MAX)));
   const nx = Math.max(1, Math.ceil((x1 - x0) / c)); const ny = Math.max(1, Math.ceil((y1 - y0) / c));
   // a cell is touched when a span at its bottom, middle or top crosses it
   const wet = new Uint8Array(nx * ny);
@@ -540,7 +541,7 @@ export function unionOutline(polys) {
  * Lake tiles: [{ cx, cy, sx, sy, z, lake }] (WaterBlock rectangles, z the
  * water surface), plus stats and lakes [{ poly, level }] (carveLakeBeds).
  */
-export function planLakes({ features = [], toWorld, heightAt, seaZ = null }) {
+export function planLakes({ features = [], toWorld, heightAt, seaZ = null, minCell = 0 }) {
   const tiles = [];
   const lakes = [];   // { poly, level } for carveLakeBeds
   const stats = { lakes: 0, dry: 0, tiles: 0, riverAreas: 0 };
@@ -578,7 +579,7 @@ export function planLakes({ features = [], toWorld, heightAt, seaZ = null }) {
     // the shore; past it by at most one cell, and only where the bank stands
     // over the water and hides it)
     const area = members.reduce((n, k) => n + lakes[k].area, 0);
-    const lakeTiles = tileOutline(poly, Math.min(LAKE_CELL_M[1], Math.max(LAKE_CELL_M[0], Math.sqrt(area) / 16)), (x, y) => heightAt(x, y) > level + BANK_HIDES_M);
+    const lakeTiles = tileOutline(poly, Math.min(LAKE_CELL_M[1], Math.max(LAKE_CELL_M[0], Math.sqrt(area) / 16)), (x, y) => heightAt(x, y) > level + BANK_HIDES_M, { minCell });
     if (!lakeTiles.length) continue;
     stats.lakes += members.length;
     if (members.length > 1) stats.joined = (stats.joined || 0) + members.length;
