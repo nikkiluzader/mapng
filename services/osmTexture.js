@@ -2169,6 +2169,7 @@ export function osmRockOnBareGround(cls, w, h, terrainData) {
   return n;
 }
 
+const OPEN_WATER_REACH = 2;   // land cover cells of water (or open sea) on every side for a cell to be open water
 export function groundFromLandCover(cls, w, h, landCover, slope = null, bright = null) {
   const lc = landCover?.grid?.length === landCover?.n * landCover?.n ? landCover : null;
   const T = 0, G = 1, DRY = 2, SOIL = 3, SAND = 4, PAVED = 5, WATER = 6, HOLE = 7, ROCK = 8;
@@ -2191,10 +2192,31 @@ export function groundFromLandCover(cls, w, h, landCover, slope = null, bright =
     }
     return false;
   };
+  // Open water by the land cover, away from every shore (water or the open sea all round, two cells out):
+  // water, whatever colour the image has there. A sea's shallows are teal and dark green in a satellite image
+  // and were classed as grass and trees: a band of green ground painted on the sea all round an island
+  // (Sint Eustatius, the user's own test, 2026-11-13).
+  let openWater = null;
+  if (lc) {
+    const { grid, n } = lc; const wet = (k) => k === WC.WATER || k === 0;
+    let any = false;
+    openWater = new Uint8Array(n * n);
+    for (let r = 0; r < n; r++) for (let c0 = 0; c0 < n; c0++) {
+      if (!wet(grid[r * n + c0])) continue;
+      let all = true;
+      for (let dr = -OPEN_WATER_REACH; dr <= OPEN_WATER_REACH && all; dr++) for (let dc = -OPEN_WATER_REACH; dc <= OPEN_WATER_REACH; dc++) {
+        const rr = r + dr; const cc = c0 + dc;
+        if (rr >= 0 && cc >= 0 && rr < n && cc < n && !wet(grid[rr * n + cc])) { all = false; break; }
+      }
+      if (all) { openWater[r * n + c0] = 1; any = true; }
+    }
+    if (!any) openWater = null;
+  }
   let holes = 0;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const i = y * w + x; const c = cls[i];
+      const i = y * w + x; let c = cls[i];
+      if (openWater && c !== WATER && openWater[Math.min(lc.n - 1, Math.floor(((y + 0.5) / h) * lc.n)) * lc.n + Math.min(lc.n - 1, Math.floor(((x + 0.5) / w) * lc.n))]) { cls[i] = WATER; c = WATER; }
       if (c === WATER) {
         if ((slope && slope.nz[i] < 0.99) || (lc && !near(x, y, (k) => k === WC.WATER || k === 0, 2))) { cls[i] = HOLE; holes++; }   // (over ~8°)
         // (beside a town and not itself water: a bridge's deck or a dam's concrete in blue-grey)

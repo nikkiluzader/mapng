@@ -154,3 +154,28 @@ test('an arid scene: dull greens in its scrub and grassland are bare ground; a g
   groundFromLandCover(leaves, w, h, landCover, null, new Uint8Array(w * h));
   assert.equal([...leaves].filter((c) => c === 0 || c === 1).length, n);
 });
+
+test('open water by the land cover is water whatever colour the image has; the shore keeps the image', async () => {
+  const { groundFromLandCover } = await import('../services/osmTexture.js');
+  const at = (cls) => GROUND_CLASSES.indexOf(cls);
+  // an island: land (grass, 30) in the middle 10 cells of a 40-cell land cover, the open sea (0) and water (80) round it
+  const n = 40; const grid = new Uint8Array(n * n);
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) grid[r * n + c] = Math.abs(r - 20) < 5 && Math.abs(c - 20) < 5 ? 30 : (r < 20 ? 0 : 80);
+  const lc = { grid, n };
+  const W = 160;   // four image pixels to a land cover cell
+  // the image reads the whole scene as grass and trees (teal shallows)
+  const cls = new Uint8Array(W * W).map((_, i) => (i % 2 ? at('grass') : at('trees')));
+  const out = groundFromLandCover(cls, W, W, lc);
+  const cell = (r, c) => GROUND_CLASSES[out[(r * 4 + 2) * W + c * 4 + 2]];
+  assert.equal(cell(2, 2), 'water', 'the open sea (no land cover) far out');
+  assert.equal(cell(36, 36), 'water', 'mapped water far out');
+  assert.equal(cell(20, 9), 'water', 'six cells off the shore');
+  assert.notEqual(cell(20, 20), 'water', 'the island itself');
+  assert.notEqual(cell(20, 14), 'water', 'the cell at the shore keeps what the image shows');
+  // no land cover: nothing changes
+  const plain = new Uint8Array(W * W).fill(at('grass'));
+  assert.equal(GROUND_CLASSES[groundFromLandCover(plain, W, W, null)[0]], 'grass');
+  // an inland scene with no water in the land cover: nothing becomes water
+  const inland = groundFromLandCover(new Uint8Array(W * W).fill(at('grass')), W, W, { grid: new Uint8Array(n * n).fill(30), n });
+  assert.ok(!inland.includes(at('water')));
+});
