@@ -78,7 +78,9 @@ test('the Hero Roads level script: plain Lua text with the hooks the level scrip
   assert.equal(HERO_ROADS_FILE, 'mapngHeroRoads.lua');
   for (const need of ['M.onUpdate = function()', 'M.remove = remove', 'M.status = function()', "require, 'editor/heroRoadEditor/groupMgr'", 'return M']) assert.ok(HERO_ROADS_LUA.includes(need), need);
   // (every block opened is closed: a script that does not parse would leave the level without its roads' upgrade, silently)
-  const count = (re) => (HERO_ROADS_LUA.replace(/--[^\n]*/g, '').match(re) || []).length;
+  // (comments and quoted text out first: a word like 'function' inside quotes opens nothing)
+  const code = HERO_ROADS_LUA.replace(/--[^\n]*/g, '').replace(/'[^'\n]*'/g, "''");
+  const count = (re) => (code.match(re) || []).length;
   assert.equal(count(/\b(function|if|for|while|do)\b/g) - count(/\bfor\b[^\n]*\bdo\b|\bwhile\b[^\n]*\bdo\b/g), count(/\bend\b/g));
 });
 

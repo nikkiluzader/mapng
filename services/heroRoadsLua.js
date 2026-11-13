@@ -21,11 +21,13 @@ export const HERO_ROADS_LUA = String.raw`-- MapNG: Hero Roads (experimental). Wr
 -- From the console: dump(mainLevel.heroRoads().status()), mainLevel.heroRoads().rebuild(), mainLevel.heroRoads().remove().
 local M = {}
 
-local PER_FRAME = 3            -- roads built a frame
+local PER_FRAME = 12           -- roads built a frame
+local RELOAD_EVERY = 120       -- the level's collision taken up again after this many roads (and at the end)
 local NODE_GAP_M = 4           -- a Hero Road node about this often along MapNG's line
 local SHOULDER_M = 0.3
 local OVER_GROUND_M = 1.0      -- a line this far over or under the terrain is a bridge deck, ramp or tunnel: left as it is
 local MIN_WIDTH_M = 3.0
+local LON_PIECES = 4            -- mesh pieces along each stretch between two nodes (a node every 4 m)
 local CLEAR_M = 0.03           -- the deck's lowest edge over the highest ground under it
 
 local gm = nil
@@ -153,6 +155,12 @@ local function buildOne(name)
   g.isRoadLaneLines = math.max(lanesLeft, lanesRight) > 1
   if lanesLeft == 0 or lanesRight == 0 then g.isRoadCenterLine = false end
   g.geometryMode = 'spline'    -- MapNG's line is already the shape wanted; no re-engineered curves
+  -- The mesh's density. The editor's own defaults are 100 pieces along each stretch between two nodes and 16
+  -- across each side, meant for a road drawn by hand with a node every 50 m. MapNG gives a node every 4 m, so
+  -- that was a hundred times the triangles wanted: minutes to build and, on a tester's 0.3.1-dev.4 map, a GPU
+  -- that stopped responding. A piece a metre along, and a metre or so across.
+  g.lonRes = LON_PIECES
+  g.latRes = math.max(2, math.min(8, math.ceil(width / 2 / 1.2)))
   g.mapngSource = name         -- (which MapNG road it stands for)
   gm.ensureCornerArray(g)
   g.isDirty = true
@@ -160,6 +168,24 @@ local function buildOne(name)
   lanesSeen[key] = (lanesSeen[key] or 0) + 1
   return g
 end
+
+-- Build the roads marked dirty. The editor's code has the engine take up the whole level's collision again after
+-- every single road (a tenth of a second each time, whatever the road: 716 roads were 148 s of loading, nearly
+-- all of it that). While it builds, that one call is held back; reloadCollision() below makes it once for many.
+local sinceReload = 0
+local function buildDirty()
+  local realBe = be
+  be = setmetatable({}, { __index = function(_, k)
+    if k == 'reloadCollision' then return function() end end
+    local v = realBe[k]
+    if type(v) == 'function' then return function(_, ...) return v(realBe, ...) end end
+    return v
+  end })
+  local ok, err = pcall(gm.updateDirtyGroups, false)
+  be = realBe
+  return ok, err
+end
+local function reloadCollision() sinceReload = 0; be:reloadCollision() end
 
 local function start()
   local ok, mod = pcall(require, 'editor/heroRoadEditor/groupMgr')
@@ -197,15 +223,18 @@ local function step()
     else skipped = skipped + 1 end
   end
   if #made > 0 then
-    local ok, err = pcall(gm.updateDirtyGroups, false)
+    local ok, err = buildDirty()
     if ok then
       built = built + #made
+      sinceReload = sinceReload + #made
+      if sinceReload >= RELOAD_EVERY then reloadCollision() end
       for _, g in ipairs(made) do hideLayers(g.mapngSource) end
     else failed = failed + #made; firstError = firstError or tostring(err) end
   end
   if at % 30 < PER_FRAME then say(string.format('MapNG: building Hero Roads (%d/%d)...', at, #queue), 6) end
   if at >= #queue then
     done = true
+    reloadCollision()
     local msg = string.format('MapNG: %d Hero Roads built in %.0f s (%d left as they were, %d failed)', built, os.clock() - t0, skipped, failed)
     log(failed > 0 and 'W' or 'I', 'mapngHeroRoads', msg .. (firstError and (' | first error: ' .. firstError) or ''))
     say(msg, 10)

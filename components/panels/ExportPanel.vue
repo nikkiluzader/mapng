@@ -1946,6 +1946,7 @@ const downloadOSM = async () => {
   }
 };
 
+const MODEL_MESH_MAX = 2048;
 const handleGLBExport = async () => {
   if (!props.terrainData) return;
   isExportingGLB.value = true;
@@ -1956,6 +1957,9 @@ const handleGLBExport = async () => {
       centerTextureType: modelCenterTextureType.value,
       tileSelection: modelTileSelection.value,
       realWorldScale: modelRealWorldScale.value,
+      // (every height of a map up to 2048 a side; the 1024 it fell back to halved a 2 km map's detail and
+      // quartered a 4 km one's: a tester's "I've lost all the details", 2026-11-13)
+      maxMeshResolution: MODEL_MESH_MAX,
       surroundingTilePositions: props.surroundingTilePositions,
       center: props.center,
       resolution: props.resolution,
@@ -1991,6 +1995,9 @@ const handleDAEExport = async () => {
       centerTextureType: modelCenterTextureType.value,
       tileSelection: modelTileSelection.value,
       realWorldScale: modelRealWorldScale.value,
+      // (every height of a map up to 2048 a side; the 1024 it fell back to halved a 2 km map's detail and
+      // quartered a 4 km one's: a tester's "I've lost all the details", 2026-11-13)
+      maxMeshResolution: MODEL_MESH_MAX,
       surroundingTilePositions: props.surroundingTilePositions,
       center: props.center,
       resolution: props.resolution,
