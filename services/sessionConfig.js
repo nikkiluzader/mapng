@@ -63,6 +63,7 @@ export const DATA_FIELDS = [
   ['advancedMode', 'mapng_advanced_mode', 'bool', false],
   ['overtureBuildings', 'mapng_overtureBuildings', 'bool', true],
   ['measureRoadWidths', 'mapng_measureRoadWidths', 'bool', false],
+  ['workflow', 'mapng_workflow', ['level', 'assets', 'both'], 'level'],   // (what is being made: composables/useWorkflow.js)
 ];
 
 const CODE_PREFIX = 'mapng:1:';

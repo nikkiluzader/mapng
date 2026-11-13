@@ -282,6 +282,19 @@
 
     <!-- 3. Generate: the whole setup at a glance, then the buttons below -->
     <div v-show="step === 3" class="space-y-4">
+      <!-- what is being made (Advanced): the Export step shows only what it needs (composables/useWorkflow.js) -->
+      <div v-if="store.advancedMode" class="space-y-1.5" data-testid="workflow-choice">
+        <div class="text-micro font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('wizard.making') }}</div>
+        <div role="radiogroup" :aria-label="t('wizard.making')" class="grid grid-cols-3 rounded-md border border-gray-300 dark:border-gray-600 overflow-hidden">
+          <button
+            v-for="w in WORKFLOWS" :key="w" type="button" role="radio" :aria-checked="workflow === w" :data-testid="`workflow-${w}`"
+            class="px-2 py-1.5 text-caption font-semibold border-l first:border-l-0 border-gray-300 dark:border-gray-600 transition-colors"
+            :class="workflow === w ? 'bg-brand text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'"
+            @click="workflow = w"
+          >{{ t(`wizard.flow_${w}`) }}</button>
+        </div>
+        <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t(`wizard.flowHint_${workflow}`) }}</p>
+      </div>
       <div class="space-y-1.5">
         <div class="text-micro font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('wizard.review') }}</div>
         <GenerateSummary rows :items="summaryItems" @step="(n) => step = n" />
@@ -400,6 +413,7 @@ import { provideSectionGroup } from '../../composables/useSectionGroup.js';
 provideSectionGroup();
 import { CUSTOM_OVERPASS_STORAGE_KEY, OVERTURE_BUILDINGS_STORAGE_KEY } from '../../services/osm.js';
 import { useMeasureRoadWidths } from '../../composables/useMeasureRoadWidths.js';
+import { useWorkflow, WORKFLOWS } from '../../composables/useWorkflow.js';
 import { useOsmSource } from '../../composables/useOsmSource.js';
 import { useI18n } from 'vue-i18n';
 import { MapPin, Box, Trees, AlertTriangle, Download, CheckCircle2 } from 'lucide-vue-next';
@@ -513,6 +527,7 @@ watch(overtureBuildings, (newVal) => {
 });
 // (shared with the line in Fine-tuning that points here: composables/useMeasureRoadWidths.js keeps it)
 const { on: measureRoadWidths, showRequest: showMeasureRoadWidths } = useMeasureRoadWidths();
+const { workflow } = useWorkflow();
 watch(showMeasureRoadWidths, async () => {
   step.value = 2;
   await nextTick();
@@ -861,6 +876,7 @@ const applyPendingConfig = () => {
     if (typeof config.elevationUnitOverride === 'string' && config.elevationUnitOverride) elevationUnitOverride.value = config.elevationUnitOverride;
     if (typeof config.overtureBuildings === 'boolean') overtureBuildings.value = config.overtureBuildings;
     if (typeof config.measureRoadWidths === 'boolean') measureRoadWidths.value = config.measureRoadWidths;
+    if (WORKFLOWS.includes(config.workflow)) workflow.value = config.workflow;
     if (applyStoredSettings(config, localStorage)) {
       // (the code's terrain edits went into the old keys: the Terrain choice reads them back)
       reloadTerrainSettings();

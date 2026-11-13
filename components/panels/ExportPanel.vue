@@ -16,7 +16,9 @@
 
     <!-- (the "Ready to export" heading and the terrain stats come from ControlPanel, above) -->
       <!-- BeamNG Level: cards of settings (components/base/Setting*.vue), then the export -->
-      <SettingSection v-model:open="showExportBeamNG" :title="t('exportPanel.beamngLevel')" :icon="PackageOpen">
+      <!-- (Both: the two halves named, each with its own sections) -->
+      <div v-if="showLevel && showAssets" class="text-micro font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500" data-testid="export-half-level">{{ t('exportPanel.ui.halfLevel') }}</div>
+      <SettingSection v-if="showLevel" v-model:open="showExportBeamNG" :title="t('exportPanel.beamngLevel')" :icon="PackageOpen" data-testid="export-level-section">
           <SettingCard :title="t('exportPanel.ui.cardLevel')">
             <SettingRow :label="t('exportPanel.levelName')">
               <input
@@ -313,8 +315,13 @@
           </div>
       </SettingSection>
 
-      <!-- 2D Assets (advanced mode) -->
-      <SettingSection v-if="advancedMode" v-model:open="showExport2D" :title="t('exportPanel.assets2d')" :icon="Layers">
+      <!-- Assets for creators (the Generate step's choice: Assets or Both; composables/useWorkflow.js) -->
+      <div v-if="showAssets" class="space-y-1" :class="showLevel ? 'pt-3 border-t border-gray-200 dark:border-gray-600' : ''" data-testid="export-half-assets">
+        <div class="text-micro font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('exportPanel.ui.halfAssets') }}</div>
+        <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.halfAssetsHint') }}</p>
+      </div>
+      <!-- 2D Assets -->
+      <SettingSection v-if="showAssets" v-model:open="showExport2D" :title="t('exportPanel.assets2d')" :icon="Layers" data-testid="export-2d-section">
         <div class="grid grid-cols-2 gap-1.5">
           <!-- Heightmap -->
           <button 
@@ -399,7 +406,7 @@
       </SettingSection>
 
       <!-- 3D Models (advanced mode) -->
-      <SettingSection v-if="advancedMode" v-model:open="showExport3D" :title="t('exportPanel.models3d')" :icon="Box">
+      <SettingSection v-if="showAssets" v-model:open="showExport3D" :title="t('exportPanel.models3d')" :icon="Box" data-testid="export-3d-section">
 
         <template v-if="showExport3D">
           <!-- Shared 3D options -->
@@ -484,7 +491,7 @@
       </SettingSection>
 
       <!-- Geo Data -->
-      <SettingSection v-model:open="showExportGeo" :title="t('exportPanel.geoData')" :icon="FileJson">
+      <SettingSection v-if="showAssets" v-model:open="showExportGeo" :title="t('exportPanel.geoData')" :icon="FileJson" data-testid="export-geo-section">
         <div class="space-y-2">
           <div class="grid grid-cols-2 gap-1.5">
             <!-- GeoTIFF -->
@@ -606,6 +613,7 @@ import TexturePaintModal from '../modals/TexturePaintModal.vue';
 import { buildRunConfiguration as buildRunConfigurationBase } from '../../services/runConfiguration';
 import { generateHeightmapBlob, generateTerBlob } from '../../services/batchExports';
 import { exportToGLB, exportToDAE } from '../../services/export3d';
+import { useWorkflow } from '../../composables/useWorkflow.js';
 import { exportGeoTiff } from '../../services/exportGeoTiff';
 import { buildCommonTraceMetadata, downloadJsonFile } from '../../services/traceability';
 import { createWGS84ToLocal } from '../../services/geoUtils';
@@ -659,6 +667,8 @@ const showExportOutcome = (id) => nextTick(() => document.getElementById(id)?.sc
 
 const store = useMainStore();
 const advancedMode = computed(() => store.advancedMode);
+// (what the Generate step said is being made: which halves of this panel show)
+const { showLevel, showAssets } = useWorkflow();
 
 const emit = defineEmits(['fetchOsm', 'exportSuccess']);
 const BEAMNG_EXPORT_UI_LOG = '[BeamNG Export UI]';
