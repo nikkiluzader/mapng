@@ -8667,6 +8667,11 @@ function resolveNativeBarrierAsset(tags = {}, biome = null) {
 
   if (!barrierType) return null;
 
+  // A kerb is the edge of a pavement or a traffic island, a hand high: no barrier object stands on it. It fell
+  // through to the guard rail at the end of this list, and every mapped island got a rail round it (a tester's
+  // islands, 2026-11-13). Raised kerbs of their own are not built yet: refs/output/backlog.md.
+  if (barrierType === 'kerb' || barrierType === 'curb') return null;
+
   if (barrierType === 'hedge') {
     const height = Number.parseFloat(tags.height);
     const h = Number.isFinite(height) && height > 0 ? height : HEDGE_HEIGHT_M;
