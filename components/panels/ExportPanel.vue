@@ -895,7 +895,9 @@ const beamNGIncludeRocks = legacyOn.rocks;
 // content caps (buildings, fences, lamps, trees ...): off builds everything the map has
 const beamNGSafeCaps = ref(storedOn('mapng_beamNGSafeCaps'));
 // (Fine-tuning: a parking lane a side on town streets with no parking tags; services/roadWidth.js)
-const beamNGAssumeParking = ref(storedOn('mapng_beamNGAssumeParking'));
+// (off unless switched on: since 0.3.1 a town street with no parking tags is built at its driving width; a
+// tester's 6 m streets came out 10.6 m wide and over where the sidewalks belong)
+const beamNGAssumeParking = ref(localStorage.getItem('mapng_beamNGAssumeParking') === 'true');
 // (Fine-tuning: sidewalks as flat decals instead of raised meshes; exportBeamNGLevel.js sidewalkStyle)
 const beamNGDecalSidewalks = ref(localStorage.getItem('mapng_beamNGDecalSidewalks') === 'true');
 // (Fine-tuning: road surfaces as MapNG's decal roads, or experimental Hero Roads; exportBeamNGLevel.js roadSurface)
@@ -2255,9 +2257,9 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       viewDistance: advanced ? viewDistanceChoice(beamNGViewDistance.value) : AUTO_VIEW_DISTANCE,
       includeRocks: effectiveIncludeRocks,
       safeCaps: !advanced || beamNGSafeCaps.value,
-      assumeParking: !advanced || beamNGAssumeParking.value,
+      assumeParking: advanced && beamNGAssumeParking.value,
       sidewalkStyle: advanced && beamNGDecalSidewalks.value ? 'decal' : 'mesh',
-      roadSurface: advanced && beamNGRoadSurface.value === 'hero' ? 'hero' : 'decal',
+      roadSurface: advanced && ['hero', 'mesh'].includes(beamNGRoadSurface.value) ? beamNGRoadSurface.value : 'decal',
       curbHeight: advanced ? beamNGCurbHeight.value : 'standard',
       treeKindsOff: advanced ? sanitizeTreeKindsOff(beamNGTreeKindsOff.value) : [],
       // (basic mode: the area's own trees, none of Fine-tuning's choices)
@@ -2289,9 +2291,9 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       viewDistance: advanced ? viewDistanceChoice(beamNGViewDistance.value) : AUTO_VIEW_DISTANCE,
       includeRocks: effectiveIncludeRocks,
       safeCaps: !advanced || beamNGSafeCaps.value,
-      assumeParking: !advanced || beamNGAssumeParking.value,
+      assumeParking: advanced && beamNGAssumeParking.value,
       sidewalkStyle: advanced && beamNGDecalSidewalks.value ? 'decal' : 'mesh',
-      roadSurface: advanced && beamNGRoadSurface.value === 'hero' ? 'hero' : 'decal',
+      roadSurface: advanced && ['hero', 'mesh'].includes(beamNGRoadSurface.value) ? beamNGRoadSurface.value : 'decal',
       curbHeight: advanced ? beamNGCurbHeight.value : 'standard',
       treeKindsOff: advanced ? sanitizeTreeKindsOff(beamNGTreeKindsOff.value) : [],
       // (basic mode: the area's own trees, none of Fine-tuning's choices)

@@ -180,6 +180,7 @@
             @change="$emit('update:roadSurface', $event.target.value)"
           >
             <option value="decal">{{ t('exportPanel.ui.roadSurface_decal') }}</option>
+            <option value="mesh">{{ t('exportPanel.ui.roadSurface_mesh') }}</option>
             <option value="hero">{{ t('exportPanel.ui.roadSurface_hero') }}</option>
           </select>
         </div>

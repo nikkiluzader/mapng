@@ -42,21 +42,21 @@ test('mapped parking, other classes and other features are left as they are', ()
   assert.equal(withoutAssumedParking([mapped, motorway]).changed, 0);
 });
 
-test('the switch is saved, shared and shown only when off, and not counted', async () => {
+test('the switch is off by default; saved, shared and shown only when on, and not counted', async () => {
   globalThis.localStorage ??= { getItem: () => null, setItem: () => {}, removeItem: () => {} };
   const { exportSettingsFor } = await import('../services/exportSettings.js');
   const { EXPORT_FIELDS, describeSessionConfig, isCountedField } = await import('../services/sessionConfig.js');
   const { summarizeExportSettings } = await import('../services/exportSettingsSummary.js');
-  assert.equal(exportSettingsFor({ assumeParking: false }).mapng_beamNGAssumeParking, 'false');
-  assert.equal(exportSettingsFor({}).mapng_beamNGAssumeParking, 'true');
+  assert.equal(exportSettingsFor({ assumeParking: true }).mapng_beamNGAssumeParking, 'true');
+  assert.equal(exportSettingsFor({}).mapng_beamNGAssumeParking, 'false');
   const field = EXPORT_FIELDS.find((f) => f[1] === 'mapng_beamNGAssumeParking');
-  assert.ok(field && field[3] === true);
+  assert.ok(field && field[3] === false);
   assert.equal(isCountedField(field), false);
   const keys = (o) => summarizeExportSettings(o).flatMap((g) => g.rows).map((r) => r.key);
-  assert.ok(keys({ assumeParking: false }).includes('assumeParking'));
+  assert.ok(keys({ assumeParking: true }).includes('assumeParking'));
   assert.ok(!keys({}).includes('assumeParking'));
-  assert.ok(describeSessionConfig({ advancedMode: true, export: { assumeParking: false } }).some((r) => r.label === 'config.assumeParking'));
-  assert.ok(!describeSessionConfig({ advancedMode: true, export: { assumeParking: true } }).some((r) => r.label === 'config.assumeParking'));
+  assert.ok(describeSessionConfig({ advancedMode: true, export: { assumeParking: true } }).some((r) => r.label === 'config.assumeParking'));
+  assert.ok(!describeSessionConfig({ advancedMode: true, export: { assumeParking: false } }).some((r) => r.label === 'config.assumeParking'));
 });
 
 test('sidewalks as decals: saved with the level, shared and shown only when on, and not counted', async () => {

@@ -46,6 +46,7 @@ import { DAE_OPTIONS, describeScene, writeDae } from './daeWorker.js';
 import { geoToWorldPoint, getTerrainHeightWorld, terrainDrape, terrainGroundAt } from './terrainLookup.js';
 import { pickFlagCell } from './flagPlacement.js';
 import { BUILDING_LITE_FROM_M, buildingTileScene } from './buildingTiles.js';
+import { buildMeshRoads, MESH_ROAD_MATERIAL, MESH_ROAD_MATERIAL_DEF } from './meshRoads.js';
 import { viewDistanceMeters, viewDistanceChoice, fogDensityFor } from './viewDistance.js';
 import { HERO_ROADS_FILE, HERO_ROADS_LUA } from './heroRoadsLua.js';
 import { ensureTexture, hasTexture } from './textureOnDemand.js';
@@ -8160,9 +8161,9 @@ function buildBeamNGExportReport({
     ...(sanitizeTreeSwaps(options?.treeSwaps).length ? [`- Tree kinds swapped (Fine-tuning): ${sanitizeTreeSwaps(options.treeSwaps).map((s) => s.replace('>', ' planted as ')).join('; ')}`] : []),
     ...(sanitizeTreeModelsOff(options?.treeModelsOff).length ? [`- Tree models left out (Fine-tuning): ${sanitizeTreeModelsOff(options.treeModelsOff).join(', ')}`] : []),
     `- Include rocks: ${formatBool(options?.includeRocks)}`,
-    `- Street parking assumed where none is mapped: ${formatBool(options?.assumeParking !== false)}`,
+    `- Street parking assumed where none is mapped: ${formatBool(options?.assumeParking === true)}`,
     `- View distance: ${viewDistanceChoice(options?.viewDistance) === 'auto' ? 'auto (the map\'s width, 4 km at least, 16 km at most)' : `${viewDistanceChoice(options?.viewDistance)} m`} (LevelInfo visibleDistance)`,
-    `- Road surfaces: ${options?.roadSurface === 'hero' ? 'Hero Roads (experimental): built by a script when the level loads, over MapNG\'s decal roads (hidden under them, kept for traffic); editable in the World Editor > Hero Road, rebuilt from MapNG\'s roads at each load' : 'decal roads'}`,
+    `- Road surfaces: ${options?.roadSurface === 'hero' ? 'Hero Roads (experimental): built by a script when the level loads, over MapNG\'s decal roads (hidden under them, kept for traffic); editable in the World Editor > Hero Road, rebuilt from MapNG\'s roads at each load' : options?.roadSurface === 'mesh' ? 'Mesh Roads (experimental): a MeshRoad deck saved in the level under each paved road on the ground, MapNG\'s decal roads drawn on it (and kept for traffic)' : 'decal roads'}`,
     `- Include sidewalks: ${formatBool(options?.includeSidewalks !== false)}${options?.includeSidewalks !== false ? ` (${options?.sidewalkStyle === 'decal' ? 'as decals: flat strips on the ground, no curbs' : `as meshes: raised slabs with curbs, ${Math.round((CURB_HEIGHTS_M[options?.curbHeight] ?? CURB_HEIGHTS_M.standard) * 100)} cm high`})` : ''}`,
     ...(() => {
       // What to build (services/buildContent.js): the features switched off and the OSM left out for them
@@ -12390,9 +12391,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} What to build: ${contentChoice.contentOff.length} feature(s) off; ${contentFilter.removed} OSM features left out (${Object.entries(contentFilter.byTag).slice(0, 8).map(([k, n]) => `${k} ${n}`).join(', ')}).`);
   }
   const built = (id) => contentOn(options, id);
-  // (Fine-tuning, "Assume street parking" off: town streets with no parking
-  // tags are built without the default parking lane a side: roadWidth.js)
-  if (options.assumeParking === false) {
+  // (Fine-tuning, "Assume street parking": off unless asked for. Town streets with no parking
+  // tags are then built without the default parking lane a side: roadWidth.js)
+  if (options.assumeParking !== true) {
     const np = withoutAssumedParking(terrainData?.osmFeatures);
     if (np.changed) {
       terrainData = { ...terrainData, osmFeatures: np.features };
@@ -14246,6 +14247,18 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
 
   // ── art/roads: the stone and brick paving decal-road materials ─────────────
   const pavingMaterials = usedPavingMaterials(decalRoads);
+  // ── Mesh Roads (experimental): a MeshRoad deck under each paved ground road (services/meshRoads.js) ──
+  // (after every road decal is made and the terrain is final: the decals over a deck are lifted onto it)
+  let meshRoadStats = null;
+  if (roadSurface === 'mesh' && decalRoads.length > 0) {
+    const made = buildMeshRoads(decalRoads, terrainDrape(exportTerrainData, squareSize).drapeAt, { makeId: generatePersistentId });
+    meshRoadStats = made.stats;
+    if (made.meshRoads.length) {
+      decalRoads.push({ class: 'SimGroup', name: 'mesh_roads', persistentId: generatePersistentId(), __parent: 'Decal_Roads', __items: made.meshRoads });
+      pavingMaterials[MESH_ROAD_MATERIAL] = MESH_ROAD_MATERIAL_DEF;
+    }
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Mesh Roads: ${made.stats.decks} decks (${made.stats.nodes} nodes), ${made.stats.skipped} road surfaces left as decals only, ${made.stats.lifted} decals lifted onto decks.`);
+  }
   if (Object.keys(pavingMaterials).length > 0) {
     zip.file(`${base}/art/roads/main.materials.json`, JSON.stringify(pavingMaterials, null, 2));
   }
