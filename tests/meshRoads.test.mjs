@@ -19,7 +19,7 @@ test('a paved ground road gets one deck in the documented node format, a little 
   assert.ok(m.sideMaterial && m.bottomMaterial);
   for (const nd of m.nodes) {
     assert.equal(nd.length, 8);                       // x, y, z, width, depth, normal
-    assert.deepEqual(nd.slice(5), [0, 0, 1]);
+    assert.deepEqual(nd.slice(5), [0, 0, 1]);          // level across
     assert.ok(nd[2] > 10 && nd[2] < 10.06, `deck at ${nd[2]}`);
     assert.equal(nd[3], 6);
     assert.ok(nd[4] >= 0.3);
@@ -77,4 +77,35 @@ test('a deck does not close into a ring through a junction it already crossed', 
   const items = sq.map((p, i) => road(`dr_ring_s${i + 1}_b`, line(p[0], p[1], sq[(i + 1) % 4][0], sq[(i + 1) % 4][1])));
   const { meshRoads } = buildMeshRoads([{ __items: items }], flat);
   for (const m of meshRoads) { const a = m.nodes[0]; const b = m.nodes[m.nodes.length - 1]; assert.ok(Math.hypot(a[0] - b[0], a[1] - b[1]) > 1); }
+});
+
+test('the through road keeps its own height where a wider side street ends in it', () => {
+  // the ground rises away from the through road, across the side street's mouth
+  // (beyond the through road's own edge, 3 m from its line)
+  const ground = (x, y) => 10 + (y > 3.2 ? 0.05 * y + 0.04 * Math.abs(x) : 0);
+  const groups = [{ __items: [
+    road('dr_main_s1_b', line(-60, 0, 0, 0), { width: 6, z: () => 10 }),
+    road('dr_main_s2_b', line(0, 0, 60, 0), { width: 6, z: () => 10 }),
+    road('dr_side_s1_b', line(0, 0, 0, 20), { width: 11, z: (x, y) => 10 + 0.05 * y }),
+  ] }];
+  const { meshRoads } = buildMeshRoads(groups, ground);
+  const main = meshRoads.find((m) => m.name === 'mr_main_s1');
+  const zs = main.nodes.map((nd) => nd[2]);
+  assert.ok(Math.max(...zs) - Math.min(...zs) < 0.01, `the through road's deck is level: ${Math.min(...zs)}..${Math.max(...zs)}`);
+});
+
+test('a side road ending in a climbing through road takes its tilt there', () => {
+  const climb = (x) => 10 + 0.1 * x;                 // the through road climbs 10 % to the east
+  const groups = [{ __items: [
+    road('dr_main_s1_b', line(-40, 0, 0, 0), { width: 8, z: climb }),
+    road('dr_main_s2_b', line(0, 0, 40, 0), { width: 8, z: climb }),
+    road('dr_side_s1_b', line(0, 0, 0, 40), { z: () => 10 }),
+  ] }];
+  const { meshRoads } = buildMeshRoads(groups, (x, y) => (Math.abs(y) < 4 ? climb(x) : 10));
+  const side = meshRoads.find((m) => m.name === 'mr_side_s1');
+  const inMain = side.nodes.filter((nd) => Math.abs(nd[1]) <= 4.05);   // (its run-on end, its end, the node on the edge)
+  assert.ok(inMain.length >= 2);
+  // the normal leans back down the climb: the deck's cross-section then rises to the east as the through road does
+  for (const nd of inMain) { assert.ok(nd[5] < -0.09 && nd[5] > -0.11, `normal x ${nd[5]}`); assert.ok(Math.abs(Math.hypot(nd[5], nd[6], nd[7]) - 1) < 1e-3); }
+  assert.deepEqual(side.nodes[side.nodes.length - 1].slice(5), [0, 0, 1]);
 });
