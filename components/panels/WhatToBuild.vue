@@ -183,6 +183,14 @@
             <option value="hero">{{ t('exportPanel.ui.roadSurface_hero') }}</option>
           </select>
         </div>
+        <!-- road widths measured from the satellite picture: set before Generate (it downloads), so only pointed to here -->
+        <div class="flex items-start gap-2" data-testid="measured-widths-note">
+          <div class="flex-1 min-w-0">
+            <div class="text-xs font-medium text-gray-800 dark:text-gray-100">{{ t('exportPanel.ui.measuredWidths') }}</div>
+            <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ measuredWidthsNote }}</p>
+          </div>
+          <button type="button" class="shrink-0 text-caption font-medium text-brand hover:underline" @click="showMeasureSetting">{{ t('exportPanel.ui.measuredWidthsChange') }}</button>
+        </div>
         <!-- sidewalks as flat decals on the ground instead of raised meshes (exportBeamNGLevel.js sidewalkStyle) -->
         <div class="flex items-start gap-2">
           <div class="flex-1 min-w-0">
@@ -233,6 +241,8 @@
 </template>
 
 <script setup>
+import { useMeasureRoadWidths } from '../../composables/useMeasureRoadWidths.js';
+import { WIDTH_SOURCE_TAG } from '../../services/satRoadWidth.js';
 import { computed, reactive, defineComponent, h, toRaw } from 'vue';
 import { treeTable, treeModelLabel, sampleElevations } from '../../services/treeTable.js';
 import { TREE_KIND_IDS } from '../../services/beamngTrees.js';
@@ -265,6 +275,18 @@ const props = defineProps({
 });
 const CURB_HEIGHT_KEYS = ['standard', 'low', 'flush'];
 const emit = defineEmits(['update:forestDensity', 'update:lidarDecks', 'update:safeCaps', 'update:assumeParking', 'update:decalSidewalks', 'update:roadSurface', 'update:curbHeight', 'update:treeKindsOff', 'update:treeSwaps', 'update:treeModelsOff']);
+// (Map data > Measure road widths: whether it is on, how many of this map's roads it measured, and the way there)
+const { on: measureWidthsOn, show: showMeasureSetting } = useMeasureRoadWidths();
+const measuredRoads = computed(() => {
+  const features = toRaw(useMainStore().terrainData)?.osmFeatures;
+  if (!Array.isArray(features)) return null;
+  let n = 0;
+  for (const f of features) if (f?.tags?.[WIDTH_SOURCE_TAG] === 'satellite') n++;
+  return n;
+});
+const measuredWidthsNote = computed(() => (measuredRoads.value > 0
+  ? t('exportPanel.ui.measuredWidthsUsed', { n: measuredRoads.value })
+  : measureWidthsOn.value ? t('exportPanel.ui.measuredWidthsOnNone') : t('exportPanel.ui.measuredWidthsOff')));
 const { t, te } = useI18n();
 const store = useMainStore();
 // (a feature's small hint, where it has one: asking for a missing key logs a warning)

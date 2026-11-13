@@ -394,12 +394,12 @@
 
 <script setup>
 import { DEFAULT_ELEVATION_SOURCE, initialElevationSource } from '../../services/elevationDefaults.js';
-import { ref, shallowRef, computed, onMounted, onUnmounted, watch, toRaw } from 'vue';
+import { ref, shallowRef, computed, onMounted, onUnmounted, watch, toRaw, nextTick } from 'vue';
 import { provideSectionGroup } from '../../composables/useSectionGroup.js';
 // Expand all / Collapse all for every section in this panel
 provideSectionGroup();
 import { CUSTOM_OVERPASS_STORAGE_KEY, OVERTURE_BUILDINGS_STORAGE_KEY } from '../../services/osm.js';
-import { MEASURE_WIDTHS_STORAGE_KEY } from '../../services/satRoadWidth.js';
+import { useMeasureRoadWidths } from '../../composables/useMeasureRoadWidths.js';
 import { useOsmSource } from '../../composables/useOsmSource.js';
 import { useI18n } from 'vue-i18n';
 import { MapPin, Box, Trees, AlertTriangle, Download, CheckCircle2 } from 'lucide-vue-next';
@@ -511,9 +511,19 @@ const overtureBuildings = ref(localStorage.getItem(OVERTURE_BUILDINGS_STORAGE_KE
 watch(overtureBuildings, (newVal) => {
   localStorage.setItem(OVERTURE_BUILDINGS_STORAGE_KEY, String(newVal));
 });
-const measureRoadWidths = ref(localStorage.getItem(MEASURE_WIDTHS_STORAGE_KEY) === 'true');
-watch(measureRoadWidths, (newVal) => {
-  localStorage.setItem(MEASURE_WIDTHS_STORAGE_KEY, String(newVal));
+// (shared with the line in Fine-tuning that points here: composables/useMeasureRoadWidths.js keeps it)
+const { on: measureRoadWidths, showRequest: showMeasureRoadWidths } = useMeasureRoadWidths();
+watch(showMeasureRoadWidths, async () => {
+  step.value = 2;
+  await nextTick();
+  const section = document.getElementById('mapng-sec-mapdata');
+  section?.querySelector('button[aria-expanded="false"]')?.click();
+  await nextTick();
+  const row = document.querySelector('[data-testid="measure-road-widths"]') || section;
+  if (!row) return;
+  row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  row.classList.add('mapng-flash');
+  setTimeout(() => row.classList.remove('mapng-flash'), 1200);
 });
 
 // Persist GPXZ API key and reset status when it changes
