@@ -63,3 +63,21 @@ test('a bore under ground a little too thin keeps its grade: the cover is made u
   const zs = t.line.filter((p) => p.kind === 'tube').map((p) => p.z);
   assert.ok(Math.min(...zs) > 20 - 0.6, `the road sags to ${Math.min(...zs).toFixed(2)} under a 20 m grade`);
 });
+
+// ── a gallery's roof past the bore ──
+test('past its covered end a bore runs on under a flat roof as a gallery, and not under a hillside coming down', () => {
+  const smooth = (t) => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
+  const ap = [{ xy: [[0, -300], [0, -500]] }, { xy: [[0, 300], [0, 500]] }];
+  // the road at 20 m; a hill 40 m over it south of y = 0, and north of it a flat roof 6.5 m over the road for 120 m
+  const roofed = (x, y) => (y > 120 ? 20 : y > 0 ? 26.5 : 20 + 40 * smooth((300 + y) / 60));
+  const t = solveTunnel({ xy: [[0, -300], [0, 300]], half: 4 }, { groundAt: roofed, approaches: ap });
+  assert.ok(t.ok, t.reason);
+  const air = (t.exposed || []).filter((e) => e[2] === 'air');
+  assert.ok(air.length === 1 && air[0][1] - air[0][0] > 90, `the roofed stretch stands in the open: ${JSON.stringify(t.exposed)}`);
+  assert.ok(t.line[t.iN].y > 100, `the tube runs on to the roof's edge: ${t.line[t.iN].y}`);
+  // the same hill coming down steadily on the north side: a portal in a cutting, as before
+  const hillside = (x, y) => (y > 0 ? 20 + 12 * Math.max(0, 1 - y / 120) : 20 + 40 * smooth((300 + y) / 60));
+  const h = solveTunnel({ xy: [[0, -300], [0, 300]], half: 4 }, { groundAt: hillside, approaches: ap });
+  assert.ok(h.ok, h.reason);
+  assert.equal((h.exposed || []).filter((e) => e[2] === 'air').length, 0, 'no gallery under a hillside');
+});

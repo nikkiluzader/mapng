@@ -5363,6 +5363,8 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
     if (nearestOnTunnel(t, x, y, reach)) return true;
     return (t.cuts || []).some((cut) => cut.line.some((q) => Math.hypot(q.x - x, q.y - y) < reach));
   };
+  // (a bore with a stretch standing in the open at an end of it: a gallery's mouth)
+  const mouthInOpen = (t) => t.kind !== 'gallery' && (t.exposed || []).some(([a, b, kind]) => kind === 'air' && (a <= t.line[t.iS].s + 1 || b >= t.line[t.iN].s - 1));
   const gradeOne = (t) => {
     // (a gallery left ungraded has no hillside brought up to its roof: its concrete back wall instead)
     if (t.kind === 'gallery' && !shape) t.keepWall = true;
@@ -5390,7 +5392,17 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
               // (a low box's mouth, on the lanes: nothing built later stands above the road going in.
               // A car park's aisle beside the portal, on the lid in the survey, had its ground composed
               // onto the lane's edge)
-              if (t.gradedCover && on.into > -LOW_MOUTH_CAP_M && Math.abs(on.d) <= t.W) out.mouth.set(idx, Math.min(out.mouth.get(idx) ?? Infinity, on.z + minHeight));
+              // (... and a tube standing in the open as a gallery, its mouth a few metres inside its way's
+              // end: what was left of the gallery's roof between the road's levelling and the face stood
+              // 2 to 5 m high in the lane: D 902, Lac du Chevril)
+              if ((t.gradedCover || mouthInOpen(t)) && on.into > -LOW_MOUTH_CAP_M && Math.abs(on.d) <= t.W) out.mouth.set(idx, Math.min(out.mouth.get(idx) ?? Infinity, on.z + minHeight));
+            } else if (on && on.beyond && on.into < 0 && mouthInOpen(t)) {
+              // (the same just past the way's own end, straight on along the road)
+              const end = on.i <= 1 ? t.line[0] : t.line[t.line.length - 1];
+              const past = Math.hypot(x - end.x, y - end.y);
+              if (past <= LOW_MOUTH_CAP_M && Number.isFinite(end.tx) && Math.abs((x - end.x) * end.ty - (y - end.y) * end.tx) <= t.W) {
+                out.mouth.set(idx, Math.min(out.mouth.get(idx) ?? Infinity, end.z + 0.08 * past + minHeight));
+              }
             }
           }
         }

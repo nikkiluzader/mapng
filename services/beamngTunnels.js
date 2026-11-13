@@ -26,6 +26,12 @@ const NOTCH_M = 60;                    // ... but a dip this short (a gully the 
 const NOTCH_FILL_M = 40;               // often just OSM a few m off a cliff face) is plugged this deep
 const MAX_SHORT_SHARE = 0.4;           // more of the tube than this short of cover: not a tunnel here
 const LEVEL_TUBE_SLACK_M = 20;           // ... when the level bore is no more than this much shorter than the dug one
+const CUT_END_LAP_M = 8;                 // past a cutting's outer end, straight on, the road's width is kept clear this far
+const GALLERY_SIDE_OPEN_M = 3;            // under a gallery's roof, ground beside the lining lower than this over the road is the open side
+const GALLERY_ROOF_MIN_M = 4.5;          // past the bore's covered end, ground this far over the road ...
+const GALLERY_ROOF_STEP_M = 1.5;         // ... holding one height to within this ...
+const GALLERY_ROOF_LEAD = 5;             // (stations by the bore left out of that: the roof meeting the hill)
+const GALLERY_ROOF_RUN_M = 30;           // ... for this long is a gallery's roof: the tube runs on under it
 const DIG_FOR_COVER_M = 0.5;           // a bore's road is lowered under thin ground by this much at most before the cover is made up instead
 const OPEN_RUN_BED_M = 1;             // a stretch too thinly covered to fill stands in the open as a gallery when the ground is this far over the road all along it
 export const MIN_TUBE_M = 20;          // a shorter bore is left on the ground
@@ -789,9 +795,35 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
     while (iS > 0 && g[iS - 1] - z[iS - 1] > RAW_PORTAL_OPEN_M) iS--;
     while (iN < n - 1 && g[iN + 1] - z[iN + 1] > RAW_PORTAL_OPEN_M) iN++;
   }
+  const roofed = [];
+  // A roof on the way out: past the covered bore, a tagged tunnel whose ground stays a storey and more over
+  // the road, flat, for a good stretch is under a gallery's roof (fine elevation shows the roof as ground: the
+  // D 902 past Lac du Chevril, 6.5 m over the lane for 138 m, open on the valley side). A cutting dug through
+  // it took the roof away and left the road between walls. The tube runs on under it, standing in the open:
+  // no cover made up, the ground in it opened, windows where the open air is beside it.
+  if (!cutCover && !low && !raw) {
+    // (flat: a hillside coming down to its portal passes through the same heights on its way, steadily;
+    // a roof holds one height. The first metres by the bore, where the roof meets the hill, are not judged)
+    const run = (from, dir, stop) => {
+      let k = from;
+      while (k !== stop && g[k + dir] - z[k + dir] >= GALLERY_ROOF_MIN_M) k += dir;
+      const covers = [];
+      for (let i = from + dir * GALLERY_ROOF_LEAD; dir > 0 ? i <= k : i >= k; i += dir) covers.push(g[i] - z[i]);
+      if (covers.length < 2 || Math.max(...covers) - Math.min(...covers) > GALLERY_ROOF_STEP_M) return from;
+      return k;
+    };
+    if (iS === c0 && iS > 0) {
+      const k = run(iS, -1, 0);
+      if (st[iS].s - st[k].s >= GALLERY_ROOF_RUN_M) { roofed.push([st[k].s, st[iS].s, 'air']); iS = k; }
+    }
+    if (iN === c1 && iN < n - 1) {
+      const k = run(iN, 1, n - 1);
+      if (st[k].s - st[iN].s >= GALLERY_ROOF_RUN_M) { roofed.push([st[iN].s, st[k].s, 'air']); iN = k; }
+    }
+  }
   const tubeLength = st[iN].s - st[iS].s;
   if (st[c1].s - st[c0].s < MIN_TUBE_M) return { ok: false, reason: `bore only ${Math.round(st[c1].s - st[c0].s)} m under ground`, length: L };
-  const exposed = [];
+  const exposed = [...roofed];
   if (bridged[0] && c0 > 0) exposed.push([st[0].s, st[c0].s]);
   if (bridged[1] && c1 < n - 1) exposed.push([st[c1].s, st[n - 1].s]);
   // dips: runs of the bore short of cover between its covered ends, each
@@ -1057,6 +1089,20 @@ function findWindows(t, groundAt) {
   const picked = [];
   t.arcades = [];
   const G = WINDOW_KINDS.gallery;
+  // A side's open face for a gallery opening. Under a gallery's roof (a stretch standing in the open, 'air')
+  // the open side is known for what it is: the ground beside the lining a storey under the roof is the open
+  // air, whatever lies further out (the D 902's valley side: spoil mounds 1 to 3 m high past the edge, which
+  // the view test read as rock, and the gallery came out as a closed tube).
+  const inAir = (sAt) => (t.exposed || []).some(([a, b, kind]) => kind === 'air' && sAt >= a - 1e-6 && sAt <= b + 1e-6);
+  const galleryFace = (q, side) => {
+    const f = faceAt(q, side, G.sill);
+    if (f != null || !inAir(q.s)) return f;
+    for (let o = outer; o <= outer + ARCADE_ROCK_M; o += 0.5) {
+      const [x, y] = lateral(q, side * o);
+      if (groundAt(x, y) < q.z + GALLERY_SIDE_OPEN_M) return o;
+    }
+    return null;
+  };
   for (const side of [-1, 1]) {
     const open = (i) => {
       if (i < t.iS || i > t.iN) return false;
@@ -1067,7 +1113,7 @@ function findWindows(t, groundAt) {
       // the surface. A bore deep in the rock with a cliff face beside it has
       // windows, a few, as before: Zion-Mount Carmel's six stayed six)
       if (!(q.g - q.z < t.need + ARCADE_COVER_M)) return false;
-      const f = faceAt(q, side, G.sill);
+      const f = galleryFace(q, side);
       if (f == null) return false;
       if (f <= outer + ARCADE_ROCK_M) return true;
       // (a thin roof, the ground falling from it to the road within a few
@@ -1083,7 +1129,7 @@ function findWindows(t, groundAt) {
         t.arcades.push({ side, i, j, s0: t.line[i].s, s1: t.line[j].s, rock: 0 });
         for (let k = i; k + G.segments <= j; k += ARCADE_PITCH) {
           const run = t.line.slice(k, k + G.segments + 1);
-          const faces = run.map((q) => faceAt(q, side, G.sill));
+          const faces = run.map((q) => galleryFace(q, side));
           if (faces.some((f) => f == null)) continue;
           picked.push({ ...make(k, side, 'gallery', Math.max(...faces)), arcade: true });
           // (how far out the ground is kept under the sill along this arcade: to its deepest face)
@@ -1549,6 +1595,13 @@ export function tunnelGroundAt(t, x, y, h) {
     const end = n.i <= 1 ? t.line[0] : t.line[t.line.length - 1];
     if (end.kind !== 'cut') return h;
     const past = Math.hypot(x - end.x, y - end.y);
+    // (straight on, where the road runs out of the cutting: no slope across it. The road's own levelling
+    // ends square at the same point but along its own last bend, and the wedge between the two kept a tooth
+    // of the old ground in the lane: 2.7 and 5.3 m of gallery roof in front of the D 902's second tunnel.
+    // Lowered only, for a few metres, within the road's width.)
+    if (past <= CUT_END_LAP_M && Number.isFinite(end.tx) && Math.abs((x - end.x) * end.ty - (y - end.y) * end.tx) <= t.W) {
+      return Math.min(h, Math.max(end.z - past, end.z + MAX_GRADE * past));
+    }
     return clamp(h, end.z - past, end.z + past);
   }
   const ad = across(t, n);
