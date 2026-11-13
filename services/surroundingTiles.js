@@ -437,12 +437,21 @@ export const fetchSurroundingTiles = async (
       } else if (includeSatellite && sCtx) {
         const numTiles = Math.pow(2, satelliteZoom);
         const wrappedTx = ((tx % numTiles) + numTiles) % numTiles;
-        const url = `${SATELLITE_API_URL}/${satelliteZoom}/${ty}/${wrappedTx}`;
-        const img = await loadImage(url, signal);
+        // (blankTile=false: where Esri has no imagery at this zoom it answers 404, not its grey "Map data not
+        // yet available" tile, which used to be drawn into the picture; the tile is then cut from the nearest
+        // zoom above that has imagery, as the map's own texture does)
         const dx = (tx - sMinTX) * TILE_SIZE;
         const dy = (ty - sMinTY) * TILE_SIZE;
-        if (img) sCtx.drawImage(img, dx, dy);
-        else { sCtx.fillStyle = '#1a1a1a'; sCtx.fillRect(dx, dy, TILE_SIZE, TILE_SIZE); }
+        let drawn = false;
+        for (let step = 0; step <= 4 && satelliteZoom - step >= 0 && !drawn; step++) {
+          const az = satelliteZoom - step; const an = 2 ** az; const ax = Math.floor(wrappedTx / 2 ** step); const ay = Math.floor(ty / 2 ** step);
+          const img = await loadImage(`${SATELLITE_API_URL}/${az}/${ay}/${((ax % an) + an) % an}?blankTile=false`, signal);
+          if (!img) continue;
+          const span = TILE_SIZE / 2 ** step;
+          sCtx.drawImage(img, (wrappedTx - ax * 2 ** step) * span, (ty - ay * 2 ** step) * span, span, span, dx, dy, TILE_SIZE, TILE_SIZE);
+          drawn = true;
+        }
+        if (!drawn) { sCtx.fillStyle = '#1a1a1a'; sCtx.fillRect(dx, dy, TILE_SIZE, TILE_SIZE); }
         completedSatellite++;
       }
       completed++;

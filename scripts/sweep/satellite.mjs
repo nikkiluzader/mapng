@@ -30,14 +30,27 @@ const y0 = Math.floor(ty(north)); const y1 = Math.floor(ty(south));
 console.log(`zoom ${z}: ${(x1 - x0 + 1) * (y1 - y0 + 1)} tiles for a ${size} px texture`);
 
 const tiles = [];
-const fetchTile = async (x, y) => {
-  const url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
+// (blankTile=false, as the app: no grey "Map data not yet available" tiles; a tile Esri has no imagery for at
+// this zoom is cut from the nearest zoom above that has it)
+const fetchOne = async (zz, x, y) => {
+  const url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zz}/${y}/${x}?blankTile=false`;
   for (let attempt = 0; attempt < 4; attempt++) {
     try {
       const r = await fetch(url, { headers: { 'User-Agent': 'MapNG-levelprobe/1.0 (local diagnostics)' } });
       if (r.ok) return Buffer.from(await r.arrayBuffer());
+      if (r.status === 404) return null;
     } catch { /* retry */ }
     await new Promise((res) => setTimeout(res, 500 * (attempt + 1)));
+  }
+  return null;
+};
+const fetchTile = async (x, y) => {
+  for (let step = 0; step <= 4; step++) {
+    const buf = await fetchOne(z - step, Math.floor(x / 2 ** step), Math.floor(y / 2 ** step));
+    if (!buf) continue;
+    if (!step) return buf;
+    const span = 256 / 2 ** step;
+    return sharp(buf).resize(256, 256).extract({ left: Math.floor((x % 2 ** step) * span), top: Math.floor((y % 2 ** step) * span), width: Math.max(1, Math.floor(span)), height: Math.max(1, Math.floor(span)) }).png().toBuffer();
   }
   return null;
 };
