@@ -40,6 +40,7 @@
     "preview2d": "2D-Vorschau",
     "preview3d": "3D-Vorschau",
     "needsData": "Zuerst generieren",
+    "preparingTexture": "Die Textur „{name}“ wird vorbereitet…",
     "sourceTiles": "MapNG-OSM-Daten",
     "sourceTilesHint": "MapNGs eigene Kopie von OpenStreetMap wird zuerst gefragt; die Live-Server von OpenStreetMap sind die Reserve. Änderbar unter Kartendaten.",
     "sourceTilesUsedHint": "Aus MapNGs eigener Kopie von OpenStreetMap gelesen, Stand {date}.",

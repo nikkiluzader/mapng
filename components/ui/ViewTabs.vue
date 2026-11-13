@@ -10,6 +10,10 @@
       <component :is="osmSource.warn ? Info : Database" :size="14" />
       {{ osmSource.label }}
     </span>
+    <!-- a texture Generate left out is being painted (services/textureOnDemand.js): the picture changes when it is done -->
+    <span v-if="preparingName" data-testid="texture-preparing" role="status" class="flex items-center gap-1.5 h-8 px-2 rounded-lg text-xs whitespace-nowrap text-brand">
+      <Loader2 :size="14" class="animate-spin" />{{ t('view.preparingTexture', { name: preparingName }) }}
+    </span>
     <BaseButton
       v-for="tab in TABS" :key="tab.id"
       size="sm"
@@ -58,7 +62,7 @@ import { useI18n } from 'vue-i18n';
 import BaseButton from '../base/BaseButton.vue';
 import { computed } from 'vue';
 import { storeToRefs } from 'pinia';
-import { Globe, Layers, Info, Database, Map as MapIcon } from 'lucide-vue-next';
+import { Globe, Layers, Info, Database, Map as MapIcon, Loader2 } from 'lucide-vue-next';
 import { useOverpassStatus } from '../../composables/useOverpassStatus.js';
 import { useOsmSource } from '../../composables/useOsmSource.js';
 import { useMainStore } from '../../stores/mainStore';
@@ -69,6 +73,8 @@ const { tilesFirst } = useOsmSource();
 const { terrainData } = storeToRefs(useMainStore());
 // The map data's source, in a few words. With a terrain: what its data pull used. Without:
 // what the next one asks first (the Map data setting), and whether the live servers answer.
+const store = useMainStore();
+const preparingName = computed(() => ({ osm: t('exportPanel.osm'), hybrid: t('exportPanel.satelliteHybrid'), game: t('exportPanel.gameTexture') }[store.texturePreparing] || ''));
 const osmSource = computed(() => {
   const info = terrainData.value?.osmRequestInfo;
   const used = String(info?.endpointUsed || '');

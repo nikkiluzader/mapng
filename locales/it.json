@@ -40,6 +40,7 @@
     "preview2d": "Anteprima 2D",
     "preview3d": "Anteprima 3D",
     "needsData": "Prima genera",
+    "preparingTexture": "Preparazione della texture {name}…",
     "sourceTiles": "Dati OSM di MapNG",
     "sourceTilesHint": "Prima viene interrogata la copia di OpenStreetMap di MapNG; i server live di OpenStreetMap sono la riserva. Si cambia in Dati della mappa.",
     "sourceTilesUsedHint": "Letto dalla copia di OpenStreetMap di MapNG, com'era il {date}.",

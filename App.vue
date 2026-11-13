@@ -958,6 +958,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
           preferNativeCoverage: uploadedAreaMode.value !== 'crop',
           raw,
           ...generationEdits,
+          ...texturesToGenerate(baseTexture.value),
         },
       );
     } else {

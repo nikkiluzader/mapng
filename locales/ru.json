@@ -40,6 +40,7 @@
     "preview2d": "2D-просмотр",
     "preview3d": "3D-просмотр",
     "needsData": "Сначала сгенерируйте",
+    "preparingTexture": "Подготовка текстуры «{name}»…",
     "sourceTiles": "Данные OSM от MapNG",
     "sourceTilesHint": "Сначала запрашивается собственная копия OpenStreetMap в MapNG; живые серверы OpenStreetMap служат запасным вариантом. Меняется в разделе «Данные карты».",
     "sourceTilesUsedHint": "Прочитано из собственной копии OpenStreetMap в MapNG, состояние на {date}.",

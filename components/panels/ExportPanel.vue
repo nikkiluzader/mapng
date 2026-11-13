@@ -1692,8 +1692,9 @@ const yieldToUi = async () => {
 // A texture Generate left out, painted before it is downloaded or put on a model (services/textureOnDemand.js).
 const prepareTexture = async (kind) => {
   const td = toRaw(props.terrainData);
-  if (!td || hasTexture(td, kind)) return;
-  if (await ensureTexture(td, kind)) store.texturesMade++;
+  if (!td || hasTexture(td, kind) || !['osm', 'hybrid', 'game'].includes(kind)) return;
+  store.texturePreparing = kind;
+  try { if (await ensureTexture(td, kind)) store.texturesMade++; } finally { if (store.texturePreparing === kind) store.texturePreparing = ''; }
 };
 const getExportTerrainData = () => prepareCroppedTerrainData(toRaw(props.terrainData));
 

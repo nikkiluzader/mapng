@@ -45,6 +45,7 @@
     "preview2d": "2D preview",
     "preview3d": "3D preview",
     "needsData": "Generate first",
+    "preparingTexture": "Preparing the {name} texture…",
     "sourceTiles": "MapNG OSM data",
     "sourceTilesHint": "MapNG's own copy of OpenStreetMap is asked first; the live OpenStreetMap servers are the fallback. Change it under Map data.",
     "sourceTilesUsedHint": "Read from MapNG's own copy of OpenStreetMap, as it was on {date}.",
