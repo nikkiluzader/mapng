@@ -147,7 +147,22 @@ function createWindow() {
   // links out open in the user's browser
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:/.test(url)) shell.openExternal(url);
+    // (a page the app makes itself, shown in a window of its own: the elevation sources' quality report.
+    // It opens empty and is then given the page; no preload, no access to the app)
+    if (url === 'about:blank' || url === '') {
+      return { action: 'allow', overrideBrowserWindowOptions: { width: 1100, height: 860, autoHideMenuBar: true, title: 'MapNG', webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } } };
+    }
     return { action: 'deny' };
+  });
+  // (in such a window: links out go to the user's browser, it opens no windows and goes nowhere but its page)
+  win.webContents.on('did-create-window', (child) => {
+    child.setMenuBarVisibility(false);
+    child.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
+    child.webContents.on('will-navigate', (event, url) => {
+      if (url.startsWith('blob:')) return;
+      event.preventDefault();
+      if (/^https?:/.test(url)) shell.openExternal(url);
+    });
   });
   // the page crashed or ran out of memory: reload it (at most once a minute,
   // so a crash on load can't loop), and the reloaded page offers a report

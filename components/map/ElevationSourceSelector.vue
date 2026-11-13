@@ -385,9 +385,26 @@ const loadGpxzCompare = async () => {
 const reportBusy = ref(false);
 const reportNote = ref('');
 const canReport = computed(() => compareCells.value.some((c) => c.url));
+/** A new tab with a waiting line in it, or null when the browser refuses one. */
+const openReportTab = (waiting) => {
+  try {
+    const tab = window.open('', '_blank');
+    if (!tab) return null;
+    tab.opener = null;
+    tab.document.title = 'MapNG';
+    const p = tab.document.createElement('p');
+    p.textContent = waiting;
+    p.style.cssText = 'font: 16px system-ui, sans-serif; margin: 3rem; color: #555';
+    tab.document.body.appendChild(p);
+    return tab;
+  } catch { return null; }
+};
 const saveQualityReport = async () => {
   if (reportBusy.value) return;
   reportBusy.value = true; reportNote.value = '';
+  // The report opens in a new tab (a button that saved a file read as a download nobody had asked for). The
+  // tab is opened now, while the click still counts as the user's, and shown the page when it is ready.
+  const tab = openReportTab(t('map.compareReportBusy'));
   try {
     const c = centerPoint();
     const [{ fetchOSMData, getLastOSMRequestInfo, restoreLastOSMRequestInfo }, { roadsInPatch, compareSources, qualityReportHtml }] = await Promise.all([import('../../services/osm.js'), import('../../services/sourceQuality.js')]);
@@ -410,14 +427,21 @@ const saveQualityReport = async () => {
       appVersion: typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : '', osmSource,
     });
     const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
-    const link = document.createElement('a');
-    link.href = url; link.download = `mapng-elevation-quality-${c.lat.toFixed(4)}_${c.lng.toFixed(4)}.html`;
-    document.body.appendChild(link); link.click(); link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    if (tab && !tab.closed) {
+      // (the address is kept for as long as this page lives: the tab can be reloaded)
+      tab.location.replace(url);
+    } else {
+      // (the browser would not open a tab: the page is saved as a file instead, as before)
+      const link = document.createElement('a');
+      link.href = url; link.download = `mapng-elevation-quality-${c.lat.toFixed(4)}_${c.lng.toFixed(4)}.html`;
+      document.body.appendChild(link); link.click(); link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    }
     reportNote.value = result.verdict;
   } catch (e) {
     console.warn('[Quality report]', e);
     reportNote.value = t('map.compareReportFailed');
+    try { tab?.close(); } catch { /* already gone */ }
   } finally { reportBusy.value = false; }
 };
 const toggleCompare = () => { compareOpen.value = !compareOpen.value; if (compareOpen.value) loadCompare(); else compareAbort?.abort(); };
