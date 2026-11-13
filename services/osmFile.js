@@ -77,7 +77,15 @@ function readOsmXml(text) {
         break;
       case 'bounds': {
         const b = { south: Number(a.minlat), west: Number(a.minlon), north: Number(a.maxlat), east: Number(a.maxlon) };
-        if (Object.values(b).every(Number.isFinite)) bounds = b;
+        // (a file from JOSM has one <bounds> for every area downloaded into it: the box round all of them.
+        // The last one alone was kept, so a file of several downloads counted as covering only its last
+        // piece and was refused, "doesn't cover the area", however much it held: a tester's files, cropped
+        // by hand to get them in.)
+        if (Object.values(b).every(Number.isFinite)) {
+          bounds = bounds
+            ? { south: Math.min(bounds.south, b.south), west: Math.min(bounds.west, b.west), north: Math.max(bounds.north, b.north), east: Math.max(bounds.east, b.east) }
+            : b;
+        }
         break;
       }
       default:

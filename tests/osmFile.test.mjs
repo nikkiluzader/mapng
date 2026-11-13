@@ -173,3 +173,19 @@ test('a via ferrata (a climbing route) is not a road', () => {
   assert.equal(features.filter((f) => f.type === 'road').length, 1);
   assert.equal(features.find((f) => f.type === 'road').tags.highway, 'path');
 });
+
+test('a JOSM file of several downloads covers the box round all of them', async () => {
+  const { parseOsmFile, osmFileCoverage } = await import('../services/osmFile.js');
+  const xml = `<?xml version='1.0' encoding='UTF-8'?>
+<osm version='0.6' generator='JOSM'>
+  <bounds minlat='46.00' minlon='7.00' maxlat='46.01' maxlon='7.01' origin='OpenStreetMap server' />
+  <bounds minlat='46.01' minlon='7.00' maxlat='46.02' maxlon='7.01' origin='OpenStreetMap server' />
+  <bounds minlat='46.00' minlon='7.01' maxlat='46.02' maxlon='7.02' origin='OpenStreetMap server' />
+  <node id='1' lat='46.001' lon='7.001' /><node id='2' lat='46.019' lon='7.019' />
+  <way id='10'><nd ref='1' /><nd ref='2' /><tag k='highway' v='residential' /></way>
+</osm>`;
+  const { bounds } = parseOsmFile(xml);
+  assert.deepEqual(bounds, { south: 46, west: 7, north: 46.02, east: 7.02 });
+  // an area inside the whole, but reaching past the last download alone
+  assert.equal(osmFileCoverage(bounds, { south: 46.002, west: 7.002, north: 46.018, east: 7.008 }).coverage, 'full');
+});
