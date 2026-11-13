@@ -1153,26 +1153,87 @@ const SEA_SURFACE_BAND_M = 0.3;
 const SEABED_DEPTH_M = 2;
 const SEABED_RAMP_CELLS = 3;
 const SEA_SHOAL_MAX_M = 6;     // in water joined to the sea, ground up to this far over it is still the sea's floor
+const COAST_REACH_M = 150;          // a cell is judged by a mapped coastline this near
+const COAST_MARGIN_M = 2.5;         // the sea begins this far out from the mapped line
+const COAST_FINE_M = 25;            // within this of the line a grid point is judged by itself, not by its 10 m land cover cell
+const PIER_AREA_MAX_M = 2.5;         // ... and on coarse elevation no more than this
+const PIER_AREA_TOP_M = 1.5;         // a pier mapped as an area stands this far over the sea
+const COAST_VOTE_CELLS = 50;          // the land cover's water beside the coastline must agree on the sea's side: this many cells ...
+const COAST_VOTE_SHARE = 0.8;         // ... and this share of them
+const COAST_SEA_MAX_M = 40;         // ground on the coastline's sea side up to this far over the sea is the data's smear
 const SEA_SEED_CELLS = 50;     // ... when at least this many cells of water lie at the sea's level (half a hectare at 10 m)
 
 /**
  * Edits that put the sea floor under the sea: grid { heightMap, width,
  * height, minHeight } (raw heights, rows from the north as the export's
  * heightmap), landCover { grid, n } (north-up), seaZ the sea surface in world
- * z (raw - minHeight); coarse: the elevation is the global 30 m data; keep(x, y): ground that stays
+ * z (raw - minHeight); coarse: the elevation is the global 30 m data; coast: mapped coastlines as world [x, y]
+ * lines in the way's own order (land on the left); keep(x, y): ground that stays
  * (roads and their quays; needs grid.worldSize). Returns { pixels, apply(set) }.
  */
-export function lowerSeabed(grid, landCover, seaZ, { coarse = false, keep = null } = {}) {
+export function lowerSeabed(grid, landCover, seaZ, { coarse = false, keep = null, coast = null, piers = null } = {}) {
   const { heightMap, width, height, minHeight = 0, worldSize = 0 } = grid;
-  const none = { pixels: 0, apply() {}, under: () => false };
+  const none = { pixels: 0, pierPixels: 0, apply() {}, under: () => false, has: () => false };
   if (!landCover?.grid || landCover.grid.length !== landCover.n * landCover.n || !Number.isFinite(seaZ)) return none;
   const { grid: lc, n } = landCover;
   // (water, or no land cover at all: the open sea beyond WorldCover's tiles)
   const wet = (k) => k === 80 || k === 0;
+  // Coarse elevation, and the coastline is mapped: what lies on its sea side is sea, whatever the land cover's
+  // 10 m cells make of the wet sand and the surf. (Sint Eustatius: the land cover's shore runs 30 to 80 m
+  // seaward of the mapped one in places, and under the cliffs the 30 m data holds the water 5 to 18 m up, 100 m
+  // out: a white shelf along the whole town.) OpenStreetMap draws a coastline with the land on its left; a cell is judged by the stretch of
+  // coastline nearest to it, within COAST_REACH_M.
+  const byCoast = new Uint8Array(n * n);
+  const landByCoast = new Uint8Array(n * n);
+  // (the stretches of coastline near each land cover cell beside the line: there the side is judged per grid
+  // point, not per 10 m cell, or the shore comes out in 10 m blocks and a pier the line is drawn round in pieces)
+  const nearSegs = new Map(); const segs = [];
+  if (coarse && coast?.length && worldSize > 0) {
+    const cellM = worldSize / n; const best = new Float32Array(n * n).fill(Infinity); const side = new Int8Array(n * n);
+    for (const line of coast) {
+      // (a line that stops, at the map's edge or where the data has a gap, says nothing past its end: Naples,
+      // Florida, where the coastline in the data ended at a beach and the square of town beyond the end, to the
+      // right of the last stretch drawn on, went under)
+      const open = !(line.length > 2 && Math.hypot(line[0][0] - line[line.length - 1][0], line[0][1] - line[line.length - 1][1]) < 0.5);
+      for (let k = 1; k < line.length; k++) {
+        const [ax, ay] = line[k - 1]; const [bx, by] = line[k]; const dx = bx - ax; const dy = by - ay; const len2 = dx * dx + dy * dy;
+        if (!(len2 > 1e-6)) continue;
+        const freeStart = open && k === 1; const freeEnd = open && k === line.length - 1;
+        const segId = segs.length; segs.push([ax, ay, dx, dy, len2, freeStart, freeEnd]);
+        const c0 = Math.max(0, Math.floor((Math.min(ax, bx) - COAST_REACH_M) / cellM + n / 2)); const c1 = Math.min(n - 1, Math.ceil((Math.max(ax, bx) + COAST_REACH_M) / cellM + n / 2));
+        const r0 = Math.max(0, Math.floor(n / 2 - (Math.max(ay, by) + COAST_REACH_M) / cellM)); const r1 = Math.min(n - 1, Math.ceil(n / 2 - (Math.min(ay, by) - COAST_REACH_M) / cellM));
+        for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
+          const px = (c + 0.5 - n / 2) * cellM; const py = (n / 2 - r - 0.5) * cellM;
+          const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2));
+          const d = Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+          if (d > COAST_REACH_M) continue;
+          if (d <= COAST_FINE_M) { const list = nearSegs.get(r * n + c); if (list) list.push(segId); else nearSegs.set(r * n + c, [segId]); }
+          // (right of the way's direction: the sea)
+          const past = (freeStart && t <= 0) || (freeEnd && t >= 1);
+          const sea = past ? 0 : dx * (py - ay) - dy * (px - ax) < 0 ? 1 : -1; const i = r * n + c;
+          if (d < best[i] - 0.01) { best[i] = d; side[i] = sea; }
+          // (nearest at a corner shared by two stretches: sea only if both say so)
+          else if (d <= best[i] + 0.01 && sea < 0) side[i] = -1;
+        }
+      }
+    }
+    // The land cover's own water votes on the coastline first: where the two disagree about which side the
+    // sea is on (a coastline drawn the wrong way round, a source that lost the ways' order), the coastline
+    // is not believed and nothing is added.
+    let agree = 0; let against = 0;
+    for (let i = 0; i < n * n; i++) { if (!side[i]) continue; if (wet(lc[i])) { if (side[i] > 0) agree++; else against++; } }
+    if (agree >= COAST_VOTE_CELLS && agree >= COAST_VOTE_SHARE * (agree + against)) {
+      // (the land cover's own water there too: under a cliff the data holds it 5 to 18 m up, past the flood's 6 m)
+      for (let i = 0; i < n * n; i++) if (side[i] > 0) byCoast[i] = 1;
+      // (and its land side is land: a breakwater the coastline is drawn round stays, though the land cover's
+      // 10 m cells call most of it water)
+      for (let i = 0; i < n * n; i++) if (side[i] < 0) landByCoast[i] = 1;
+    } else nearSegs.clear();
+  }
   // distance (in cells) from the nearest non-water cell, two chamfer passes
   const D = new Float32Array(n * n);
   const BIG = 1e9;
-  for (let i = 0; i < n * n; i++) D[i] = wet(lc[i]) ? BIG : 0;
+  for (let i = 0; i < n * n; i++) D[i] = wet(lc[i]) || byCoast[i] ? BIG : 0;
   for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
     const i = r * n + c; if (!D[i]) continue;
     if (c > 0) D[i] = Math.min(D[i], D[i - 1] + 1);
@@ -1206,23 +1267,46 @@ export function lowerSeabed(grid, landCover, seaZ, { coarse = false, keep = null
     while (qh < qt) {
       const i = queue[qh++]; const c = i % n;
       for (const k of [c > 0 ? i - 1 : -1, c < n - 1 ? i + 1 : -1, i - n, i + n]) {
-        if (k < 0 || k >= n * n || sea[k] || !D[k] || cellZ[k] > reach) continue;
+        if (k < 0 || k >= n * n || sea[k] || !D[k] || cellZ[k] > reach || landByCoast[k]) continue;
         sea[k] = 1; queue[qt++] = k;
       }
     }
   } else sea.fill(0);
+  // (the coastline's own sea: no flood needed, the map says so; not ground far over the sea, which is a
+  // coastline drawn the wrong way round or a cliff the data did resolve)
+  if (coarse) for (let i = 0; i < n * n; i++) if (byCoast[i] && cellZ[i] <= seaZ + COAST_SEA_MAX_M) sea[i] = 2;
   const edits = new Map();
   const shoal = seaZ + SEA_SHOAL_MAX_M;
   for (let r = 0; r < height; r++) {
     const lr = Math.min(n - 1, Math.floor((r / height) * n)) * n;
     for (let c = 0; c < width; c++) {
       const cell = lr + Math.min(n - 1, Math.floor((c / width) * n));
-      const d = D[cell];
-      if (!d) continue;
+      let d = D[cell];
       const idx = r * width + c;
       const z = heightMap[idx] - minHeight;
+      // beside the mapped coastline: this grid point's own side of it
+      let seaHere = sea[cell]; let landHere = landByCoast[cell];
+      const list = nearSegs.get(cell);
+      if (list) {
+        const px = ((c + 0.5) / width - 0.5) * worldSize; const py = (0.5 - (r + 0.5) / height) * worldSize;
+        let best = Infinity; let sd = 0;
+        for (const k of list) {
+          const [ax, ay, dx, dy, len2, freeStart, freeEnd] = segs[k];
+          const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2));
+          const dist = Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+          const sgn = (freeStart && t <= 0) || (freeEnd && t >= 1) ? 0 : dx * (py - ay) - dy * (px - ax) < 0 ? 1 : -1;
+          if (dist < best - 0.01) { best = dist; sd = sgn; } else if (dist <= best + 0.01 && sgn < 0) sd = -1;
+        }
+        // (not the last couple of metres before the line: a promenade or a quay's kerb is mapped a little to
+        // either side of it, and its ground went from under it: Naples's seafront walks floated)
+        if (sd > 0 && best < COAST_MARGIN_M) { landHere = 1; }
+        else if (sd > 0) { landHere = 0; if (z <= seaZ + COAST_SEA_MAX_M) { seaHere = 2; if (!d) d = 1; } }
+        else if (sd < 0) { landHere = 1; }
+      }
+      if (!d) continue;
       if (z > top) {
-        if (!(sea[cell] && z <= shoal)) continue;
+        if (landHere) continue;
+        if (!(seaHere && z <= (seaHere === 2 ? seaZ + COAST_SEA_MAX_M : shoal))) continue;
         // (a road along the shore, and its quay, stay on their ground: the land cover's 10 m cells run a
         // little under a seafront street, and its ground went 2 m down from under it)
         if (keep && worldSize > 0 && keep(((c / width) - 0.5) * worldSize, (0.5 - (r + 1) / height) * worldSize)) continue;
@@ -1231,9 +1315,45 @@ export function lowerSeabed(grid, landCover, seaZ, { coarse = false, keep = null
       if (target < z) edits.set(idx, target + minHeight);
     }
   }
+  // A pier, breakwater, groyne or quay mapped as an area is a platform over the water. Where the ground under
+  // it is at the sea or under it (the data has none: the 30 m data never does, a bare-earth survey took it
+  // out; or has half of one, and a breakwater came out as a row of separate blocks), it is stood up as one,
+  // PIER_AREA_TOP_M over the sea.
+  let pierPixels = 0;
+  // (coarse elevation only: a fine survey has what stands there, and a platform added beside its quays and
+  // bridges stood up as steps: Amsterdam)
+  if (coarse && piers?.length && worldSize > 0) {
+    const sq = worldSize / width; const topZ = seaZ + PIER_AREA_TOP_M;
+    for (const ring of piers) {
+      if (!(ring?.length >= 3)) continue;
+      let x0 = Infinity; let x1 = -Infinity; let y0 = Infinity; let y1 = -Infinity;
+      for (const [x, y] of ring) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      const c0 = Math.max(0, Math.floor(x0 / sq + width / 2)); const c1 = Math.min(width - 1, Math.ceil(x1 / sq + width / 2));
+      const r0 = Math.max(0, Math.floor(height / 2 - y1 / sq) - 1); const r1 = Math.min(height - 1, Math.ceil(height / 2 - y0 / sq));
+      const inside = [];
+      for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
+        const x = (c / width - 0.5) * worldSize; const y = (0.5 - (r + 1) / height) * worldSize;
+        let hit = false;
+        for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) if (((ring[i][1] > y) !== (ring[j][1] > y)) && (x < ((ring[j][0] - ring[i][0]) * (y - ring[i][1])) / (ring[j][1] - ring[i][1]) + ring[i][0])) hit = !hit;
+        if (!hit) continue;
+        inside.push(r * width + c);
+      }
+      // (only what is under that height: a pier or a mole the data has standing higher is left as the data has it)
+      for (const idx of inside) {
+        const now = edits.has(idx) ? edits.get(idx) - minHeight : heightMap[idx] - minHeight;
+        if (now < topZ || edits.has(idx)) { edits.set(idx, topZ + minHeight); pierPixels++; }
+        // (coarse elevation: the land's height carried out along it made the harbour pier of Sint Eustatius a
+        // wall 6 to 8 m over the water; such a structure stands a couple of metres over the sea)
+        else if (coarse && now > seaZ + PIER_AREA_MAX_M) { edits.set(idx, seaZ + PIER_AREA_MAX_M + minHeight); pierPixels++; }
+      }
+    }
+  }
   return {
+    pierPixels,
     pixels: edits.size,
     apply(set) { for (const [idx, v] of edits) set(idx, v); },
+    /** Whether the heightmap cell idx is sea floor that goes under. */
+    has(idx) { return edits.has(idx); },
     /** Whether the ground at world (x, y) is sea floor that goes under (needs grid.worldSize). */
     under(x, y) {
       if (!(worldSize > 0)) return false;

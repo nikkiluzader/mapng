@@ -17,6 +17,7 @@ import * as GeoTIFF from 'geotiff';
 import { createLocalToWGS84 } from '../../services/geoUtils.js';
 import { resampleToMeterGrid } from '../../services/terrainResampler.js';
 import { decodeTerrariumPixels, blendTerrariumTileSeams, sampleTerrariumHeights, wrapMosaicX } from '../../services/terrariumSampling.js';
+import { fillSmallSeaPits } from '../../services/terrariumPits.js';
 import { AREAS_DIR, areas, key } from './env.mjs';
 
 const MIN_OSM_FEATURES = 50;
@@ -119,6 +120,15 @@ async function fetchOne({ name, lat, lng, size }) {
     }
   }
   const th = decodeTerrariumPixels(rgba, MW, MH, NO_DATA);
+  // (the app's repair of small pits in the sea beside a coast, tile by tile as it does)
+  let pitPixels = 0;
+  for (let ty = 0; ty < MH / TS; ty++) for (let tx = 0; tx < MW / TS; tx++) {
+    const tile = new Float32Array(TS * TS);
+    for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) tile[y * TS + x] = th[(ty * TS + y) * MW + tx * TS + x];
+    const n = fillSmallSeaPits(tile, TS, NO_DATA);
+    if (n) { pitPixels += n; for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) th[(ty * TS + y) * MW + tx * TS + x] = tile[y * TS + x]; }
+  }
+  if (pitPixels) console.log(`[Terrarium] ${pitPixels} pixel(s) of small sea pits filled`);
   blendTerrariumTileSeams(th, MW, MH, NO_DATA);
   const sampler = (lat, lng) => { const p = proj(lat, lng); return sampleTerrariumHeights(th, MW, MH, wrapMosaicX(p.x - minTx * TS, Z, MW, TS), p.y - minTy * TS, NO_DATA); };
   const sigmaPx = 5 / MPP, smoothR = Math.round((Math.sqrt(6 * sigmaPx * sigmaPx + 1) - 1) / 2);

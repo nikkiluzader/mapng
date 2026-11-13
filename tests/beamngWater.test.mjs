@@ -439,3 +439,71 @@ test('coarse elevation: the land\'s height carried out over the sea goes under i
   const dry = new Float32Array(W * W).fill(3);   // "water" in the land cover, but all of it 3 m up: a reservoir, no sea
   assert.equal(lowerSeabed({ heightMap: dry, width: W, height: W, minHeight: 0 }, { grid, n }, 0, { coarse: true }).pixels, 0);
 });
+
+test('coarse elevation: the mapped coastline decides the sea where the land cover\'s shore runs seaward of it', async () => {
+  const { lowerSeabed } = await import('../services/beamngWater.js');
+  // 128 cells of 4 m: land east of x = 0 (the coastline), the land cover's water only from 60 m out,
+  // and the 30 m data holding the strip between 8 m up
+  const W = 128; const ws = W * 4; const heightMap = new Float32Array(W * W); const lc = new Uint8Array(W * W);
+  for (let r = 0; r < W; r++) for (let c = 0; c < W; c++) { const x = (c + 0.5 - W / 2) * 4; heightMap[r * W + c] = x > 0 ? 20 : x > -60 ? 8 : 0; lc[r * W + c] = x > -60 ? 60 : 80; }
+  const grid = () => ({ heightMap: Float32Array.from(heightMap), width: W, height: W, minHeight: 0, worldSize: ws });
+  // the coastline along x = 0, land to the east: OpenStreetMap draws it with the land on the left, so it runs south
+  const north = [[[0, 250], [0, -250]]]; const south = [[[0, -250], [0, 250]]];   // (north: the right way; south: reversed)
+  const without = lowerSeabed(grid(), { grid: lc, n: W }, 0, { coarse: true });
+  assert.equal(without.under(-30, 0), false, 'without a coastline the 8 m strip is over the 6 m limit: left');
+  const withCoast = lowerSeabed(grid(), { grid: lc, n: W }, 0, { coarse: true, coast: north });
+  assert.equal(withCoast.under(-30, 0), true, 'the strip on the coastline\'s sea side goes under');
+  assert.equal(withCoast.under(-10, 0), true, 'nearly up to the line');
+  assert.equal(withCoast.under(-1, 0), false, 'the last couple of metres before it stay: a promenade mapped on the line keeps its ground');
+  assert.equal(withCoast.under(30, 0), false, 'the land does not');
+  // drawn the wrong way round: the land cover's water disagrees, the coastline is not believed
+  const wrong = lowerSeabed(grid(), { grid: lc, n: W }, 0, { coarse: true, coast: south });
+  assert.equal(wrong.under(30, 0), false, 'no land drowned');
+  assert.equal(wrong.under(-30, 0), false);
+  // a coastline that stops half way down the map says nothing past its end
+  const half = lowerSeabed(grid(), { grid: lc, n: W }, 0, { coarse: true, coast: [[[0, 250], [0, 0]]] });
+  assert.equal(half.under(-30, 100), true, 'beside the line: sea');
+  assert.equal(half.under(-30, -60), false, 'past its end: not judged');
+  assert.equal(half.under(30, -60), false);
+  // a fine survey: the coastline adds nothing
+  assert.equal(lowerSeabed(grid(), { grid: lc, n: W }, 0, { coarse: false, coast: north }).under(-30, 0), false);
+  // a cliff the data did resolve on the sea side (60 m): left
+  const cliff = grid(); for (let r = 0; r < W; r++) for (let c = 0; c < W; c++) { const x = (c + 0.5 - W / 2) * 4; if (x > -20 && x <= 0) cliff.heightMap[r * W + c] = 60; }
+  assert.equal(lowerSeabed(cliff, { grid: lc, n: W }, 0, { coarse: true, coast: north }).under(-10, 0), false);
+});
+
+test('a breakwater the coastline is drawn round stays; a pier mapped as an area stands 1.5 m over the sea', async () => {
+  const { lowerSeabed } = await import('../services/beamngWater.js');
+  const W = 128; const ws = W * 4; const heightMap = new Float32Array(W * W); const lc = new Uint8Array(W * W);
+  // land east of x = 100; sea west of it at 0; a breakwater 16 m wide running west from the shore along y = 0, 4 m high,
+  // which the land cover's cells call water
+  const onBreakwater = (x, y) => x > -100 && x <= 100 && Math.abs(y) < 8;
+  for (let r = 0; r < W; r++) for (let c = 0; c < W; c++) { const x = (c + 0.5 - W / 2) * 4; const y = (W / 2 - r - 0.5) * 4; heightMap[r * W + c] = x > 100 ? 20 : onBreakwater(x, y) ? 4 : 0; lc[r * W + c] = x > 100 ? 60 : 80; }
+  const grid = () => ({ heightMap: Float32Array.from(heightMap), width: W, height: W, minHeight: 0, worldSize: ws });
+  // the coastline, land on its left: south along the shore, out round the breakwater, on south
+  const coast = [[[100, 250], [100, 8], [-100, 8], [-100, -8], [100, -8], [100, -250]]];
+  const plain = lowerSeabed(grid(), { grid: lc, n: W }, 0, { coarse: true });
+  assert.equal(plain.under(0, 0), true, 'without the coastline the breakwater goes under with the water round it');
+  const kept = lowerSeabed(grid(), { grid: lc, n: W }, 0, { coarse: true, coast });
+  assert.equal(kept.under(0, 0), false, 'with it the breakwater stays');
+  assert.equal(kept.under(0, 60), true, 'the sea beside it is sea');
+  // a cargo pier mapped as an area, out in the water: nothing of it in the data
+  const pier = [[[-150, -120], [-90, -120], [-90, -60], [-150, -60]]];
+  const g = grid(); const plan = lowerSeabed(g, { grid: lc, n: W }, 0, { coarse: true, coast, piers: pier });
+  assert.ok(plan.pierPixels > 150, `${plan.pierPixels} grid points`);
+  const out = Float32Array.from(g.heightMap); plan.apply((idx, v) => { out[idx] = v; });
+  const at = (x, y) => out[(Math.round((0.5 - y / ws) * W) - 1) * W + Math.round((x / ws + 0.5) * W)];
+  assert.ok(Math.abs(at(-120, -90) - 1.5) < 0.01, `the pier's top: ${at(-120, -90)}`);
+  assert.ok(at(-200, -90) < -0.5, 'the sea floor beside it is under');
+  // coarse elevation holding the pier 7 m up (the shore's height carried out): brought down to 2.5 m; a fine survey's is left
+  const high = grid(); for (let r = 0; r < W; r++) for (let c = 0; c < W; c++) { const x = (c + 0.5 - W / 2) * 4; const y = (W / 2 - r - 0.5) * 4; if (x > -170 && x < -70 && y > -140 && y < -40) high.heightMap[r * W + c] = 7; }
+  const hp = lowerSeabed(high, { grid: lc, n: W }, 0, { coarse: true, coast, piers: pier }); const ho = Float32Array.from(high.heightMap); hp.apply((idx, v) => { ho[idx] = v; });
+  const pierTop = ho[(Math.round((0.5 - (-90) / ws) * W) - 1) * W + Math.round((-120 / ws + 0.5) * W)];
+  assert.ok(pierTop >= 1.5 - 0.01 && pierTop <= 2.5 + 0.01, `the carried height comes down to a pier's: ${pierTop}`);
+  const fineHigh = grid(); fineHigh.heightMap.set(high.heightMap);
+  assert.equal(lowerSeabed(fineHigh, { grid: lc, n: W }, 0, { coarse: false, piers: pier }).pierPixels, 0, 'a fine survey has the pier as it is');
+  assert.equal(lowerSeabed(grid(), { grid: lc, n: W }, 0, { coarse: false, piers: pier }).pierPixels, 0, 'and no platform is added on a fine survey');
+  // the same pier where the data has land (a pier on a quay): left as it is
+  const dry = grid(); for (let i = 0; i < dry.heightMap.length; i++) dry.heightMap[i] = 3;
+  assert.equal(lowerSeabed(dry, { grid: new Uint8Array(W * W).fill(60), n: W }, 0, { coarse: false, piers: pier }).pierPixels, 0);
+});

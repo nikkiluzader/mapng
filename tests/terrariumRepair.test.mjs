@@ -226,3 +226,29 @@ test('encodeTerrariumHeight round-trips through the Terrarium decode', () => {
     assert.ok(Math.abs(back - v) <= 1 / 256, `${v} -> ${back}`);
   }
 });
+
+// ── Small pits beside a coast (Sint Eustatius harbour, 2026-11-13) ──
+test('small sea pits: round holes beside a shore are filled, real sea floor and land are not', async () => {
+  const { fillSmallSeaPits, hasSmallSeaPit } = await import('../services/terrain.js');
+  // a shore: land rising to the east of x = 150, a 2 m deep harbour west of it; three pits 60 to 110 m deep, 8 pixels across
+  const pits = [[60, 60, -110], [120, 140, -60], [90, 200, -85]];
+  const shore = (x) => (x > 150 ? (x - 150) * 1.5 : -2);
+  const withPits = (x, y) => { let h = shore(x); for (const [px, py, d] of pits) { const r = Math.hypot(x - px, y - py); if (r < 6) h = Math.min(h, d * Math.max(0, 1 - (r / 6) ** 2)); } return h; };
+  const h = grid(withPits);
+  assert.equal(hasSmallSeaPit(h), true);
+  const n = fillSmallSeaPits(h);
+  assert.ok(n > 100, `${n} pixels filled`);
+  assert.ok(Math.min(...h) >= -5.5, `deepest left: ${Math.min(...h)}`);
+  assert.equal(h[100 * SIZE + 200], shore(200), 'land untouched');
+  assert.equal(h[10 * SIZE + 10], -2, 'the harbour floor untouched');
+  // a real steep sea floor, a drowned valley 20 pixels wide and 60 m deep, a deep basin: none is a pit
+  for (const real of [grid((x) => -4 * x), grid((x, y) => (Math.abs(y - 128) < 10 ? -80 : -20)), grid((x, y) => (Math.hypot(x - 128, y - 128) < 40 ? -200 : -30))]) {
+    const before = Float32Array.from(real);
+    assert.equal(hasSmallSeaPit(real), false);
+    assert.equal(fillSmallSeaPits(real), 0);
+    assert.deepEqual(real, before);
+  }
+  // land below sea level with a small hollow 10 m deep (a polder's pond): left alone
+  const polder = grid((x, y) => (Math.hypot(x - 100, y - 100) < 5 ? -14 : -4));
+  assert.equal(fillSmallSeaPits(polder), 0);
+});

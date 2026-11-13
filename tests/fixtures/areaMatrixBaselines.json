@@ -1,7 +1,7 @@
 {
  "_note": "Area baselines for scripts/sweep/runSweep.mjs: re-record with --save after a change that improves an area (commit the file with it).",
  "recorded": "2026-11-13",
- "commit": "3aabaf1",
+ "commit": "192e1fa",
  "areas": {
   "normandy_flat@gpxz/untouched": {
    "steps": 0,
@@ -173,7 +173,7 @@
    "maxDeckLen": 1102,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 31
+   "seconds": 29
   },
   "naldo@gpxz/noshape": {
    "steps": 0,
@@ -199,7 +199,7 @@
    "maxDeckLen": 1119,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 32
+   "seconds": 31
   },
   "naldo@gpxz/ready": {
    "steps": 0,
@@ -225,7 +225,7 @@
    "maxDeckLen": 1098,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 34
+   "seconds": 32
   },
   "naldo@t30/noshape": {
    "steps": 0,
@@ -234,7 +234,7 @@
    "shortX": 6,
    "groundGaps": 0,
    "thruDeck": 33,
-   "spikes": 11,
+   "spikes": 16,
    "bumps": 1,
    "cross": 41,
    "junctions": 2,
@@ -244,12 +244,12 @@
    "lintErrors": 0,
    "lintWarnings": 3,
    "decks": 25,
-   "maxDeckH": 11.26,
+   "maxDeckH": 13.36,
    "deckKm": 7.74,
    "maxDeckLen": 1139,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 32
+   "seconds": 30
   },
   "naldo@t30/untouched": {
    "steps": 0,
@@ -282,7 +282,7 @@
    "shortX": 0,
    "groundGaps": 0,
    "thruDeck": 3,
-   "spikes": 27,
+   "spikes": 32,
    "bumps": 16,
    "cross": 66,
    "junctions": 1,
@@ -297,7 +297,7 @@
    "maxDeckLen": 1098,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 33
+   "seconds": 31
   },
   "kingst@gpxz/noshape": {
    "steps": 0,
@@ -1795,7 +1795,7 @@
    "maxDeckLen": 1119,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 31
+   "seconds": 34
   },
   "naldo@mh/ready": {
    "steps": 0,
@@ -1821,7 +1821,7 @@
    "maxDeckLen": 1098,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 36
+   "seconds": 35
   },
   "naldo@mh/untouched": {
    "steps": 0,
@@ -1845,7 +1845,7 @@
    "maxDeckLen": 1114,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 33
+   "seconds": 32
   },
   "kingst@mh/noshape": {
    "steps": 0,

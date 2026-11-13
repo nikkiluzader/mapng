@@ -7572,7 +7572,8 @@ function shapingReportLines(sh, section) {
   for (const lk of (sh.lakeDepths || []).slice(0, 12)) {
     lines.push(`  - ${lk.name || 'Unnamed lake'}: ${formatNumber(lk.depth, 1)} m at its deepest (${lk.source === 'osm' ? 'its OSM depth tag' : lk.source === 'dam' ? 'a reservoir: against its dam, the floor rising away from it' : lk.source === 'slope' ? `the shore's slope ${formatNumber(lk.slope * 100, 0)}% carried under the water` : 'no shore to read: the shallow bed'}), ${formatNumber(lk.reach, 0)} m from the nearest shore there`);
   }
-  if (sh.seabedPixels) lines.push(`- Sea floor grid points lowered under the sea (WorldCover water at the sea's surface${sh.seabedCoarse ? ', and on the global 30 m data the ground it carries out over the sea, up to 6 m' : ': the survey recorded the water\'s surface'}): ${sh.seabedPixels}`);
+  if (sh.seabedPixels) lines.push(`- Sea floor grid points lowered under the sea (WorldCover water at the sea's surface${sh.seabedCoarse ? ', and on the global 30 m data the ground it carries out over the sea: up to 6 m, and up to 40 m on the sea side of a mapped coastline' : ': the survey recorded the water\'s surface'}): ${sh.seabedPixels}`);
+  if (sh.pierAreaPixels) lines.push(`- Piers, breakwaters and quays mapped as areas stood up 1.5 m over the sea where the elevation has them at or under it: ${sh.pierAreaPixels} grid points`);
   if (sh.lidar === null || sh.lidar === undefined) lines.push('- Measured bridge heights (US lidar): off');
   else if (sh.lidar.skipped) lines.push(`- Measured bridge heights (US lidar): not used, ${sh.lidar.skipped}`);
   else {
@@ -10316,12 +10317,27 @@ function buildWaterBlockObjects(terrainData, squareSize, biome, stats = {}, dryZ
   }));
 }
 
+/** Piers, breakwaters, groynes and quays mapped as areas (closed ways) as world [x, y] rings. */
+function pierAreasOf(terrainData, squareSize) {
+  return (terrainData.osmFeatures || [])
+    .filter((f) => ['pier', 'breakwater', 'groyne', 'quay'].includes(f?.tags?.man_made) && f.type !== 'pier' && f.geometry?.length > 3
+      && Math.abs(f.geometry[0].lat - f.geometry[f.geometry.length - 1].lat) < 1e-9 && Math.abs(f.geometry[0].lng - f.geometry[f.geometry.length - 1].lng) < 1e-9)
+    .map((f) => f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0).slice(0, 2)));
+}
+
+/** The mapped coastlines as world [x, y] lines, in the ways' own order (land on the left). */
+function coastLinesOf(terrainData, squareSize) {
+  return (terrainData.osmFeatures || [])
+    .filter((f) => (f?.type === 'coastline' || f?.tags?.natural === 'coastline') && f.geometry?.length > 1)
+    .map((f) => f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0).slice(0, 2)));
+}
+
 /**
  * The sea as WaterBlocks (beamngWaterClip.planSeaBlocks), in place of the
  * plane where a tunnel reaches under sea level: none over its trenches, none
  * deeper than its roof over the tube.
  */
-function buildSeaBlockObjects(terrainData, squareSize, biome, seaLevelOffset, dryZones, tunnels, sourceHeightMap = terrainData.heightMap, seaAtUV = null) {
+function buildSeaBlockObjects(terrainData, squareSize, biome, seaLevelOffset, dryZones, tunnels, sourceHeightMap = terrainData.heightMap, seaAtUV = null, seaFloor = null) {
   const waterProfile = getWaterProfile(biome);
   const minHeight = Number(terrainData?.minHeight);
   const seaZ = (Number.isFinite(minHeight) ? -minHeight : 0) + (Number(seaLevelOffset) || 0);
@@ -10330,10 +10346,13 @@ function buildSeaBlockObjects(terrainData, squareSize, biome, seaLevelOffset, dr
     size: terrainData.width * squareSize,
     seaZ,
     // the sea where the ground was below it before grading, and still is
-    heightAt: (x, y) => Math.max(
-      getTerrainHeightAtWorldXY(x, y, terrainData, squareSize),
-      getTerrainHeightAtWorldXY(x, y, before, squareSize),
-    ),
+    // (sea floor that was lowered under the sea is sea: its height before is the measuring artifact)
+    heightAt: (x, y) => (seaFloor?.under(x, y)
+      ? getTerrainHeightAtWorldXY(x, y, terrainData, squareSize)
+      : Math.max(
+        getTerrainHeightAtWorldXY(x, y, terrainData, squareSize),
+        getTerrainHeightAtWorldXY(x, y, before, squareSize),
+      )),
     zones: dryZones,
     minZ: Math.min(0, ...tunnels.flatMap((t) => t.line.map((p) => p.z))),
     // (world x east, y north from the centre -> the map's fractions)
@@ -12882,7 +12901,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
           const plan = lowerSeabed({
             heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
             minHeight: Number(exportTerrainData.minHeight) || 0, worldSize: exportTerrainData.width * squareSize,
-          }, exportTerrainData.landCover, -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0), { coarse: !!terrainData?.coarseElevation });
+          }, exportTerrainData.landCover, -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0), { coarse: !!terrainData?.coarseElevation, coast: coastLinesOf(exportTerrainData, squareSize) });
           return plan.pixels ? (x, y) => plan.under(x, y) : null;
         } catch { return null; }
       })(),
@@ -13158,6 +13177,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // ground the elevation data records at the water's surface get a bed
   // (the water showed nowhere over it), and the water blocks use this plan
   let lakePlan = null;
+  // (the sea floor the water step lowered under the sea: sea, not a cut below it)
+  let seaFloor = null;
   if (includeWater) {
     try {
       lakePlan = planLakes({
@@ -13195,10 +13216,12 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       const seabed = lowerSeabed({
         heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
         minHeight: Number(exportTerrainData.minHeight) || 0, worldSize: exportTerrainData.width * squareSize,
-      }, exportTerrainData.landCover, -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0), { coarse: !!terrainData?.coarseElevation, keep: (x, y) => isOnOtherCarriageway(quayIndex, x, y, 0, () => false) });
+      }, exportTerrainData.landCover, -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0), { coarse: !!terrainData?.coarseElevation, coast: coastLinesOf(exportTerrainData, squareSize), piers: pierAreasOf(exportTerrainData, squareSize), keep: (x, y) => isOnOtherCarriageway(quayIndex, x, y, 0, () => false) });
       seabed.apply((idx, v) => hmLake.set(idx, v));
+      if (seabed.pixels) seaFloor = seabed;
       lakePlan.stats.seabedPixels = seabed.pixels;
       lakePlan.stats.seabedCoarse = !!terrainData?.coarseElevation;
+      lakePlan.stats.pierAreaPixels = seabed.pierPixels || 0;
     } catch (err) {
       console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Lake beds skipped: ${err?.message || err}`);
       lakePlan = null;
@@ -13564,7 +13587,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   if (exportTerrainData.heightMap !== sourceHeightMap) {
     const seaAbs = seaZ + (Number(exportTerrainData.minHeight) || 0);
     const hm = exportTerrainData.heightMap;
-    for (let i = 0; i < hm.length && !cutBelowSea; i++) cutBelowSea = hm[i] < seaAbs && sourceHeightMap[i] >= seaAbs;
+    // (sea floor lowered under the sea is no cut: it was counted as one, the sea became blocks, and the blocks
+    // left that very floor dry, which on the global 30 m data is the whole strip along the shore)
+    for (let i = 0; i < hm.length && !cutBelowSea; i++) cutBelowSea = hm[i] < seaAbs && sourceHeightMap[i] >= seaAbs && !(seaFloor && seaFloor.has(i));
   }
   // (and ground below sea level the sea can't reach, a polder or a desert
   // basin: the plane flooded it; the blocks fill only what joins the edge)
@@ -13580,7 +13605,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   if (inlandBelowSea) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Ground below sea level the sea doesn't reach: the sea as blocks, not one plane.`);
   const seaAsBlocks = (tunnelList.length > 0 && tunnelsBelow(tunnelList, seaZ)) || cutBelowSea || inlandBelowSea;
   const seaObjects = seaAsBlocks
-    ? buildSeaBlockObjects(exportTerrainData, squareSize, biome, seaLevelOffset, dryZones, tunnelList, sourceHeightMap, seaAtUV)
+    ? buildSeaBlockObjects(exportTerrainData, squareSize, biome, seaLevelOffset, dryZones, tunnelList, sourceHeightMap, seaAtUV, seaFloor)
     : [buildSeaLevelWaterPlane(exportTerrainData, biome, seaLevelOffset)];
   waterStats.sea = seaAsBlocks ? { blocks: seaObjects.length } : { plane: true };
   waterStats.pools = {};
@@ -14547,6 +14572,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         lakeDepths: lakePlan?.stats?.lakeDepths ?? null,
         seabedPixels: lakePlan?.stats?.seabedPixels ?? null,
         seabedCoarse: !!lakePlan?.stats?.seabedCoarse,
+        pierAreaPixels: lakePlan?.stats?.pierAreaPixels || 0,
         underDeckBedPixels: underDeckBeds,
         levelledUnderDecks,
         lidar: lidar ? (lidar.skipped ? { skipped: lidar.skipped } : {

@@ -25,6 +25,7 @@ import {
 import { createLocalToWGS84 } from "./geoUtils.js";
 import { fetchKron86GridForBounds, isWithinKron86Coverage } from "./kron86.js";
 import { readUsgsWindows, readUsgsImageService } from "./usgsWindow.js";
+import { fillSmallSeaPits, hasSmallSeaPit } from "./terrariumPits.js";
 import { fetchMapterhornRaw } from "./mapterhorn.js";
 import { isGroundLevelRoad, smoothRoadsInHeightmap } from "./roadSmoother.js";
 import { snapRoadsToTerrain } from "./roadSnap.js";
@@ -434,6 +435,9 @@ export const patchBlendedHeights = (heights, reference, size = TILE_SIZE) => {
   return replace.length;
 };
 
+// (small round pits in the sea beside a coast: services/terrariumPits.js)
+export { fillSmallSeaPits, hasSmallSeaPit };
+
 /**
  * The one height of a tile that holds nothing else (gaps aside), or null.
  * AWS serves such placeholder tiles where its z15 source is missing (seen
@@ -553,7 +557,7 @@ export const repairTerrariumBlendedTiles = async ({
     for (let tx = 0; tx < tileCountX; tx++) {
       const heights = decodeTile(data, rowWidth, tx * TILE_SIZE, 0);
       const flat = flatTerrariumHeight(heights) !== null;
-      if (flat || detectBlendedTerrarium(heights)) {
+      if (flat || detectBlendedTerrarium(heights) || hasSmallSeaPit(heights)) {
         suspects.push({ tx: minTileX + tx, ty: minTileY + ty, drawX: tx * TILE_SIZE, drawY: ty * TILE_SIZE, heights, flat });
       }
     }
@@ -664,7 +668,8 @@ export const repairTerrariumBlendedTiles = async ({
     // reference values): its real coastal cliffs would fail a whole-tile
     // blend test. Go coarser only while impossible depths remain.
     let patched = 0;
-    for (const step of ancestorSteps) {
+    // (a tile here only for its small pits needs no other zoom)
+    for (const step of detectBlendedTerrarium(heights) ? ancestorSteps : []) {
       signal?.throwIfAborted();
       if (zoom - step < 0) break;
       const ancestor = await loadAncestorHeights(zoom - step, tx >> step, ty >> step);
@@ -674,6 +679,8 @@ export const repairTerrariumBlendedTiles = async ({
       patched += patchBlendedHeights(heights, reference);
       if (!hasImplausibleDepth(heights)) break;
     }
+    // (the small pits beside a coast: from the ground around them, no other zoom is better there)
+    patched += fillSmallSeaPits(heights);
     if (patched > 0) {
       const img = ctx.getImageData(drawX, drawY, TILE_SIZE, TILE_SIZE);
       for (let i = 0; i < heights.length; i++) {
