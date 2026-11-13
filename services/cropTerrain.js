@@ -162,9 +162,10 @@ export async function prepareCroppedTerrainData(terrainData) {
   const origWidth  = terrainData.width;
   const origHeight = terrainData.height;
 
-  // Center the crop
-  const startX = Math.floor((origWidth  - cropSize) / 2);
-  const startY = Math.floor((origHeight - cropSize) / 2);
+  // Centred, unless a corner is given (exportCropStart { x, y }: a 3D model of part of the map, or one tile)
+  const given = terrainData.exportCropStart;
+  const startX = Number.isFinite(given?.x) ? Math.max(0, Math.min(origWidth - cropSize, Math.round(given.x))) : Math.floor((origWidth  - cropSize) / 2);
+  const startY = Number.isFinite(given?.y) ? Math.max(0, Math.min(origHeight - cropSize, Math.round(given.y))) : Math.floor((origHeight - cropSize) / 2);
 
   // Crop heightmap
   const croppedHeightMap = cropHeightmap(
@@ -227,6 +228,7 @@ export async function prepareCroppedTerrainData(terrainData) {
     osmFeatures: croppedOSMFeatures,
     // exportCropSize cleared so downstream doesn't try to crop again
     exportCropSize: null,
+    exportCropStart: null,
     ...croppedUrls,
     // Canvas refs are invalidated after crop; clear them
     osmTextureCanvas: null,

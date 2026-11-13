@@ -1583,6 +1583,22 @@ const disposeScene = (scene) => {
   });
 };
 
+// Real-world scale: the model in the level's own frame, to the centimetre. The scene is a box SCENE_SIZE wide
+// with the first and last height samples on its edges; the level has sample (col, row) at x = (col - W/2) m,
+// y = (H/2 - 1 - row) m. So the box is scaled to (W - 1) samples' width (it was W: a model a sample too wide,
+// half a metre out at each edge of a 1 m map) and moved half a sample, and heights are scaled apart from the
+// plan so that a metre of height is a metre. `placeMeters` { x, y, z } moves a model of part of a map to its
+// place in the whole (services/modelArea.js).
+const placeRootInLevelFrame = (root, data, placeMeters = null) => {
+  const mpp = [data?.metersPerPixel, data?.processingMetersPerPixel].map(Number).find((v) => Number.isFinite(v) && v > 0) || 1;
+  const latRad = (((data.bounds.north + data.bounds.south) / 2) * Math.PI) / 180;
+  const realWidthMeters = (data.bounds.east - data.bounds.west) * 111320 * Math.cos(latRad);
+  const plan = ((data.width - 1) * mpp) / SCENE_SIZE;
+  const up = realWidthMeters / SCENE_SIZE;   // (heights were put in as metres * SCENE_SIZE / realWidthMeters)
+  root.scale.set(plan, up, plan);
+  root.position.set(-mpp / 2 + (placeMeters?.x || 0), placeMeters?.y || 0, mpp / 2 + (placeMeters?.z || 0));
+};
+
 export const exportToGLB = async (data, options = {}) => {
   const {
     includeSurroundings,
@@ -1607,7 +1623,7 @@ export const exportToGLB = async (data, options = {}) => {
     // so it imports into Blender at real-world scale.
     const root = new THREE.Group();
     root.name = 'mapng_model';
-    if (realWorldScale) root.scale.setScalar(computeMetersPerUnit(data));
+    if (realWorldScale) placeRootInLevelFrame(root, data, options.placeMeters);
     scene.add(root);
 
     if (resolvedIncludeCenterTile) {
@@ -1686,7 +1702,7 @@ export const exportToDAE = async (data, options = {}) => {
     // so it imports into Blender at real-world scale.
     const root = new THREE.Group();
     root.name = 'mapng_model';
-    if (realWorldScale) root.scale.setScalar(computeMetersPerUnit(data));
+    if (realWorldScale) placeRootInLevelFrame(root, data, options.placeMeters);
     scene.add(root);
 
     if (resolvedIncludeCenterTile) {

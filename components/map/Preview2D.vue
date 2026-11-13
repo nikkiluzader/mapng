@@ -94,6 +94,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount, toRaw } from 'vue';
 import { useI18n } from 'vue-i18n';
 import L from 'leaflet';
+import { squareOfDrag } from '../../services/modelArea.js';
 import 'leaflet/dist/leaflet.css';
 import { attachContentLayer } from './contentLayer.js';
 import { useMainStore } from '../../stores/mainStore';
@@ -154,6 +155,23 @@ const legend = computed(() => CONTENT_GROUPS.map((g) => ({
 })));
 
 const bounds = () => { const b = td()?.bounds; return b ? L.latLngBounds([b.south, b.west], [b.north, b.east]) : null; };
+// The 3D model's area on the map (the export panel's Area: a square picked here by a drag).
+const AREA_STYLE = { color: '#ff6600', weight: 2, dashArray: '6 4', fill: true, fillColor: '#ff6600', fillOpacity: 0.08, interactive: false };
+let areaLayer = null; let dragFrom = null; let dragLayer = null;
+const toSample = (ll) => { const d = td(); const b = d.bounds; return { c: ((ll.lng - b.west) / (b.east - b.west)) * d.width, r: ((b.north - ll.lat) / (b.north - b.south)) * d.height }; };
+const areaBounds = (a) => { const d = td(); const b = d.bounds; const lng = (c) => b.west + (c / d.width) * (b.east - b.west); const lat = (r) => b.north - (r / d.height) * (b.north - b.south); return L.latLngBounds([lat(a.r0 + a.size), lng(a.c0)], [lat(a.r0), lng(a.c0 + a.size)]); };
+const drawArea = () => {
+  if (areaLayer) { map?.removeLayer(areaLayer); areaLayer = null; }
+  if (map && td() && store.modelArea) areaLayer = L.rectangle(areaBounds(store.modelArea), AREA_STYLE).addTo(map);
+};
+const applyPicking = () => {
+  if (!map) return;
+  if (store.modelAreaPicking) map.dragging.disable(); else map.dragging.enable();
+  map.getContainer().style.cursor = store.modelAreaPicking ? 'crosshair' : '';
+};
+watch(() => store.modelArea, drawArea);
+watch(() => store.modelAreaPicking, applyPicking);
+
 // (clear of the panel on the left and the view tabs along the top)
 const fit = () => { const b = bounds(); if (map && b) map.fitBounds(b, { paddingTopLeft: [264, 72], paddingBottomRight: [24, 24], animate: false }); };
 
@@ -362,6 +380,22 @@ onMounted(() => {
   });
   content.update();
   map.on('mousemove', onMove);
+  // (the 3D model's area: a drag while the export panel asked for one, services/modelArea.js)
+  map.on('mousedown', (e) => { if (store.modelAreaPicking && td()) { dragFrom = toSample(e.latlng); } });
+  map.on('mousemove', (e) => {
+    if (!dragFrom) return;
+    const sq = squareOfDrag(dragFrom, toSample(e.latlng), td().width, td().height);
+    if (dragLayer) { map.removeLayer(dragLayer); dragLayer = null; }
+    if (sq) dragLayer = L.rectangle(areaBounds(sq), AREA_STYLE).addTo(map);
+  });
+  map.on('mouseup', (e) => {
+    if (!dragFrom) return;
+    const sq = squareOfDrag(dragFrom, toSample(e.latlng), td().width, td().height);
+    dragFrom = null; if (dragLayer) { map.removeLayer(dragLayer); dragLayer = null; }
+    if (sq && Math.abs(sq.size) >= 16) store.modelArea = sq;
+    store.modelAreaPicking = false;
+  });
+  applyPicking(); drawArea();
   map.on('mouseout', () => { hover.value = null; });
   if (import.meta.env.DEV) window.__mapngPreview2d = map;
 });

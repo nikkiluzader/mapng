@@ -439,16 +439,32 @@
               <input type="checkbox" v-model="modelRealWorldScale" :class="CHECKBOX" />
               <span class="text-nano text-gray-500 dark:text-gray-400">{{ t('exportPanel.realWorldScale') }}</span>
             </label>
+            <!-- the area modelled: the whole map, or a square picked on the 2D preview (services/modelArea.js) -->
+            <div class="flex items-center justify-between gap-2" data-testid="model-area">
+              <span class="text-nano text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.modelArea') }}: <span class="text-gray-700 dark:text-gray-200">{{ store.modelAreaPicking ? t('exportPanel.ui.modelAreaPicking') : store.modelArea ? t('exportPanel.ui.modelAreaPart', { m: Math.round(modelAreaRect.size * meshMpp) }) : t('exportPanel.ui.modelAreaWhole') }}</span></span>
+              <span class="flex items-center gap-2 shrink-0">
+                <button type="button" class="text-nano font-semibold text-brand hover:underline" data-testid="model-area-pick" @click="pickModelArea">{{ t('exportPanel.ui.modelAreaPick') }}</button>
+                <button v-if="store.modelArea" type="button" class="text-nano font-semibold text-brand hover:underline" data-testid="model-area-clear" @click="store.modelArea = null">{{ t('exportPanel.ui.modelAreaWhole') }}</button>
+              </span>
+            </div>
+            <!-- a mesh too big for one file goes out as tiles that share their edges -->
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-nano text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.modelTiles') }}</span>
+              <select v-model="modelTiles" :class="SELECT_XS" data-testid="model-tiles" :aria-label="t('exportPanel.ui.modelTiles')">
+                <option value="auto">{{ t('exportPanel.ui.modelTilesAuto', { k: modelTilesAuto || 16 }) }}</option>
+                <option v-for="k in TILE_COUNTS" :key="k" :value="String(k)">{{ k === 1 ? t('exportPanel.ui.modelTilesOne') : `${k} × ${k}` }}</option>
+              </select>
+            </div>
             <!-- the mesh's point spacing, and what it costs, before the download (services/modelMesh.js) -->
             <div class="flex items-center justify-between gap-2">
               <span class="text-nano text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.meshSpacing') }}</span>
               <select v-model="modelMeshStride" :class="SELECT_XS" data-testid="mesh-spacing" :aria-label="t('exportPanel.ui.meshSpacing')">
-                <option value="auto">{{ t('exportPanel.ui.meshSpacingAuto', { m: meshSpacingText(meshPlan(terrainData.width, meshMpp, autoStride(terrainData.width)).spacingM) }) }}</option>
+                <option value="auto">{{ t('exportPanel.ui.meshSpacingAuto', { m: meshSpacingText(meshPlan(modelAreaRect.size, meshMpp, autoStride(modelAreaRect.size)).spacingM) }) }}</option>
                 <option v-for="s in MESH_STRIDES" :key="s" :value="String(s)">{{ t('exportPanel.ui.meshSpacingEvery', { m: meshSpacingText(s * meshMpp) }) }}</option>
               </select>
             </div>
             <p class="text-nano tabular-nums" :class="modelMesh.tooBig ? 'text-amber-700 dark:text-amber-300' : 'text-gray-500 dark:text-gray-400'" data-testid="mesh-info">
-              {{ t(modelMesh.tooBig ? 'exportPanel.ui.meshTooBig' : 'exportPanel.ui.meshInfo', { side: modelMesh.side.toLocaleString(), millions: (modelMesh.points / 1e6).toFixed(modelMesh.points < 1e7 ? 1 : 0), size: formatBytes(modelMesh.bytes) }) }}
+              {{ t(modelMesh.tooBig ? 'exportPanel.ui.meshTooBig' : modelTileCount > 1 ? 'exportPanel.ui.meshInfoTiles' : 'exportPanel.ui.meshInfo', { k: modelTileCount, side: modelMesh.side.toLocaleString(), millions: (modelMesh.points / 1e6).toFixed(modelMesh.points < 1e7 ? 1 : 0), size: formatBytes(modelMesh.bytes * modelTileCount * modelTileCount) }) }}
             </p>
           </div>
 
@@ -471,7 +487,8 @@
             <!-- DAE (Collada) Model -->
             <button 
               @click="handleDAEExport"
-              :disabled="isAnyExporting || modelMesh.tooBig"
+              :disabled="isAnyExporting || modelMesh.tooBig || modelTileCount > 1"
+              :title="modelTileCount > 1 ? t('exportPanel.ui.daeNoTiles') : ''"
               class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-20"
             >
               <div class="w-full h-full flex items-center justify-center mb-0.5">
@@ -627,6 +644,7 @@ import { exportToGLB, exportToDAE } from '../../services/export3d';
 import { useWorkflow } from '../../composables/useWorkflow.js';
 import { ensureTexture, hasTexture } from '../../services/textureOnDemand.js';
 import { MESH_STRIDES, meshPlan, autoStride, strideOf, maxMeshResolutionFor } from '../../services/modelMesh.js';
+import { TILE_COUNTS, clampArea, tileRects, tilesNeeded, partOffset } from '../../services/modelArea.js';
 import { exportGeoTiff } from '../../services/exportGeoTiff';
 import { buildCommonTraceMetadata, downloadJsonFile } from '../../services/traceability';
 import { createWGS84ToLocal } from '../../services/geoUtils';
@@ -1143,7 +1161,28 @@ const modelRealWorldScale = ref(localStorage.getItem('mapng_modelRealWorldScale'
 const modelMeshStride = ref((() => { const v = localStorage.getItem('mapng_modelMeshStride'); return MESH_STRIDES.includes(Number(v)) ? v : 'auto'; })());
 watch(modelMeshStride, (v) => localStorage.setItem('mapng_modelMeshStride', String(v)));
 const meshMpp = computed(() => { const m = Number(props.terrainData?.processingMetersPerPixel); return m > 0 ? m : 1; });
-const modelMesh = computed(() => meshPlan(props.terrainData?.width || 2, meshMpp.value, strideOf(modelMeshStride.value, props.terrainData?.width || 2)));
+// (the area modelled, the tiles it is cut into, and one tile's mesh: services/modelArea.js)
+const modelAreaRect = computed(() => { const w = props.terrainData?.width || 2; const h = props.terrainData?.height || w; return clampArea(store.modelArea, w, h) || { c0: 0, r0: 0, size: Math.min(w, h) }; });
+const modelTiles = ref((() => { const v = localStorage.getItem('mapng_modelTiles'); return TILE_COUNTS.includes(Number(v)) ? v : 'auto'; })());
+watch(modelTiles, (v) => localStorage.setItem('mapng_modelTiles', String(v)));
+const modelStride = computed(() => strideOf(modelMeshStride.value, modelAreaRect.value.size));
+const modelTilesAuto = computed(() => tilesNeeded(modelAreaRect.value.size, meshMpp.value, modelStride.value));
+const modelTileCount = computed(() => (modelTiles.value === 'auto' ? (modelTilesAuto.value || 16) : Number(modelTiles.value)));
+const modelTileSize = computed(() => (modelTileCount.value > 1 ? Math.ceil((modelAreaRect.value.size - 1) / modelTileCount.value) + 1 : modelAreaRect.value.size));
+const modelMesh = computed(() => meshPlan(modelTileSize.value, meshMpp.value, modelStride.value));
+watch(() => props.terrainData, () => { store.modelArea = null; store.modelAreaPicking = false; });
+const pickModelArea = () => { store.modelAreaPicking = true; if (store.viewMode !== 'preview2d') store.viewMode = 'preview2d'; };
+// One piece of the model (the whole map, the picked area, or one tile of either): its terrain and where it goes.
+const modelPieces = () => (modelTileCount.value > 1 ? tileRects(modelAreaRect.value, modelTileCount.value) : [{ i: 0, j: 0, ...modelAreaRect.value }]);
+const modelPieceData = async (rect) => {
+  const full = toRaw(props.terrainData);
+  const whole = rect.c0 === 0 && rect.r0 === 0 && rect.size === full.width && rect.size === full.height;
+  const td = whole ? await getExportTerrainData() : await prepareCroppedTerrainData({ ...full, exportCropSize: rect.size, exportCropStart: { x: rect.c0, y: rect.r0 } });
+  // (a part's game texture is its cropped file, not the whole map's canvas)
+  if (!whole) { td.gameTextureCanvas = null; td.gameTextureBlob = null; }
+  const place = partOffset({ width: full.width, height: full.height, metersPerPixel: meshMpp.value, minHeight: full.minHeight }, rect, td.minHeight);
+  return { td, whole, place };
+};
 const meshSpacingText = (m) => (Number.isInteger(m) ? String(m) : m.toFixed(1));
 const formatBytes = (b) => (b >= 2 ** 30 ? `${(b / 2 ** 30).toFixed(1)} GB` : `${Math.max(1, Math.round(b / 2 ** 20))} MB`);
 watch(modelRealWorldScale, (v) => localStorage.setItem('mapng_modelRealWorldScale', String(v)));
@@ -1992,19 +2031,34 @@ const handleGLBExport = async () => {
   try {
     await yieldToUi();
     await prepareTexture(modelCenterTextureType.value);
-    const td = await getExportTerrainData();
-    const blob = await exportToGLB(td, {
-      centerTextureType: modelCenterTextureType.value,
-      tileSelection: modelTileSelection.value,
-      realWorldScale: modelRealWorldScale.value,
-      // (every height of a map up to 2048 a side; the 1024 it fell back to halved a 2 km map's detail and
-      // quartered a 4 km one's: a tester's "I've lost all the details", 2026-11-13)
-      maxMeshResolution: maxMeshResolutionFor(props.terrainData.width, modelMesh.value.stride),
-      surroundingTilePositions: props.surroundingTilePositions,
-      center: props.center,
-      resolution: props.resolution,
-      returnBlob: true
-    });
+    const pieces = modelPieces(); const made = [];
+    for (const rect of pieces) {
+      const { td, whole, place } = await modelPieceData(rect);
+      made.push({ rect, blob: await exportToGLB(td, {
+        centerTextureType: modelCenterTextureType.value,
+        // (surrounding tiles belong to the whole map: a part or a tile is the terrain itself)
+        tileSelection: whole ? modelTileSelection.value : 'center-only',
+        realWorldScale: modelRealWorldScale.value,
+        placeMeters: place,
+        maxMeshResolution: maxMeshResolutionFor(rect.size, modelStride.value),
+        surroundingTilePositions: props.surroundingTilePositions,
+        center: props.center,
+        resolution: props.resolution,
+        returnBlob: true
+      }) });
+      await yieldToUi();
+    }
+    if (made.length > 1) {
+      // (tiles: one zip of GLBs, each in its place: import them all and they lie edge to edge)
+      const { default: JSZip } = await import('jszip');
+      const zip = new JSZip();
+      for (const m of made) zip.file(`terrain_tile_r${m.rect.j + 1}_c${m.rect.i + 1}.glb`, m.blob);
+      const zipName = `terrain_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}_${modelTileCount.value}x${modelTileCount.value}_tiles.zip`;
+      triggerDownload(await zip.generateAsync({ type: 'blob', compression: 'STORE' }), zipName);
+      notifyExportSuccess('glb', zipName);
+      return;
+    }
+    const blob = made[0].blob;
     const typedBlob = await ensureDownloadBlobType(blob, 'model/gltf-binary', 'application/octet-stream');
     const filename = `terrain_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.glb`;
     triggerDownload(typedBlob, filename);
@@ -2031,14 +2085,13 @@ const handleDAEExport = async () => {
   try {
     await yieldToUi();
     await prepareTexture(modelCenterTextureType.value);
-    const td = await getExportTerrainData();
+    const { td, whole, place } = await modelPieceData(modelAreaRect.value);
     const zipBlob = await exportToDAE(td, {
       centerTextureType: modelCenterTextureType.value,
-      tileSelection: modelTileSelection.value,
+      tileSelection: whole ? modelTileSelection.value : 'center-only',
       realWorldScale: modelRealWorldScale.value,
-      // (every height of a map up to 2048 a side; the 1024 it fell back to halved a 2 km map's detail and
-      // quartered a 4 km one's: a tester's "I've lost all the details", 2026-11-13)
-      maxMeshResolution: maxMeshResolutionFor(props.terrainData.width, modelMesh.value.stride),
+      placeMeters: place,
+      maxMeshResolution: maxMeshResolutionFor(modelAreaRect.value.size, modelStride.value),
       surroundingTilePositions: props.surroundingTilePositions,
       center: props.center,
       resolution: props.resolution,

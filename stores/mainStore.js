@@ -89,6 +89,10 @@ export const useMainStore = defineStore('main', () => {
   // previews and the export panel's thumbnails look again; texturePreparing names the one being painted)
   const texturesMade = ref(0);
   const texturePreparing = ref('');
+  // (the 3D model's area: a square of the map picked on the 2D preview, { c0, r0, size } in height samples, or
+  // null for the whole map; modelAreaPicking while the next drag on the 2D preview picks it. services/modelArea.js)
+  const modelArea = ref(null);
+  const modelAreaPicking = ref(false);
   // (the export's backdrop choice, 'off' or its elevation source: the 2D preview draws
   // the surrounding tiles when one is chosen; the export panel keeps it up to date)
   // (the export's data-step options, as the export panel has them: the 2D preview asks the
@@ -275,6 +279,8 @@ export const useMainStore = defineStore('main', () => {
     textureRevision,
     texturesMade,
     texturePreparing,
+    modelArea,
+    modelAreaPicking,
     backdropSource,
     exportDataOptions,
     backdropImagery,
