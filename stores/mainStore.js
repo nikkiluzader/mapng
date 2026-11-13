@@ -31,6 +31,8 @@ export const useMainStore = defineStore('main', () => {
   }
   const center = ref(sanitizeCenter(persistedCenter));
   const zoom = ref(parseInt(localStorage.getItem('mapng_zoom')) || 13);
+  // where "Compare sources here" looks: a spot chosen on the map (right-click), or null for the selection's middle
+  const compareSpot = ref(null);
   const resolution = ref(parseInt(localStorage.getItem('mapng_resolution')) || 1024);
   const isDarkMode = ref(localStorage.getItem('theme') === 'dark');
   if (typeof document !== 'undefined') {
@@ -252,6 +254,7 @@ export const useMainStore = defineStore('main', () => {
   }
 
   return {
+    compareSpot,
     // State
     center,
     zoom,

@@ -189,6 +189,8 @@
         :options="{ dashArray: tile.status === 'pending' ? '4, 6' : undefined, lineCap: 'round' }"
       />
 
+      <l-rectangle v-if="compareSpotBounds" :bounds="compareSpotBounds" color="#f97316" :weight="2" :fill-opacity="0.08" :options="{ dashArray: '5, 5', interactive: false }" />
+
       <l-marker
         v-for="tile in shownBatchGrid"
         v-if="batchEditable"
@@ -343,6 +345,8 @@
       <div class="px-3 py-1 text-micro text-gray-500 dark:text-gray-400 font-mono">{{ formatLatLng(contextMenu.lat, contextMenu.lng) }}</div>
       <button type="button" role="menuitem" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700" v-if="!boxLocked" @click="centerSelectionHere">{{ t('map.centerHere') }}</button>
       <button type="button" role="menuitem" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700" @click="copyCoordinates">{{ copiedNotice ? t('map.copied') : t('map.copyCoordinates') }}</button>
+      <!-- the 500 m square "Compare sources here" looks at (components/map/SourceComparison.vue) -->
+      <button type="button" role="menuitem" data-testid="ctx-compare-here" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700" @click="compareSourcesHere">{{ t('map.compareAtSpot') }}</button>
       <!-- Spawn and quicktravel points (single tile; components/controls/SpawnPoints.vue) -->
       <template v-if="pointsActive()">
         <div class="my-1 border-t border-gray-200 dark:border-gray-700"></div>
@@ -1089,6 +1093,17 @@ const centerSelectionHere = () => {
   if (!m || !leafletMap.value) return;
   leafletMap.value.panTo([m.lat, m.lng]);
 };
+const compareSourcesHere = () => {
+  const m = contextMenu.value;
+  closeContextMenu();
+  if (m) store.compareSpot = { lat: m.lat, lng: m.lng };
+};
+// (the square as a box on the map: 512 m, as the comparison reads)
+const compareSpotBounds = computed(() => {
+  const c = store.compareSpot; if (!c) return null;
+  const dLat = 256 / 111320; const dLng = dLat / Math.cos((c.lat * Math.PI) / 180);
+  return [[c.lat - dLat, c.lng - dLng], [c.lat + dLat, c.lng + dLng]];
+});
 const copyCoordinates = async () => {
   const m = contextMenu.value;
   if (!m) return;

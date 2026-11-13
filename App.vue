@@ -813,6 +813,8 @@ const applyLoadingUpdate = (update) => {
 };
 
 const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default', gpxzApiKey = '', elevationUnitOverride = 'auto', processingMpp = 1, gapFillSource = DEFAULT_GAP_FILL_SOURCE) => {
+  // The website, at a size a browser tab does not finish (8192 and up: the tab's memory limit): asked first.
+  if (!desktopApp && Number(resolution.value) >= 8192 && !window.confirm(t(Number(resolution.value) >= 16384 ? 'controlPanel.browserSizeConfirm16k' : 'controlPanel.browserSizeConfirm8k'))) return;
   const normalizedSource = String(elevationSource || 'default').toLowerCase();
   const useUSGS = normalizedSource === 'usgs';
   const useGPXZ = normalizedSource === 'gpxz';

@@ -106,7 +106,13 @@
           </ResolutionSelector>
         </fieldset>
         <!-- (the website only: big maps belong in the desktop app) -->
-        <p v-if="!desktopApp && Number(resolution) >= 4096" class="flex items-start gap-1.5 -mt-1 text-micro leading-snug text-gray-500 dark:text-gray-400">
+        <!-- (8192 and up: every website crash report so far is one of these, on machines with 16 to 32 GB: the
+             tab's own memory limit, about 4 GB, not the machine's) -->
+        <div v-if="!desktopApp && Number(resolution) >= 8192" data-testid="browser-size-warning" class="-mt-1 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-2.5 py-2 text-micro leading-snug text-amber-800 dark:text-amber-200">
+          <p class="flex items-start gap-1.5 font-medium"><AlertTriangle :size="12" class="shrink-0 mt-px" />{{ Number(resolution) >= 16384 ? t('controlPanel.browserSize16k') : t('controlPanel.browserSize8k') }}</p>
+          <p class="mt-1 pl-[18px]">{{ t('controlPanel.browserSizeWhy') }} <a :href="DESKTOP_DOWNLOAD_URL" target="_blank" rel="noopener" class="font-semibold underline">{{ t('controlPanel.desktopHintLink') }}</a></p>
+        </div>
+        <p v-else-if="!desktopApp && Number(resolution) >= 4096" class="flex items-start gap-1.5 -mt-1 text-micro leading-snug text-gray-500 dark:text-gray-400">
           <Download :size="11" class="shrink-0 mt-px text-brand" />
           <span>{{ t('controlPanel.desktopHint') }} <a :href="DESKTOP_DOWNLOAD_URL" target="_blank" rel="noopener" class="text-brand hover:underline">{{ t('controlPanel.desktopHintLink') }}</a></span>
         </p>

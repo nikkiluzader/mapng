@@ -3,7 +3,11 @@
        a recommendation and the quality report. Its own section (it sat folded inside the source selector). -->
   <SettingSection v-if="hasCenter" v-model:open="open" :title="t('map.compareHere')" :icon="Layers" data-testid="compare-section">
     <div class="space-y-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800/40 p-2.5 text-micro leading-tight">
-      <p class="text-gray-500 dark:text-gray-400">{{ t('map.compareIntro') }}</p>
+      <p class="text-gray-500 dark:text-gray-400">
+        {{ store.compareSpot ? t('map.compareIntroSpot') : t('map.compareIntro') }}
+        <button v-if="store.compareSpot" type="button" data-testid="compare-middle" class="text-brand hover:underline" @click="store.compareSpot = null">{{ t('map.compareBackToMiddle') }}</button>
+        <span v-else>{{ t('map.compareSpotHint') }}</span>
+      </p>
       <div v-if="stale" class="flex items-center gap-2">
         <button type="button" data-testid="compare-toggle" class="font-bold text-brand hover:underline" @click="loadCompare">{{ t('map.compareStart') }}</button>
         <span v-if="moved" class="text-gray-500 dark:text-gray-400">{{ t('map.compareMoved') }}</span>
@@ -44,6 +48,7 @@ import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Layers } from 'lucide-vue-next';
 import { boxAround, probeMapterhorn } from '../../services/sourceAdvisor.js';
+import { useMainStore } from '../../stores/mainStore';
 import { recommendSource } from '../../services/sourceRecommend.js';
 import { standardPatch, mapterhornPatch, gpxzPatch, regionalPatch, regionalSourcesAt, hillshadeDataUrl } from '../../services/sourceCompare.js';
 
@@ -55,6 +60,7 @@ const props = defineProps({
   elevationSource: { type: String, default: '' },
 });
 const emit = defineEmits(['pick']);
+const store = useMainStore();
 
 // (folded until asked for: opening it reads tiles from every source)
 const open = ref(false);
@@ -69,7 +75,8 @@ const compare = ref({});           // key -> { url, state, note, detail, progres
 const stale = ref(true);           // nothing loaded for where the selection is now
 const moved = ref(false);
 let compareAbort = null;
-const centerPoint = () => ({ lat: Number(props.center?.lat), lng: Number(props.center?.lng) });
+// (a spot chosen on the map with a right-click, else the middle of the selection)
+const centerPoint = () => (store.compareSpot ? { lat: Number(store.compareSpot.lat), lng: Number(store.compareSpot.lng) } : { lat: Number(props.center?.lat), lng: Number(props.center?.lng) });
 // the region's own surveys at this place (USGS in the United States, NMT in Poland): each its own cell
 const regional = computed(() => (hasCenter.value ? regionalSourcesAt(centerPoint()) : []));
 const REGIONAL_LABEL = { usgs: 'USGS 1 m', kron86: 'NMT (Polska)' };
@@ -205,8 +212,15 @@ const saveQualityReport = async () => {
 // cleared and offered again (not re-read on every pan: each read is tiles from every source).
 watch(open, (v) => { if (v && stale.value) loadCompare(); else if (!v) compareAbort?.abort(); });
 watch(() => [props.center?.lat, props.center?.lng], () => {
+  // (a chosen spot stays where it was put: the selection moving does not move it)
+  if (store.compareSpot) return;
   compareAbort?.abort(); const had = !stale.value;
   compare.value = {}; recommend.value = null; reportNote.value = ''; for (const k of Object.keys(compareHeights)) delete compareHeights[k];
   stale.value = true; moved.value = had;
+});
+// A spot chosen on the map (or given up): the section opens and compares there at once.
+watch(() => [store.compareSpot?.lat, store.compareSpot?.lng], () => {
+  if (store.compareSpot) { if (!open.value) { stale.value = true; open.value = true; } else loadCompare(); }
+  else if (open.value) loadCompare();
 });
 </script>
