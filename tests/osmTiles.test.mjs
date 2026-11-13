@@ -138,3 +138,22 @@ test('a tile whose read fails is asked again; an abort is not', async () => {
   await assert.rejects(readTile({ getZxy: async () => { aborted++; throw abort; } }, 1, 2), /stop/);
   assert.equal(aborted, 1);
 });
+
+test('an area in the last row of tiles under an archive edge given to six decimals is covered', async () => {
+  const { planTileSources } = await import('../services/osmTiles.js');
+  // the planet archives meet at 40.97989806962013 N (a zoom 3 tile edge); the manifest says 40.979898
+  const archives = [
+    { key: 'south', bounds: [0, 0, 45, 40.979898], built_at: '2026-11-12T00:00:00Z' },
+    { key: 'north', bounds: [0, 40.979898, 45, 66.513260], built_at: '2026-11-12T00:00:00Z' },
+  ];
+  const box = (lat, lng, km) => { const dLat = (km * 500) / 111320; const dLng = dLat / Math.cos((lat * Math.PI) / 180); return { north: lat + dLat, south: lat - dLat, east: lng + dLng, west: lng - dLng }; };
+  // north of Naples, 4 km: its top row of tiles ends on the edge
+  const plan = planTileSources(archives, box(40.93024, 14.3684, 4));
+  assert.ok(plan, 'covered');
+  assert.deepEqual(plan.map((p) => p.key), ['south']);
+  // 16 km: across the edge, from both
+  const both = planTileSources(archives, box(40.93024, 14.3684, 16));
+  assert.deepEqual(both.map((p) => p.key).sort(), ['north', 'south']);
+  // and an area outside every archive is still not covered
+  assert.equal(planTileSources(archives, box(40.9, -3, 4)), null);
+});

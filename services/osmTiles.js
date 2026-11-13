@@ -113,9 +113,13 @@ export const planTileSources = (archivesList, bounds, z = TILE_ZOOM) => {
   const byKey = new Map();
   for (const { x, y } of tilesCovering(bounds, z)) {
     const c = tileCorners(x, y, z);
-    // (a tile's corners shrunk a hair inwards: tiles on an archive's edge
-    // share their corners with the outline itself)
-    const eps = 1e-9;
+    // (a tile's corners shrunk a hair inwards: tiles on an archive's edge share their corners with the
+    // outline itself, and the manifest gives the outline to six decimals. At 1e-9 the last row of tiles
+    // under 40.979898 N stuck out of "40.979898" by 7e-8 of a degree and counted as not covered: a strip
+    // 3.7 km deep along every archive edge that is not a round number, where maps fell to the live servers
+    // and, with those busy, to Overture. lominsax's, north of Naples, 2026-11-13. A millionth of a degree
+    // is 11 cm.)
+    const eps = 1e-6;
     const tileBounds = { west: c.west + eps, east: c.east - eps, south: c.south + eps, north: c.north - eps };
     const archive = newestFirst.find((a) => archiveCovers(a, tileBounds));
     if (!archive) return null;
