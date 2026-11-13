@@ -1152,22 +1152,27 @@ export function fillRemnants(heightMap, width, height, lowered, { rounds = 2, ke
 const SEA_SURFACE_BAND_M = 0.3;
 const SEABED_DEPTH_M = 2;
 const SEABED_RAMP_CELLS = 3;
+const SEA_SHOAL_MAX_M = 6;     // in water joined to the sea, ground up to this far over it is still the sea's floor
+const SEA_SEED_CELLS = 50;     // ... when at least this many cells of water lie at the sea's level (half a hectare at 10 m)
 
 /**
  * Edits that put the sea floor under the sea: grid { heightMap, width,
  * height, minHeight } (raw heights, rows from the north as the export's
  * heightmap), landCover { grid, n } (north-up), seaZ the sea surface in world
- * z (raw - minHeight). Returns { pixels, apply(set) }.
+ * z (raw - minHeight); coarse: the elevation is the global 30 m data; keep(x, y): ground that stays
+ * (roads and their quays; needs grid.worldSize). Returns { pixels, apply(set) }.
  */
-export function lowerSeabed(grid, landCover, seaZ) {
-  const { heightMap, width, height, minHeight = 0 } = grid;
+export function lowerSeabed(grid, landCover, seaZ, { coarse = false, keep = null } = {}) {
+  const { heightMap, width, height, minHeight = 0, worldSize = 0 } = grid;
   const none = { pixels: 0, apply() {} };
   if (!landCover?.grid || landCover.grid.length !== landCover.n * landCover.n || !Number.isFinite(seaZ)) return none;
   const { grid: lc, n } = landCover;
+  // (water, or no land cover at all: the open sea beyond WorldCover's tiles)
+  const wet = (k) => k === 80 || k === 0;
   // distance (in cells) from the nearest non-water cell, two chamfer passes
   const D = new Float32Array(n * n);
   const BIG = 1e9;
-  for (let i = 0; i < n * n; i++) D[i] = lc[i] === 80 ? BIG : 0;
+  for (let i = 0; i < n * n; i++) D[i] = wet(lc[i]) ? BIG : 0;
   for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
     const i = r * n + c; if (!D[i]) continue;
     if (c > 0) D[i] = Math.min(D[i], D[i - 1] + 1);
@@ -1178,16 +1183,50 @@ export function lowerSeabed(grid, landCover, seaZ) {
     if (c < n - 1) D[i] = Math.min(D[i], D[i + 1] + 1);
     if (r < n - 1) D[i] = Math.min(D[i], D[i + n] + 1);
   }
-  const edits = new Map();
   const top = seaZ + SEA_SURFACE_BAND_M;
+  // The sea itself, by the land cover: water joined to water that lies at the sea's level (or to the open
+  // sea beyond the tiles), through water whose ground is no more than SEA_SHOAL_MAX_M over it. Coarse
+  // elevation carries the land's height out over the water: off Visakhapatnam's beach the global 30 m data
+  // has the "sea floor" 3.3 m over the sea at the shore, 1.2 m at 30 to 100 m out, and level only from 100 m
+  // (glitter_shitter: "the water doesn't reach the shore", and raising the sea drowned the low town). All of
+  // that is under the sea. A lake up in the hills is not joined to it; a river is, as far up as its bed in
+  // the data stays within the band: its tidal mouth.
+  const cellZ = new Float32Array(n * n);
+  for (let r = 0; r < n; r++) {
+    const hr = Math.min(height - 1, Math.floor(((r + 0.5) / n) * height)) * width;
+    for (let c = 0; c < n; c++) cellZ[r * n + c] = heightMap[hr + Math.min(width - 1, Math.floor(((c + 0.5) / n) * width))] - minHeight;
+  }
+  const sea = new Uint8Array(n * n);
+  const queue = new Int32Array(n * n); let qh = 0; let qt = 0;
+  for (let i = 0; i < n * n; i++) if (D[i] && (lc[i] === 0 || cellZ[i] <= top)) { sea[i] = 1; queue[qt++] = i; }
+  // (coarse elevation only: a fine survey has a breakwater or a sandbar where it stands, and the land cover's
+  // 10 m cells may call it water)
+  if (coarse && qt >= SEA_SEED_CELLS) {
+    const reach = seaZ + SEA_SHOAL_MAX_M;
+    while (qh < qt) {
+      const i = queue[qh++]; const c = i % n;
+      for (const k of [c > 0 ? i - 1 : -1, c < n - 1 ? i + 1 : -1, i - n, i + n]) {
+        if (k < 0 || k >= n * n || sea[k] || !D[k] || cellZ[k] > reach) continue;
+        sea[k] = 1; queue[qt++] = k;
+      }
+    }
+  } else sea.fill(0);
+  const edits = new Map();
+  const shoal = seaZ + SEA_SHOAL_MAX_M;
   for (let r = 0; r < height; r++) {
     const lr = Math.min(n - 1, Math.floor((r / height) * n)) * n;
     for (let c = 0; c < width; c++) {
-      const d = D[lr + Math.min(n - 1, Math.floor((c / width) * n))];
+      const cell = lr + Math.min(n - 1, Math.floor((c / width) * n));
+      const d = D[cell];
       if (!d) continue;
       const idx = r * width + c;
       const z = heightMap[idx] - minHeight;
-      if (z > top) continue;
+      if (z > top) {
+        if (!(sea[cell] && z <= shoal)) continue;
+        // (a road along the shore, and its quay, stay on their ground: the land cover's 10 m cells run a
+        // little under a seafront street, and its ground went 2 m down from under it)
+        if (keep && worldSize > 0 && keep(((c / width) - 0.5) * worldSize, (0.5 - (r + 1) / height) * worldSize)) continue;
+      }
       const target = seaZ - SEABED_DEPTH_M * Math.min(1, d / SEABED_RAMP_CELLS);
       if (target < z) edits.set(idx, target + minHeight);
     }

@@ -409,3 +409,33 @@ test('lake beds: a lake that arrives in pieces (cut along map tiles) is dug as o
   assert.ok(at(0, 0) < at(-40, 0) + 0.5 && at(0, 0) < at(40, 0) + 0.5, `the seam is as deep as the bed beside it: ${at(0, 0).toFixed(2)} vs ${at(-40, 0).toFixed(2)} and ${at(40, 0).toFixed(2)}`);
   assert.ok(at(0, 0) < 50 - 5, `and deep: ${at(0, 0).toFixed(2)}`);
 });
+
+test('coarse elevation: the land\'s height carried out over the sea goes under it; a hill lake and the land do not', async () => {
+  const { lowerSeabed } = await import('../services/beamngWater.js');
+  // a 1 km square at 5 m a point (200 x 200), land cover at 10 m (100 x 100): land west of x = 400 m, the sea east
+  // of it. As 30 m data has it: 3.3 m of "ground" at the shore falling to the sea's level 100 m out, level beyond.
+  const W = 200; const n = 100; const grid = new Uint8Array(n * n);
+  const hm = new Float32Array(W * W);
+  const xOf = (c) => c * 5; const lake = (x, y) => Math.hypot(x - 150, y - 150) < 60;
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) { const x = c * 10 + 5; const y = r * 10 + 5; grid[r * n + c] = x > 400 || lake(x, y) ? 80 : 30; }
+  for (let r = 0; r < W; r++) for (let c = 0; c < W; c++) {
+    const x = xOf(c); const y = r * 5;
+    hm[r * W + c] = x <= 400 ? 5 + (400 - x) * 0.05 : lake(x, y) ? 0 : Math.max(0, 3.3 * (1 - (x - 400) / 100));
+    if (lake(x, y)) hm[r * W + c] = 40;   // a lake up on the land, its surface at 40 m
+  }
+  const before = hm.slice();
+  // (a fine survey: only the water's own surface is lowered, the 3.3 m stays)
+  { const fine = hm.slice(); lowerSeabed({ heightMap: fine, width: W, height: W, minHeight: 0 }, { grid, n }, 0).apply((idx, v) => { fine[idx] = v; }); assert.equal(fine[100 * W + 83], hm[100 * W + 83], 'fine survey: ground standing over the sea near the shore is left'); assert.ok(fine[100 * W + 160] <= -1.9, 'fine survey: the water\'s own surface far out still goes under'); }
+  const res = lowerSeabed({ heightMap: hm, width: W, height: W, minHeight: 0 }, { grid, n }, 0, { coarse: true });
+  res.apply((idx, v) => { hm[idx] = v; });
+  const at = (x, y) => hm[Math.round(y / 5) * W + Math.round(x / 5)];
+  assert.ok(at(415, 500) < -0.3, `15 m off the shore the floor is under the sea: ${at(415, 500).toFixed(2)} (was ${before[100 * W + 83].toFixed(2)})`);
+  assert.ok(at(450, 500) <= -1.9, `50 m out: ${at(450, 500).toFixed(2)}`);
+  assert.ok(at(800, 500) <= -1.9, `far out: ${at(800, 500).toFixed(2)}`);
+  assert.equal(at(300, 500), before[100 * W + 60], 'the land is left alone');
+  assert.equal(at(150, 150), 40, 'a lake up on the land is not the sea');
+  // lowered only, and nothing without a sea at the sea's level to join
+  for (let i = 0; i < hm.length; i++) assert.ok(hm[i] <= before[i] + 1e-6);
+  const dry = new Float32Array(W * W).fill(3);   // "water" in the land cover, but all of it 3 m up: a reservoir, no sea
+  assert.equal(lowerSeabed({ heightMap: dry, width: W, height: W, minHeight: 0 }, { grid, n }, 0, { coarse: true }).pixels, 0);
+});

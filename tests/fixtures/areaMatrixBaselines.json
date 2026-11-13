@@ -1,7 +1,7 @@
 {
  "_note": "Area baselines for scripts/sweep/runSweep.mjs: re-record with --save after a change that improves an area (commit the file with it).",
  "recorded": "2026-11-13",
- "commit": "65a3e19",
+ "commit": "3aabaf1",
  "areas": {
   "normandy_flat@gpxz/untouched": {
    "steps": 0,
@@ -173,7 +173,7 @@
    "maxDeckLen": 1102,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 30
+   "seconds": 31
   },
   "naldo@gpxz/noshape": {
    "steps": 0,
@@ -234,11 +234,11 @@
    "shortX": 6,
    "groundGaps": 0,
    "thruDeck": 33,
-   "spikes": 4,
+   "spikes": 11,
    "bumps": 1,
    "cross": 41,
    "junctions": 2,
-   "creases": 520,
+   "creases": 543,
    "swFloat": 223,
    "swBuried": 14,
    "lintErrors": 0,
@@ -273,7 +273,7 @@
    "maxDeckLen": 1169,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 33
+   "seconds": 28
   },
   "naldo@t30/ready": {
    "steps": 0,
@@ -282,11 +282,11 @@
    "shortX": 0,
    "groundGaps": 0,
    "thruDeck": 3,
-   "spikes": 20,
+   "spikes": 27,
    "bumps": 16,
    "cross": 66,
    "junctions": 1,
-   "creases": 811,
+   "creases": 834,
    "swFloat": 6,
    "swBuried": 0,
    "lintErrors": 0,
@@ -323,7 +323,7 @@
    "maxDeckLen": 505,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 37
+   "seconds": 36
   },
   "kingst@gpxz/untouched": {
    "steps": 0,
@@ -347,7 +347,7 @@
    "maxDeckLen": 505,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 39
+   "seconds": 32
   },
   "kingst@gpxz/ready": {
    "steps": 0,
@@ -373,7 +373,7 @@
    "maxDeckLen": 491,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 42
+   "seconds": 38
   },
   "kingst@t30/untouched": {
    "steps": 0,
@@ -397,7 +397,7 @@
    "maxDeckLen": 536,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 36
+   "seconds": 32
   },
   "kingst@t30/noshape": {
    "steps": 0,
@@ -406,11 +406,11 @@
    "shortX": 0,
    "groundGaps": 0,
    "thruDeck": 0,
-   "spikes": 3,
+   "spikes": 8,
    "bumps": 1,
    "cross": 0,
    "junctions": 0,
-   "creases": 101,
+   "creases": 64,
    "swFloat": 165,
    "swBuried": 0,
    "lintErrors": 0,
@@ -421,7 +421,7 @@
    "maxDeckLen": 512,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 38
+   "seconds": 34
   },
   "kingst@t30/ready": {
    "steps": 0,
@@ -430,11 +430,11 @@
    "shortX": 0,
    "groundGaps": 0,
    "thruDeck": 0,
-   "spikes": 19,
+   "spikes": 22,
    "bumps": 6,
    "cross": 21,
    "junctions": 0,
-   "creases": 65,
+   "creases": 90,
    "swFloat": 1,
    "swBuried": 71,
    "lintErrors": 0,
@@ -445,7 +445,7 @@
    "maxDeckLen": 491,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 46
+   "seconds": 43
   },
   "deckpark_g@gpxz/untouched": {
    "steps": 4,
@@ -1795,7 +1795,7 @@
    "maxDeckLen": 1119,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 32
+   "seconds": 31
   },
   "naldo@mh/ready": {
    "steps": 0,
@@ -1821,7 +1821,7 @@
    "maxDeckLen": 1098,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 37
+   "seconds": 36
   },
   "naldo@mh/untouched": {
    "steps": 0,
@@ -1871,7 +1871,7 @@
    "maxDeckLen": 505,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 25
+   "seconds": 24
   },
   "kingst@mh/untouched": {
    "steps": 0,
@@ -1895,7 +1895,7 @@
    "maxDeckLen": 505,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 23
+   "seconds": 21
   },
   "kingst@mh/ready": {
    "steps": 0,
@@ -1921,7 +1921,7 @@
    "maxDeckLen": 491,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 28
+   "seconds": 26
   },
   "deckpark_g@mh/noshape": {
    "steps": 1,

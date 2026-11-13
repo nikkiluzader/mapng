@@ -7572,7 +7572,7 @@ function shapingReportLines(sh, section) {
   for (const lk of (sh.lakeDepths || []).slice(0, 12)) {
     lines.push(`  - ${lk.name || 'Unnamed lake'}: ${formatNumber(lk.depth, 1)} m at its deepest (${lk.source === 'osm' ? 'its OSM depth tag' : lk.source === 'dam' ? 'a reservoir: against its dam, the floor rising away from it' : lk.source === 'slope' ? `the shore's slope ${formatNumber(lk.slope * 100, 0)}% carried under the water` : 'no shore to read: the shallow bed'}), ${formatNumber(lk.reach, 0)} m from the nearest shore there`);
   }
-  if (sh.seabedPixels) lines.push(`- Sea floor grid points lowered under the sea (the survey recorded the water's surface; WorldCover water within 0.3 m of the sea): ${sh.seabedPixels}`);
+  if (sh.seabedPixels) lines.push(`- Sea floor grid points lowered under the sea (WorldCover water at the sea's surface${sh.seabedCoarse ? ', and on the global 30 m data the ground it carries out over the sea, up to 6 m' : ': the survey recorded the water\'s surface'}): ${sh.seabedPixels}`);
   if (sh.lidar === null || sh.lidar === undefined) lines.push('- Measured bridge heights (US lidar): off');
   else if (sh.lidar.skipped) lines.push(`- Measured bridge heights (US lidar): not used, ${sh.lidar.skipped}`);
   else {
@@ -13184,10 +13184,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       // water's surface (any terrain choice: a measuring artifact, not shaping)
       const seabed = lowerSeabed({
         heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
-        minHeight: Number(exportTerrainData.minHeight) || 0,
-      }, exportTerrainData.landCover, -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0));
+        minHeight: Number(exportTerrainData.minHeight) || 0, worldSize: exportTerrainData.width * squareSize,
+      }, exportTerrainData.landCover, -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0), { coarse: !!terrainData?.coarseElevation, keep: (x, y) => isOnOtherCarriageway(quayIndex, x, y, 0, () => false) });
       seabed.apply((idx, v) => hmLake.set(idx, v));
       lakePlan.stats.seabedPixels = seabed.pixels;
+      lakePlan.stats.seabedCoarse = !!terrainData?.coarseElevation;
     } catch (err) {
       console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Lake beds skipped: ${err?.message || err}`);
       lakePlan = null;
@@ -14535,6 +14536,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         lakeBedPixels: lakePlan?.stats?.bedPixels ?? null,
         lakeDepths: lakePlan?.stats?.lakeDepths ?? null,
         seabedPixels: lakePlan?.stats?.seabedPixels ?? null,
+        seabedCoarse: !!lakePlan?.stats?.seabedCoarse,
         underDeckBedPixels: underDeckBeds,
         levelledUnderDecks,
         lidar: lidar ? (lidar.skipped ? { skipped: lidar.skipped } : {
