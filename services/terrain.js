@@ -1,6 +1,7 @@
 import { gpxzChunkGrid } from './gpxzChunks.js';
 import { attachLandCover } from './worldCover.js';
 import { attachTreeSpecies } from './treeSpecies.js';
+import { withMeasuredWidths } from './satRoadWidth.js';
 import { loadDataImage } from './dataCache.js';
 import { backgroundLookup, filterFeaturesByBackground, makeSkipBox, keptBoxes, tileLatLngBox, rawWeightLookup } from './backgroundMask.js';
 import { fetchOSMData, getLastOSMRequestInfo, getOSMQueryParameters } from "./osm.js";
@@ -2375,6 +2376,8 @@ export const fetchTerrainData = async (
       // (background areas: map tiles wholly inside them skipped, Overpass asked for the kept parts only)
       ...(backgroundAt ? { skipBox, keptBoxes: keptBoxes(backgroundAt, backgroundMask.bounds) } : {}),
     }));
+    // (Map data > Measure road widths: paved widths read off the satellite picture, before anything is drawn or shaped)
+    osmFeatures = await withMeasuredWidths(osmFeatures, { onProgress, signal });
     if (backgroundAt) {
       const before = osmFeatures.length;
       osmFeatures = filterFeaturesByBackground(osmFeatures, backgroundAt, backgroundMask.bounds);
@@ -2838,6 +2841,7 @@ export const loadTerrainFromTif = async (
     signal?.throwIfAborted();
     emitProgress('Fetching OpenStreetMap data...');
     osmFeatures = shapeRoads(await fetchOSMData(finalBounds, { onStatus: emitProgress, signal }));
+    osmFeatures = await withMeasuredWidths(osmFeatures, { onProgress: emitProgress, signal });
     osmRequestInfo = getLastOSMRequestInfo() || {
       ...getOSMQueryParameters(finalBounds),
       endpointUsed: null,
@@ -3076,6 +3080,7 @@ export const loadTerrainFromLaz = async (
     signal?.throwIfAborted();
     onProgress?.(`${fetchWord()} OpenStreetMap data...`);
     osmFeatures = shapeRoads(await fetchOSMData(fetchBounds, { onStatus: onProgress, signal }));
+    osmFeatures = await withMeasuredWidths(osmFeatures, { onProgress, signal });
     osmRequestInfo = getLastOSMRequestInfo() || {
       ...getOSMQueryParameters(fetchBounds),
       endpointUsed: null,

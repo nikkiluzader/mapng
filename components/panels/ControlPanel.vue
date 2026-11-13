@@ -264,6 +264,16 @@
             :disabled="!fetchOSM"
             :disabled-reason="t('controlPanel.ui.needsOsmOn')"
           />
+          <!-- (services/satRoadWidth.js: off unless chosen; it downloads fine satellite tiles along the roads) -->
+          <SettingRow
+            check
+            data-testid="measure-road-widths"
+            v-model="measureRoadWidths"
+            :label="t('controlPanel.measureRoadWidths')"
+            :hint="t('controlPanel.measureRoadWidthsHint')"
+            :disabled="!fetchOSM"
+            :disabled-reason="t('controlPanel.ui.needsOsmOn')"
+          />
         </SettingCard>
 
       </SettingSection>
@@ -389,6 +399,7 @@ import { provideSectionGroup } from '../../composables/useSectionGroup.js';
 // Expand all / Collapse all for every section in this panel
 provideSectionGroup();
 import { CUSTOM_OVERPASS_STORAGE_KEY, OVERTURE_BUILDINGS_STORAGE_KEY } from '../../services/osm.js';
+import { MEASURE_WIDTHS_STORAGE_KEY } from '../../services/satRoadWidth.js';
 import { useOsmSource } from '../../composables/useOsmSource.js';
 import { useI18n } from 'vue-i18n';
 import { MapPin, Box, Trees, AlertTriangle, Download, CheckCircle2 } from 'lucide-vue-next';
@@ -500,6 +511,10 @@ const overtureBuildings = ref(localStorage.getItem(OVERTURE_BUILDINGS_STORAGE_KE
 watch(overtureBuildings, (newVal) => {
   localStorage.setItem(OVERTURE_BUILDINGS_STORAGE_KEY, String(newVal));
 });
+const measureRoadWidths = ref(localStorage.getItem(MEASURE_WIDTHS_STORAGE_KEY) === 'true');
+watch(measureRoadWidths, (newVal) => {
+  localStorage.setItem(MEASURE_WIDTHS_STORAGE_KEY, String(newVal));
+});
 
 // Persist GPXZ API key and reset status when it changes
 watch(gpxzApiKey, (newVal) => {
@@ -545,8 +560,8 @@ watch(() => props.terrainData, (newData) => {
 // Sections that differ from the defaults (a dot by the title) and their Reset
 const elevationChanged = computed(() => elevationSource.value !== 'mapterhorn' || (store.advancedMode && terrainMode.value !== 'ready'));
 const resetElevation = () => { elevationSource.value = 'mapterhorn'; setTerrainMode('ready'); };
-const mapDataChanged = computed(() => !fetchOSM.value || !overtureBuildings.value || !osmTilesFirst.value);
-const resetMapData = () => { fetchOSM.value = true; overtureBuildings.value = true; osmTilesFirst.value = true; };
+const mapDataChanged = computed(() => !fetchOSM.value || !overtureBuildings.value || !osmTilesFirst.value || measureRoadWidths.value);
+const resetMapData = () => { fetchOSM.value = true; overtureBuildings.value = true; osmTilesFirst.value = true; measureRoadWidths.value = false; };
 
 // The setup in one line (the wizard's bottom bar) and as the review step's
 // list (components/ui/GenerateSummary.vue); each part goes to its step.
@@ -835,6 +850,7 @@ const applyPendingConfig = () => {
     if (typeof config.gapFillSource === 'string' && config.gapFillSource) gapFillSource.value = normalizeGapFillSource(config.gapFillSource);
     if (typeof config.elevationUnitOverride === 'string' && config.elevationUnitOverride) elevationUnitOverride.value = config.elevationUnitOverride;
     if (typeof config.overtureBuildings === 'boolean') overtureBuildings.value = config.overtureBuildings;
+    if (typeof config.measureRoadWidths === 'boolean') measureRoadWidths.value = config.measureRoadWidths;
     if (applyStoredSettings(config, localStorage)) {
       // (the code's terrain edits went into the old keys: the Terrain choice reads them back)
       reloadTerrainSettings();

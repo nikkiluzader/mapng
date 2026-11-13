@@ -61,6 +61,7 @@ export const DATA_FIELDS = [
   ['elevationUnitOverride', 'mapng_elevationUnitOverride', 'string', 'auto'],
   ['advancedMode', 'mapng_advanced_mode', 'bool', false],
   ['overtureBuildings', 'mapng_overtureBuildings', 'bool', true],
+  ['measureRoadWidths', 'mapng_measureRoadWidths', 'bool', false],
 ];
 
 const CODE_PREFIX = 'mapng:1:';
