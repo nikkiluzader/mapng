@@ -7173,6 +7173,11 @@ const WATER_BLOCK_TEMPLATE = {
   fresnelBias: 0.2,
   fresnelPower: 20,
   fullReflect: false,
+  // No occlusion query: the game keeps one for every water object to skip its planar reflection when the water is
+  // out of sight, and MapNG's lakes and rivers have no planar reflection (fullReflect off). A level with 11,301 of
+  // them (9,171 lake tiles over the backdrop) ran a BeamNG developer's Direct3D 12 build out of queries: its pool
+  // holds 8,192, and the console filled with "occlusion query ring exhausted" (2026-11-13).
+  useOcclusionQuery: false,
   gridElementSize: 1,
   gridSize: 1,
   overallRippleMagnitude: 0.6,
@@ -7258,6 +7263,7 @@ const RIVER_TEMPLATE = {
   fresnelBias: 0,
   fresnelPower: 3,
   fullReflect: false,
+  useOcclusionQuery: false,   // (as the lake tiles: no planar reflection to skip)
   lowLODDistance: 120,
   overallFoamOpacity: 0,
   overallRippleMagnitude: 1.2,

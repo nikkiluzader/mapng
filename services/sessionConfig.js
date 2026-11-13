@@ -38,7 +38,7 @@ export const EXPORT_FIELDS = [
   ['shapeTunnels', 'mapng_beamNGShapeTunnels', 'bool', true],
   ['shapeExtras', 'mapng_beamNGShapeExtras', 'bool', true],
   ['shapeDetail', 'mapng_beamNGShapeDetail', 'bool', true],
-  ['backdrop', 'mapng_beamNGBackdropSource', ['off', 'global30m', 'usgs1m', 'gpxz'], 'off'],
+  ['backdrop', 'mapng_beamNGBackdropSource', ['off', 'global30m', 'mapterhorn', 'usgs1m', 'kron86', 'gpxz'], 'off'],
   ['seaLevelOffset', 'mapng_beamNGSeaLevelOffset', 'number', 0],
   // What to build (composables/useBuildContent.js): features switched off beyond the seven
   // above, OSM tags left out one by one, and the preset basic mode builds

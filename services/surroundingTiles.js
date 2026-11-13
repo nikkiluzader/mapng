@@ -207,7 +207,7 @@ export const fetchSurroundingTiles = async (
   const outputSize = resolution;
   const includeSatellite = options?.includeSatellite !== false;
   const useNativeTerrainGrid = options?.useNativeTerrainGrid === true;
-  const elevationSource = options?.elevationSource || 'global30m'; // global30m | usgs1m | gpxz
+  const elevationSource = options?.elevationSource || 'global30m'; // global30m | mapterhorn | usgs1m | kron86 | gpxz (services/backdropSources.js)
   const gpxzApiKey = options?.gpxzApiKey || '';
   const onDownloadProgress = typeof options?.onDownloadProgress === 'function'
     ? options.onDownloadProgress
@@ -258,7 +258,7 @@ export const fetchSurroundingTiles = async (
         false,
         elevationSource === 'usgs1m',
         elevationSource === 'gpxz',
-        false,
+        elevationSource === 'kron86',
         elevationSource === 'gpxz' ? gpxzApiKey : '',
         undefined,
         undefined,
@@ -269,6 +269,7 @@ export const fetchSurroundingTiles = async (
           generateHybridTextureAsset: false,
           generateGameTextureAsset: false,
           globalTileConcurrency: 10,
+          useMapterhorn: elevationSource === 'mapterhorn',
           targetBounds: b,
         },
       );

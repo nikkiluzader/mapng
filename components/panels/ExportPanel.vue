@@ -130,11 +130,14 @@
 
           <!-- Elevation around the map, beyond its edges -->
           <SettingCard :title="t('exportPanel.ui.cardSurroundings')">
-            <SettingRow :label="t('exportPanel.includeBackdrop')" :hint="t(`exportPanel.ui.backdropHint_${beamNGBackdropSource}`)">
+            <SettingRow :label="t('exportPanel.includeBackdrop')" :hint="backdropNotHere ? t('exportPanel.ui.backdropNotHere') : t(`exportPanel.ui.backdropHint_${beamNGBackdropSource}`)">
               <select v-model="beamNGBackdropSource" :class="SELECT_XS">
                 <option value="off">{{ t('exportPanel.ui.backdropOff') }}</option>
                 <option value="global30m">{{ t('exportPanel.ui.backdropGlobal') }}</option>
-                <option value="usgs1m">{{ t('exportPanel.ui.backdropUsgs') }}</option>
+                <!-- (a source with no data for this map is listed, greyed: services/backdropSources.js) -->
+                <option value="mapterhorn">{{ t('exportPanel.ui.backdropMapterhorn') }}</option>
+                <option value="usgs1m" :disabled="!backdropCovers('usgs1m')">{{ t('exportPanel.ui.backdropUsgs') }}</option>
+                <option value="kron86" :disabled="!backdropCovers('kron86')">{{ t('exportPanel.ui.backdropKron86') }}</option>
                 <option value="gpxz" :disabled="!canUseGpxzBackdrop">GPXZ</option>
               </select>
             </SettingRow>
@@ -626,6 +629,7 @@
 </style>
 
 <script setup>
+import { backdropSourceCovers, effectiveBackdropSource } from '../../services/backdropSources.js';
 import { ref, shallowRef, computed, watch, nextTick, onUnmounted, toRaw } from 'vue';
 import { useMainStore } from '../../stores/mainStore';
 import { useI18n } from 'vue-i18n';
@@ -946,12 +950,16 @@ const levelWeight = computed(() => estimateLevelWeight({
 const squareCrop = computed(() => squareCropNotice(props.terrainData?.width, props.terrainData?.height, resolveProcessingMetersPerPixel(props.terrainData)));
 const isCustomUploadTerrain = computed(() => !!props.terrainData?.elevationUnitApplied);
 const canUseGpxzBackdrop = computed(() => props.elevationSource === 'gpxz' && !!props.gpxzApiKey);
+// (the backdrop's source: the chosen one where it has data for this map, 30 m global where it has none)
+const backdropCovers = (source) => backdropSourceCovers(source, props.terrainData?.bounds, { gpxzOk: canUseGpxzBackdrop.value });
+const backdropInUse = computed(() => effectiveBackdropSource(beamNGBackdropSource.value, props.terrainData?.bounds, { gpxzOk: canUseGpxzBackdrop.value }));
+const backdropNotHere = computed(() => beamNGBackdropSource.value !== 'off' && backdropInUse.value !== beamNGBackdropSource.value);
 
 // The export's data step (services/exportData.js): the backdrop's tiles and
 // the bridges' lidar survey downloaded ahead, in the background, as soon as
 // these options ask for them; the export waits for it, then only processes.
 const exportDataOptions = computed(() => {
-  const source = beamNGBackdropSource.value === 'gpxz' && !canUseGpxzBackdrop.value ? 'global30m' : beamNGBackdropSource.value;
+  const source = backdropInUse.value;
   return {
     includeBackdrop: source !== 'off',
     backdropElevationSource: source,
@@ -2209,9 +2217,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
     // is fetched from the chosen external source (global 30 m / USGS 1 m / GPXZ)
     // around the upload's geographic bounds and scaled by the processing
     // resolution, exactly like a standard export.
-    const effectiveBackdropSource = beamNGBackdropSource.value === 'gpxz' && !canUseGpxzBackdrop.value
-      ? 'global30m'
-      : beamNGBackdropSource.value;
+    const effectiveBackdropSource = backdropInUse.value;
     const effectiveIncludeBackdrop = effectiveBackdropSource !== 'off';
     // Basic mode ignores the (hidden) per-category boxes: buildings, trees,
     // rocks and water whenever OSM data exists.
