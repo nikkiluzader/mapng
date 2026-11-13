@@ -137,3 +137,16 @@ test('the flaws are marked where they are: spikes, a seam, terraced blocks, nois
   const html = qualityReportHtml(r, { center: { lat: 1, lng: 2 }, sideM: PX, roadCount: 0, generatedAt: '2026-11-13', appVersion: 'test' });
   assert.match(html, /class="f-spike"/); assert.match(html, /class="f-seam"/);
 });
+
+test('the page can hide a source and enlarge its pictures', () => {
+  const h = grid((x, y) => 50 + 4 * Math.sin(x / 11) + 3 * Math.cos(y / 13));
+  const r = compareSources([{ key: 'standard', label: 'Global 30 m', nativeResM: 30, heights: h, px: PX, cellM: 1 }, { key: 'usgs', label: 'USGS 1 m', nativeResM: 1, heights: h, px: PX, cellM: 1 }], road, PX);
+  const html = qualityReportHtml(r, { center: { lat: 1, lng: 2 }, sideM: PX, roadCount: 1, generatedAt: '2026-11-13', appVersion: 'test' });
+  assert.match(html, /data-toggle="standard"/); assert.match(html, /data-toggle="usgs"/);
+  assert.match(html, /body\.hide-standard \[data-src="standard"\]/);
+  for (const what of ['<div data-src="standard" class="tile', '<figure data-src="standard">', '<td data-src="standard">', '<th data-src="standard">', '<polyline data-src="standard"']) assert.ok(html.includes(what), what);
+  assert.match(html, /classList\.add\('zoomed'\)/);
+  // the page's own script parses
+  const script = html.slice(html.lastIndexOf('<script>') + 8, html.lastIndexOf('</script>'));
+  assert.doesNotThrow(() => new Function(script));
+});

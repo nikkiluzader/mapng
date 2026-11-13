@@ -428,12 +428,12 @@ function lineChart(series, { width = 720, height = 260, xLabel, yLabel, band = n
   for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 14) ends[i].y = ends[i - 1].y + 14;
   for (const s of series) {
     if (!s.pts.length) continue;
-    g += `<polyline class="line s${SERIES[s.key] || 1}" points="${s.pts.map((p) => `${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(' ')}"/>`;
+    g += `<polyline data-src="${esc(s.key)}" class="line s${SERIES[s.key] || 1}" points="${s.pts.map((p) => `${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(' ')}"/>`;
   }
-  for (const e of ends) g += `<circle class="dot s${SERIES[e.s.key] || 1}" cx="${width - R + 8}" cy="${(e.y).toFixed(1)}" r="4"/><text class="label" x="${width - R + 16}" y="${(e.y + 4).toFixed(1)}">${esc(e.s.label)}</text>`;
+  for (const e of ends) g += `<circle data-src="${esc(e.s.key)}" class="dot s${SERIES[e.s.key] || 1}" cx="${width - R + 8}" cy="${(e.y).toFixed(1)}" r="4"/><text data-src="${esc(e.s.key)}" class="label" x="${width - R + 16}" y="${(e.y + 4).toFixed(1)}">${esc(e.s.label)}</text>`;
   g += `<text class="axis" x="${(L + width - R) / 2}" y="${height - 4}" text-anchor="middle">${esc(xLabel)}</text><text class="axis" transform="translate(12 ${(T + height - B) / 2}) rotate(-90)" text-anchor="middle">${esc(yLabel)}</text>`;
   g += `<line class="cross" x1="0" x2="0" y1="${T}" y2="${height - B}" visibility="hidden"/>`;
-  const data = { x0, x1, L, R, width, series: series.map((s) => ({ label: s.label, pts: s.pts.map((p) => [+p[0].toFixed(1), +p[1].toFixed(2)]) })) };
+  const data = { x0, x1, L, R, width, series: series.map((s) => ({ key: s.key, label: s.label, pts: s.pts.map((p) => [+p[0].toFixed(1), +p[1].toFixed(2)]) })) };
   return `<div class="chart" id="${id}"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(yLabel)} against ${esc(xLabel)}">${g}</svg><div class="tip" hidden></div><script type="application/json">${JSON.stringify(data)}</script></div>`;
 }
 
@@ -490,12 +490,12 @@ export function qualityReportHtml(result, meta) {
   const { sources, verdict, section, long } = result;
   const measured = sources.filter((s) => s.m);
   const hero = sources.map((s) => `
-    <div class="tile${result.bestKeys.includes(s.key) ? ' best' : ''}">
+    <div data-src="${esc(s.key)}" class="tile${result.bestKeys.includes(s.key) ? ' best' : ''}">
       <div class="name"><span class="sw s${SERIES[s.key] || 1}"></span>${esc(s.label)}${result.bestKeys.includes(s.key) ? ` <span class="badge">${result.bestKeys.length > 1 ? 'equal best' : 'best here'}</span>` : ''}</div>
       <div class="score">${Number.isFinite(s.score?.total) ? s.score.total : '–'}<small>${Number.isFinite(s.score?.total) ? ' / 100' : ''}</small></div>
       <div class="muted">${esc(s.m ? cardLine(s) : s.note || 'not available here')}</div>
     </div>`).join('');
-  const maps = sources.map((s) => `<figure>${roadMap(s, meta.sideM)}<figcaption><b>${esc(s.label)}</b> ${esc(s.m ? cardLine(s) : s.note || '')}</figcaption></figure>`).join('');
+  const maps = sources.map((s) => `<figure data-src="${esc(s.key)}">${roadMap(s, meta.sideM)}<figcaption><b>${esc(s.label)}</b> ${esc(s.m ? cardLine(s) : s.note || '')}</figcaption></figure>`).join('');
   const parts = [
     ['bench', 'Road bench', 'On hillsides: does the ground have a flat shelf, as wide as the road, where the map says the road is? A real road is cut into its hill that way. This matters most.'],
     ['tilt', 'Level across', 'How little the ground leans across the lanes.'],
@@ -503,12 +503,12 @@ export function qualityReportHtml(result, meta) {
     ['detail', 'Detail', 'How fine the detail in the data really is, measured in the heights themselves: a fine grid filled with coarse data counts as coarse.'],
     ['clean', 'Free of flaws', 'Terraces, straight seam lines, spikes and pits, noise: see the list below.'],
   ];
-  const partRows = parts.map(([k, name, what]) => `<tr><th scope="row">${name}<div class="muted">${what}</div></th>${sources.map((s) => `<td>${s.score ? bar(s.score[k], `s${SERIES[s.key] || 1}`) : '<span class="muted">–</span>'}</td>`).join('')}</tr>`).join('');
-  const row = (name, f) => `<tr><th scope="row">${name}</th>${sources.map((s) => `<td>${s.m ? f(s) : '–'}</td>`).join('')}</tr>`;
+  const partRows = parts.map(([k, name, what]) => `<tr><th scope="row">${name}<div class="muted">${what}</div></th>${sources.map((s) => `<td data-src="${esc(s.key)}">${s.score ? bar(s.score[k], `s${SERIES[s.key] || 1}`) : '<span class="muted">–</span>'}</td>`).join('')}</tr>`).join('');
+  const row = (name, f) => `<tr><th scope="row">${name}</th>${sources.map((s) => `<td data-src="${esc(s.key)}">${s.m ? f(s) : '–'}</td>`).join('')}</tr>`;
   const anyBench = measured.some((s) => s.score?.weights.bench > 0);
   const noRoadsHere = measured.length > 0 && measured.every((s) => !s.score?.roads);
-  const flawMaps = measured.map((s) => `<figure>${flawMap(s, meta.sideM)}<figcaption><b>${esc(s.label)}</b> ${s.flaws?.length ? 'flaws marked' : 'nothing to mark'}</figcaption></figure>`).join('');
-  const flawList = measured.map((s) => `<li><b><span class="sw s${SERIES[s.key] || 1}"></span> ${esc(s.label)}:</b> ${s.flaws?.length ? s.flaws.map(esc).join(' ') : 'none found.'}</li>`).join('');
+  const flawMaps = measured.map((s) => `<figure data-src="${esc(s.key)}">${flawMap(s, meta.sideM)}<figcaption><b>${esc(s.label)}</b> ${s.flaws?.length ? 'flaws marked' : 'nothing to mark'}</figcaption></figure>`).join('');
+  const flawList = measured.map((s) => `<li data-src="${esc(s.key)}"><b><span class="sw s${SERIES[s.key] || 1}"></span> ${esc(s.label)}:</b> ${s.flaws?.length ? s.flaws.map(esc).join(' ') : 'none found.'}</li>`).join('');
   const details = [
     row('Resolution the source states', (s) => `${fmt(s.nativeResM, s.nativeResM < 10 ? 1 : 0)} m`),
     row('Detail measured in the data', (s) => (!s.g ? 'n/a' : s.g.effectiveResM > 30 ? '30 m or coarser (or the ground is simply even)' : `${fmt(s.g.effectiveResM, s.g.effectiveResM < 10 ? 1 : 0)} m`)),
@@ -545,6 +545,9 @@ svg.map{width:100%;height:auto;border-radius:8px;border:1px solid var(--line);di
 .q0{stroke:#9a9a94}.q1{stroke:#1e9e3c}.q2{stroke:#f0b000}.q3{stroke:#e23b36}.nodata{fill:var(--line)}
 .key{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--ink2);margin:8px 0}.key i{display:inline-block;width:18px;height:5px;border-radius:3px;vertical-align:middle;margin-right:5px}
 .f-seam{stroke:#e5484d;stroke-width:3;stroke-dasharray:10 6;vector-effect:non-scaling-stroke;stroke-width:2}.f-spike{fill:none;stroke:#e5484d;stroke-width:2;vector-effect:non-scaling-stroke}.f-terrace{fill:#f0a020;opacity:.38}.f-noise{fill:#c040d0;opacity:.3}
+.show{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;margin:12px 0;font-size:14px}.show label{cursor:pointer;white-space:nowrap}.show .muted{flex-basis:100%}
+body.hide-standard [data-src="standard"],body.hide-mapterhorn [data-src="mapterhorn"],body.hide-gpxz [data-src="gpxz"],body.hide-usgs [data-src="usgs"],body.hide-kron86 [data-src="kron86"]{display:none}
+svg.map,.chart svg{cursor:zoom-in}.zoomed{position:fixed;inset:0;z-index:20;background:var(--bg);margin:0;padding:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;border-radius:0;border:0}.zoomed svg{cursor:zoom-out;width:min(94vw,calc(94vh - 60px));height:auto;max-height:calc(100vh - 80px)}.zoomed.chart svg{width:94vw}
 ul.flaws{list-style:none;padding:0;margin:8px 0;display:grid;gap:8px}ul.flaws li{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
 .wrap{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:10px}table{border-collapse:collapse;width:100%;min-width:560px}th,td{padding:9px 12px;text-align:left;border-top:1px solid var(--line);vertical-align:middle;font-variant-numeric:tabular-nums}
 thead th{border-top:0;font-size:13px}tbody th{font-weight:600;width:34%}.bar{display:inline-block;width:110px;height:10px;background:var(--line);border-radius:5px;vertical-align:middle;margin-right:8px;overflow:hidden}.fill{display:block;height:100%;border-radius:5px}.num{font-weight:600}
@@ -558,6 +561,7 @@ details{margin-top:12px}summary{cursor:pointer;font-weight:600}footer{margin-top
 <div class="muted">A ${km} km square at ${esc(meta.center.lat.toFixed(5))}, ${esc(meta.center.lng.toFixed(5))} · ${esc(String(meta.roadCount))} road${meta.roadCount === 1 ? '' : 's'} measured · made ${esc(meta.generatedAt)} with MapNG ${esc(meta.appVersion || '')}</div>
 <p class="verdict">${esc(verdict)}</p>
 <div class="tiles">${hero}</div>
+${measured.length > 1 ? `<div class="show" role="group" aria-label="Sources shown"><span>Show:</span>${measured.map((s) => `<label><input type="checkbox" checked data-toggle="${esc(s.key)}"> ${esc(s.label)}</label>`).join('')}<span class="muted">Unticking a source hides it from the pictures, tables and graphs below (the scores stay as they are). Click a picture or a graph to enlarge it.</span></div>` : ''}
 <p class="muted">The score has three parts: how well each source's ground already holds the roads of this square before MapNG shapes anything, how fine the detail in its data really is, and how free of flaws it is. A low roads part is not bad terrain, it is terrain that needs shaping under roads.</p>
 
 <h2>The ground, with the roads on it</h2>
@@ -565,7 +569,7 @@ details{margin-top:12px}summary{cursor:pointer;font-weight:600}footer{margin-top
 <div class="key"><span><i style="background:#1e9e3c"></i>road lies level across (under 5 %)</span><span><i style="background:#f0b000"></i>leans (5 to 12 %)</span><span><i style="background:#e23b36"></i>leans a lot (over 12 %)</span><span><i style="background:#9a9a94"></i>no data</span></div>
 
 <h2>What the score is made of</h2>
-<div class="wrap"><table><thead><tr><th></th>${sources.map((s) => `<th><span class="sw s${SERIES[s.key] || 1}"></span> ${esc(s.label)}</th>`).join('')}</tr></thead><tbody>${partRows}</tbody></table></div>
+<div class="wrap"><table><thead><tr><th></th>${sources.map((s) => `<th data-src="${esc(s.key)}"><span class="sw s${SERIES[s.key] || 1}"></span> ${esc(s.label)}</th>`).join('')}</tr></thead><tbody>${partRows}</tbody></table></div>
 <p class="muted">${noRoadsHere ? 'No roads were measured in this square: the score is detail 50 %, free of flaws 50 %.' : anyBench ? 'Weights: road bench 35 %, level across 20 %, smooth along 15 %, detail 15 %, free of flaws 15 %.' : 'This square has too few hillside roads to look for benches, so the score is level across 30 %, smooth along 25 %, detail 20 %, free of flaws 25 %.'} A coarse source is smooth along a road because it holds no detail at all, so read "smooth along" together with "level across".</p>
 
 <h2>Flaws in the ground</h2>
@@ -583,7 +587,7 @@ ${long ? `<h2>Along one road: ${esc(long.road)}</h2>
 ${lineChart(long.series, { xLabel: 'metres along the road', yLabel: 'height, m', id: 'c2' })}` : ''}
 
 <h2>The numbers</h2>
-<div class="wrap"><table><thead><tr><th></th>${sources.map((s) => `<th>${esc(s.label)}</th>`).join('')}</tr></thead><tbody>${details}</tbody></table></div>
+<div class="wrap"><table><thead><tr><th></th>${sources.map((s) => `<th data-src="${esc(s.key)}">${esc(s.label)}</th>`).join('')}</tr></thead><tbody>${details}</tbody></table></div>
 <details><summary>How this is measured</summary>
 <p class="muted">Every drivable road in the square (bridges and tunnels left out) is walked in 2 m steps on each source's heights, resampled to 1 m. <b>Road bench</b>: where the ground falls more than 8 % across the road (read on the finest source, so every source is asked at the same places), the widest strip within 6 m of the mapped line that stays level (25 cm, plus 3 % crossfall) is found; a strip 3 to 16 m wide counts as a bench. <b>Level across</b>: the height difference 2.5 m either side of the line, as a slope; 2 % or less scores 100, 20 % scores 0. <b>Smooth along</b>: what is left of the centre line's heights after a 12 m moving average, as its usual size (a robust spread, so one wall or seam does not decide it); 1 cm scores 100, 12 cm scores 0. <b>Detail</b>: the source's own resolution on a log scale, 1 m scores 100, 30 m scores 0. The total is the weighted mean of the parts that could be measured. The map data's position is taken as true: where a mapped road is drawn a few metres off, a real bench is missed on every source alike.</p></details>
 <footer>Map data © OpenStreetMap contributors${meta.osmSource ? ` (${esc(meta.osmSource)})` : ''}. Elevation: global 30 m from AWS Terrain Tiles (Mapzen, with its sources); lidar from Mapterhorn and its open-data sources (mapterhorn.com/attribution); GPXZ where shown. This page holds no script from elsewhere and loads nothing.</footer>
@@ -595,12 +599,18 @@ for (const el of document.querySelectorAll('.chart')) {
     const r = svg.getBoundingClientRect(); const vx = ((ev.clientX - r.left) / r.width) * d.width;
     if (vx < d.L || vx > d.width - d.R) { tip.hidden = true; cross.setAttribute('visibility', 'hidden'); return; }
     const x = d.x0 + ((vx - d.L) / (d.width - d.L - d.R)) * (d.x1 - d.x0);
-    const rows = d.series.map((s) => { let b = null; for (const p of s.pts) if (!b || Math.abs(p[0] - x) < Math.abs(b[0] - x)) b = p; return b ? s.label + ': ' + b[1].toFixed(2) + ' m' : ''; }).filter(Boolean);
+    const rows = d.series.filter((s) => !document.body.classList.contains('hide-' + s.key)).map((s) => { let b = null; for (const p of s.pts) if (!b || Math.abs(p[0] - x) < Math.abs(b[0] - x)) b = p; return b ? s.label + ': ' + b[1].toFixed(2) + ' m' : ''; }).filter(Boolean);
     tip.innerHTML = '<b>' + x.toFixed(1) + ' m</b><br>' + rows.join('<br>'); tip.hidden = false;
     tip.style.left = Math.min(r.width - 170, Math.max(8, ev.clientX - r.left + 12)) + 'px';
     cross.setAttribute('x1', vx); cross.setAttribute('x2', vx); cross.setAttribute('visibility', 'visible');
   };
   svg.addEventListener('pointermove', move); svg.addEventListener('pointerleave', () => { tip.hidden = true; cross.setAttribute('visibility', 'hidden'); });
 }
+// the Show switches: a source unticked is hidden everywhere below
+for (const box of document.querySelectorAll('[data-toggle]')) box.addEventListener('change', () => document.body.classList.toggle('hide-' + box.dataset.toggle, !box.checked));
+// a picture or a graph, clicked: shown as large as the window (again, or Escape: back)
+const unzoom = () => { for (const z of document.querySelectorAll('.zoomed')) z.classList.remove('zoomed'); };
+for (const svg of document.querySelectorAll('svg.map, .chart svg')) svg.addEventListener('click', () => { const host = svg.closest('figure, .chart'); const was = host.classList.contains('zoomed'); unzoom(); if (!was) host.classList.add('zoomed'); });
+document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') unzoom(); });
 </script></body></html>`;
 }
