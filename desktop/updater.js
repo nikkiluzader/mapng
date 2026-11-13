@@ -28,6 +28,13 @@ export function startUpdater({ settings, busy, ready = () => true }) {
   autoUpdater.allowPrerelease = false;
   autoUpdater.logger = null;
 
+  // Test builds (Help > Get Test Builds, off unless chosen): versions like 0.3.1-dev.4, published on GitHub as
+  // pre-releases. Everyone else is offered only what GitHub calls the latest release, which a pre-release never is.
+  const testBuilds = () => settings.read().testBuilds === true;
+  const onTestBuild = () => /-/.test(app.getVersion());
+  let quiet = false;        // a first look that says nothing when it finds nothing (a second one follows)
+  let found = false;        // an update was offered by the check that is running
+
   let manual = false;       // the user asked: tell them the outcome either way
   let state = 'idle';       // idle | checking | downloading | ready
 
@@ -65,20 +72,35 @@ export function startUpdater({ settings, busy, ready = () => true }) {
     else if (!(await consent())) return;
     manual = byUser;
     state = 'checking';
+    found = false;
     try {
+      const tests = testBuilds();
+      // On a test build, the finished release first: the library only looks among test builds from one
+      // (0.3.1-dev.5 would never be offered 0.3.1), so the latest release is asked for by itself.
+      if (tests && onTestBuild()) {
+        autoUpdater.allowPrerelease = false; quiet = true;
+        try { await autoUpdater.checkForUpdates(); } catch { /* the look among test builds reports */ }
+        quiet = false;
+        if (found) return;
+        state = 'checking';
+      }
+      autoUpdater.allowPrerelease = tests;
       await autoUpdater.checkForUpdates();
     } catch (error) {
+      quiet = false;
       state = 'idle';
       if (manual) await ask({ type: 'warning', message: u().checkFailed, detail: String(error?.message || error) });
     }
   }
 
   autoUpdater.on('update-not-available', async () => {
+    if (quiet) return;
     state = 'idle';
     if (manual) await ask({ message: fill(u().latest, { have: app.getVersion() }) });
   });
 
   autoUpdater.on('update-available', async (info) => {
+    found = true;
     const s = settings.read();
     if (!manual && s.skipVersion === info.version) { state = 'idle'; return; }
     const notes = typeof info.releaseNotes === 'string'
@@ -95,7 +117,7 @@ export function startUpdater({ settings, busy, ready = () => true }) {
     });
     if (response === 2) settings.write({ skipVersion: info.version });
     if (response !== 0) { state = 'idle'; return; }
-    if (portable) { state = 'idle'; shell.openExternal('https://github.com/nikkiluzader/mapng/releases/latest'); return; }
+    if (portable) { state = 'idle'; shell.openExternal(/-/.test(String(info.version)) ? `https://github.com/nikkiluzader/mapng/releases/tag/v${info.version}` : 'https://github.com/nikkiluzader/mapng/releases/latest'); return; }
     state = 'downloading';
     try {
       await autoUpdater.downloadUpdate();
@@ -138,5 +160,8 @@ export function startUpdater({ settings, busy, ready = () => true }) {
     checkSoon: () => { if (supported) setTimeout(() => check(), 3000).unref?.(); },
     setEnabled: (on) => settings.write({ updates: on ? 'on' : 'off' }),
     enabled: () => settings.read().updates === 'on',
+    testBuilds,
+    // (turned on: looked for at once, and that is the user asking for updates)
+    setTestBuilds: (on) => { settings.write({ testBuilds: !!on }); if (on) check({ byUser: true }); },
   };
 }

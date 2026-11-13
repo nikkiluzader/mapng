@@ -497,7 +497,7 @@ export function qualityReportHtml(result, meta) {
     </div>`).join('');
   const maps = sources.map((s) => `<figure>${roadMap(s, meta.sideM)}<figcaption><b>${esc(s.label)}</b> ${esc(s.m ? cardLine(s) : s.note || '')}</figcaption></figure>`).join('');
   const parts = [
-    ['bench', 'Road bench', 'On hillsides: is there a level strip a road wide where the map says the road is? This matters most.'],
+    ['bench', 'Road bench', 'On hillsides: does the ground have a flat shelf, as wide as the road, where the map says the road is? A real road is cut into its hill that way. This matters most.'],
     ['tilt', 'Level across', 'How little the ground leans across the lanes.'],
     ['bumps', 'Smooth along', 'How little the ground ripples along the road.'],
     ['detail', 'Detail', 'How fine the detail in the data really is, measured in the heights themselves: a fine grid filled with coarse data counts as coarse.'],

@@ -1151,6 +1151,8 @@ function buildMenu(updater) {
       submenu: [
         { label: m.checkUpdates, click: () => updater.checkNow() },
         { label: m.autoUpdates, type: 'checkbox', checked: updater.enabled(), click: (item) => updater.setEnabled(item.checked) },
+        // (test builds: pre-releases for testers, off unless chosen)
+        { label: m.testBuilds, type: 'checkbox', checked: updater.testBuilds(), click: (item) => updater.setTestBuilds(item.checked) },
         { type: 'separator' },
         { label: m.logs, click: () => { fs.mkdirSync(JOBS(), { recursive: true }); shell.openPath(JOBS()); } },
         // (the report dialog in the window: what's included is shown, nothing sent without Send)

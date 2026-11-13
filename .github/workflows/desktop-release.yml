@@ -2,6 +2,9 @@
 # build the Windows installer, the Windows portable zip and the Linux AppImage and attach them to a
 # draft GitHub Release (with the latest*.yml files the app's updater reads).
 # Publish the draft by hand once it is checked: users are offered it then.
+#
+# A test build is a tag with a suffix (v0.3.1-dev.4). It is built the same way and then published by this
+# workflow as a GitHub pre-release: never "Latest", so only installs with Help > Get Test Builds are offered it.
 name: Desktop release
 
 on:
@@ -70,3 +73,29 @@ jobs:
             desktop/release/*.AppImage
             desktop/release/latest*.yml
           if-no-files-found: error
+
+  # A test build (a tag like v0.3.1-dev.4): once both platforms are attached, the draft becomes a pre-release.
+  publish-test-build:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/') && contains(github.ref_name, '-')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Publish as a pre-release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          prev="$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)"
+          {
+            echo "Test build from the dev branch. It may be unstable: for testers who turned on Help > Get Test Builds."
+            echo
+            if [ -n "$prev" ]; then
+              echo "Changes since ${prev}:"
+              echo
+              git log --no-merges --pretty='- %s' "${prev}..${GITHUB_REF_NAME}" | head -n 60
+            fi
+          } > notes.md
+          gh release edit "${GITHUB_REF_NAME}" --draft=false --prerelease --latest=false --title "MapNG ${GITHUB_REF_NAME#v} (test build)" --notes-file notes.md
