@@ -262,6 +262,8 @@ import ViewTabs from './components/ui/ViewTabs.vue';
 import BackupDataNotice from './components/ui/BackupDataNotice.vue';
 import { createGenerationProgress, GENERATION_STEP_GROUPS } from './services/generationProgress.js';
 import { terrainGenerationOptions } from './composables/useTerrainMode.js';
+import { useBaseTexture } from './composables/useBaseTexture.js';
+import { texturesToGenerate, ensureTexture, hasTexture, textureKindOf } from './services/textureOnDemand.js';
 import StageLoader from './components/ui/StageLoader.vue';
 import { Compass, Mountain, Grid3x3, Map as MapIcon, Shovel, Paintbrush } from 'lucide-vue-next';
 import { fetchTerrainData, addOSMToTerrain, parseElevationFile, loadTerrainFromUploadedElevation } from './services/terrain';
@@ -319,6 +321,18 @@ const {
   showBatchProgress,
   savedBatchState
 } = storeToRefs(store);
+
+// The ground texture looked at or exported, when Generate did not paint it: painted now, once, from what the
+// Generate already holds (no download). The previews and the export panel hear of it through store.texturesMade.
+const { baseTexture } = useBaseTexture();
+watch(() => [baseTexture.value, store.terrainData], async ([choice, td]) => {
+  const kind = textureKindOf(choice);
+  if (!kind || !td || hasTexture(td, kind) || !(td.osmFeatures?.length > 0)) return;
+  store.texturePreparing = kind;
+  try { if (await ensureTexture(td, kind) && store.terrainData === td) store.texturesMade++; }
+  catch (e) { console.warn(`[Textures] the ${kind} texture could not be prepared:`, e?.message || e); }
+  finally { if (store.texturePreparing === kind) store.texturePreparing = ''; }
+});
 // (the 3D preview stops drawing while Generate runs: services/heavyJob.js; an export sets it itself)
 watch(isLoading, (loading) => { heavyJobRunning.value = !!loading; });
 
@@ -953,6 +967,8 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         raw,
         useMapterhorn: normalizedSource === 'mapterhorn',
         ...generationEdits,
+        // (only the ground texture chosen is painted now; another when it is first wanted: services/textureOnDemand.js)
+        ...texturesToGenerate(baseTexture.value),
         // (a plain copy: it goes to a worker / the desktop app)
         ...(store.backgroundActive ? { backgroundMask: JSON.parse(JSON.stringify(store.backgroundMask)) } : {}),
         // (the desktop app keeps these with the level's project, so Modify

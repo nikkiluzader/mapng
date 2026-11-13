@@ -48,6 +48,7 @@ import { pickFlagCell } from './flagPlacement.js';
 import { BUILDING_LITE_FROM_M, buildingTileScene } from './buildingTiles.js';
 import { viewDistanceMeters, viewDistanceChoice, fogDensityFor } from './viewDistance.js';
 import { HERO_ROADS_FILE, HERO_ROADS_LUA } from './heroRoadsLua.js';
+import { ensureTexture, hasTexture } from './textureOnDemand.js';
 import { parallelMap, parallelThreads } from './parallel.js';
 import { measureStructures, roadLinesFromDecals } from './structures/metrics.js';
 import { buildStructureGraph } from './structures/graph.js';
@@ -623,6 +624,9 @@ async function buildVegetationMask(blob) {
  */
 async function getTerrainTextureBlob(terrainData, textureType = 'hybrid') {
   try {
+    // (Generate paints only the ground texture chosen then; another one is painted here, from the map data and
+    // the satellite picture the terrain already holds: services/textureOnDemand.js)
+    if (!hasTexture(terrainData, textureType) && !(textureType === 'painted' && terrainData.paintedTextureBlob)) await ensureTexture(terrainData, textureType);
     if (textureType === 'none') {
       const canvas = document.createElement('canvas');
       canvas.width = 64;

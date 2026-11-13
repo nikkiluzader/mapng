@@ -130,7 +130,7 @@ const urlOf = (kind) => {
   return null;
 };
 const textureOptions = computed(() => {
-  void store.textureRevision;
+  void store.textureRevision; void store.texturesMade;
   return [
     { id: 'game', label: t('exportPanel.gameTexture') },
     { id: 'hybrid', label: t('exportPanel.satelliteHybrid') },
@@ -367,7 +367,7 @@ onMounted(() => {
 });
 onBeforeUnmount(() => { offData?.(); loadTicket++; if (hoverRaf) cancelAnimationFrame(hoverRaf); content?.remove(); map?.remove(); map = null; });
 
-watch(() => [texture.value, store.textureRevision, terrainView.value], drawTexture);
+watch(() => [texture.value, store.textureRevision, store.texturesMade, terrainView.value], drawTexture);
 watch(() => [hasBackdrop.value, store.exportDataOptions], syncBackdrop);
 watch(() => [hasBackdrop.value, showBackdrop.value, terrainView.value], drawBackdrop);
 watch(() => [showContours.value, contourStep.value, terrainView.value === 'normal', texture.value === 'none'], drawContours);

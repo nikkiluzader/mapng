@@ -39,10 +39,10 @@
             <SettingRow :label="t('exportPanel.baseTexture')">
               <select v-model="beamNGBaseTexture" :class="SELECT_XS" @change="handleBeamNGBaseTextureChange">
                 <option value="none">{{ t('exportPanel.none') }}</option>
-                <option value="hybrid" :disabled="!terrainData?.hybridTextureUrl && !terrainData?.hybridTextureCanvas">{{ t('exportPanel.satelliteHybrid') }}</option>
+                <option value="hybrid">{{ t('exportPanel.satelliteHybrid') }}</option>
                 <option value="satellite" :disabled="!terrainData?.satelliteTextureUrl">{{ t('exportPanel.satellite') }}</option>
-                <option v-if="hasOsmData" value="osm" :disabled="!terrainData?.osmTextureUrl">{{ t('exportPanel.osm') }}</option>
-                <option v-if="hasOsmData" value="game" :disabled="!terrainData?.gameTextureUrl && !terrainData?.gameTextureCanvas">{{ t('exportPanel.gameTexture') }}</option>
+                <option v-if="hasOsmData" value="osm">{{ t('exportPanel.osm') }}</option>
+                <option v-if="hasOsmData" value="game">{{ t('exportPanel.gameTexture') }}</option>
                 <option v-if="hasPaintedTexture" value="painted">{{ t('exportPanel.touchedUp') }}</option>
               </select>
               <button
@@ -358,7 +358,7 @@
           <!-- OSM Texture -->
           <button 
             @click="downloadOSMTexture"
-            :disabled="!terrainData.osmTextureUrl || isAnyExporting"
+            :disabled="!hasOsmData || isAnyExporting"
             class="relative flex flex-col items-center justify-center p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
           >
             <div class="w-full h-full flex items-center justify-center mb-0.5 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
@@ -374,7 +374,7 @@
           <!-- Game Texture -->
           <button 
             @click="downloadGameTexture"
-            :disabled="(!terrainData.gameTextureUrl && !terrainData.gameTextureCanvas) || isAnyExporting"
+            :disabled="!hasOsmData || isAnyExporting"
             class="relative flex flex-col items-center justify-center p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
           >
             <div class="w-full h-full flex items-center justify-center mb-0.5 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
@@ -415,8 +415,8 @@
               <span class="text-nano text-gray-500 dark:text-gray-400">{{ t('exportPanel.centerTexture') }}</span>
               <select v-model="modelCenterTextureType" :class="SELECT_XS">
                 <option value="satellite">{{ t('exportPanel.satellite') }}</option>
-                <option value="osm" :disabled="!terrainData?.osmTextureUrl">{{ t('exportPanel.osm') }}</option>
-                <option value="hybrid" :disabled="!terrainData?.hybridTextureUrl">{{ t('exportPanel.hybrid') }}</option>
+                <option value="osm" :disabled="!hasOsmData">{{ t('exportPanel.osm') }}</option>
+                <option value="hybrid" :disabled="!hasOsmData">{{ t('exportPanel.hybrid') }}</option>
                 <option value="none">{{ t('exportPanel.none') }}</option>
               </select>
             </div>
@@ -614,6 +614,7 @@ import { buildRunConfiguration as buildRunConfigurationBase } from '../../servic
 import { generateHeightmapBlob, generateTerBlob } from '../../services/batchExports';
 import { exportToGLB, exportToDAE } from '../../services/export3d';
 import { useWorkflow } from '../../composables/useWorkflow.js';
+import { ensureTexture, hasTexture } from '../../services/textureOnDemand.js';
 import { exportGeoTiff } from '../../services/exportGeoTiff';
 import { buildCommonTraceMetadata, downloadJsonFile } from '../../services/traceability';
 import { createWGS84ToLocal } from '../../services/geoUtils';
@@ -1313,8 +1314,8 @@ watch(
 );
 
 watch(
-  () => props.terrainData?.osmTextureUrl,
-  (url) => {
+  () => [props.terrainData?.osmTextureUrl, store.texturesMade],
+  ([url]) => {
     const token = ++osmPreviewToken;
     updatePreviewUrl(url, osmPreviewUrl, () => token === osmPreviewToken);
   },
@@ -1322,8 +1323,8 @@ watch(
 );
 
 watch(
-  () => props.terrainData?.hybridTextureUrl,
-  (url) => {
+  () => [props.terrainData?.hybridTextureUrl, store.texturesMade],
+  ([url]) => {
     const token = ++hybridPreviewToken;
     updatePreviewUrl(url, hybridPreviewUrl, () => token === hybridPreviewToken);
   },
@@ -1332,8 +1333,8 @@ watch(
 
 let gamePreviewToken = 0;
 watch(
-  () => props.terrainData?.gameTextureUrl,
-  (url) => {
+  () => [props.terrainData?.gameTextureUrl, store.texturesMade],
+  ([url]) => {
     const token = ++gamePreviewToken;
     updatePreviewUrl(url, gamePreviewUrl, () => token === gamePreviewToken);
   },
@@ -1669,6 +1670,12 @@ const yieldToUi = async () => {
 // Vue's proxy made a wooded 8 km BeamNG export plant trees for 9 minutes
 // (~150x slower than the raw object). Exports only read it, so hand them
 // the raw object.
+// A texture Generate left out, painted before it is downloaded or put on a model (services/textureOnDemand.js).
+const prepareTexture = async (kind) => {
+  const td = toRaw(props.terrainData);
+  if (!td || hasTexture(td, kind)) return;
+  if (await ensureTexture(td, kind)) store.texturesMade++;
+};
 const getExportTerrainData = () => prepareCroppedTerrainData(toRaw(props.terrainData));
 
 const resolveProcessingMetersPerPixel = (terrainData) => {
@@ -1755,10 +1762,11 @@ const downloadTexture = async () => {
 };
 
 const downloadOSMTexture = async () => {
-  if (!props.terrainData?.osmTextureUrl) return;
+  if (!hasOsmData.value) return;
   isExportingOSMTexture.value = true;
   try {
     await yieldToUi();
+    await prepareTexture('osm');
     const td = await getExportTerrainData();
     const filename = `osm_texture_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.png`;
     await downloadBlobUrlAsFile(td.osmTextureUrl ?? props.terrainData.osmTextureUrl, filename, 'image/', 'image/png');
@@ -1775,10 +1783,11 @@ const downloadOSMTexture = async () => {
 
 const downloadGameTexture = async () => {
   const td0 = props.terrainData;
-  if (!td0?.gameTextureUrl && !td0?.gameTextureCanvas) return;
+  if (!hasOsmData.value) return;
   isExportingGameTexture.value = true;
   try {
     await yieldToUi();
+    await prepareTexture('game');
     const td = await getExportTerrainData();
     const filename = `game_texture_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.png`;
     let url = td.gameTextureUrl ?? td0.gameTextureUrl;
@@ -1798,10 +1807,11 @@ const downloadGameTexture = async () => {
 };
 
 const downloadHybridTexture = async () => {
-  if (!props.terrainData?.hybridTextureUrl) return;
+  if (!hasOsmData.value) return;
   isExportingHybridTexture.value = true;
   try {
     await yieldToUi();
+    await prepareTexture('hybrid');
     const td = await getExportTerrainData();
     const filename = `hybrid_texture_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.png`;
     await downloadBlobUrlAsFile(td.hybridTextureUrl ?? props.terrainData.hybridTextureUrl, filename, 'image/', 'image/png');
@@ -1962,6 +1972,7 @@ const handleGLBExport = async () => {
   isExportingGLB.value = true;
   try {
     await yieldToUi();
+    await prepareTexture(modelCenterTextureType.value);
     const td = await getExportTerrainData();
     const blob = await exportToGLB(td, {
       centerTextureType: modelCenterTextureType.value,
@@ -2000,6 +2011,7 @@ const handleDAEExport = async () => {
   isExportingDAE.value = true;
   try {
     await yieldToUi();
+    await prepareTexture(modelCenterTextureType.value);
     const td = await getExportTerrainData();
     const zipBlob = await exportToDAE(td, {
       centerTextureType: modelCenterTextureType.value,

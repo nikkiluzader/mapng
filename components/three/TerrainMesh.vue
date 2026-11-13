@@ -644,7 +644,7 @@ watch(() => props.terrainData?.satelliteTextureUrl, (url) => {
   textureCache.satellite = loadTexture(url);
 }, { immediate: true });
 
-watch(() => props.terrainData?.osmTextureUrl, (url) => {
+watch(() => [props.terrainData?.osmTextureUrl, mainStore.texturesMade], ([url]) => {
   if (textureCache.osm) textureCache.osm.dispose();
   const canvas = props.terrainData?.osmTextureCanvas;
   console.log(`[TerrainMesh] osm texture watch — url=${url ? "ok" : "empty/null"}, canvas=${canvas ? `${canvas.width}x${canvas.height}` : "null"}`);
@@ -665,7 +665,7 @@ watch(() => props.terrainData?.osmTextureUrl, (url) => {
   }
 }, { immediate: true });
 
-watch(() => props.terrainData?.hybridTextureUrl, (url) => {
+watch(() => [props.terrainData?.hybridTextureUrl, mainStore.texturesMade], ([url]) => {
   if (textureCache.hybrid) textureCache.hybrid.dispose();
   const canvas = props.terrainData?.hybridTextureCanvas;
   console.log(`[TerrainMesh] hybrid texture watch — url=${url ? "ok" : "empty/null"}, canvas=${canvas ? `${canvas.width}x${canvas.height}` : "null"}`);
@@ -690,7 +690,7 @@ watch(() => props.terrainData?.hybridTextureUrl, (url) => {
 // Game Texture: from its URL, or its canvas without freeing it (the BeamNG
 // export reads terrainData.gameTextureCanvas)
 // (repainted in place, the export panel's Satellite detail slider: the store's textureRevision says so)
-watch(() => [props.terrainData?.gameTextureUrl, props.terrainData?.gameTextureCanvas, mainStore.textureRevision], () => {
+watch(() => [props.terrainData?.gameTextureUrl, props.terrainData?.gameTextureCanvas, mainStore.textureRevision, mainStore.texturesMade], () => {
   const url = props.terrainData?.gameTextureUrl; const canvas = props.terrainData?.gameTextureCanvas;
   if (textureCache.game) textureCache.game.dispose();
   // (repainted in place: the canvas is ahead of its file while the slider moves)

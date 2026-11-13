@@ -85,6 +85,10 @@ export const useMainStore = defineStore('main', () => {
   // (bumped when a texture of the terrain is repainted in place: the terrain is a
   // shallow ref, so the previews watch this)
   const textureRevision = ref(0);
+  // (bumped when a texture Generate left out has been painted on demand, services/textureOnDemand.js: the
+  // previews and the export panel's thumbnails look again; texturePreparing names the one being painted)
+  const texturesMade = ref(0);
+  const texturePreparing = ref('');
   // (the export's backdrop choice, 'off' or its elevation source: the 2D preview draws
   // the surrounding tiles when one is chosen; the export panel keeps it up to date)
   // (the export's data-step options, as the export panel has them: the 2D preview asks the
@@ -269,6 +273,8 @@ export const useMainStore = defineStore('main', () => {
     previewMode,
     viewMode,
     textureRevision,
+    texturesMade,
+    texturePreparing,
     backdropSource,
     exportDataOptions,
     backdropImagery,
