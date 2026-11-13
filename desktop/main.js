@@ -1153,6 +1153,7 @@ function buildMenu(updater) {
         { label: m.autoUpdates, type: 'checkbox', checked: updater.enabled(), click: (item) => updater.setEnabled(item.checked) },
         // (test builds: pre-releases for testers, off unless chosen)
         { label: m.testBuilds, type: 'checkbox', checked: updater.testBuilds(), click: (item) => updater.setTestBuilds(item.checked) },
+        { label: m.softwareRendering, type: 'checkbox', checked: readSettings().softwareRendering === true, click: (item) => writeSettings({ softwareRendering: item.checked }) },
         { type: 'separator' },
         { label: m.logs, click: () => { fs.mkdirSync(JOBS(), { recursive: true }); shell.openPath(JOBS()); } },
         // (the report dialog in the window: what's included is shown, nothing sent without Send)
@@ -1203,14 +1204,32 @@ const levelExportReport = (zipName, levelName) => {
     return buf ? { level: level.title || level.levelName, text: Buffer.from(buf).toString('utf8') } : null;
   } catch { return null; }
 };
-ipcMain.handle('report:prepare', (_event, kind, ctx = {}) => {
+// The graphics as the app knows them, for a problem report: the active card's ids and driver, the features
+// Chromium switched off for it, and whether software rendering is on. Two seconds at most.
+const hex = (n) => (Number.isFinite(n) ? `0x${n.toString(16).padStart(4, '0')}` : '?');
+async function gpuSummary() {
+  const parts = softwareRendering ? ['software rendering switched on'] : [];
+  try {
+    const info = await Promise.race([app.getGPUInfo('basic'), new Promise((resolve) => setTimeout(() => resolve(null), 2000))]);
+    const devices = info?.gpuDevice || [];
+    const d = devices.find((x) => x.active) || devices[0];
+    if (d) parts.push(`card ${hex(d.vendorId)}:${hex(d.deviceId)}${d.driverVendor ? ` ${d.driverVendor}` : ''}${d.driverVersion ? ` driver ${d.driverVersion}` : ''}${devices.length > 1 ? ` (${devices.length} cards)` : ''}`);
+  } catch { /* said by its absence */ }
+  try {
+    const off = Object.entries(app.getGPUFeatureStatus() || {}).filter(([k, v]) => !/^enabled|_ok$/.test(String(v)) && !/^(webnn|skia_graphite|trees_in_viz|raw_draw|video_|webgpu_on|multiple_raster)/.test(k)).map(([k, v]) => `${k}=${v}`);
+    parts.push(off.length ? `not hardware: ${off.join(', ')}` : 'all graphics features on');
+  } catch { /* the same */ }
+  return parts.join('; ').slice(0, 600);
+}
+ipcMain.handle('report:prepare', async (_event, kind, ctx = {}) => {
   const { exportReport: _ignored, level: _alsoIgnored, ...rest } = ctx || {};
+  const gpu = await gpuSummary();
   if (String(kind) === 'level') {
     const found = levelExportReport(rest.zipName, rest.levelName);
     if (!found) throw new Error('This level has no export report to send (it may have been made by an older MapNG, or the zip was moved).');
-    return prepareReport('level', { ...rest, level: found.level, exportReport: found.text }, { build: String(rest.build || ''), settings: readSettings() });
+    return prepareReport('level', { ...rest, level: found.level, exportReport: found.text }, { build: String(rest.build || ''), settings: readSettings(), gpu });
   }
-  return prepareReport(String(kind), rest, { build: String(rest.build || ''), settings: readSettings() });
+  return prepareReport(String(kind), rest, { build: String(rest.build || ''), settings: readSettings(), gpu });
 });
 ipcMain.handle('report:send', async (_event, token, choices = {}) => {
   const result = await sendReport(String(token), choices, TEST_API_ORIGIN || API_ORIGIN);
@@ -1223,6 +1242,11 @@ ipcMain.handle('report:dismiss', (_event, kind) => { if (kind === 'crash') { wri
 // (the gaming GPU, not integrated graphics, on laptops that have both: the 3D
 // preview is drawn with WebGL; the preview also asks for it, Preview3D.vue)
 app.commandLine.appendSwitch('force_high_performance_gpu');
+// Help > Software Rendering: the way out where the graphics driver draws the window wrong (bands across the 2D
+// preview, no 3D preview; a BeamNG developer's Intel Arc on Linux, 2026-11-13). Read at start: it cannot change
+// while the app runs. The second switch keeps the 3D preview, drawn by the processor.
+const softwareRendering = readSettings().softwareRendering === true || process.argv.includes('--software-rendering');
+if (softwareRendering) { app.disableHardwareAcceleration(); app.commandLine.appendSwitch('enable-unsafe-swiftshader'); }
 
 app.on('second-instance', () => {
   const win = BrowserWindow.getAllWindows()[0];

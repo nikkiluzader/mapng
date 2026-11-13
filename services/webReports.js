@@ -63,6 +63,8 @@ export async function prepareReport(kind, ctx = {}) {
     area: ctx.area && typeof ctx.area === 'object' ? ctx.area : null,
     config: typeof ctx.config === 'string' ? ctx.config : '',
     memory: { totalGB: Number(nav.deviceMemory) || null, cpus: Number(nav.hardwareConcurrency) || null },
+    // (the card and driver as WebGL names them: a garbled or missing preview is a graphics matter)
+    gpu: String(ctx.gpu || '').slice(0, 400),
     log,
   };
   const token = `w${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -70,7 +72,7 @@ export async function prepareReport(kind, ctx = {}) {
   return {
     token,
     preview: {
-      appVersion: report.build ? `web (${report.build})` : 'web', os: report.os, memory: report.memory, error: report.error,
+      appVersion: report.build ? `web (${report.build})` : 'web', os: report.os, memory: report.memory, gpu: report.gpu, error: report.error,
       logChars: log.length, logTail: log.split('\n').slice(-12).join('\n'), hasOptions: !!report.options, area: report.area, hasConfig: !!report.config,
     },
   };

@@ -56,7 +56,7 @@ const prepared = new Map();   // token -> report
  * logPath, options, area { lat, lng, resolution, metersPerPixel }, description }.
  * Returns { token, preview } (the preview lists exactly what would be sent).
  */
-export function prepareReport(kind, ctx = {}, { build = '', settings = {} } = {}) {
+export function prepareReport(kind, ctx = {}, { build = '', settings = {}, gpu = '' } = {}) {
   const report = {
     kind,
     appVersion: app.getVersion(),
@@ -70,6 +70,8 @@ export function prepareReport(kind, ctx = {}, { build = '', settings = {} } = {}
     // (the settings as a session code; holds the location, so it goes with it)
     config: typeof ctx.config === 'string' && ctx.config.startsWith('mapng:') ? ctx.config.slice(0, MAX_CONFIG_CHARS) : '',
     memory: { totalGB: +(os.totalmem() / 2 ** 30).toFixed(1), freeGB: +(os.freemem() / 2 ** 30).toFixed(1), cpus: os.cpus().length },
+    // (graphics: what the window's WebGL names, then what the app itself knows: device ids, driver, features switched off)
+    gpu: [String(ctx.gpu || '').slice(0, 400), String(gpu || '').slice(0, 600)].filter(Boolean).join(' | '),
     log: ctx.logPath ? scrubText(readTail(ctx.logPath, MAX_LOG_CHARS)) : '',
     // (a level's own export_report.txt, read from its zip by the main process: kind 'level')
     level: String(ctx.level || '').slice(0, 120),
@@ -93,6 +95,7 @@ export function prepareReport(kind, ctx = {}, { build = '', settings = {} } = {}
       appVersion: report.appVersion,
       os: report.os,
       memory: report.memory,
+      gpu: report.gpu,
       error: report.error,
       logChars: report.log.length,
       logTail: report.log.slice(-1200),

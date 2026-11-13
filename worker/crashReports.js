@@ -47,6 +47,7 @@ export function reportSummary(body, id, receivedAt) {
     area: body.area && typeof body.area === 'object' ? body.area : null,
     config: typeof body.config === 'string' && body.config.startsWith('mapng:') ? clip(body.config, MAX_CONFIG_CHARS) : '',
     memory: body.memory && typeof body.memory === 'object' ? body.memory : null,
+    gpu: clip(body.gpu, 1100),
     hasLog: typeof body.log === 'string' && body.log.length > 0,
     hasDump: typeof body.minidump === 'string' && body.minidump.length > 0,
     hasExportReport: typeof body.exportReport === 'string' && body.exportReport.length > 0,

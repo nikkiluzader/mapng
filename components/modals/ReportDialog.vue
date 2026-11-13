@@ -41,6 +41,7 @@
               <ul class="mt-2 space-y-1 text-caption text-gray-600 dark:text-gray-300">
                 <li>{{ t('report.incApp', { version: preview.appVersion }) }}</li>
                 <li>{{ t('report.incSystem', { os: preview.os, ram: preview.memory?.totalGB, cpus: preview.memory?.cpus }) }}</li>
+                <li v-if="preview.gpu" data-testid="report-gpu">{{ t('report.incGpu', { gpu: preview.gpu }) }}</li>
                 <li v-if="preview.error">{{ t('report.incError') }}</li>
                 <li v-if="preview.exportReportChars">{{ t('report.incExportReport', { kb: Math.max(1, Math.round(preview.exportReportChars / 1024)) }) }}</li>
                 <li v-if="preview.logChars">{{ t('report.incLog', { kb: Math.max(1, Math.round(preview.logChars / 1024)) }) }}</li>
@@ -75,6 +76,7 @@
 </template>
 
 <script setup>
+import { gpuLine } from '../../services/gpuInfo.js';
 /* global __BUILD_HASH__ */
 import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
@@ -107,7 +109,7 @@ watch(request, async (req) => {
     const config = req.ctx.config ?? await currentSessionCode();
     // (a plain copy: req.ctx sits in a ref, so its nested objects, e.g. the
     // level's area, are reactive proxies IPC can't clone)
-    const ctx = JSON.parse(JSON.stringify({ ...req.ctx, config, build: typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : '' }));
+    const ctx = JSON.parse(JSON.stringify({ ...req.ctx, config, gpu: gpuLine(), build: typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : '' }));
     const r = await reporter.prepareReport(req.kind, ctx);
     token.value = r.token; preview.value = r.preview;
   } catch (error) {

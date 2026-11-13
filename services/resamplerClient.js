@@ -458,6 +458,7 @@ export const resampleHeightAndImageOffThread = async (
 ) => {
     const imageWidth = imageSize?.width || width;
     const imageHeight = imageSize?.height || height;
+    let bundledError = null;
     if (getWorker() && imageSourceData) {
         try {
             let tiles = [];
@@ -526,6 +527,7 @@ export const resampleHeightAndImageOffThread = async (
             }
         } catch (e) {
             console.warn('[ResamplerClient] Bundled resampling failed, falling back to main-thread (imageSourceData.pixels may be detached):', e);
+            bundledError = e;
         }
     }
 
@@ -535,7 +537,11 @@ export const resampleHeightAndImageOffThread = async (
     // garbage from a detached TypedArray.
     const pixelsDetached = imageSourceData && imageSourceData.pixels?.buffer?.byteLength === 0;
     if (pixelsDetached) {
-        console.warn('[ResamplerClient] imageSourceData.pixels is detached — falling back to black satellite texture');
+        // The satellite picture went to the worker and is gone from this side, so there is none to fit here.
+        // Going on without one ended in "can't access property width, e is null" further down (website
+        // report MR-5EHNCD, Firefox, 8192: the worker's answer did not fit into a canvas). Say what happened.
+        console.warn('[ResamplerClient] imageSourceData.pixels is detached: no satellite picture left to fit');
+        throw new Error(satelliteFitError(width, height, bundledError));
     }
     const safeImageSampler = (!pixelsDetached && imageSampler) ? imageSampler : null;
     const [{ heightMap, bounds }, canvas] = await Promise.all([
@@ -559,6 +565,14 @@ export const resampleHeightAndImageOffThread = async (
     ]);
 
     return { heightMap, bounds, canvas };
+};
+
+/** What to say when the satellite picture could not be fitted to the map and no copy of it is left. */
+export const satelliteFitError = (width, height, cause) => {
+    const why = String(cause instanceof Error ? cause.message : (typeof cause === 'string' ? cause : '')).trim();
+    return `out of memory: the satellite picture could not be fitted to a ${width} × ${height} map`
+        + `${why && !/out of memory/i.test(why) ? ` (${why.slice(0, 120)})` : ''}. `
+        + 'Close other tabs and try again, choose a smaller size, or use the desktop app.';
 };
 
 /**
