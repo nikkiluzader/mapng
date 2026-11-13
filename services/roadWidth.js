@@ -162,6 +162,25 @@ export function estimateRoadHalfWidth(tags = {}, highway, isOneWay = false, fall
 }
 
 /**
+ * A road's lanes each way, from OpenStreetMap: { forward, backward, tagged }. lanes:forward / lanes:backward as
+ * mapped; else lanes shared out (all forward on a one-way; the odd one forward on a two-way, so a single-lane
+ * two-way road is 1 + 0); else the class's usual count, with tagged false.
+ */
+export function laneSplit(tags = {}, highway, isOneWay = false) {
+  const cap = (n) => Math.min(n, TAGGED_LANES_MAX);
+  const f = parsePositiveInt(tags['lanes:forward']), b = parsePositiveInt(tags['lanes:backward']);
+  const total = parsePositiveInt(tags.lanes);
+  if (isOneWay) { const n = total || f || 0; return { forward: cap(n || Math.max(1, getDefaultLaneCount(highway, true))), backward: 0, tagged: n > 0 }; }
+  if (f > 0 && b > 0) return { forward: cap(f), backward: cap(b), tagged: true };
+  if (total > 0) {
+    const forward = f > 0 ? Math.min(f, total) : b > 0 ? Math.max(0, total - b) : Math.ceil(total / 2);
+    return { forward: cap(forward), backward: cap(total - forward), tagged: true };
+  }
+  const usual = Math.max(1, getDefaultLaneCount(highway, false));
+  return { forward: Math.ceil(usual / 2), backward: Math.floor(usual / 2), tagged: false };
+}
+
+/**
  * Whether a way is one-way, which halves the inferred lane count.
  */
 export function isOneWayRoad(tags = {}) {

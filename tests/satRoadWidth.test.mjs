@@ -81,3 +81,16 @@ test('the Hero Roads level script: plain Lua text with the hooks the level scrip
   const count = (re) => (HERO_ROADS_LUA.replace(/--[^\n]*/g, '').match(re) || []).length;
   assert.equal(count(/\b(function|if|for|while|do)\b/g) - count(/\bfor\b[^\n]*\bdo\b|\bwhile\b[^\n]*\bdo\b/g), count(/\bend\b/g));
 });
+
+test('lanes each way come from OpenStreetMap', async () => {
+  const { laneSplit } = await import('../services/roadWidth.js');
+  assert.deepEqual(laneSplit({ lanes: '2' }, 'secondary', false), { forward: 1, backward: 1, tagged: true });
+  assert.deepEqual(laneSplit({ lanes: '3', 'lanes:forward': '2', 'lanes:backward': '1' }, 'primary', false), { forward: 2, backward: 1, tagged: true });
+  assert.deepEqual(laneSplit({ lanes: '3', 'lanes:backward': '2' }, 'primary', false), { forward: 1, backward: 2, tagged: true });
+  assert.deepEqual(laneSplit({ lanes: '3' }, 'primary', false), { forward: 2, backward: 1, tagged: true });
+  assert.deepEqual(laneSplit({ lanes: '3' }, 'primary', true), { forward: 3, backward: 0, tagged: true });
+  assert.deepEqual(laneSplit({ lanes: '1' }, 'unclassified', false), { forward: 1, backward: 0, tagged: true }, 'a single-lane two-way road');
+  const usual = laneSplit({}, 'residential', false);
+  assert.equal(usual.tagged, false); assert.ok(usual.forward >= 1 && usual.forward + usual.backward >= 1);
+  assert.equal(laneSplit({}, 'residential', true).backward, 0);
+});

@@ -8,7 +8,11 @@ export const HERO_ROADS_LUA = String.raw`-- MapNG: Hero Roads (experimental). Wr
 -- It turns MapNG's paved road surfaces (the DecalRoads named dr_..._b) into BeamNG Hero Roads: a real road
 -- mesh with a crown, shoulders and its own markings, built by the game's Hero Road Editor code. The roads are
 -- built a few each frame after the level has loaded, and removed when the level is left: they are not saved.
--- MapNG's own DecalRoads stay underneath (traffic and the minimap read them).
+--
+-- Hero Roads carry nothing for traffic: the game's road map (lua/ge/map.lua) is read from DecalRoads that are
+-- drivable, and every decal a Hero Road makes is marked not drivable. So MapNG's DecalRoads stay in the level
+-- as the roads traffic, navigation and the minimap follow, but under a Hero Road they are hidden: not drawn,
+-- still read (tried in game: the road map is the same with them hidden).
 --
 -- From the console: dump(mainLevel.heroRoads().status()), mainLevel.heroRoads().rebuild(), mainLevel.heroRoads().remove().
 local M = {}
@@ -22,6 +26,7 @@ local MIN_WIDTH_M = 3.0
 local gm = nil
 local queue, at = nil, 0
 local built, skipped, failed = 0, 0, 0
+local lanesSeen = {}          -- 'forward+backward' -> roads, for status()
 local firstError = nil
 local started, done = false, false
 local t0 = 0
@@ -35,13 +40,43 @@ local function paved(road)
   return mat:find('asphalt', 1, true) ~= nil or mat:find('concrete', 1, true) ~= nil
 end
 
+-- A road surface's lanes: forward, backward, left-hand traffic. Without MapNG's note (a level from an older
+-- MapNG): one lane each way, two on a road 13 m wide or more.
+local function lanesOf(road, width)
+  local ok, note = pcall(function() return road:getField('mapngLanes', 0) end)
+  if (not ok or not note or note == '') then ok, note = pcall(function() return road.mapngLanes end) end
+  local f, b, lht = tostring(ok and note or ''):match('^(%d+) (%d+) (%d)')
+  f, b = tonumber(f), tonumber(b)
+  if not f or f + b < 1 then local n = width >= 13 and 2 or 1; return n, n, false end
+  return f, b, lht == '1'
+end
+
+local layersOf = {}           -- 'dr_<road>_s<n>_' -> the names of that road's DecalRoad layers
+local hiddenByUs = {}         -- the layers this script hid (shown again when the Hero Roads are removed)
+
 local function collect()
   local list = {}
+  layersOf = {}
   for _, name in ipairs(scenetree.findClassObjects('DecalRoad') or {}) do
     if name:match('^dr_.*_b$') then list[#list + 1] = name end
+    local prefix, layer = name:match('^(dr_.*_s%d+_)(%w+)$')
+    -- (the grass blends along the edges lie outside the deck: they stay)
+    if prefix and layer ~= 'ebl' and layer ~= 'ebr' then
+      layersOf[prefix] = layersOf[prefix] or {}
+      table.insert(layersOf[prefix], name)
+    end
   end
   table.sort(list)
   return list
+end
+
+-- MapNG's own surface and paint for a road that now has a Hero Road: hidden, kept for traffic.
+local function hideLayers(baseName)
+  local prefix = baseName:match('^(dr_.*_s%d+_)b$')
+  for _, name in ipairs(prefix and layersOf[prefix] or {}) do
+    local o = scenetree.findObject(name)
+    if o and not o.hidden then o.hidden = true; hiddenByUs[#hiddenByUs + 1] = name end
+  end
 end
 
 -- One MapNG road surface -> one Hero Road as wide as it, or nil and why.
@@ -69,16 +104,25 @@ local function buildOne(name)
   gm.addNewGroup('MapNG ' .. name:sub(4))
   local groups = gm.getGroups()
   local g = groups[#groups]
-  gm.applyProfilePreset(g, width >= 13 and 'highway' or 'city')
-  local lanesEachWay = width >= 13 and 2 or 1
+  -- The lanes each way are OpenStreetMap's (MapNG writes them on the road surface as "forward backward
+  -- left-hand tagged"); the width is MapNG's, which is the mapped or measured one where there is one.
+  local forward, backward, leftHand = lanesOf(road, width)
+  local lanesLeft, lanesRight = backward, forward
+  if leftHand then lanesLeft, lanesRight = forward, backward end
+  local total = lanesLeft + lanesRight
+  gm.applyProfilePreset(g, total >= 4 and 'highway' or 'city')
   g.shoulderWidthM = SHOULDER_M
   g.nodes, g.widths, g.nmls = nodes, {}, {}
   for i = 1, #nodes do g.widths[i] = width; g.nmls[i] = vec3(0, 0, 1) end
   -- (the lanes carry the width: the editor's code works the deck out from lanes and shoulders)
-  gm.setLaneProfile(g, lanesEachWay, lanesEachWay, math.max(1.5, (width - 2 * SHOULDER_M) / (2 * lanesEachWay)))
+  gm.setLaneProfile(g, lanesLeft, lanesRight, math.max(1.5, (width - 2 * SHOULDER_M) / total))
+  g.isRoadLaneLines = math.max(lanesLeft, lanesRight) > 1
+  if lanesLeft == 0 or lanesRight == 0 then g.isRoadCenterLine = false end
   g.geometryMode = 'spline'    -- MapNG's line is already the shape wanted; no re-engineered curves
   gm.ensureCornerArray(g)
   g.isDirty = true
+  local key = forward .. '+' .. backward
+  lanesSeen[key] = (lanesSeen[key] or 0) + 1
   return g
 end
 
@@ -102,23 +146,27 @@ local function start()
     end
   end
   queue, at, built, skipped, failed, firstError = collect(), 0, 0, 0, 0, nil
+  lanesSeen = {}
   t0 = os.clock()
   log('I', 'mapngHeroRoads', string.format('Building Hero Roads from %d MapNG road surfaces', #queue))
   say(string.format('MapNG: building Hero Roads (0/%d)...', #queue), 6)
 end
 
 local function step()
-  local made = 0
-  while at < #queue and made < PER_FRAME do
+  local made = {}
+  while at < #queue and #made < PER_FRAME do
     at = at + 1
     local ok, g, why = pcall(buildOne, queue[at])
     if not ok then failed = failed + 1; firstError = firstError or tostring(g)
-    elseif g then made = made + 1
+    elseif g then made[#made + 1] = queue[at]
     else skipped = skipped + 1 end
   end
-  if made > 0 then
+  if #made > 0 then
     local ok, err = pcall(gm.updateDirtyGroups, false)
-    if ok then built = built + made else failed = failed + made; firstError = firstError or tostring(err) end
+    if ok then
+      built = built + #made
+      for _, name in ipairs(made) do hideLayers(name) end
+    else failed = failed + #made; firstError = firstError or tostring(err) end
   end
   if at % 30 < PER_FRAME then say(string.format('MapNG: building Hero Roads (%d/%d)...', at, #queue), 6) end
   if at >= #queue then
@@ -131,6 +179,8 @@ end
 
 local function remove()
   if gm then pcall(gm.removeAllGroups, true) end
+  for _, name in ipairs(hiddenByUs) do local o = scenetree.findObject(name); if o then o.hidden = false end end
+  hiddenByUs = {}
   queue, at, started, done = nil, 0, true, true
 end
 
@@ -145,7 +195,7 @@ M.onUpdate = function()
   if queue then step() end
 end
 
-M.status = function() return { started = started, done = done, total = queue and #queue or 0, at = at, built = built, skipped = skipped, failed = failed, firstError = firstError } end
+M.status = function() return { started = started, done = done, total = queue and #queue or 0, at = at, built = built, skipped = skipped, failed = failed, firstError = firstError, lanes = lanesSeen, hiddenLayers = #hiddenByUs } end
 M.remove = remove
 M.rebuild = function() remove(); started, done = false, false end
 

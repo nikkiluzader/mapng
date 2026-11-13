@@ -126,7 +126,7 @@ import { prepareRailEdges, unjoinedRailCrossings, markUnjoinedCrossing, buildTra
 // footways and other paths: a level crossing of one is a foot crossing
 const PATH_HIGHWAYS = new Set(['footway', 'cycleway', 'path', 'pedestrian', 'steps', 'bridleway']);
 import { POLE_SHAPE, POLE_SHAPE_HEIGHT_M, beamRotation } from './sportsLights.js';
-import { buildCurbedStreetClassifier, buildUrbanRoadClassifier, estimateRoadCrossSection, estimateRoadHalfWidth, getDefaultLaneCount, getDefaultLaneWidthMeters, isOneWayRoad, NON_DRIVEABLE_HIGHWAYS, racewayKind, streetParkingSide, markShortSpans, withoutAssumedParking } from './roadWidth.js';
+import { buildCurbedStreetClassifier, buildUrbanRoadClassifier, estimateRoadCrossSection, estimateRoadHalfWidth, getDefaultLaneCount, getDefaultLaneWidthMeters, isOneWayRoad, NON_DRIVEABLE_HIGHWAYS, racewayKind, streetParkingSide, markShortSpans, withoutAssumedParking, laneSplit } from './roadWidth.js';
 import {
   getBeamNGBiomeById,
   getGlobalEnvironmentMap,
@@ -6451,6 +6451,12 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
           const edgeBlend = layerCode === 'ebl' || layerCode === 'ebr';
           if (edgeBlend && onStructure) continue;
           decal.name = sanitizeBeamNGObjectName(`${roadNamePrefix}_${nameSuffix}_${layerCode}`);
+          // (the road's lanes each way as OpenStreetMap has them, and the side traffic keeps: "forward backward
+          // left-hand tagged". Read by the Hero Roads script, heroRoadsLua.js; the game keeps it as a dynamic field)
+          if (layerCode === 'b') {
+            const lanes = laneSplit(renderTags, highway, isOneWay);
+            decal.mapngLanes = `${lanes.forward} ${lanes.backward} ${leftHandTraffic ? 1 : 0} ${lanes.tagged ? 1 : 0}`;
+          }
           // On a bridge the road clips onto the deck, in a tunnel onto its
           // floor: without overObjects a DecalRoad is projected onto the
           // terrain (the hill over a tunnel).
