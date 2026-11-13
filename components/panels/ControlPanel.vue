@@ -219,6 +219,9 @@
           </SettingCard>
         </ElevationSourceSelector>
 
+      <!-- every elevation source this place has, side by side (its own section, after the choice) -->
+      <SourceComparison :center="center" :gpxz-api-key="gpxzApiKey" :elevation-source="elevationSource" @pick="(k) => (elevationSource = k)" />
+
       <SettingSection id="mapng-sec-mapdata" :changed="mapDataChanged" resettable @reset="resetMapData" :title="t('controlPanel.ui.mapData')" :icon="Trees" storage-key="mapng_ui_sec_mapdata">
         <!-- OpenStreetMap features, and Overture's buildings where OSM has none -->
         <SettingCard>
@@ -390,6 +393,7 @@ import SettingCard from '../base/SettingCard.vue';
 import SegmentedControl from '../base/SegmentedControl.vue';
 import CoordinatesInput from '../map/CoordinatesInput.vue';
 import ElevationSourceSelector from '../map/ElevationSourceSelector.vue';
+import SourceComparison from '../map/SourceComparison.vue';
 import ResolutionSelector from '../map/ResolutionSelector.vue';
 import SurroundingTiles from '../map/SurroundingTiles.vue';
 import BackgroundAreas from '../controls/BackgroundAreas.vue';

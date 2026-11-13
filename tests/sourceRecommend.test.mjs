@@ -37,3 +37,10 @@ test('a real slope in both, however far apart, raises no doubt', () => {
   const lower = grid((x, y) => 2 + y * 0.03);
   assert.equal(levelWhereItSlopes(lower, slope, PX, CELL).share, 0);
 });
+
+test('a region\'s own survey: picked where the free lidar is missing or coarse, not over fine free lidar', () => {
+  const h = new Float32Array(64 * 64).map((_, i) => 100 + (i % 64) * 0.5);
+  assert.deepEqual(recommendSource({ standard: { h, res: 30 }, usgs: { h, res: 1 } }, 64, 8), { pick: 'usgs', why: 'finest' });
+  assert.equal(recommendSource({ standard: { h, res: 30 }, mapterhorn: { h, res: 10 }, kron86: { h, res: 1 } }, 64, 8).pick, 'kron86');
+  assert.equal(recommendSource({ standard: { h, res: 30 }, mapterhorn: { h, res: 1 }, usgs: { h, res: 1 } }, 64, 8).pick, 'mapterhorn');
+});

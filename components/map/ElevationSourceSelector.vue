@@ -34,35 +34,6 @@
         </div>
         <p v-else-if="probing" class="text-micro text-gray-400 leading-tight">{{ t('map.hintChecking') }}</p>
 
-        <!-- Compare here: a 500 m square from each source at the selection's centre, as hillshades -->
-        <div v-if="center" class="text-micro leading-tight">
-          <button type="button" data-testid="compare-toggle" class="text-brand hover:underline" @click="toggleCompare">
-            {{ compareOpen ? t('map.compareHide') : t('map.compareHere') }}
-          </button>
-          <div v-if="compareOpen" data-testid="compare-panel" class="mt-1.5 grid grid-cols-3 gap-1.5">
-            <figure v-for="cell in compareCells" :key="cell.key" class="flex flex-col gap-0.5 min-w-0">
-              <div class="aspect-square rounded border border-gray-200 dark:border-gray-600 bg-gray-100 dark:bg-gray-900 overflow-hidden flex items-center justify-center">
-                <img v-if="cell.url" :src="cell.url" :alt="cell.label" class="w-full h-full object-cover" style="image-rendering: auto" />
-                <button v-else-if="cell.key === 'gpxz' && cell.state === 'ask'" type="button" class="px-1 text-center text-brand hover:underline" @click="loadGpxzCompare">{{ t('map.compareAddGpxz') }}</button>
-                <span v-else class="px-1 text-center text-gray-400">{{ cell.state === 'loading' ? '…' : cell.note }}</span>
-              </div>
-              <figcaption class="truncate font-bold text-gray-700 dark:text-gray-200" :title="cell.label">{{ cell.label }}</figcaption>
-              <span v-if="cell.detail" class="truncate text-gray-500 dark:text-gray-400">{{ cell.detail }}</span>
-            </figure>
-          </div>
-          <!-- the comparison as a page to keep or share: each source scored on this square's roads -->
-          <!-- which of the loaded sources to use here (services/sourceRecommend.js): light, from the pictures' own heights -->
-          <p v-if="compareOpen && recommendText" data-testid="compare-recommend" class="mt-1.5 leading-snug" :class="recommend?.why === 'lidarLevel' ? 'text-amber-700 dark:text-amber-400' : 'text-gray-600 dark:text-gray-300'">
-            <span class="font-semibold">{{ t('map.recommendLabel') }}</span> {{ recommendText }}
-          </p>
-          <div v-if="compareOpen && canReport" class="mt-1.5 flex items-center gap-2">
-            <button type="button" data-testid="compare-report" class="text-brand hover:underline disabled:opacity-50" :disabled="reportBusy" @click="saveQualityReport">
-              {{ reportBusy ? t('map.compareReportBusy') : t('map.compareReport') }}
-            </button>
-            <span v-if="reportNote" class="text-gray-500 dark:text-gray-400">{{ reportNote }}</span>
-          </div>
-        </div>
-
         <!-- Default -->
         <span v-if="localElevationSource === 'default'" class="block text-micro text-gray-500 dark:text-gray-400 leading-tight">
             {{ t('map.standardDescription') }}
@@ -159,10 +130,9 @@ import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Mountain, ChevronDown, AlertTriangle, Sparkles } from 'lucide-vue-next';
 import { boxAround, probeMapterhorn, probeGpxz } from '../../services/sourceAdvisor.js';
-import { recommendSource } from '../../services/sourceRecommend.js';
 import { mapterhornZoomFor, mapterhornMosaicBudget, mapterhornMetersPerPixel } from '../../services/mapterhorn.js';
 import { desktopApp } from '../../services/platform/desktop.js';
-import { standardPatch, mapterhornPatch, gpxzPatch, hillshadeDataUrl } from '../../services/sourceCompare.js';
+import { REGIONAL_COVERAGE } from '../../services/sourceCompare.js';
 
 const { t } = useI18n({ useScope: 'global' });
 
@@ -212,13 +182,8 @@ const props = defineProps({
   }
 });
 
-// Coarse coverage boxes [south, west, north, east] of the region-only sources.
-const SOURCE_COVERAGE = {
-  // USGS 3DEP 1 m: conterminous US, Alaska, Hawaii, Puerto Rico
-  usgs: [[24.4, -125.0, 49.5, -66.8], [51.0, -180.0, 71.6, -129.9], [18.8, -160.4, 22.4, -154.7], [17.8, -67.4, 18.6, -65.2]],
-  // NMT EVRF2007: Poland
-  kron86: [[49.0, 14.1, 54.9, 24.2]],
-};
+// Coarse coverage boxes of the region-only sources (services/sourceCompare.js).
+const SOURCE_COVERAGE = REGIONAL_COVERAGE;
 
 const coverage = computed(() => {
   const lat = Number(props.center?.lat);
@@ -325,127 +290,6 @@ const checkGpxzHere = async () => {
   } catch (e) { gpxzProbe.value = t('map.gpxzHereFailed'); }
 };
 watch(() => [props.center?.lat, props.center?.lng], () => { if (gpxzProbe.value !== 'loading') gpxzProbe.value = null; });
-
-// ── Compare here ──
-// (1 m cells: the quality report measures road benches on the same heights the pictures show)
-const COMPARE_SIDE_M = 512, COMPARE_PX = 512;
-// heights behind each picture, for the report (not reactive: three 1 MB arrays)
-const compareHeights = {};
-const compareOpen = ref(false);
-const compare = ref({});           // key -> { url, state, note, detail }
-let compareAbort = null;
-const compareCells = computed(() => [
-  { key: 'standard', label: t('map.compareGlobal30'), ...compare.value.standard },
-  { key: 'mapterhorn', label: 'Mapterhorn', ...compare.value.mapterhorn },
-  { key: 'gpxz', label: 'GPXZ', ...(compare.value.gpxz || { state: localGpxzApiKey.value ? 'ask' : 'none', note: t('map.compareNeedsKey') }) },
-]);
-const centerPoint = () => ({ lat: Number(props.center?.lat), lng: Number(props.center?.lng) });
-const recommend = ref(null);       // { pick, why, share, apartM } once every picture asked for has loaded
-const updateRecommend = () => {
-  const loading = ['standard', 'mapterhorn', 'gpxz'].some((k) => compare.value[k]?.state === 'loading');
-  try { recommend.value = loading ? null : recommendSource(compareHeights, COMPARE_PX, COMPARE_SIDE_M / COMPARE_PX); } catch { recommend.value = null; }
-};
-const recommendText = computed(() => {
-  const r = recommend.value; if (!r) return '';
-  const name = { standard: t('map.compareGlobal30'), mapterhorn: t('map.recommendBestFree'), gpxz: 'GPXZ' }[r.pick];
-  if (r.why === 'lidarLevel') return t('map.recommendLidarLevel', { source: name, percent: Math.round(r.share * 100), metres: Math.round(r.apartM) });
-  if (r.why === 'noLidar') return t('map.recommendNoLidar', { source: name });
-  return t('map.recommendFinest', { source: name });
-});
-const setCell = (key, v) => { compare.value = { ...compare.value, [key]: v }; updateRecommend(); };
-const loadCompare = async () => {
-  compareAbort?.abort(); compareAbort = new AbortController(); const signal = compareAbort.signal;
-  const c = centerPoint(); compare.value = {}; recommend.value = null; for (const k of Object.keys(compareHeights)) delete compareHeights[k]; reportNote.value = '';
-  const cell = COMPARE_SIDE_M / COMPARE_PX;
-  setCell('standard', { state: 'loading' }); setCell('mapterhorn', { state: 'loading' });
-  standardPatch(c, { sideM: COMPARE_SIDE_M, px: COMPARE_PX, signal })
-    .then((h) => { compareHeights.standard = { h, res: 30 }; setCell('standard', { url: hillshadeDataUrl(h, COMPARE_PX, cell), detail: '~30 m' }); })
-    .catch(() => { if (!signal.aborted) setCell('standard', { note: t('map.compareFailed') }); });
-  try {
-    const p = probe.value?.reachable ? probe.value : await probeMapterhorn(boxAround(c, 0.6), { signal });
-    if (!p.zoom) setCell('mapterhorn', { note: t('map.compareNoLidar') });
-    else {
-      const h = await mapterhornPatch(c, p.zoom, { sideM: COMPARE_SIDE_M, px: COMPARE_PX, signal });
-      compareHeights.mapterhorn = { h, res: p.metersPerPixel };
-      setCell('mapterhorn', { url: hillshadeDataUrl(h, COMPARE_PX, cell), detail: `~${fmtRes(p.metersPerPixel)} m · ${t('map.compareFree')}` });
-    }
-  } catch { if (!signal.aborted) setCell('mapterhorn', { note: t('map.compareFailed') }); }
-};
-const loadGpxzCompare = async () => {
-  const c = centerPoint(); setCell('gpxz', { state: 'loading' });
-  try {
-    const h = await gpxzPatch(c, localGpxzApiKey.value, { sideM: COMPARE_SIDE_M, px: COMPARE_PX, signal: compareAbort?.signal });
-    compareHeights.gpxz = { h, res: 1 };
-    setCell('gpxz', { url: hillshadeDataUrl(h, COMPARE_PX, COMPARE_SIDE_M / COMPARE_PX), detail: t('map.compareOneCall') });
-  } catch { setCell('gpxz', { note: t('map.compareFailed') }); }
-};
-// The quality report: this square's roads (one map data request) measured on
-// every source the comparison has loaded; saved as one HTML page. GPXZ is in
-// it only when the user added it to the comparison (no call is made for it here).
-const reportBusy = ref(false);
-const reportNote = ref('');
-const canReport = computed(() => compareCells.value.some((c) => c.url));
-/** A new tab with a waiting line in it, or null when the browser refuses one. */
-const openReportTab = (waiting) => {
-  try {
-    const tab = window.open('', '_blank');
-    if (!tab) return null;
-    tab.opener = null;
-    tab.document.title = 'MapNG';
-    const p = tab.document.createElement('p');
-    p.textContent = waiting;
-    p.style.cssText = 'font: 16px system-ui, sans-serif; margin: 3rem; color: #555';
-    tab.document.body.appendChild(p);
-    return tab;
-  } catch { return null; }
-};
-const saveQualityReport = async () => {
-  if (reportBusy.value) return;
-  reportBusy.value = true; reportNote.value = '';
-  // The report opens in a new tab (a button that saved a file read as a download nobody had asked for). The
-  // tab is opened now, while the click still counts as the user's, and shown the page when it is ready.
-  const tab = openReportTab(t('map.compareReportBusy'));
-  try {
-    const c = centerPoint();
-    const [{ fetchOSMData, getLastOSMRequestInfo, restoreLastOSMRequestInfo }, { roadsInPatch, compareSources, qualityReportHtml }] = await Promise.all([import('../../services/osm.js'), import('../../services/sourceQuality.js')]);
-    const dLat = COMPARE_SIDE_M / 2 / 111320, dLng = dLat / Math.cos((c.lat * Math.PI) / 180);
-    // (this small pull is not the map's: what the last real one recorded is put back after it)
-    const lastInfo = getLastOSMRequestInfo();
-    let features; let osmSource = '';
-    try {
-      features = await fetchOSMData({ north: c.lat + dLat, south: c.lat - dLat, east: c.lng + dLng, west: c.lng - dLng }, { signal: compareAbort?.signal });
-      osmSource = getLastOSMRequestInfo()?.endpointUsed || '';
-    } finally { restoreLastOSMRequestInfo(lastInfo); }
-    const roads = roadsInPatch(features, c, COMPARE_SIDE_M);
-    const sources = compareCells.value.map((cell) => {
-      const got = compareHeights[cell.key];
-      return { key: cell.key, label: cell.label, detail: cell.detail || '', note: cell.note || '', nativeResM: got?.res ?? NaN, heights: cell.url && got ? got.h : null, px: COMPARE_PX, cellM: COMPARE_SIDE_M / COMPARE_PX, image: cell.url || null };
-    });
-    const result = compareSources(sources, roads, COMPARE_SIDE_M);
-    const html = qualityReportHtml(result, {
-      center: c, sideM: COMPARE_SIDE_M, roadCount: roads.length, generatedAt: new Date().toISOString().slice(0, 10),
-      appVersion: typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : '', osmSource,
-    });
-    const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
-    if (tab && !tab.closed) {
-      // (the address is kept for as long as this page lives: the tab can be reloaded)
-      tab.location.replace(url);
-    } else {
-      // (the browser would not open a tab: the page is saved as a file instead, as before)
-      const link = document.createElement('a');
-      link.href = url; link.download = `mapng-elevation-quality-${c.lat.toFixed(4)}_${c.lng.toFixed(4)}.html`;
-      document.body.appendChild(link); link.click(); link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 10000);
-    }
-    reportNote.value = result.verdict;
-  } catch (e) {
-    console.warn('[Quality report]', e);
-    reportNote.value = t('map.compareReportFailed');
-    try { tab?.close(); } catch { /* already gone */ }
-  } finally { reportBusy.value = false; }
-};
-const toggleCompare = () => { compareOpen.value = !compareOpen.value; if (compareOpen.value) loadCompare(); else compareAbort?.abort(); };
-watch(() => [props.center?.lat, props.center?.lng], () => { if (compareOpen.value) { compareOpen.value = false; compareAbort?.abort(); } });
 
 watch(() => props.gpxzApiKey, (newVal) => {
   localGpxzApiKey.value = newVal;

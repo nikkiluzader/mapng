@@ -72,13 +72,17 @@ export function levelWhereItSlopes(lidar, coarse, px, cellM) {
  * or null when nothing is loaded.
  */
 export function recommendSource(sources, px, cellM) {
-  const { standard, mapterhorn, gpxz } = sources || {};
-  if (!standard?.h && !mapterhorn?.h && !gpxz?.h) return null;
+  const { standard, mapterhorn, gpxz, usgs, kron86 } = sources || {};
+  // (the region's own survey, when it was added to the comparison: USGS 1 m, Poland's NMT)
+  const regional = usgs?.h ? 'usgs' : kron86?.h ? 'kron86' : null;
+  if (!standard?.h && !mapterhorn?.h && !gpxz?.h && !regional) return null;
   if (mapterhorn?.h && standard?.h) {
     const { share, apartM } = levelWhereItSlopes(mapterhorn.h, standard.h, px, cellM);
-    if (share >= SUSPECT_SHARE) return { pick: gpxz?.h ? 'gpxz' : 'standard', why: 'lidarLevel', share, apartM };
+    if (share >= SUSPECT_SHARE) return { pick: gpxz?.h ? 'gpxz' : regional || 'standard', why: 'lidarLevel', share, apartM };
   }
   if (gpxz?.h && (!mapterhorn?.h || (gpxz.res || 1) < (mapterhorn.res || 30))) return { pick: 'gpxz', why: 'finest' };
+  // (the free lidar first where it is as fine: a map from it reads small tiles, the survey's own sheets are large)
+  if (regional && !gpxz?.h && (!mapterhorn?.h || (mapterhorn.res || 30) > 2)) return { pick: regional, why: 'finest' };
   if (mapterhorn?.h) return { pick: 'mapterhorn', why: 'finest' };
   if (gpxz?.h) return { pick: 'gpxz', why: 'finest' };
   return { pick: 'standard', why: 'noLidar' };

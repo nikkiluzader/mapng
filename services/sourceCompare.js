@@ -122,6 +122,110 @@ export function bilinearAt(ras, W, H, fx, fy, nd = null) {
   return (a * (1 - u) + b2 * u) * (1 - v) + (c * (1 - u) + d * u) * v;
 }
 
+// Coarse coverage boxes [south, west, north, east] of the region-only surveys (the source selector's own).
+export const REGIONAL_COVERAGE = {
+  // USGS 3DEP 1 m: conterminous US, Alaska, Hawaii, Puerto Rico
+  usgs: [[24.4, -125.0, 49.5, -66.8], [51.0, -180.0, 71.6, -129.9], [18.8, -160.4, 22.4, -154.7], [17.8, -67.4, 18.6, -65.2]],
+  // NMT EVRF2007: Poland
+  kron86: [[49.0, 14.1, 54.9, 24.2]],
+};
+
+/** The regional surveys that may cover a place: [] | ['usgs'] | ['kron86']. */
+export function regionalSourcesAt(center) {
+  const lat = Number(center?.lat); const lng = Number(center?.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return [];
+  return Object.keys(REGIONAL_COVERAGE).filter((k) => REGIONAL_COVERAGE[k].some(([s, w, n, e]) => lat >= s && lat <= n && lng >= w && lng <= e));
+}
+
+const USGS_PRODUCTS = 'https://tnmaccess.nationalmap.gov/api/v1/products';
+const USGS_1M = 'Digital Elevation Model (DEM) 1 meter';
+
+/** The proj4 text of a USGS 1 m tile's grid (NAD83 UTM north, by EPSG code; else the zone of the longitude). */
+export function usgsUtmDef(code, lng) {
+  let zone = 0;
+  if (code >= 26901 && code <= 26923) zone = code - 26900;          // NAD83 / UTM zone N
+  else if (code >= 6330 && code <= 6348) zone = code - 6329;        // NAD83(2011) / UTM zone N
+  else if (code >= 32601 && code <= 32660) zone = code - 32600;     // WGS 84 / UTM zone N
+  if (!zone) zone = Math.max(1, Math.min(60, Math.floor((lng + 180) / 6) + 1));
+  return `+proj=utm +zone=${zone} +ellps=GRS80 +towgs84=0,0,0 +units=m +no_defs`;
+}
+
+/**
+ * The square from the USGS 1 m survey, read out of the survey's own files in place: each is a tile 10 km
+ * across and 150 to 450 MB (two cover St. Augustine's centre: 580 MB), and a 500 m square of one is a few
+ * hundred kilobytes, so only that part is asked for (the files are laid out for partial reads, and the
+ * server allows them). null where the catalogue has no 1 m tile.
+ */
+export async function usgsPatch(center, { sideM = 512, px = 192, signal, onProgress } = {}) {
+  const dLat = sideM / 2 / 111320, dLng = dLat / Math.cos((center.lat * Math.PI) / 180);
+  const b = { n: center.lat + dLat, s: center.lat - dLat, w: center.lng - dLng, e: center.lng + dLng };
+  onProgress?.('USGS…');
+  // (the catalogue can take half a minute to answer; no custom headers: it refuses the preflight)
+  const url = `${USGS_PRODUCTS}?datasets=${encodeURIComponent(USGS_1M)}&bbox=${b.w.toFixed(6)},${b.s.toFixed(6)},${b.e.toFixed(6)},${b.n.toFixed(6)}&prodFormats=GeoTIFF&max=16`;
+  let items = null;
+  for (let attempt = 0; attempt < 2 && !items; attempt++) {
+    const timer = new AbortController(); const stop = () => timer.abort();
+    const t = setTimeout(stop, 60000); signal?.addEventListener('abort', stop, { once: true });
+    try { const r = await fetch(url, { signal: timer.signal }); if (r.ok) items = (await r.json())?.items || []; }
+    catch { if (signal?.aborted) throw new Error('aborted'); }
+    finally { clearTimeout(t); signal?.removeEventListener('abort', stop); }
+  }
+  if (!items) throw new Error('USGS catalogue did not answer');
+  if (!items.length) return null;
+  const [{ fromUrl }, { default: proj4 }] = await Promise.all([import('geotiff'), import('proj4')]);
+  const out = new Float32Array(px * px).fill(NaN); let filled = 0;
+  // (the catalogue lists every project's tile near the box, neighbours included: in Little Cottonwood Canyon
+  // the first four of seven were three of the tile next door and one project that is empty there)
+  items = items.filter((it) => { const q = it.boundingBox; return !q || !(q.maxX < b.w || q.minX > b.e || q.maxY < b.s || q.minY > b.n); });
+  // (the newest survey first: the catalogue lists overlapping projects)
+  items.sort((p, q) => String(q.publicationDate || '').localeCompare(String(p.publicationDate || '')));
+  for (let k = 0; k < items.length && filled < out.length; k++) {
+    signal?.throwIfAborted?.();
+    onProgress?.(`USGS ${k + 1}/${items.length}…`);
+    try {
+      const img = await (await fromUrl(items[k].downloadURL, {}, signal)).getImage();
+      const keys = img.getGeoKeys() || {};
+      const to = proj4('EPSG:4326', usgsUtmDef(keys.ProjectedCSTypeGeoKey, center.lng));
+      const [x0, y0, x1, y1] = img.getBoundingBox(); const W = img.getWidth(), H = img.getHeight();
+      const corners = [[b.w, b.n], [b.e, b.n], [b.w, b.s], [b.e, b.s]].map((c) => to.forward(c));
+      const col = (x) => ((x - x0) / (x1 - x0)) * W; const row = (y) => ((y1 - y) / (y1 - y0)) * H;
+      const c0 = Math.max(0, Math.floor(Math.min(...corners.map((c) => col(c[0]))) - 2)); const c1 = Math.min(W, Math.ceil(Math.max(...corners.map((c) => col(c[0]))) + 2));
+      const r0 = Math.max(0, Math.floor(Math.min(...corners.map((c) => row(c[1]))) - 2)); const r1 = Math.min(H, Math.ceil(Math.max(...corners.map((c) => row(c[1]))) + 2));
+      if (!(c1 - c0 >= 2 && r1 - r0 >= 2)) continue;
+      const [ras] = await img.readRasters({ window: [c0, r0, c1, r1], signal }); const nd = img.getGDALNoData();
+      const w = c1 - c0, h = r1 - r0;
+      for (let j = 0; j < px; j++) for (let i = 0; i < px; i++) {
+        const at = j * px + i; if (Number.isFinite(out[at])) continue;
+        const [x, y] = to.forward([b.w + ((i + 0.5) / px) * (b.e - b.w), b.n - ((j + 0.5) / px) * (b.n - b.s)]);
+        const v = bilinearAt(ras, w, h, col(x) - c0 - 0.5, row(y) - r0 - 0.5, nd);
+        if (Number.isFinite(v) && v > -1000) { out[at] = v; filled++; }
+      }
+    } catch (e) { if (signal?.aborted) throw e; console.warn('[Compare] USGS tile', e); }
+  }
+  // (a sliver of the square is no comparison)
+  return filled > out.length * 0.2 ? out : null;
+}
+
+/**
+ * The square from a region's own survey ('usgs' | 'kron86'). USGS: usgsPatch. Poland's NMT is read the way
+ * a map is: the app's terrain fetch on the square alone, heights as downloaded (no ground filter, no road
+ * shaping, no textures); it downloads the survey's sheets for the spot. null where the survey has nothing.
+ * Asked for with a click, never on its own.
+ */
+export async function regionalPatch(center, kind, { sideM = 512, px = 192, signal, onProgress } = {}) {
+  if (kind === 'usgs') return usgsPatch(center, { sideM, px, signal, onProgress });
+  const { fetchTerrainData } = await import('./terrain.js');
+  const data = await fetchTerrainData(center, px, false, kind === 'usgs', false, kind === 'kron86', '', undefined, onProgress, signal, {
+    keepSourceGeoTiffs: false, generateOSMTextureAsset: false, generateHybridTextureAsset: false, generateGameTextureAsset: false,
+    processingMetersPerPixel: sideM / px, raw: true, groundFilter: false, lowerWater: false, smoothRoads: false,
+  });
+  try { if (data?.satelliteTextureUrl) URL.revokeObjectURL(data.satelliteTextureUrl); } catch { /* not a blob address */ }
+  if (!data?.heightMap || (kind === 'usgs' && data.usgsFallback) || (kind === 'kron86' && data.kron86Fallback)) return null;
+  const out = new Float32Array(px * px);
+  for (let i = 0; i < out.length; i++) { const h = data.heightMap[i]; out[i] = Number.isFinite(h) && h > -9000 ? h : NaN; }
+  return out;
+}
+
 /** A hillshade of heights (px x px, cell metres) as a data URL. */
 export function hillshadeDataUrl(h, px, cellM) {
   const c = document.createElement('canvas'); c.width = px; c.height = px;

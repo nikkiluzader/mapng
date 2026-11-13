@@ -165,6 +165,9 @@
         </SettingCard>
       </ElevationSourceSelector>
 
+      <!-- every elevation source this place has, side by side (its own section, after the choice) -->
+      <SourceComparison :center="center" :gpxz-api-key="gpxzApiKey" :elevation-source="elevationSource" @pick="(k) => (elevationSource = k)" />
+
       <SettingSection id="mapng-bsec-mapdata" :changed="!includeOSM" resettable @reset="includeOSM = true" :title="t('controlPanel.ui.mapData')" :icon="Trees" storage-key="mapng_ui_sec_mapdata">
         <SettingCard>
           <SettingRow check v-model="includeOSM" :label="t('batch.includeOsm')" :hint="t('controlPanel.ui.osmHint')" />
@@ -305,6 +308,7 @@ import { terrainMode, terrainShapingOptions, terrainGenerationOptions, setTerrai
 import { Grid3X3, Box, Trees, Mountain, MapPin, ChevronDown, Play, RotateCcw, X, AlertTriangle, PackageOpen, Info } from 'lucide-vue-next';
 import CoordinatesInput from '../map/CoordinatesInput.vue';
 import ElevationSourceSelector from '../map/ElevationSourceSelector.vue';
+import SourceComparison from '../map/SourceComparison.vue';
 import ResolutionSelector from '../map/ResolutionSelector.vue';
 import BatchGridConfig from '../batch/BatchGridConfig.vue';
 import BatchPerformanceProfile from '../batch/BatchPerformanceProfile.vue';
