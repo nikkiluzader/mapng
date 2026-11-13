@@ -473,7 +473,7 @@ export function qualityReportHtml(result, meta) {
   const flawList = measured.map((s) => `<li><b><span class="sw s${SERIES[s.key] || 1}"></span> ${esc(s.label)}:</b> ${s.flaws?.length ? s.flaws.map(esc).join(' ') : 'none found.'}</li>`).join('');
   const details = [
     row('Resolution the source states', (s) => `${fmt(s.nativeResM, s.nativeResM < 10 ? 1 : 0)} m`),
-    row('Detail measured in the data', (s) => (s.g ? `${fmt(s.g.effectiveResM, s.g.effectiveResM < 10 ? 1 : 0)} m` : 'n/a')),
+    row('Detail measured in the data', (s) => (!s.g ? 'n/a' : s.g.effectiveResM > 30 ? '30 m or coarser (or the ground is simply even)' : `${fmt(s.g.effectiveResM, s.g.effectiveResM < 10 ? 1 : 0)} m`)),
     row('Ground that is dead level', (s) => (s.g ? `${fmt(100 * s.g.flatShare)} %${s.g.water ? ' (water left out)' : ''}` : 'n/a')),
     row('Straight seam lines', (s) => (s.g ? String(s.g.seams.count) : 'n/a')),
     row('Spikes and pits per hectare', (s) => (s.g ? fmt(s.g.spikesPerHa, 1) : 'n/a')),
