@@ -2600,7 +2600,7 @@ const WALK_ATTACH_CLEAR_M = 0.3;
  * carriageways. Their posts stand wherever the deck is clear of the ground.
  */
 const DECK_PATH_BRIDGE_GAP_M = 250;   // a bridge sidewalk off its deck this long at most is carried across
-export function buildDeckRuns(paths, bridges, { groundAt, seaZ = 0 } = {}) {
+export function buildDeckRuns(paths, bridges, { groundAt, seaZ = 0, seaAt = null } = {}) {
   if (!groundAt) return [];
   const index = bridges?.length ? buildCarriagewayIndex(bridges) : null;
   const layerByOwner = new Map((bridges || []).map((cw) => [cw.owner, Number.parseFloat(cw.tags?.layer)]));
@@ -2609,7 +2609,10 @@ export function buildDeckRuns(paths, bridges, { groundAt, seaZ = 0 } = {}) {
     const { nodes, half } = path;
     // one level over the water, so piers that join meet; up only on to real ground
     // (a real stretch of it: a point on a seawall's face isn't land to stand on)
-    const ground = nodes.map((q) => groundAt(q[0], q[1]));
+    // (ground that is sea floor about to go under is no land: on coarse elevation the land's height is carried
+    // out over the water, a pier followed it up, and with the floor lowered from under it stood on posts as
+    // tall as the shore is high; the user's, on Sint Eustatius: "hundreds of feet")
+    const ground = nodes.map((q) => (seaAt?.(q[0], q[1]) ? -Infinity : groundAt(q[0], q[1])));
     const onLand = (i) => {
       let run = 1;
       for (const step of [-1, 1]) for (let k = i + step; k >= 0 && k < ground.length && ground[k] > least + DECK_SHORE_M; k += step) run++;

@@ -910,3 +910,24 @@ test('a footbridge with no surface tag: planks over water on its own, concrete o
   assert.equal(buildDeckRuns([{ nodes, half: 1, wood: true }], [], { groundAt: () => 3, seaZ: 0 })[0].wood, true);
   assert.equal(buildDeckRuns([{ nodes, half: 1, wood: false }], [], { groundAt: (x) => stream(x), seaZ: 0 })[0].wood, false);
 });
+
+test('a pier over sea floor that coarse elevation holds up at the shore\'s height stays at the water', async () => {
+  const { buildDeckRuns } = await import('../services/beamngSidewalks.js');
+  const { lowerSeabed } = await import('../services/beamngWater.js');
+  // the land 25 m up, and the 30 m data carrying 20 to 5 m of it 60 m out over the sea
+  const carried = (x) => (x < 0 ? 25 : x < 60 ? 20 - x / 4 : -2);
+  const pier = { nodes: Array.from({ length: 31 }, (_, i) => [-10 + i * 2, 0, 0]), half: 1.2, wood: true };
+  const [before] = buildDeckRuns([pier], [], { groundAt: (x) => carried(x), seaZ: 0 });
+  assert.ok(before.centre[30][2] > 6, `followed the carried ground: ${before.centre[30][2]}`);
+  const [after] = buildDeckRuns([pier], [], { groundAt: (x) => carried(x), seaZ: 0, seaAt: (x) => x >= 0 });
+  assert.ok(Math.abs(after.centre[0][2] - 25) < 0.5, 'still starts on the shore');
+  assert.ok(after.centre.slice(12).every((q) => Math.abs(q[2] - 1.2) < 0.05), `level over the water: ${after.centre[30][2]}`);
+  // the sea floor plan says where: a square with land in the west, sea in the east, a little of the land's height carried out
+  const W = 64; const heightMap = new Float32Array(W * W); const lc = new Uint8Array(W * W);
+  for (let r = 0; r < W; r++) for (let c = 0; c < W; c++) { heightMap[r * W + c] = c < 20 ? 8 : c < 26 ? 4 : 0; lc[r * W + c] = c < 20 ? 50 : 80; }
+  const plan = lowerSeabed({ heightMap, width: W, height: W, minHeight: 0, worldSize: W * 2 }, { grid: lc, n: W }, 0, { coarse: true });
+  assert.ok(plan.pixels > 0);
+  assert.equal(plan.under(-40, 0), false, 'the land is not sea floor');
+  assert.equal(plan.under(-16, 0), true, 'the carried ground just off the shore goes under');
+  assert.equal(plan.under(500, 0), false, 'off the map');
+});

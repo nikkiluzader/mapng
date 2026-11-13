@@ -12876,6 +12876,16 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         .map((f) => f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0))),
       // piers and footbridges: decks clear of the ground (and sidewalks on road bridges)
       decks: buildDeckPaths(exportTerrainData, squareSize),
+      // (the sea floor that the water step lowers further on: no ground for a pier to follow)
+      seaAt: (() => {
+        try {
+          const plan = lowerSeabed({
+            heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
+            minHeight: Number(exportTerrainData.minHeight) || 0, worldSize: exportTerrainData.width * squareSize,
+          }, exportTerrainData.landCover, -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0), { coarse: !!terrainData?.coarseElevation });
+          return plan.pixels ? (x, y) => plan.under(x, y) : null;
+        } catch { return null; }
+      })(),
       // (a road bridge's own deck: its road's line, at the deck's height)
       // (its layer: a path mapped on another layer, a low crossing under it, is not on it)
       bridgeRoads: bridgeDecks.flatMap((d, di) => d.parts.filter((part) => part.xy?.length > 1).map((part, i) => ({

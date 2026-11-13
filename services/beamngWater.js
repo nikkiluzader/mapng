@@ -1164,7 +1164,7 @@ const SEA_SEED_CELLS = 50;     // ... when at least this many cells of water lie
  */
 export function lowerSeabed(grid, landCover, seaZ, { coarse = false, keep = null } = {}) {
   const { heightMap, width, height, minHeight = 0, worldSize = 0 } = grid;
-  const none = { pixels: 0, apply() {} };
+  const none = { pixels: 0, apply() {}, under: () => false };
   if (!landCover?.grid || landCover.grid.length !== landCover.n * landCover.n || !Number.isFinite(seaZ)) return none;
   const { grid: lc, n } = landCover;
   // (water, or no land cover at all: the open sea beyond WorldCover's tiles)
@@ -1231,5 +1231,14 @@ export function lowerSeabed(grid, landCover, seaZ, { coarse = false, keep = null
       if (target < z) edits.set(idx, target + minHeight);
     }
   }
-  return { pixels: edits.size, apply(set) { for (const [idx, v] of edits) set(idx, v); } };
+  return {
+    pixels: edits.size,
+    apply(set) { for (const [idx, v] of edits) set(idx, v); },
+    /** Whether the ground at world (x, y) is sea floor that goes under (needs grid.worldSize). */
+    under(x, y) {
+      if (!(worldSize > 0)) return false;
+      const c = Math.round((x / worldSize + 0.5) * width); const r = Math.round((0.5 - y / worldSize) * height) - 1;
+      return c >= 0 && r >= 0 && c < width && r < height && edits.has(r * width + c);
+    },
+  };
 }
