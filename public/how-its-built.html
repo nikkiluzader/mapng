@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How MapNG Is Built</title>
+<meta name="description" content="MapNG's code is written with Claude, an AI model, and directed, reviewed and tested by its developer. What each of us does, how every change is tested, and what the tests do not catch.">
+<link rel="canonical" href="https://mapng.com/how-its-built.html">
+<meta property="og:title" content="How MapNG is built">
+<meta property="og:description" content="Written with AI, directed and tested by a person. The process, the tests, and the mistakes.">
+<meta property="og:url" content="https://mapng.com/how-its-built.html">
+<meta property="og:image" content="https://mapng.com/og-image.jpg">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  /* BeamNG.drive's UI fonts, as the app (public/fonts, SIL OFL) */
+  @font-face { font-family: "Noto Sans"; src: url(/fonts/noto-sans-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass"; src: url(/fonts/overpass-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass Mono"; src: url(/fonts/overpass-mono-latin-wght-normal.woff2) format("woff2"); font-weight: 300 700; font-display: swap; }
+  :root {
+    --bg: #f7f7f8; --surface: #ffffff; --surface-2: #f2f2f4; --border: #e3e3e8;
+    --text: #1d1d22; --text-2: #4a4a55; --muted: #6e6e7a;
+    --brand: #ff6600; --brand-ink: #c2410c; --brand-tint: #fff4ec;
+    --ok: #15803d; --code-bg: #1d1d22; --code-text: #f4f4f6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+      --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+      --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+      --ok: #4ade80; --code-bg: #0b0b0e; --code-text: #ececf0;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+    --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+    --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+    --ok: #4ade80; --code-bg: #0b0b0e; --code-text: #ececf0;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--brand-ink); }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 0 16px; }
+  header.top { background: linear-gradient(90deg, #ff6600, #f59e0b); color: #fff; }
+  header.top .wrap { padding-top: 20px; padding-bottom: 36px; }
+  .brand { display: inline-flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; opacity: .95; }
+  .brand img { width: 22px; height: 22px; }
+  h1, h2, h3 { font-family: "Overpass", "Noto Sans", system-ui, sans-serif; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.15; margin: 22px 0 10px; letter-spacing: -0.01em; }
+  .lede { font-size: 18px; max-width: 640px; margin: 0; color: rgba(255,255,255,.95); }
+  main { padding: 0 0 64px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: -22px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .card b { display: block; font-size: 15px; margin-bottom: 2px; }
+  .card span { color: var(--text-2); font-size: 14px; }
+  .card .tick { color: var(--ok); font-weight: 700; margin-right: 4px; }
+  section { margin-top: 44px; }
+  h2 { font-size: 24px; line-height: 1.25; margin: 0 0 10px; }
+  h3 { font-size: 17px; margin: 22px 0 6px; }
+  p, li { color: var(--text-2); }
+  .note { background: var(--brand-tint); border-left: 3px solid var(--brand); border-radius: 0 8px 8px 0; padding: 10px 14px; color: var(--text); font-size: 15px; }
+  pre { background: var(--code-bg); color: var(--code-text); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-size: 14px; line-height: 1.5; }
+  code { font-family: "Overpass Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; }
+  p code, li code, td code { background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; color: var(--text); }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; color: var(--text); white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  td { color: var(--text-2); }
+  .flow { list-style: none; padding: 0; margin: 14px 0 0; counter-reset: step; }
+  .flow li { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px 12px 52px; margin: 0 0 22px; counter-increment: step; }
+  .flow li::before { content: counter(step); position: absolute; left: 14px; top: 12px; width: 26px; height: 26px; border-radius: 50%; background: var(--brand); color: #fff; font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+  .flow li:not(:last-child)::after { content: ""; position: absolute; left: 26px; bottom: -22px; width: 2px; height: 22px; background: var(--border); }
+  .flow b { color: var(--text); }
+  .flow .where { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .02em; color: var(--brand-ink); background: var(--brand-tint); border-radius: 999px; padding: 1px 8px; margin-left: 6px; vertical-align: 1px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 12px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .stat .v { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
+  .stat .k { font-size: 13px; color: var(--muted); }
+  .usage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 12px; }
+  .usage-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
+  .usage-card h3 { font-size: 14px; margin: 0 0 6px; }
+  .usage-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; font-size: 13px; margin: 4px 0; }
+  .usage-row .bar { grid-column: 1 / -1; height: 4px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
+  .usage-row .bar span { display: block; height: 100%; background: var(--brand); border-radius: 2px; }
+  .usage-row .n { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .never { columns: 2 240px; column-gap: 24px; padding-left: 20px; }
+  .never li { break-inside: avoid; margin-bottom: 6px; }
+  footer { border-top: 1px solid var(--border); margin-top: 56px; padding-top: 18px; font-size: 14px; color: var(--muted); }
+  footer p { color: var(--muted); }
+
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 12px; }
+  figure { margin: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  figure img { display: block; width: 100%; height: auto; }
+  figcaption { padding: 8px 12px; font-size: 13px; color: var(--text-2); }
+  figcaption b { color: var(--text); }
+  .who { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 12px; }
+  .who > div { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; }
+  .who h3 { margin: 0 0 6px; }
+  .who ul { margin: 0; padding-left: 18px; }
+  .who li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/favicon.svg" alt="">MapNG</a>
+    <h1>How MapNG is built</h1>
+    <p class="lede">MapNG's code is written with Claude, an AI model made by Anthropic. I direct it, review it and test it. This page says what each of us does, how every change is checked, and where the checks fall short.</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="cards">
+    <div class="card"><b><span class="tick">✓</span>About 1,100 automated tests</b><span>All of them pass before a change is kept.</span></div>
+    <div class="card"><b><span class="tick">✓</span>99 full exports per sweep</b><span>Real places, three elevation sources, three terrain settings.</span></div>
+    <div class="card"><b><span class="tick">✓</span>Checked in the game</b><span>Measured in BeamNG.drive, with before and after pictures.</span></div>
+    <div class="card"><b><span class="tick">✓</span>Open source</b><span>MIT licence. Every change is in the public history.</span></div>
+  </div>
+
+  <section id="who">
+    <h2>Who does what</h2>
+    <p>I'm Nikki. I started MapNG in November 2025 and it has had over a thousand changes since. I don't type most of the code any more; Claude does. That is not the same as asking for an app and shipping whatever comes back.</p>
+    <div class="who">
+      <div>
+        <h3>What I do</h3>
+        <ul>
+          <li>Decide what MapNG should do, and what it should not.</li>
+          <li>Choose the data sources, and read their licences and usage rules.</li>
+          <li>Set the rules the code must follow (some are listed below).</li>
+          <li>Read tester reports and decide what to fix first.</li>
+          <li>Look at the result in the game and say when it is wrong.</li>
+          <li>Decide what goes to the public site and what stays a test build.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>What Claude does</h3>
+        <ul>
+          <li>Writes the code and its tests.</li>
+          <li>Finds the cause of a reported bug and shows the evidence.</li>
+          <li>Runs the test suite, the export sweep and the in-game checks.</li>
+          <li>Makes the plots and before and after pictures I review.</li>
+          <li>Says what it did not verify, so I know what is still a guess.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="testing">
+    <h2>How a change is tested</h2>
+    <ol class="flow">
+      <li><b>Automated tests.</b> About 1,100 tests in 167 files cover the pieces: road widths, bridges and tunnels, water, terrain repair, map data reading, the texts in all seven languages, and more. A change is kept only when all of them pass.</li>
+      <li><b>A plot first.</b> For anything that shapes terrain or structures, the expected result is drawn from above before a level is exported, so a wrong idea is caught before it is built.</li>
+      <li><b>The export sweep.</b> Before a change reaches the public site, MapNG exports 99 complete levels: a set of real test places, each on three elevation sources (1 m lidar, free lidar, global 30 m) and three terrain settings. Each export is measured (road steps, steep spots, sidewalks floating or buried, bridge decks, tunnels) and compared with recorded results. A number that got worse stops the change.</li>
+      <li><b>In the game.</b> Levels are loaded in BeamNG.drive and checked from several angles and from the driver's seat. Where it can be measured, it is: rays cast onto the road surface, heights read every half metre through a tunnel.</li>
+      <li><b>Test builds, then releases.</b> Desktop test builds go to testers who opted in. The stable release and the public site get a change only after that, and only when I say so.</li>
+    </ol>
+  </section>
+
+  <section id="rules">
+    <h2>Rules the code has to follow</h2>
+    <p>These are mine, and some of them are enforced by tests.</p>
+    <ul>
+      <li><b>No special cases for places.</b> A fix has to be a general rule that works everywhere. A test fails if a place name appears in the code.</li>
+      <li><b>Open data only</b>, worldwide where possible, and within each source's usage policy. OpenStreetMap's servers are asked as little as possible; MapNG keeps its own copy of the map for that reason.</li>
+      <li><b>Nothing is sent without your choice.</b> What can be sent, and when, is on the <a href="/data.html">data page</a>, and a test checks that the page's example matches what the app really sends.</li>
+      <li><b>Exporting never downloads.</b> Everything is fetched when you generate, so an export cannot fail halfway on a network error.</li>
+      <li><b>Every text in seven languages</b>, checked by a test.</li>
+    </ul>
+  </section>
+
+  <section id="example">
+    <h2>One day, as an example</h2>
+    <p>13 November 2026. Two reports came in from testers, and both were fixed the same day.</p>
+    <h3>A map that used the wrong data</h3>
+    <p>A tester near Naples saw his map fall back to a second-choice data source. The cause was a rounding mismatch of seven hundred-millionths of a degree along the edges where MapNG's map archives meet: a strip about 3.7 km deep was judged "not covered". It was fixed on the server for everyone, with no app update needed, and a test now covers it.</p>
+    <h3>Roads under the ground</h3>
+    <p>An experimental option builds BeamNG's Hero Roads over MapNG's roads. It went out in a test build after being tried only on flat ground. Within the hour a BeamNG developer reported that on hills most of the roads were under the terrain. He was right: measured in the game, terrain covered the road at 68% of the sampled points. After the fix it was 0.3%.</p>
+    <div class="pair">
+      <figure><img src="/how/hero-roads-before.jpg" alt="A hill road with patches of terrain showing through the road surface"><figcaption><b>Before.</b> Terrain shows through the road. Covered at 1,499 of 2,205 points.</figcaption></figure>
+      <figure><img src="/how/hero-roads-after.jpg" alt="The same hill road with a clean surface and markings"><figcaption><b>After.</b> The same spot. Covered at 9 of 2,592 points.</figcaption></figure>
+    </div>
+  </section>
+
+  <section id="limits">
+    <h2>What the tests do not catch</h2>
+    <p class="note">Tests find what they were written to look for. They did not catch the roads under the ground above; a tester did. That is why new features are marked experimental, why test builds exist, and why reports matter.</p>
+    <ul>
+      <li>The sweep uses a fixed set of places. The world has more shapes than that.</li>
+      <li>Looks are judged by eye. A level can pass every measurement and still look wrong.</li>
+      <li>Graphics cards and browsers differ. A problem report now includes the graphics card and driver for that reason.</li>
+      <li>Mistakes get through. When one does, the update notes say what happened and what changed.</li>
+    </ul>
+  </section>
+
+  <section id="see">
+    <h2>See for yourself</h2>
+    <ul>
+      <li><a href="https://github.com/nikkiluzader/mapng">The source code and its full history</a>, including the tests (<code>tests/</code>) and the sweep (<code>scripts/sweep/</code>).</li>
+      <li><a href="https://github.com/nikkiluzader/mapng/releases">Every release and test build</a>, with its notes.</li>
+      <li><a href="/data.html">What MapNG can send, and only if you choose to</a>.</li>
+      <li><a href="https://discord.gg/j6ZvcF8rgk">The Discord</a>, where reports come in and fixes are posted.</li>
+    </ul>
+    <p>Found something wrong? Use <b>Help &gt; Report a Problem</b> in the app, or post in the Discord. Reports from testers are credited in the update notes.</p>
+  </section>
+
+  <footer>
+    <p>MapNG is free and open source. <a href="https://github.com/nikkiluzader/mapng">GitHub</a> · <a href="/data.html">Your data</a> · <a href="/">Back to MapNG</a></p>
+    <p>Numbers on this page are as of November 2026.</p>
+  </footer>
+</main>
+</body>
+</html>

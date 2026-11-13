@@ -28,7 +28,8 @@
     "desktopBuild": "MapNG Desktop {version}",
     "desktopApp": "Приложение для ПК",
     "desktopAppTooltip": "MapNG для Windows и Linux: большие и плотные карты, уровни сохраняются прямо в BeamNG и обновляются с каждой новой версией",
-    "yourData": "Ваши данные"
+    "yourData": "Ваши данные",
+    "howBuilt": "Как это сделано"
   },
   "mode": {
     "singleTile": "Одиночный тайл",

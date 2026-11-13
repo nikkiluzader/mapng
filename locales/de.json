@@ -28,7 +28,8 @@
     "desktopBuild": "MapNG Desktop {version}",
     "desktopApp": "Desktop-App",
     "desktopAppTooltip": "MapNG für Windows und Linux: große und dichte Karten, Level direkt in BeamNG gespeichert, und deine Level werden mit jeder neuen Version aktualisiert",
-    "yourData": "Deine Daten"
+    "yourData": "Deine Daten",
+    "howBuilt": "So wird es gebaut"
   },
   "mode": {
     "singleTile": "Einzelnes Tile",

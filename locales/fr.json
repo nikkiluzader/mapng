@@ -28,7 +28,8 @@
     "desktopBuild": "MapNG Desktop {version}",
     "desktopApp": "Application de bureau",
     "desktopAppTooltip": "MapNG pour Windows et Linux : cartes grandes et denses, niveaux enregistrés directement dans BeamNG, et vos niveaux mis à jour à chaque nouvelle version",
-    "yourData": "Vos données"
+    "yourData": "Vos données",
+    "howBuilt": "Comment il est fait"
   },
   "mode": {
     "singleTile": "Tuile unique",

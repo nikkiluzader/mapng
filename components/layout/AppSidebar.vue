@@ -126,7 +126,7 @@ import { useI18n } from 'vue-i18n';
 import BaseButton from '../base/BaseButton.vue';
 import ModeToggle from '../ui/ModeToggle.vue';
 import { getSupportedLocales, setI18nLanguage } from '../../i18n';
-import { CircleHelp, Heart, Sun, Moon, Code, Download, RotateCw, Globe, Github, MessageCircle, Mail, Database, Shield, Share2 } from 'lucide-vue-next';
+import { CircleHelp, Heart, Sun, Moon, Code, Download, RotateCw, Globe, Github, MessageCircle, Mail, Database, Shield, Share2, FlaskConical } from 'lucide-vue-next';
 import { openShareDialog } from '../../composables/useShareDialog.js';
 
 const { t, locale } = useI18n({ useScope: 'global' });
@@ -143,6 +143,8 @@ const footerLinks = computed(() => [
   { key: 'contact', icon: Mail, label: t('sidebar.contact'), href: 'mailto:nikkiluzader@gmail.com' },
   ...(desktopApp ? [] : [{ key: 'desktop', icon: Download, label: t('sidebar.desktopApp'), title: t('sidebar.desktopAppTooltip'), href: DESKTOP_DOWNLOAD_URL }]),
   { key: 'data', icon: Database, label: t('sidebar.yourData'), href: desktopApp ? 'https://mapng.com/data.html' : '/data.html' },
+  // (who writes the code, how it is tested, what the tests miss: public/how-its-built.html)
+  { key: 'how', icon: FlaskConical, label: t('sidebar.howBuilt'), href: desktopApp ? 'https://mapng.com/how-its-built.html' : '/how-its-built.html' },
   { key: 'disclaimer', icon: Shield, label: t('sidebar.disclaimer'), emit: 'show-disclaimer' },
   { key: 'stack', icon: Code, label: t('sidebar.stack'), emit: 'show-stack' },
 ]);

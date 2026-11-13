@@ -33,7 +33,8 @@
     "desktopBuild": "MapNG Desktop {version}",
     "desktopApp": "Desktop app",
     "desktopAppTooltip": "MapNG for Windows and Linux: big and dense maps, levels saved straight to BeamNG, and your levels updated with each new version",
-    "yourData": "Your data"
+    "yourData": "Your data",
+    "howBuilt": "How it's built"
   },
   "mode": {
     "singleTile": "Single tile",
