@@ -7,6 +7,7 @@
 //   as: 'canvas'                     a canvas, as its PNG
 // The app writes them (services/platform/desktop.js packs them in the
 // page); the export runner revives them here.
+import { jsonArrayReader } from '../../services/bigJson.js';
 import { canvasToPng } from './fastPng.mjs';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -21,7 +22,12 @@ const TYPED = {
 
 async function revive(ref, dir) {
   const file = path.join(dir, path.basename(ref.$file));
-  if (ref.as === 'json') return JSON.parse(fs.readFileSync(file, 'utf8'));
+  if (ref.as === 'json') {
+    // (read a piece at a time: services/bigJson.js)
+    const reader = jsonArrayReader(); const fd = fs.openSync(file, 'r'); const buf = Buffer.alloc(8 << 20);
+    try { for (let n; (n = fs.readSync(fd, buf, 0, buf.length, null)) > 0;) reader.push(buf.subarray(0, n)); } finally { fs.closeSync(fd); }
+    return reader.end();
+  }
   const buf = fs.readFileSync(file);
   if (ref.as === 'canvas') {
     const img = await loadImage(buf);

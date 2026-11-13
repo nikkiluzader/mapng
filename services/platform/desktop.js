@@ -4,6 +4,7 @@
 // The terrain data goes over as files of a job (desktop/runner/jobFormat.mjs
 // reads them back): the OSM features as JSON, typed arrays as their bytes,
 // canvases and images as PNGs, the rest inline in job.json.
+import { jsonArrayChunks, jsonArrayReader } from '../bigJson.js';
 import { getLoadedOsmFile } from '../osmFile.js';
 import { toRaw } from 'vue';
 
@@ -120,7 +121,12 @@ async function packTerrainData(terrainData, job) {
     if (k === 'osmFeatures' && Array.isArray(v)) {
       // (the biggest value by far: one JSON file, not walked value by value)
       const file = `osmFeatures_${++job.files}.json`;
-      await sendBytes(job.id, file, new TextEncoder().encode(JSON.stringify(toRaw(v))));
+      // (a piece at a time, each added to the file: services/bigJson.js)
+      let first = true;
+      for (const chunk of jsonArrayChunks(toRaw(v))) {
+        const bytes = new TextEncoder().encode(chunk);
+        for (let o = 0; o < bytes.byteLength; o += CHUNK_BYTES) { await desktopApp.writeJobFile(job.id, file, bytes.subarray(o, Math.min(o + CHUNK_BYTES, bytes.byteLength)), !first); first = false; }
+      }
       out[k] = { $file: file, as: 'json' };
     } else if (k === 'sourceGeoTiffs') {
       // (the GeoTIFF readers stay behind; the export reads only their source)
@@ -214,7 +220,12 @@ async function reviveTerrainValue(value, base) {
     if (value.as === 'blobUrl' || value.as === 'canvas') return url;
     const r = await fetch(url);
     if (!r.ok) throw new Error(`terrain file ${value.$file}: ${r.status}`);
-    if (value.as === 'json') return r.json();
+    if (value.as === 'json') {
+      if (!r.body?.getReader) return r.json();
+      const reader = jsonArrayReader(); const stream = r.body.getReader();
+      for (;;) { const { done, value: bytes } = await stream.read(); if (done) break; reader.push(bytes); }
+      return reader.end();
+    }
     if (value.as === 'blob') {
       const blob = new Blob([await r.arrayBuffer()], { type: value.type || '' });
       terrainBlobUrls.set(blob, url);
