@@ -137,19 +137,6 @@ export function regionalSourcesAt(center) {
   return Object.keys(REGIONAL_COVERAGE).filter((k) => REGIONAL_COVERAGE[k].some(([s, w, n, e]) => lat >= s && lat <= n && lng >= w && lng <= e));
 }
 
-const USGS_PRODUCTS = 'https://tnmaccess.nationalmap.gov/api/v1/products';
-const USGS_1M = 'Digital Elevation Model (DEM) 1 meter';
-
-/** The proj4 text of a USGS 1 m tile's grid (NAD83 UTM north, by EPSG code; else the zone of the longitude). */
-export function usgsUtmDef(code, lng) {
-  let zone = 0;
-  if (code >= 26901 && code <= 26923) zone = code - 26900;          // NAD83 / UTM zone N
-  else if (code >= 6330 && code <= 6348) zone = code - 6329;        // NAD83(2011) / UTM zone N
-  else if (code >= 32601 && code <= 32660) zone = code - 32600;     // WGS 84 / UTM zone N
-  if (!zone) zone = Math.max(1, Math.min(60, Math.floor((lng + 180) / 6) + 1));
-  return `+proj=utm +zone=${zone} +ellps=GRS80 +towgs84=0,0,0 +units=m +no_defs`;
-}
-
 /**
  * The square from the USGS 1 m survey, read out of the survey's own files in place: each is a tile 10 km
  * across and 150 to 450 MB (two cover St. Augustine's centre: 580 MB), and a 500 m square of one is a few
@@ -160,25 +147,29 @@ export async function usgsPatch(center, { sideM = 512, px = 192, signal, onProgr
   const dLat = sideM / 2 / 111320, dLng = dLat / Math.cos((center.lat * Math.PI) / 180);
   const b = { n: center.lat + dLat, s: center.lat - dLat, w: center.lng - dLng, e: center.lng + dLng };
   onProgress?.('USGS…');
-  // (the catalogue can take half a minute to answer; no custom headers: it refuses the preflight)
-  const url = `${USGS_PRODUCTS}?datasets=${encodeURIComponent(USGS_1M)}&bbox=${b.w.toFixed(6)},${b.s.toFixed(6)},${b.e.toFixed(6)},${b.n.toFixed(6)}&prodFormats=GeoTIFF&max=16`;
-  let items = null;
-  for (let attempt = 0; attempt < 2 && !items; attempt++) {
-    const timer = new AbortController(); const stop = () => timer.abort();
-    const t = setTimeout(stop, 60000); signal?.addEventListener('abort', stop, { once: true });
-    try { const r = await fetch(url, { signal: timer.signal }); if (r.ok) items = (await r.json())?.items || []; }
-    catch { if (signal?.aborted) throw new Error('aborted'); }
-    finally { clearTimeout(t); signal?.removeEventListener('abort', stop); }
-  }
-  if (!items) throw new Error('USGS catalogue did not answer');
+  const { usgsCatalogue, usgsItemsOver, usgsUtmDef, readUsgsImageService } = await import('./usgsWindow.js');
+  // (the image service first: one request for the square; the survey's files when it does not answer)
+  try {
+    const pieces = await readUsgsImageService({ north: b.n, south: b.s, east: b.e, west: b.w }, { signal });
+    if (!pieces.length) return null;
+    const grid = new Float32Array(px * px).fill(NaN); let got = 0;
+    for (const { image, raster, noData } of pieces) {
+      const [x0, y0, x1, y1] = image.getBoundingBox(); const W = image.getWidth(), H = image.getHeight();
+      for (let j = 0; j < px; j++) for (let i = 0; i < px; i++) {
+        const at = j * px + i; if (Number.isFinite(grid[at])) continue;
+        const lng = b.w + ((i + 0.5) / px) * (b.e - b.w), lat = b.n - ((j + 0.5) / px) * (b.n - b.s);
+        const v = bilinearAt(raster, W, H, ((lng - x0) / (x1 - x0)) * W - 0.5, ((y1 - lat) / (y1 - y0)) * H - 0.5, noData);
+        if (Number.isFinite(v)) { grid[at] = v; got++; }
+      }
+    }
+    return got > grid.length * 0.2 ? grid : null;
+  } catch (e) { if (signal?.aborted) throw e; console.warn('[Compare] USGS image service', e); }
+  const listed = await usgsCatalogue({ north: b.n, south: b.s, east: b.e, west: b.w }, { signal, tries: 2 });
+  if (!listed) throw new Error('USGS catalogue did not answer');
+  const items = usgsItemsOver(listed, { north: b.n, south: b.s, east: b.e, west: b.w });
   if (!items.length) return null;
   const [{ fromUrl }, { default: proj4 }] = await Promise.all([import('geotiff'), import('proj4')]);
   const out = new Float32Array(px * px).fill(NaN); let filled = 0;
-  // (the catalogue lists every project's tile near the box, neighbours included: in Little Cottonwood Canyon
-  // the first four of seven were three of the tile next door and one project that is empty there)
-  items = items.filter((it) => { const q = it.boundingBox; return !q || !(q.maxX < b.w || q.minX > b.e || q.maxY < b.s || q.minY > b.n); });
-  // (the newest survey first: the catalogue lists overlapping projects)
-  items.sort((p, q) => String(q.publicationDate || '').localeCompare(String(p.publicationDate || '')));
   for (let k = 0; k < items.length && filled < out.length; k++) {
     signal?.throwIfAborted?.();
     onProgress?.(`USGS ${k + 1}/${items.length}…`);

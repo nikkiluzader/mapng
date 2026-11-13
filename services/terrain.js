@@ -24,6 +24,7 @@ import {
 } from "./resamplerClient.js";
 import { createLocalToWGS84 } from "./geoUtils.js";
 import { fetchKron86GridForBounds, isWithinKron86Coverage } from "./kron86.js";
+import { readUsgsWindows, readUsgsImageService } from "./usgsWindow.js";
 import { fetchMapterhornRaw } from "./mapterhorn.js";
 import { isGroundLevelRoad, smoothRoadsInHeightmap } from "./roadSmoother.js";
 import { snapRoadsToTerrain } from "./roadSnap.js";
@@ -1651,130 +1652,56 @@ export const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal, { skipBox
  *
  * @returns {{ data: Array<{image, raster}>, rawArrayBuffers: ArrayBuffer[] } | null}
  */
-const fetchUSGSRaw = async (bounds, onProgress, signal) => {
-  const MAX_RETRIES = 3;
-  const RETRY_DELAY = 1000;
-
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
+const fetchUSGSRaw = async (bounds, onProgress, signal, { metersPerPixel = 1 } = {}) => {
   try {
     signal?.throwIfAborted();
-    // 1. Query USGS API (a box across the date line: each side on its own,
-    // the far Aleutians; TNM's answers past ±180 were unreliable)
-    const queryProducts = async (b) => {
-      // Round coordinates to 6 decimal places to improve cache hit rate and reduce query string length
-      const bbox = `${b.west.toFixed(6)},${b.south.toFixed(6)},${b.east.toFixed(6)},${b.north.toFixed(6)}`;
-      // Limit to 4 tiles to cover corners/overlaps without overloading memory
-      const url = `${USGS_PRODUCT_API}?datasets=${encodeURIComponent(USGS_DATASET)}&bbox=${bbox}&prodFormats=GeoTIFF&max=4`;
-
-      console.log(`[USGS] Querying products: ${url}`);
-
-      let response = null;
-      let attempts = 0;
-
-      while (attempts < MAX_RETRIES) {
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
-
-          response = await fetch(url, {
-            signal: signal || controller.signal,
-            // Ensure no custom headers are sent to avoid preflight OPTIONS request which fails on USGS
-            headers: {},
-          });
-          clearTimeout(timeoutId);
-
-          if (response.ok) break;
-
-          console.warn(
-            `[USGS] API Query failed: ${response.status}. Retrying...`,
-          );
-        } catch (err) {
-          console.warn(`[USGS] Network error: ${err}. Retrying...`);
-        }
-
-        attempts++;
-        await sleep(RETRY_DELAY * attempts);
-      }
-
-      if (!response || !response.ok) {
-        console.warn(`[USGS] Failed to query API after ${MAX_RETRIES} attempts.`);
-        return null;
-      }
-
-      try {
-        const text = await response.text();
-        return JSON.parse(text).items || [];
-      } catch (e) {
-        console.warn(`[USGS] Failed to parse API response as JSON:`, e);
-        return null;
-      }
-    };
-
+    // (a box across the date line: each side on its own, the far Aleutians; TNM's answers past ±180 were unreliable)
     const boxes = bounds.east > 180
       ? [{ ...bounds, east: 180 }, { ...bounds, west: -180, east: bounds.east - 360 }]
       : bounds.west < -180
         ? [{ ...bounds, west: bounds.west + 360, east: 180 }, { ...bounds, west: -180 }]
         : [bounds];
-    const items = [];
-    for (const box of boxes) {
-      const found = await queryProducts(box);
-      if (!found) return null;
-      for (const item of found) if (!items.some((i) => i.downloadURL === item.downloadURL)) items.push(item);
-    }
-    const data = { items };
-
-    if (!data.items || data.items.length === 0) {
-      console.log(`[USGS] No products found for bounds.`);
-      return null;
-    }
-
-    onProgress?.(`Found ${data.items.length} USGS tiles. Downloading...`);
-
-    const results = [];
-    const rawArrayBuffers = [];
-
-    // 2. Download GeoTIFFs sequentially
-    // We process sequentially to avoid memory exhaustion with large 1m tiles
-    for (let i = 0; i < data.items.length; i++) {
-      const item = data.items[i];
-      const downloadUrl = item.downloadURL;
-      onProgress?.(`${fetchWord('Downloading')} USGS tile ${i + 1}/${data.items.length}...`);
-      signal?.throwIfAborted();
-
-      try {
-        const tiffResponse = await fetch(downloadUrl, { signal });
-        if (!tiffResponse.ok) {
-          console.warn(
-            `[USGS] Failed to download tile: ${tiffResponse.status}`,
-          );
-          continue;
-        }
-
-        const arrayBuffer = await tiffResponse.arrayBuffer();
-
-        // 3. Parse GeoTIFF
-        const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
-        const image = await tiff.getImage();
-        const rasters = await image.readRasters();
-        const raster = rasters[0]; // Height data
-
-        await tiff.close();
-
-        results.push({ image, raster });
-        rawArrayBuffers.push(arrayBuffer);
-      } catch (e) {
-        console.warn(`[USGS] Failed to parse tile ${downloadUrl}`, e);
+    // First the 3DEP image service: the map's own box, 1 m surveys only, mosaicked by USGS (services/usgsWindow.js).
+    // The tiles were downloaded whole before: 150 to 450 MB each, four at most, as the catalogue listed them.
+    try {
+      const pieces = []; let answered = true;
+      onProgress?.('Reading USGS 1 m elevation for the map...');
+      for (const box of boxes) {
+        const got = await readUsgsImageService(box, { metersPerPixel, signal, onProgress: (i, n) => onProgress?.(`Reading USGS 1 m elevation for the map: piece ${i}/${n}...`) });
+        if (!got) { answered = false; break; }
+        pieces.push(...got);
       }
+      if (answered) {
+        if (!pieces.length) { console.log('[USGS] The 1 m surveys have nothing for these bounds.'); return null; }
+        const bytes = pieces.reduce((a, p) => a + p.arrayBuffer.byteLength, 0);
+        console.info(`[USGS] image service: ${pieces.length} piece(s), ${(bytes / 2 ** 20).toFixed(1)} MB`);
+        return { data: pieces.map(({ image, raster, noData }) => ({ image, raster, noData })), rawArrayBuffers: pieces.map((p) => p.arrayBuffer) };
+      }
+    } catch (e) {
+      if (signal?.aborted) throw e;
+      console.warn('[USGS] The image service did not answer; reading the survey files in place instead:', e);
     }
-
+    onProgress?.('Asking the USGS catalogue for 1 m tiles...');
+    const results = [];
+    for (const box of boxes) {
+      // Only the part of each tile under the map is read (services/usgsWindow.js): the tiles are 150 to
+      // 450 MB each and were downloaded whole, four at most and as listed, neighbours included.
+      const windows = await readUsgsWindows(box, {
+        signal,
+        onProgress: (i, n) => onProgress?.(`Reading USGS 1 m tile ${i + 1}/${n} (only the part under the map)...`),
+      });
+      if (windows === null) { console.warn('[USGS] The catalogue did not answer.'); return null; }
+      for (const w of windows) results.push({ ...w, layerIndex: results.length });
+    }
     if (results.length === 0) {
-      console.warn("[USGS] All tile downloads failed.");
+      console.log('[USGS] No 1 m tiles for these bounds.');
       return null;
     }
-
-    return { data: results, rawArrayBuffers };
+    console.info(`[USGS] ${results.length} tile window(s), ${(results.reduce((a, r) => a + r.bytes, 0) / 2 ** 20).toFixed(1)} MB of heights: ${results.map((r) => r.title).join('; ')}`);
+    // (no whole source files any more: the GeoTIFF export builds its own from the map's heights)
+    return { data: results, rawArrayBuffers: [] };
   } catch (e) {
+    if (signal?.aborted) throw e;
     console.warn("Failed to load USGS terrain:", e);
     return null;
   }
@@ -2096,7 +2023,7 @@ export const fetchTerrainData = async (
     fetchBounds.east < -154;
 
   if (!rawData && useUSGS && (isCONUS || isAlaska || isHawaii)) {
-    const usgsResult = await fetchUSGSRaw(fetchBounds, onProgress, signal);
+    const usgsResult = await fetchUSGSRaw(fetchBounds, onProgress, signal, { metersPerPixel: effectiveMetersPerPixel });
     if (usgsResult) {
       rawData = usgsResult.data;
       if (keepSourceGeoTiffs) {

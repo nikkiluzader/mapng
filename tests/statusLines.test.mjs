@@ -28,7 +28,7 @@ const REAL = [
   'Planting trees and bushes where the land cover (ESA WorldCover) has them, rocks, ground cover and props…',
   'Loading bundled assets (MapNG flag, reflection cubemap)…', 'Assembling the level files (levels/cordova_street/…)…',
   'Compressing 497 files (66.7 MB) into the level ZIP…', 'Compressing the level ZIP (66.7 MB, 497 files): art/cubemaps/skybox4.hdr.dds (5.3 MB)…', 'Done',
-  'Downloading NMT EVRF2007 tile 3/12 (2023)...', 'Fetching GPXZ tiles... 3/9 (87 API calls remaining today)', 'Combined level: Compressing ZIP...',
+  'Downloading NMT EVRF2007 tile 3/12 (2023)...', 'Reading USGS 1 m elevation for the map...', 'Reading USGS 1 m elevation for the map: piece 2/4...', 'Asking the USGS catalogue for 1 m tiles...', 'Reading USGS 1 m tile 2/5 (only the part under the map)...', 'Fetching GPXZ tiles... 3/9 (87 API calls remaining today)', 'Combined level: Compressing ZIP...',
 ];
 
 test('every language has every status line, with the same gaps', () => {
