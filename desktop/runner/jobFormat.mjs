@@ -7,6 +7,7 @@
 //   as: 'canvas'                     a canvas, as its PNG
 // The app writes them (services/platform/desktop.js packs them in the
 // page); the export runner revives them here.
+import { canvasToPng } from './fastPng.mjs';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -100,7 +101,7 @@ export async function writeJobValue(value, key, dir, state = { files: 0 }) {
   }
   if (isNapiCanvas(value)) {
     const file = name('.png');
-    fs.writeFileSync(path.join(dir, file), await value.encode('png'));
+    fs.writeFileSync(path.join(dir, file), await canvasToPng(value));
     return { $file: file, as: 'canvas' };
   }
   if (Array.isArray(value)) {

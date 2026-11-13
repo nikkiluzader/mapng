@@ -3,6 +3,7 @@
 // Image, ImageData and createImageBitmap, and blob: URLs kept in memory so
 // images and fetch() can read them back. (scripts/sweep/polyfill.mjs stubs
 // the images instead; the desktop app needs the real ones.)
+import { canvasToPng } from './fastPng.mjs';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -34,7 +35,8 @@ export function withBrowserMethods(canvas) {
   canvas.toBlob = function toBlob(callback, type, quality) {
     const mime = mimeOf(type);
     const q = Number.isFinite(quality) ? Math.round(quality * 100) : undefined;
-    this.encode(mime === 'image/png' ? 'png' : mime.slice(6), q)
+    // (a PNG: written on many cores, fastPng.mjs; the canvas's own encoder takes 10 s for an 8 km texture)
+    (mime === 'image/png' ? canvasToPng(this) : this.encode(mime.slice(6), q))
       .then((buf) => callback(new Blob([buf], { type: mime })), () => callback(null));
   };
   canvas.convertToBlob = function convertToBlob({ type, quality } = {}) {
