@@ -25,6 +25,8 @@ const MAX_FILL_M = 4;                  // cover made up with fill over the tube,
 const NOTCH_M = 60;                    // ... but a dip this short (a gully the line crosses,
 const NOTCH_FILL_M = 40;               // often just OSM a few m off a cliff face) is plugged this deep
 const MAX_SHORT_SHARE = 0.4;           // more of the tube than this short of cover: not a tunnel here
+const LEVEL_TUBE_SLACK_M = 20;           // ... when the level bore is no more than this much shorter than the dug one
+const DIG_FOR_COVER_M = 0.5;           // a bore's road is lowered under thin ground by this much at most before the cover is made up instead
 const OPEN_RUN_BED_M = 1;             // a stretch too thinly covered to fill stands in the open as a gallery when the ground is this far over the road all along it
 export const MIN_TUBE_M = 20;          // a shorter bore is left on the ground
 const SMOOTH_SIGMA_M = 15;             // vertical curves on the profile
@@ -127,6 +129,8 @@ const CUT_APRON_SQUARES = 0.75;         // ... and this much of a grid square (t
 const RAW_HEAD_GROW_M = 3;              // terrain shaping off: the headwall this much taller and wider each side           // terrain shaping off: a portal where the ground is no more than this over the road            // the approach meets the ground again within this
 const APPROACH_FIT_M = [4, 40];        // approach road samples a portal's height is fitted to
 const APPROACH_MAX_GRADE = 0.25;
+const APPROACH_FAR_FIT_M = [20, 70];   // ... and the road further out, for an end under a roof the survey shows as ground
+const APPROACH_ROOF_STEP_M = 1.5;      // the near fit this far over the far road's line carried in: a roof, the far line is the road
 
 // Lights (wcusa ligtemitters_tunnels, castShadows off) and Zones
 export const LIGHT_SPACING_M = 8;
@@ -279,12 +283,25 @@ function splitBranches(parts, group, ends, key) {
 
 /** A portal's height from the approach road's ground (Theil-Sen, as the bridges do). */
 export function fitApproachHeight(approach, groundAt) {
+  const all = fitApproachWindow(approach, groundAt, APPROACH_FIT_M);
+  if (all == null) return null;
+  // A roof or a lid in the survey right at the tunnel's end (an avalanche gallery's roof, a portal hood: fine
+  // elevation shows their tops as the ground, and the road smoothing blends them into the road for 20 m out)
+  // lifts the nearest samples off the road. The road further out says where it really is: when the near fit
+  // stands well over the far road's own line carried in to the end, the far line is the road (the D 902's
+  // tunnels along Lac du Chevril came out 2.5 and 3.5 m too high at their ends, the open road between them
+  // dipping and climbing back).
+  const far = fitApproachWindow(approach, groundAt, APPROACH_FAR_FIT_M);
+  return far != null && all - far > APPROACH_ROOF_STEP_M ? far : all;
+}
+
+function fitApproachWindow(approach, groundAt, [from, to]) {
   if (!approach || approach.length < 2) return null;
   const samples = [];
   let s0 = 0;
-  for (let i = 0; i + 1 < approach.length && s0 < APPROACH_FIT_M[1]; i++) {
+  for (let i = 0; i + 1 < approach.length && s0 < to; i++) {
     const L = Math.hypot(approach[i + 1][0] - approach[i][0], approach[i + 1][1] - approach[i][1]);
-    for (let s = Math.ceil(Math.max(s0, APPROACH_FIT_M[0]) / 2) * 2; s <= Math.min(s0 + L, APPROACH_FIT_M[1]); s += 2) {
+    for (let s = Math.ceil(Math.max(s0, from) / 2) * 2; s <= Math.min(s0 + L, to); s += 2) {
       const t = (s - s0) / (L || 1);
       samples.push([s, groundAt(approach[i][0] + (approach[i + 1][0] - approach[i][0]) * t, approach[i][1] + (approach[i + 1][1] - approach[i][1]) * t)]);
     }
@@ -359,7 +376,18 @@ function stations(xy, step = STEP_M) {
  */
 export function solveTunnel(path, opts) {
   if (path.gallery) return solveGallery(path, opts);
-  const bored = solveTunnelAs(path, opts, false);
+  // A bore's road is the straight grade between its portals. It is dug deeper for cover only a little
+  // (DIG_FOR_COVER_M): a road sagging 3.5 m under what the survey shows as ground was the D 902 along Lac du
+  // Chevril, whose avalanche galleries' roofs are that ground (lidar-road 7 to 9 m for 150 m of a way tagged
+  // tunnel=yes). What cover is still missing is made up over the tube, or the tube stands in the open as a
+  // gallery, as for any dip. Only a tunnel that cannot be built that way is dug as deep as the cover asks.
+  // (... and only where the level road is as much of a tunnel: under a city lid a little too thin all along
+  // (Deck Park, Phoenix) the level solve bored 26 m of 818 and laid the rest open in a cutting through the park)
+  const level = solveTunnelAs(path, opts, false, DIG_FOR_COVER_M);
+  const dug = solveTunnelAs(path, opts, false);
+  // (a tunnel the old solve would not build is not built this way either: a wider bore tried for a joining
+  // ramp passed as a level 26 m stub where it used to be refused, and the narrower one never got its turn)
+  const bored = level.ok && dug.ok && level.tubeLength >= dug.tubeLength - LEVEL_TUBE_SLACK_M ? level : dug;
   if (bored.ok || !/not under ground|bore only/.test(bored.reason)) return bored;
   // too little ground for a bore's arch, but a hump of a few metres all along
   // the road, at its own level: a concrete box under a ski piste, a lawn, a
@@ -654,7 +682,7 @@ function overTheStep(path, opts) {
   return xy === path.xy ? [path, opts] : [{ ...path, xy }, { ...opts, approaches }];
 }
 
-function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = () => false, squareSize = 1, raw = false }, mode) {
+function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = () => false, squareSize = 1, raw = false }, mode, digMax = Infinity) {
   // mode: false a bore, true a cut-and-cover box sunk under the street, 'low' a low box at the road's own level
   const cutCover = mode === true;
   const low = mode === 'low';
@@ -731,7 +759,8 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
     z = st.map((p) => endZ[0] + ((endZ[1] - endZ[0]) * p.s) / (L || 1));
     // (a low box: the road where it is between its ends, never dug down for cover:
     // under flat ground that is cut and cover's job)
-    if (!low) z = z.map((v, i) => Math.min(v, g[i] - need));
+    // (... by digMax at most: see solveTunnel)
+    if (!low) z = z.map((v, i) => Math.max(v - digMax, Math.min(v, g[i] - need)));
     z[0] = endZ[0];
     z[n - 1] = endZ[1];
     for (let i = 1; i < n; i++) z[i] = Math.max(z[i], z[i - 1] - MAX_GRADE * (st[i].s - st[i - 1].s));

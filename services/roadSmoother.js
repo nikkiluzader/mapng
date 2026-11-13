@@ -318,7 +318,7 @@ function corridorHalfWidthMeters(corridor, isUrbanRoad) {
  * Build per-corridor elevation profiles: pixel-space sample points, original
  * and smoothed Z arrays, and cumulative arc length in metres.
  */
-function buildCorridorProfiles(corridors, heightMap, width, height, project, metersPerPixel, bridgeNodes = new Set(), tuning = TUNING.coarse) {
+function buildCorridorProfiles(corridors, heightMap, width, height, project, metersPerPixel, bridgeNodes = new Set(), tuning = TUNING.coarse, tunnelNodes = new Set()) {
     const maxSegmentLengthPx = Math.max(1, SAMPLE_SPACING_M / metersPerPixel);
     const windowSamples = Math.max(3, Math.round(tuning.window / SAMPLE_SPACING_M));
     const profiles = [];
@@ -347,6 +347,13 @@ function buildCorridorProfiles(corridors, heightMap, width, height, project, met
         const bridgeAtEnd = bridgeNodes.has(baseKey(corridor.endKey));
         if (bridgeAtStart) holdGradeToBridge(zOrig, cumLenM, false);
         if (bridgeAtEnd) holdGradeToBridge(zOrig, cumLenM, true);
+        // A road running into a tunnel: fine elevation shows what stands over the mouth as the ground (an
+        // avalanche gallery's roof, a portal hood, the hillside over the bore), a step of several metres in
+        // the road's last metres. liftOverCliffs then built a 10 % ramp up onto the roof and the tunnel
+        // started 3.5 m too high (D 902 along Lac du Chevril: the road dipped and climbed back between its
+        // galleries). The last metres follow the grade the road arrives with, as at a bridge.
+        if (!bridgeAtStart && tunnelNodes.has(baseKey(corridor.startKey))) holdGradeToBridge(zOrig, cumLenM, false, true);
+        if (!bridgeAtEnd && tunnelNodes.has(baseKey(corridor.endKey))) holdGradeToBridge(zOrig, cumLenM, true, true);
 
         liftOverCliffs(zOrig, cumLenM);
 
@@ -367,7 +374,7 @@ function buildCorridorProfiles(corridors, heightMap, width, height, project, met
  * end meeting a bridge) that stand off the grade fitted behind them, run
  * from the end inwards, laid on that grade.
  */
-function holdGradeToBridge(z, cumLenM, atEnd) {
+function holdGradeToBridge(z, cumLenM, atEnd, onlyAbove = false) {
     const n = z.length;
     const total = cumLenM[n - 1];
     const dist = (i) => (atEnd ? total - cumLenM[i] : cumLenM[i]);
@@ -388,7 +395,10 @@ function holdGradeToBridge(z, cumLenM, atEnd) {
     const order = atEnd ? Array.from({ length: n }, (_, k) => n - 1 - k) : Array.from({ length: n }, (_, k) => k);
     let replace = -1;   // index (in order) of the innermost sample to lay on the grade
     order.forEach((i, k) => {
-        if (dist(i) <= BRIDGE_END_TRIM_M && (z[i] === NO_DATA_VALUE || Math.abs(z[i] - (at0 + slope * dist(i))) > BRIDGE_END_TOL_M)) replace = k;
+        // (onlyAbove, at a tunnel: only ground standing over the grade is a roof; ground under it is a road
+        // coming down into its tunnel, or a structure bare earth took out, which liftOverCliffs sees to)
+        const off = z[i] === NO_DATA_VALUE ? Infinity : z[i] - (at0 + slope * dist(i));
+        if (dist(i) <= BRIDGE_END_TRIM_M && (onlyAbove ? off > BRIDGE_END_TOL_M : Math.abs(off) > BRIDGE_END_TOL_M)) replace = k;
     });
     for (let k = 0; k <= replace; k++) z[order[k]] = at0 + slope * dist(order[k]);
 }
@@ -612,7 +622,17 @@ export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeat
         if (tags.tunnel === 'yes' || tags.covered === 'yes') continue;
         for (const p of f.geometry) bridgeNodes.add(makeRoadNodeKey(p));
     }
-    const profiles = buildCorridorProfiles(corridors, heightMap, width, height, project, metersPerPixel, bridgeNodes, tuning);
+    // nodes where a ground road runs into a tunnel or an avalanche gallery
+    // (fine elevation only: 30 m data has no roofs in it, only the hillside smeared over the mouth, and
+    // a road held to its grade there was cut 20 m into it beside its bridges: D 87A at Tignes)
+    const tunnelNodes = new Set();
+    for (const f of (fine ? osmFeatures : [])) {
+        if (f?.type !== 'road' || !Array.isArray(f.geometry) || NON_DRIVEABLE_HIGHWAYS.has(f.tags?.highway)) continue;
+        const t = f.tags?.tunnel;
+        if (t !== 'yes' && t !== 'avalanche_protector') continue;
+        for (const p of [f.geometry[0], f.geometry[f.geometry.length - 1]]) tunnelNodes.add(makeRoadNodeKey(p));
+    }
+    const profiles = buildCorridorProfiles(corridors, heightMap, width, height, project, metersPerPixel, bridgeNodes, tuning, tunnelNodes);
     if (profiles.length === 0) return;
 
     pinJunctionElevations(profiles, tuning);
