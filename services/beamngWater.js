@@ -66,10 +66,48 @@ const isUnderground = (tags = {}) => ['culvert', 'yes', 'flooded', 'building_pas
   || norm(tags.culvert) === 'yes' || norm(tags.location) === 'underground' || Number.parseInt(tags.layer ?? '0', 10) < 0;
 const isClosed = (g) => g.length > 3 && g[0].lat === g[g.length - 1].lat && g[0].lng === g[g.length - 1].lng;
 
+// Even-odd point test. A long outline (a river bank of thousands of points, asked about every pixel of its
+// box) is sorted once into bands by height: only the edges whose span reaches the point's band can cross its
+// row, so only they are tested, with the same arithmetic as before (carving lake beds was 14 s of an 8 km
+// export, nearly all of it here).
+const RING_BANDS_FROM = 24;
+const ringBands = new WeakMap();
+function bandsOf(ring) {
+  let ix = ringBands.get(ring);
+  if (ix && ix.n === ring.length) return ix;
+  const n = ring.length;
+  const xs = new Float64Array(n); const ys = new Float64Array(n);
+  let y0 = Infinity; let y1 = -Infinity;
+  for (let i = 0; i < n; i++) { xs[i] = ring[i][0]; ys[i] = ring[i][1]; if (ys[i] < y0) y0 = ys[i]; if (ys[i] > y1) y1 = ys[i]; }
+  const count = Math.min(1024, Math.max(1, n >> 2));
+  const h = (y1 - y0) / count || 1;
+  const band = (y) => Math.min(count - 1, Math.max(0, Math.floor((y - y0) / h)));
+  const lists = Array.from({ length: count }, () => []);
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const lo = band(Math.min(ys[i], ys[j])); const hi = band(Math.max(ys[i], ys[j]));
+    for (let b = lo; b <= hi; b++) lists[b].push(i);
+  }
+  ix = { n, xs, ys, y0, y1, h, count, edges: lists.map((l) => Int32Array.from(l)) };
+  ringBands.set(ring, ix);
+  return ix;
+}
 function pointInRing(x, y, ring) {
   let inside = false;
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-    const [xi, yi] = ring[i]; const [xj, yj] = ring[j];
+  const n = ring.length;
+  if (n < RING_BANDS_FROM) {
+    for (let i = 0, j = n - 1; i < n; j = i++) {
+      const xi = ring[i][0]; const yi = ring[i][1]; const xj = ring[j][0]; const yj = ring[j][1];
+      if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  }
+  const ix = bandsOf(ring);
+  if (!(y >= ix.y0 && y <= ix.y1)) return false;   // (no edge crosses a row outside the outline's own span)
+  const edges = ix.edges[Math.min(ix.count - 1, Math.max(0, Math.floor((y - ix.y0) / ix.h)))];
+  const { xs, ys } = ix;
+  for (let e = 0; e < edges.length; e++) {
+    const i = edges[e]; const j = i === 0 ? n - 1 : i - 1;
+    const xi = xs[i]; const yi = ys[i]; const xj = xs[j]; const yj = ys[j];
     if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
   }
   return inside;

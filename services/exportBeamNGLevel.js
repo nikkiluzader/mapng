@@ -3546,9 +3546,13 @@ function cutPaintAtOtherRoads(paintDecals, index, drivableRoads, ownersAtNode, z
     const margin = isLine ? PAINT_CUT_MARGIN_M.line : PAINT_CUT_MARGIN_M.edge;
     // (a carriageway on another level never cuts it: both decks of a
     // double-deck bridge lost every lane line, each "under" the other)
+    // (this road's own height at a point is read once, not once for every other road near it)
+    let ownX = NaN; let ownY = NaN; let ownZ = null;
     const otherLevel = heightOf ? (o, x, y) => {
-      const zo = heightOf(o, x, y); const zs = heightOf(owner, x, y);
-      return zo !== null && zs !== null && Math.abs(zo - zs) > PAINT_CUT_LEVEL_M;
+      if (x !== ownX || y !== ownY) { ownX = x; ownY = y; ownZ = heightOf(owner, x, y); }
+      if (ownZ === null) return false;
+      const zo = heightOf(o, x, y);
+      return zo !== null && Math.abs(zo - ownZ) > PAINT_CUT_LEVEL_M;
     } : () => false;
     const runs = cutNodes(decal.nodes, (x, y) => (
       isOnOtherCarriageway(index, x, y, margin, (o) => ignore.has(o) || otherLevel(o, x, y))

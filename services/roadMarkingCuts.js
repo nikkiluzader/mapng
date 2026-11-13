@@ -17,13 +17,18 @@ const SIDE_SLACK = 0.02;
  */
 const halfOfSegment = (s, t) => (s.halfA === undefined ? s.half : s.halfA + (s.halfB - s.halfA) * t);
 
+// A grid cell as one number (cells within a million of the origin: a level is a few thousand across). It was
+// a string, made anew for every one of the millions of look-ups an 8 km export does: 8 s of an export in
+// isOnOtherCarriageway alone, and work for the garbage collector besides.
+const cellKey = (gx, gy) => (gx + 1048576) * 2097152 + (gy + 1048576);
+
 export function buildCarriagewayIndex(carriageways) {
   const segments = [];
   const grid = new Map();
   const add = (idx, x0, y0, x1, y1) => {
     for (let gx = Math.floor(x0 / CELL_M); gx <= Math.floor(x1 / CELL_M); gx++) {
       for (let gy = Math.floor(y0 / CELL_M); gy <= Math.floor(y1 / CELL_M); gy++) {
-        const key = `${gx},${gy}`;
+        const key = cellKey(gx, gy);
         if (!grid.has(key)) grid.set(key, []);
         grid.get(key).push(idx);
       }
@@ -53,7 +58,7 @@ export function buildCarriagewayIndex(carriageways) {
  */
 export function carriagewaysAt(index, x, y, margin, { sides = false } = {}) {
   const out = [];
-  const cell = index.grid.get(`${Math.floor(x / CELL_M)},${Math.floor(y / CELL_M)}`);
+  const cell = index.grid.get(cellKey(Math.floor(x / CELL_M), Math.floor(y / CELL_M)));
   if (!cell) return out;
   for (const idx of cell) {
     const s = index.segments[idx];
@@ -76,11 +81,10 @@ export function carriagewaysAt(index, x, y, margin, { sides = false } = {}) {
  * `ignore(owner)` skips the road itself and its plain continuations.
  */
 export function isOnOtherCarriageway(index, x, y, margin, ignore) {
-  const cell = index.grid.get(`${Math.floor(x / CELL_M)},${Math.floor(y / CELL_M)}`);
+  const cell = index.grid.get(cellKey(Math.floor(x / CELL_M), Math.floor(y / CELL_M)));
   if (!cell) return false;
   for (const idx of cell) {
     const s = index.segments[idx];
-    if (ignore(s.owner)) continue;
     const dx = s.bx - s.ax;
     const dy = s.by - s.ay;
     const len = dx * dx + dy * dy;
@@ -88,7 +92,9 @@ export function isOnOtherCarriageway(index, x, y, margin, ignore) {
     const ex = s.ax + t * dx - x;
     const ey = s.ay + t * dy - y;
     const reach = halfOfSegment(s, t) + margin;
-    if (ex * ex + ey * ey < reach * reach) return true;
+    // (the distance first, then whose road it is: `ignore` can be dear, the export's reads both roads'
+    // heights there, and most segments of a cell are not within reach at all)
+    if (ex * ex + ey * ey < reach * reach && !ignore(s.owner)) return true;
   }
   return false;
 }
@@ -138,7 +144,7 @@ export function cutNodes(nodes, blocked, { minPieceM = 3 } = {}) {
 // Segments within reach of (x, y): [{ s, distance }].
 function nearbySegments(index, x, y, extra) {
   const out = [];
-  for (const idx of index.grid.get(`${Math.floor(x / CELL_M)},${Math.floor(y / CELL_M)}`) || []) {
+  for (const idx of index.grid.get(cellKey(Math.floor(x / CELL_M), Math.floor(y / CELL_M))) || []) {
     const s = index.segments[idx];
     const dx = s.bx - s.ax;
     const dy = s.by - s.ay;
@@ -191,7 +197,7 @@ function zoneGridFor(zones) {
     const r = Math.hypot(z.halfLength, z.halfWidth);
     for (let gx = Math.floor((z.x - r) / CELL_M); gx <= Math.floor((z.x + r) / CELL_M); gx++) {
       for (let gy = Math.floor((z.y - r) / CELL_M); gy <= Math.floor((z.y + r) / CELL_M); gy++) {
-        const key = `${gx},${gy}`;
+        const key = cellKey(gx, gy);
         if (!grid.has(key)) grid.set(key, []);
         grid.get(key).push(z);
       }
@@ -207,7 +213,7 @@ function zoneGridFor(zones) {
  */
 export function isInZone(zones, x, y) {
   if (!zones?.length) return false;
-  const cell = zoneGridFor(zones).get(`${Math.floor(x / CELL_M)},${Math.floor(y / CELL_M)}`);
+  const cell = zoneGridFor(zones).get(cellKey(Math.floor(x / CELL_M), Math.floor(y / CELL_M)));
   if (!cell) return false;
   for (const z of cell) {
     const dx = x - z.x;
