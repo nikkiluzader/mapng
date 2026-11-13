@@ -26,3 +26,7 @@ refs/
 scratch/
 .claude
 .wrangler/
+
+# Python bytecode caches (made when the planet scripts run; rebuilt on their own)
+__pycache__/
+*.pyc
