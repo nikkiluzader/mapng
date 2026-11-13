@@ -72,3 +72,12 @@ test('pieces of one named road take one width', async () => {
   await measureRoadWidths([a, b], { loadTile: async (x, y) => paintedTile(45, 3.2)(x, y) });
   assert.ok(a.tags.width && a.tags.width === b.tags.width);
 });
+
+test('the Hero Roads level script: plain Lua text with the hooks the level script calls', async () => {
+  const { HERO_ROADS_LUA, HERO_ROADS_FILE } = await import('../services/heroRoadsLua.js');
+  assert.equal(HERO_ROADS_FILE, 'mapngHeroRoads.lua');
+  for (const need of ['M.onUpdate = function()', 'M.remove = remove', 'M.status = function()', "require, 'editor/heroRoadEditor/groupMgr'", 'return M']) assert.ok(HERO_ROADS_LUA.includes(need), need);
+  // (every block opened is closed: a script that does not parse would leave the level without its roads' upgrade, silently)
+  const count = (re) => (HERO_ROADS_LUA.replace(/--[^\n]*/g, '').match(re) || []).length;
+  assert.equal(count(/\b(function|if|for|while|do)\b/g) - count(/\bfor\b[^\n]*\bdo\b|\bwhile\b[^\n]*\bdo\b/g), count(/\bend\b/g));
+});

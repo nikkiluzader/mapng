@@ -168,6 +168,21 @@
           </div>
           <Switch :on="assumeParking && roadsBuilt" :label="t('exportPanel.ui.assumeParking')" :disabled="!roadsBuilt || !hasOsmData" @toggle="$emit('update:assumeParking', !assumeParking)" />
         </div>
+        <!-- road surfaces: MapNG's decal roads, or (experimental) BeamNG Hero Roads built by a script when the level loads (heroRoadsLua.js) -->
+        <div class="flex items-start gap-2">
+          <div class="flex-1 min-w-0">
+            <div class="text-xs font-medium text-gray-800 dark:text-gray-100">{{ t('exportPanel.ui.roadSurface') }}</div>
+            <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ roadsBuilt ? t('exportPanel.ui.roadSurfaceHint') : t('build.offInFeatures', { what: t('build.item_roadSurfaces') }) }}</p>
+          </div>
+          <select
+            data-testid="road-surface" :value="roadSurface" :disabled="!roadsBuilt || !hasOsmData" :aria-label="t('exportPanel.ui.roadSurface')"
+            class="max-w-[11rem] rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-micro py-0.5 pl-1 pr-5"
+            @change="$emit('update:roadSurface', $event.target.value)"
+          >
+            <option value="decal">{{ t('exportPanel.ui.roadSurface_decal') }}</option>
+            <option value="hero">{{ t('exportPanel.ui.roadSurface_hero') }}</option>
+          </select>
+        </div>
         <!-- sidewalks as flat decals on the ground instead of raised meshes (exportBeamNGLevel.js sidewalkStyle) -->
         <div class="flex items-start gap-2">
           <div class="flex-1 min-w-0">
@@ -242,13 +257,14 @@ const props = defineProps({
   safeCaps: { type: Boolean, default: true },
   assumeParking: { type: Boolean, default: true },
   decalSidewalks: { type: Boolean, default: false },
+  roadSurface: { type: String, default: 'decal' },
   curbHeight: { type: String, default: 'standard' },
   treeKindsOff: { type: Array, default: () => [] },
   treeSwaps: { type: Array, default: () => [] },
   treeModelsOff: { type: Array, default: () => [] },
 });
 const CURB_HEIGHT_KEYS = ['standard', 'low', 'flush'];
-const emit = defineEmits(['update:forestDensity', 'update:lidarDecks', 'update:safeCaps', 'update:assumeParking', 'update:decalSidewalks', 'update:curbHeight', 'update:treeKindsOff', 'update:treeSwaps', 'update:treeModelsOff']);
+const emit = defineEmits(['update:forestDensity', 'update:lidarDecks', 'update:safeCaps', 'update:assumeParking', 'update:decalSidewalks', 'update:roadSurface', 'update:curbHeight', 'update:treeKindsOff', 'update:treeSwaps', 'update:treeModelsOff']);
 const { t, te } = useI18n();
 const store = useMainStore();
 // (a feature's small hint, where it has one: asking for a missing key logs a warning)

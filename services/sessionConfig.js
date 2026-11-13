@@ -24,6 +24,7 @@ export const EXPORT_FIELDS = [
   ['rocks', 'mapng_beamNGIncludeRocks', 'bool', true],
   ['safeCaps', 'mapng_beamNGSafeCaps', 'bool', true],
   ['curbHeight', 'mapng_beamNGCurbHeight', ['standard', 'low', 'flush'], 'standard'],   // (raised sidewalks' height: beamngSidewalks.js CURB_HEIGHTS_M)
+  ['roadSurface', 'mapng_beamNGRoadSurface', ['decal', 'hero'], 'decal'],   // (hero: experimental Hero Roads, heroRoadsLua.js)
   ['decalSidewalks', 'mapng_beamNGDecalSidewalks', 'bool', false],   // (on: sidewalks as flat decals, exportBeamNGLevel.js sidewalkStyle)
   ['assumeParking', 'mapng_beamNGAssumeParking', 'bool', true],   // (off: only mapped street parking, services/roadWidth.js)
   ['bridges', 'mapng_beamNGIncludeBridges', 'bool', true],

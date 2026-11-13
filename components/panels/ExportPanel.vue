@@ -111,6 +111,7 @@
             v-model:safe-caps="beamNGSafeCaps"
             v-model:assume-parking="beamNGAssumeParking"
             v-model:decal-sidewalks="beamNGDecalSidewalks"
+            v-model:road-surface="beamNGRoadSurface"
             v-model:curb-height="beamNGCurbHeight"
             v-model:tree-kinds-off="beamNGTreeKindsOff"
             v-model:tree-swaps="beamNGTreeSwaps"
@@ -856,6 +857,8 @@ const beamNGSafeCaps = ref(storedOn('mapng_beamNGSafeCaps'));
 const beamNGAssumeParking = ref(storedOn('mapng_beamNGAssumeParking'));
 // (Fine-tuning: sidewalks as flat decals instead of raised meshes; exportBeamNGLevel.js sidewalkStyle)
 const beamNGDecalSidewalks = ref(localStorage.getItem('mapng_beamNGDecalSidewalks') === 'true');
+// (Fine-tuning: road surfaces as MapNG's decal roads, or experimental Hero Roads; exportBeamNGLevel.js roadSurface)
+const beamNGRoadSurface = ref(localStorage.getItem('mapng_beamNGRoadSurface') === 'hero' ? 'hero' : 'decal');
 // (Fine-tuning: the raised sidewalks' height over the road; beamngSidewalks.js CURB_HEIGHTS_M)
 const beamNGCurbHeight = ref(['standard', 'low', 'flush'].includes(localStorage.getItem('mapng_beamNGCurbHeight')) ? localStorage.getItem('mapng_beamNGCurbHeight') : 'standard');
 // (Fine-tuning: tree kinds left out of the area's mix; services/beamngTrees.js)
@@ -1149,7 +1152,7 @@ const exportInputs = computed(() => JSON.stringify({
   baseTexture: beamNGBaseTexture.value, pbr: beamNGPbrSource.value, roads: beamNGRoadType.value,
   backdrop: beamNGBackdropSource.value, gpxz: beamNGBackdropSource.value === 'gpxz' ? String(props.gpxzApiKey || '').length : 0,
   buildings: beamNGIncludeBuildings.value, water: beamNGIncludeWater.value, trees: beamNGIncludeTrees.value,
-  forest: beamNGForestDensity.value, rocks: beamNGIncludeRocks.value, caps: beamNGSafeCaps.value, parking: beamNGAssumeParking.value, decalWalks: beamNGDecalSidewalks.value, curb: beamNGCurbHeight.value, treeKinds: beamNGTreeKindsOff.value.join(','), treeSwaps: beamNGTreeSwaps.value.join(','), treeModels: beamNGTreeModelsOff.value.join(','),
+  forest: beamNGForestDensity.value, rocks: beamNGIncludeRocks.value, caps: beamNGSafeCaps.value, parking: beamNGAssumeParking.value, decalWalks: beamNGDecalSidewalks.value, roadSurface: beamNGRoadSurface.value, curb: beamNGCurbHeight.value, treeKinds: beamNGTreeKindsOff.value.join(','), treeSwaps: beamNGTreeSwaps.value.join(','), treeModels: beamNGTreeModelsOff.value.join(','),
   view: beamNGViewDistance.value,
   bridges: beamNGIncludeBridges.value, tunnels: beamNGIncludeTunnels.value, lidar: beamNGLidarDecks.value,
   sea: beamNGSeaLevelOffset.value,
@@ -1283,6 +1286,7 @@ watch(beamNGViewDistance, (v) => localStorage.setItem('mapng_beamNGViewDistance'
 watch(beamNGSafeCaps, (v) => localStorage.setItem('mapng_beamNGSafeCaps', String(v)));
 watch(beamNGAssumeParking, (v) => localStorage.setItem('mapng_beamNGAssumeParking', String(v)));
 watch(beamNGDecalSidewalks, (v) => localStorage.setItem('mapng_beamNGDecalSidewalks', String(v)));
+watch(beamNGRoadSurface, (v) => localStorage.setItem('mapng_beamNGRoadSurface', v === 'hero' ? 'hero' : 'decal'));
 watch(beamNGCurbHeight, (v) => localStorage.setItem('mapng_beamNGCurbHeight', v));
 watch(beamNGTreeKindsOff, (v) => localStorage.setItem('mapng_beamNGTreeKindsOff', JSON.stringify(sanitizeTreeKindsOff(v))));
 watch(beamNGTreeSwaps, (v) => localStorage.setItem('mapng_beamNGTreeSwaps', JSON.stringify(sanitizeTreeSwaps(v))));
@@ -2152,6 +2156,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       safeCaps: !advanced || beamNGSafeCaps.value,
       assumeParking: !advanced || beamNGAssumeParking.value,
       sidewalkStyle: advanced && beamNGDecalSidewalks.value ? 'decal' : 'mesh',
+      roadSurface: advanced && beamNGRoadSurface.value === 'hero' ? 'hero' : 'decal',
       curbHeight: advanced ? beamNGCurbHeight.value : 'standard',
       treeKindsOff: advanced ? sanitizeTreeKindsOff(beamNGTreeKindsOff.value) : [],
       // (basic mode: the area's own trees, none of Fine-tuning's choices)
@@ -2185,6 +2190,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       safeCaps: !advanced || beamNGSafeCaps.value,
       assumeParking: !advanced || beamNGAssumeParking.value,
       sidewalkStyle: advanced && beamNGDecalSidewalks.value ? 'decal' : 'mesh',
+      roadSurface: advanced && beamNGRoadSurface.value === 'hero' ? 'hero' : 'decal',
       curbHeight: advanced ? beamNGCurbHeight.value : 'standard',
       treeKindsOff: advanced ? sanitizeTreeKindsOff(beamNGTreeKindsOff.value) : [],
       // (basic mode: the area's own trees, none of Fine-tuning's choices)
