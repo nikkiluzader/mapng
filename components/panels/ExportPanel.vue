@@ -439,13 +439,24 @@
               <input type="checkbox" v-model="modelRealWorldScale" :class="CHECKBOX" />
               <span class="text-nano text-gray-500 dark:text-gray-400">{{ t('exportPanel.realWorldScale') }}</span>
             </label>
+            <!-- the mesh's point spacing, and what it costs, before the download (services/modelMesh.js) -->
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-nano text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.meshSpacing') }}</span>
+              <select v-model="modelMeshStride" :class="SELECT_XS" data-testid="mesh-spacing" :aria-label="t('exportPanel.ui.meshSpacing')">
+                <option value="auto">{{ t('exportPanel.ui.meshSpacingAuto', { m: meshSpacingText(meshPlan(terrainData.width, meshMpp, autoStride(terrainData.width)).spacingM) }) }}</option>
+                <option v-for="s in MESH_STRIDES" :key="s" :value="String(s)">{{ t('exportPanel.ui.meshSpacingEvery', { m: meshSpacingText(s * meshMpp) }) }}</option>
+              </select>
+            </div>
+            <p class="text-nano tabular-nums" :class="modelMesh.tooBig ? 'text-amber-700 dark:text-amber-300' : 'text-gray-500 dark:text-gray-400'" data-testid="mesh-info">
+              {{ t(modelMesh.tooBig ? 'exportPanel.ui.meshTooBig' : 'exportPanel.ui.meshInfo', { side: modelMesh.side.toLocaleString(), millions: (modelMesh.points / 1e6).toFixed(modelMesh.points < 1e7 ? 1 : 0), size: formatBytes(modelMesh.bytes) }) }}
+            </p>
           </div>
 
           <div class="grid grid-cols-2 gap-1.5">
             <!-- GLB Model -->
             <button 
               @click="handleGLBExport"
-              :disabled="isAnyExporting"
+              :disabled="isAnyExporting || modelMesh.tooBig"
               class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-20"
             >
               <div class="w-full h-full flex items-center justify-center mb-0.5">
@@ -460,7 +471,7 @@
             <!-- DAE (Collada) Model -->
             <button 
               @click="handleDAEExport"
-              :disabled="isAnyExporting"
+              :disabled="isAnyExporting || modelMesh.tooBig"
               class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-20"
             >
               <div class="w-full h-full flex items-center justify-center mb-0.5">
@@ -615,6 +626,7 @@ import { generateHeightmapBlob, generateTerBlob } from '../../services/batchExpo
 import { exportToGLB, exportToDAE } from '../../services/export3d';
 import { useWorkflow } from '../../composables/useWorkflow.js';
 import { ensureTexture, hasTexture } from '../../services/textureOnDemand.js';
+import { MESH_STRIDES, meshPlan, autoStride, strideOf, maxMeshResolutionFor } from '../../services/modelMesh.js';
 import { exportGeoTiff } from '../../services/exportGeoTiff';
 import { buildCommonTraceMetadata, downloadJsonFile } from '../../services/traceability';
 import { createWGS84ToLocal } from '../../services/geoUtils';
@@ -1127,6 +1139,13 @@ const modelTileSelection = ref('center-only');
 // Default GLB/DAE exports to real-world metres (1 unit = 1 m) so models drop
 // into Blender at the correct scale for modelling guard rails etc.
 const modelRealWorldScale = ref(localStorage.getItem('mapng_modelRealWorldScale') !== 'false');
+// (the 3D model's point spacing: 'auto' or every nth height; services/modelMesh.js)
+const modelMeshStride = ref((() => { const v = localStorage.getItem('mapng_modelMeshStride'); return MESH_STRIDES.includes(Number(v)) ? v : 'auto'; })());
+watch(modelMeshStride, (v) => localStorage.setItem('mapng_modelMeshStride', String(v)));
+const meshMpp = computed(() => { const m = Number(props.terrainData?.processingMetersPerPixel); return m > 0 ? m : 1; });
+const modelMesh = computed(() => meshPlan(props.terrainData?.width || 2, meshMpp.value, strideOf(modelMeshStride.value, props.terrainData?.width || 2)));
+const meshSpacingText = (m) => (Number.isInteger(m) ? String(m) : m.toFixed(1));
+const formatBytes = (b) => (b >= 2 ** 30 ? `${(b / 2 ** 30).toFixed(1)} GB` : `${Math.max(1, Math.round(b / 2 ** 20))} MB`);
 watch(modelRealWorldScale, (v) => localStorage.setItem('mapng_modelRealWorldScale', String(v)));
 
 // Collapsible section states
@@ -1966,7 +1985,6 @@ const downloadOSM = async () => {
   }
 };
 
-const MODEL_MESH_MAX = 2048;
 const handleGLBExport = async () => {
   if (!props.terrainData) return;
   isExportingGLB.value = true;
@@ -1980,7 +1998,7 @@ const handleGLBExport = async () => {
       realWorldScale: modelRealWorldScale.value,
       // (every height of a map up to 2048 a side; the 1024 it fell back to halved a 2 km map's detail and
       // quartered a 4 km one's: a tester's "I've lost all the details", 2026-11-13)
-      maxMeshResolution: MODEL_MESH_MAX,
+      maxMeshResolution: maxMeshResolutionFor(props.terrainData.width, modelMesh.value.stride),
       surroundingTilePositions: props.surroundingTilePositions,
       center: props.center,
       resolution: props.resolution,
@@ -2019,7 +2037,7 @@ const handleDAEExport = async () => {
       realWorldScale: modelRealWorldScale.value,
       // (every height of a map up to 2048 a side; the 1024 it fell back to halved a 2 km map's detail and
       // quartered a 4 km one's: a tester's "I've lost all the details", 2026-11-13)
-      maxMeshResolution: MODEL_MESH_MAX,
+      maxMeshResolution: maxMeshResolutionFor(props.terrainData.width, modelMesh.value.stride),
       surroundingTilePositions: props.surroundingTilePositions,
       center: props.center,
       resolution: props.resolution,
