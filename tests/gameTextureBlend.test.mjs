@@ -24,5 +24,5 @@ test('the setting is remembered, kept within 0..100; junk falls back to the defa
 test('at 0 the painter blends nothing in', async () => {
   const { addSatelliteDetail } = await import('../services/osmTexture.js');
   // (returns before touching the canvas)
-  assert.equal(addSatelliteDetail(null, null, null, { strength: 0 }), null);
+  assert.equal(await addSatelliteDetail(null, null, null, { strength: 0 }), null);
 });

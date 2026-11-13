@@ -335,7 +335,7 @@
               <Mountain v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
             <span class="text-caption font-medium">{{ t('exportPanel.heightmap') }}</span>
-            <span class="text-micro text-gray-500 dark:text-gray-400">{{ terrainData.width }}px 16-bit grayscale PNG</span>
+            <span class="text-micro text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.fmtGray16', { px: terrainData.width }) }}</span>
             <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-brand" />
           </button>
 
@@ -351,7 +351,7 @@
               <Box v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
             <span class="text-caption font-medium">{{ t('exportPanel.satellite') }}</span>
-            <span class="text-micro text-gray-500 dark:text-gray-400">{{ terrainData.width }}px PNG</span>
+            <span class="text-micro text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.fmtPng', { px: terrainData.width }) }}</span>
             <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-brand" />
           </button>
 
@@ -367,7 +367,7 @@
               <Trees v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
             <span class="text-caption font-medium">{{ t('exportPanel.osmTexture') }}</span>
-            <span class="text-micro text-gray-500 dark:text-gray-400">{{ terrainData.width }}px PNG</span>
+            <span class="text-micro text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.fmtPng', { px: terrainData.width }) }}</span>
             <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-brand" />
           </button>
 
@@ -383,7 +383,7 @@
               <Layers v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
             <span class="text-caption font-medium">{{ t('exportPanel.gameTexture') }}</span>
-            <span class="text-micro text-gray-500 dark:text-gray-400">{{ terrainData.width }}px PNG</span>
+            <span class="text-micro text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.fmtPng', { px: terrainData.width }) }}</span>
             <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-brand" />
           </button>
 
@@ -399,7 +399,7 @@
               <Route v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
             <span class="text-caption font-medium">{{ t('exportPanel.roadMask') }}</span>
-            <span class="text-micro text-gray-500 dark:text-gray-400">{{ terrainData.width }}px 16-bit grayscale PNG</span>
+            <span class="text-micro text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.fmtGray16', { px: terrainData.width }) }}</span>
             <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-brand" />
           </button>
         </div>
@@ -480,7 +480,7 @@
                 <Box v-else :size="24" class="text-gray-400 dark:text-gray-500" />
               </div>
               <span class="text-caption font-medium">{{ t('exportPanel.glbModel') }}</span>
-              <span class="text-micro text-gray-500 dark:text-gray-400">.glb binary</span>
+              <span class="text-micro text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.fmtGlb') }}</span>
               <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-brand" />
             </button>
 
@@ -496,7 +496,7 @@
                 <FileCode v-else :size="24" class="text-gray-400 dark:text-gray-500" />
               </div>
               <span class="text-caption font-medium">{{ t('exportPanel.colladaDae') }}</span>
-              <span class="text-micro text-gray-500 dark:text-gray-400">.dae + textures</span>
+              <span class="text-micro text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.fmtDae') }}</span>
               <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-brand" />
             </button>
             
@@ -511,7 +511,7 @@
                 <FileCode v-else :size="24" class="text-gray-400 dark:text-gray-500" />
               </div>
               <span class="text-caption font-medium">{{ t('exportPanel.beamngTerrain') }}</span>
-              <span class="text-micro text-gray-500 dark:text-gray-400">.ter heightmap</span>
+              <span class="text-micro text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.fmtTer') }}</span>
               <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-brand" />
             </button>
           </div>
