@@ -6,7 +6,10 @@ export const HERO_ROADS_LUA = String.raw`-- MapNG: Hero Roads (experimental). Wr
 -- "Road surfaces" choice is Hero Roads; the level's mainLevel.lua loads it and calls it every frame.
 --
 -- It turns MapNG's paved road surfaces (the DecalRoads named dr_..._b) into BeamNG Hero Roads: a real road
--- mesh with a crown, shoulders and its own markings, built by the game's Hero Road Editor code. The roads are
+-- mesh with a crown and shoulders, built by the game's Hero Road Editor code. The markings stay MapNG's own:
+-- the Hero Road's lines are switched off (it knows one style, the USA's: a tester's French mountain road got
+-- double yellow lines) and MapNG's lines, cut at junctions and drawn by each country's rules, are lifted onto
+-- the road's surface. The roads are
 -- built a few each frame after the level has loaded, and removed when the level is left.
 --
 -- They are ordinary, unbaked Hero Roads: open the World Editor (F11) > Hero Road and they are there to edit.
@@ -28,6 +31,7 @@ local SHOULDER_M = 0.3
 local OVER_GROUND_M = 1.0      -- a line this far over or under the terrain is a bridge deck, ramp or tunnel: left as it is
 local MIN_WIDTH_M = 3.0
 local LON_PIECES = 4            -- mesh pieces along each stretch between two nodes (a node every 4 m)
+local LINE_OVER_DECK_M = 0.02   -- MapNG's painted lines over the Hero Road's surface
 local CLEAR_M = 0.03           -- the deck's lowest edge over the highest ground under it
 
 local gm = nil
@@ -61,17 +65,55 @@ end
 local layersOf = {}            -- 'dr_<road>_s<n>_' -> the names of that road's DecalRoad layers
 local hiddenByUs = {}          -- the layers this script hid (shown again when the Hero Roads are removed)
 
+-- MapNG's painted lines along a road: centre (cl), edges (ell, elr), lanes (l2, l3...), whole or cut in pieces.
+local lineNames = {}
+local lifted = {}             -- { name, over, z = { node heights before } }: put back when the Hero Roads go
+local function lineLayer(name)
+  local layer = name:match('^dr_.*_s%d+_([a-z]+%d*)')
+  return layer ~= nil and (layer == 'cl' or layer == 'ell' or layer == 'elr' or layer:match('^l%d+$') ~= nil)
+end
+
+-- The lines lifted onto the Hero Roads under them. A DecalRoad is drawn on the ground at its nodes' height; the
+-- deck lies some centimetres over that, so each node over a deck is raised to the deck's surface and the line
+-- is told to drape over objects. A line with no deck under it (a bridge, a road left as it was) is not touched.
+local function liftLines()
+  local n = 0
+  for _, name in ipairs(lineNames) do
+    local o = scenetree.findObject(name)
+    if o then
+      local before, any = {}, false
+      for i = 0, o:getNodeCount() - 1 do
+        local p = o:getNodePosition(i)
+        before[i + 1] = p.z
+        local hit = castRay(vec3(p.x, p.y, p.z + 2), vec3(p.x, p.y, p.z - 2), true, true)
+        if hit and hit.pt and hit.obj and hit.obj:getClassName() == 'ProceduralMesh' then
+          o:setNodePosition(i, vec3(p.x, p.y, hit.pt.z + LINE_OVER_DECK_M)); any = true
+        end
+      end
+      if any then
+        lifted[#lifted + 1] = { name = name, over = o:getField('overObjects', 0), z = before }
+        o:setField('overObjects', 0, '1')
+        n = n + 1
+      end
+    end
+  end
+  return n
+end
+
 local function collect()
   local list = {}
   layersOf = {}
+  lineNames = {}
   for _, name in ipairs(scenetree.findClassObjects('DecalRoad') or {}) do
     if name:match('^dr_.*_b$') then list[#list + 1] = name end
     local prefix, layer = name:match('^(dr_.*_s%d+_)(%w+)$')
-    -- (the grass blends along the edges lie outside the deck: they stay)
-    if prefix and layer ~= 'ebl' and layer ~= 'ebr' then
+    -- (only the surface is hidden under a Hero Road: b, or b1, b2... where it is paved in strips. The lines
+    -- are lifted onto the deck below, the grass blends lie outside it, the AI path is what traffic follows)
+    if prefix and layer:match('^b%d*$') then
       layersOf[prefix] = layersOf[prefix] or {}
       table.insert(layersOf[prefix], name)
     end
+    if lineLayer(name) then lineNames[#lineNames + 1] = name end
   end
   table.sort(list)
   return list
@@ -152,8 +194,8 @@ local function buildOne(name)
   for i = 1, #nodes do g.widths[i] = width; g.nmls[i] = vec3(0, 0, 1) end
   -- (the lanes carry the width: the editor's code works the deck out from lanes and shoulders)
   gm.setLaneProfile(g, lanesLeft, lanesRight, math.max(1.5, (width - 2 * SHOULDER_M) / total))
-  g.isRoadLaneLines = math.max(lanesLeft, lanesRight) > 1
-  if lanesLeft == 0 or lanesRight == 0 then g.isRoadCenterLine = false end
+  -- (no lines of the Hero Road's own: MapNG's are lifted onto it, liftLines)
+  g.isRoadCenterLine, g.isRoadEdgeLines, g.isRoadLaneLines = false, false, false
   g.geometryMode = 'spline'    -- MapNG's line is already the shape wanted; no re-engineered curves
   -- The mesh's density. The editor's own defaults are 100 pieces along each stretch between two nodes and 16
   -- across each side, meant for a road drawn by hand with a node every 50 m. MapNG gives a node every 4 m, so
@@ -173,6 +215,7 @@ end
 -- every single road (a tenth of a second each time, whatever the road: 716 roads were 148 s of loading, nearly
 -- all of it that). While it builds, that one call is held back; reloadCollision() below makes it once for many.
 local sinceReload = 0
+local linesLifted = 0
 local function buildDirty()
   local realBe = be
   be = setmetatable({}, { __index = function(_, k)
@@ -235,6 +278,9 @@ local function step()
   if at >= #queue then
     done = true
     reloadCollision()
+    local okLift, nLines = pcall(liftLines)
+    if not okLift then firstError = firstError or tostring(nLines); nLines = 0 end
+    linesLifted = nLines
     local msg = string.format('MapNG: %d Hero Roads built in %.0f s (%d left as they were, %d failed)', built, os.clock() - t0, skipped, failed)
     log(failed > 0 and 'W' or 'I', 'mapngHeroRoads', msg .. (firstError and (' | first error: ' .. firstError) or ''))
     say(msg, 10)
@@ -245,6 +291,14 @@ local function remove()
   if gm then pcall(gm.removeAllGroups, true) end
   for _, name in ipairs(hiddenByUs) do local o = scenetree.findObject(name); if o then o.hidden = false end end
   hiddenByUs = {}
+  for _, l in ipairs(lifted) do
+    local o = scenetree.findObject(l.name)
+    if o then
+      for i = 0, math.min(o:getNodeCount(), #l.z) - 1 do local p = o:getNodePosition(i); o:setNodePosition(i, vec3(p.x, p.y, l.z[i + 1])) end
+      o:setField('overObjects', 0, tostring(l.over or '0'))
+    end
+  end
+  lifted = {}
   queue, at, started, done = nil, 0, true, true
 end
 
@@ -259,7 +313,7 @@ M.onUpdate = function()
   if queue then step() end
 end
 
-M.status = function() return { started = started, done = done, total = queue and #queue or 0, at = at, built = built, skipped = skipped, failed = failed, firstError = firstError, lanes = lanesSeen, hiddenLayers = #hiddenByUs } end
+M.status = function() return { started = started, done = done, total = queue and #queue or 0, at = at, built = built, skipped = skipped, failed = failed, firstError = firstError, lanes = lanesSeen, hiddenLayers = #hiddenByUs, linesLifted = linesLifted } end
 M.remove = remove
 M.rebuild = function() remove(); started, done = false, false end
 
