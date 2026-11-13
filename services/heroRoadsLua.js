@@ -101,8 +101,8 @@ local function buildOne(name)
   for i = 0, n - 1 do
     local p = road:getNodePosition(i)
     local ground = groundAt(p.x, p.y)
-    -- (a bridge deck or ramp over the ground, or a tunnel under it: the Zion tunnel's road was rebuilt on top of
-    -- the mountain before this looked both ways)
+    -- (a bridge deck or ramp over the ground, or a tunnel under it: a long mountain tunnel's road was rebuilt
+    -- on top of the mountain before this looked both ways)
     if ground and math.abs(p.z - ground) > OVER_GROUND_M then return nil, 'not on the ground' end
     if not last or (p - last):length() >= NODE_GAP_M or i == n - 1 then
       -- (the last node is always kept; one that would sit almost on the node before it replaces it)
