@@ -255,6 +255,8 @@ const OSM_REQUEST = /^(overpass:|\/api\/osm(\?|$))/;
 // saved data). Map data in it expires after CACHE_OSM_MS (someone fixing
 // their town on OSM wants it fresh); error answers never go in.
 const CACHE_OSM_MS = 30 * 60 * 1000;
+const CACHE_MANIFEST_MS = 5 * 60 * 1000;
+export const MANIFEST_REQUEST = /\/api\/osm-tiles\/manifest(-all)?(\?|$)/;
 const cacheable = (status) => (status >= 200 && status < 300) || status === 404;
 const linkInto = (from, to) => { try { fs.linkSync(from, to); } catch { try { fs.copyFileSync(from, to); } catch { /* best effort */ } } };
 
@@ -305,7 +307,11 @@ export function installSourceRecorder({ dir, mode = 'record', fallback = true, r
       const normalized = String(url).replace(/^https?:\/\/[^/]+(\/api\/interpreter)/, 'overpass:$1');
       let meta = null;
       try { meta = fs.existsSync(metaFile) ? JSON.parse(fs.readFileSync(metaFile, 'utf8')) : null; } catch { meta = null; }
-      const stale = meta && OSM_REQUEST.test(normalized) && !(Date.now() - (meta.savedAt || 0) < CACHE_OSM_MS);
+      // (the list of MapNG's map archives: asked again after five minutes. It was kept for as long as the app
+      // stayed open, so a list corrected on the server never reached an app left running: a tester's map went
+      // on falling back to Overture hours after the list was fixed, 2026-11-13.)
+      const age = Date.now() - (meta?.savedAt || 0);
+      const stale = meta && ((OSM_REQUEST.test(normalized) && !(age < CACHE_OSM_MS)) || (MANIFEST_REQUEST.test(normalized) && !(age < CACHE_MANIFEST_MS)));
       if (meta && !stale) {
         stats.replayed++;
         // (recently used: the app trims the cache by this, desktop/main.js)

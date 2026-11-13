@@ -34,3 +34,11 @@ test('the file is one valid zlib stream with the right checksum (a strict reader
   assert.equal(raw.length, h * (w * 4 + 1));
   await assert.rejects(() => encodePng(src, w + 1, h), /are not/);
 });
+
+test('the desktop cache asks for the archive list again, not for the archives themselves', async () => {
+  const { MANIFEST_REQUEST } = await import('../desktop/runner/browserShims.mjs');
+  assert.ok(MANIFEST_REQUEST.test('https://mapng.com/api/osm-tiles/manifest-all'));
+  assert.ok(MANIFEST_REQUEST.test('https://mapng.com/api/osm-tiles/manifest'));
+  assert.ok(!MANIFEST_REQUEST.test('https://mapng.com/api/osm-tiles/osm-all/planet-3-4-3-2026-11-12.pmtiles'));
+  assert.ok(!MANIFEST_REQUEST.test('https://mapng.com/api/mapterhorn/17/1/1.webp'));
+});
