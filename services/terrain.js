@@ -2522,32 +2522,45 @@ export const fetchTerrainData = async (
 
   if (includeOSM && osmFeatures.length > 0) {
     const options = { Roads: true, baseColor, onProgress };
+    // Each texture is painted on this thread and then encoded as a PNG, which takes about as long again
+    // (10 s for an 8 km map) and runs on another thread. In the desktop app's own process the next texture
+    // is painted while the last one encodes; in a browser tab they stay one after another, where three
+    // pictures of that size encoding at once is memory a tab may not have.
+    const overlapEncodes = typeof window === 'undefined';
+    const encoding = [];
+    const afterPainting = async (work) => { if (overlapEncodes) encoding.push(work); else await work; };
     if (generateOSMTextureAsset) {
       onProgress?.("Generating OSM texture...");
-      const osmResult = await generateOSMTexture(terrainData, options);
-      terrainData.osmTextureUrl = osmResult.url;
-      terrainData.osmTextureCanvas = osmResult.canvas;
-      terrainData.osmTextureBlob = osmResult.blob || null;
+      await afterPainting(generateOSMTexture(terrainData, options).then((osmResult) => {
+        terrainData.osmTextureUrl = osmResult.url;
+        terrainData.osmTextureCanvas = osmResult.canvas;
+        terrainData.osmTextureBlob = osmResult.blob || null;
+      }));
     }
 
     if (generateHybridTextureAsset) {
       onProgress?.("Generating Hybrid texture...");
-      const hybridResult = await generateHybridTexture(
+      await afterPainting(generateHybridTexture(
         terrainData,
         { ...options, satelliteCanvas: hybridSatelliteCanvas },
-      );
-      terrainData.hybridTextureUrl = hybridResult.url;
-      terrainData.hybridTextureCanvas = hybridResult.canvas;
-      terrainData.hybridTextureBlob = hybridResult.blob || null;
+      ).then((hybridResult) => {
+        terrainData.hybridTextureUrl = hybridResult.url;
+        terrainData.hybridTextureCanvas = hybridResult.canvas;
+        terrainData.hybridTextureBlob = hybridResult.blob || null;
+      }));
     }
 
     if (generateGameTextureAsset) {
       onProgress?.("Generating game map texture...");
-      const gameResult = await generateGameTexture(terrainData, { ...options, satelliteCanvas: hybridSatelliteCanvas });
-      terrainData.gameTextureUrl = gameResult.url;
-      terrainData.gameTextureCanvas = gameResult.canvas;
-      terrainData.gameTextureBlob = gameResult.blob || null;
+      await afterPainting(generateGameTexture(terrainData, { ...options, satelliteCanvas: hybridSatelliteCanvas }).then((gameResult) => {
+        terrainData.gameTextureUrl = gameResult.url;
+        terrainData.gameTextureCanvas = gameResult.canvas;
+        terrainData.gameTextureBlob = gameResult.blob || null;
+      }));
     }
+    // (all of them done before the satellite picture they read is let go; the first failure is the error)
+    const failed = (await Promise.allSettled(encoding)).find((r) => r.status === 'rejected');
+    if (failed) throw failed.reason;
 
   }
 
