@@ -2296,21 +2296,48 @@ export function paintSteepRock(ctx, canvas, terrainData) {
   const lc = terrainData.landCover?.grid?.length === terrainData.landCover?.n ** 2 ? terrainData.landCover : null;
   let painted = 0;
   const STRIP = 256;
+  const cw = canvas.width;
+  // Each texture column's height cell and land cover cell, worked out once (not per pixel), and the gentlest
+  // slope any ground is painted at: most pixels of most maps are nowhere near it, and are left after one
+  // comparison. A strip with no pixel that steep is not read from the canvas at all (a flat 8 km map spent
+  // 16 s here reading and testing 67 million pixels to paint none).
+  const colH = new Int32Array(cw); const colLc = lc ? new Int32Array(cw) : null;
+  for (let tx = 0; tx < cw; tx++) {
+    colH[tx] = Math.min(W - 2, Math.max(1, Math.floor((tx + 0.5) * sx)));
+    if (colLc) colLc[tx] = Math.min(lc.n - 1, Math.floor(((tx + 0.5) / cw) * lc.n));
+  }
+  const MIN_FROM = 0.9; const minSq = MIN_FROM * MIN_FROM; const inv = 1 / (2 * mpp);
+  const steepAt = new Uint8Array(cw * STRIP);
   for (let y0 = 0; y0 < canvas.height; y0 += STRIP) {
     const rows = Math.min(STRIP, canvas.height - y0);
-    const img = ctx.getImageData(0, y0, canvas.width, rows);
+    // (the heights alone first: which pixels of this strip could be steep enough)
+    let any = false;
+    for (let ty = 0; ty < rows; ty++) {
+      const hy = Math.min(H - 2, Math.max(1, Math.floor((y0 + ty + 0.5) * sy)));
+      const base = hy * W; const off = ty * cw;
+      for (let tx = 0; tx < cw; tx++) {
+        const k = base + colH[tx];
+        const gx = (hm[k + 1] - hm[k - 1]) * inv; const gy = (hm[k + W] - hm[k - W]) * inv;
+        const on = gx * gx + gy * gy >= minSq ? 1 : 0;
+        steepAt[off + tx] = on;
+        if (on) any = true;
+      }
+    }
+    if (!any) continue;
+    const img = ctx.getImageData(0, y0, cw, rows);
     const d = img.data; let changed = false;
     for (let ty = 0; ty < rows; ty++) {
       const hy = Math.min(H - 2, Math.max(1, Math.floor((y0 + ty + 0.5) * sy)));
       const lcRow = lc ? Math.min(lc.n - 1, Math.floor(((y0 + ty + 0.5) / canvas.height) * lc.n)) * lc.n : 0;
-      for (let tx = 0; tx < canvas.width; tx++) {
-        const hx = Math.min(W - 2, Math.max(1, Math.floor((tx + 0.5) * sx)));
-        const k = hy * W + hx;
+      const off = ty * cw;
+      for (let tx = 0; tx < cw; tx++) {
+        if (!steepAt[off + tx]) continue;
+        const k = hy * W + colH[tx];
         const gx = (hm[k + 1] - hm[k - 1]) / (2 * mpp); const gy = (hm[k + W] - hm[k - W]) / (2 * mpp);
         const u = hash(tx, y0 + ty);
-        const from = lc ? steepRockFrom(lc.grid[lcRow + Math.min(lc.n - 1, Math.floor(((tx + 0.5) / canvas.width) * lc.n))]) : 0.9;
+        const from = lc ? steepRockFrom(lc.grid[lcRow + colLc[tx]]) : 0.9;
         if (Math.hypot(gx, gy) < from * (1 + 0.233 * u)) continue;   // tan 42°..48° (grass 50°..56°)
-        const i = (ty * canvas.width + tx) * 4;
+        const i = (off + tx) * 4;
         const r = d[i], g = d[i + 1], b = d[i + 2];
         // (natural colours only: green or brown, not the greys of roads, buildings and water)
         if (Math.abs(r - g) < 6 && Math.abs(g - b) < 6) continue;
@@ -2643,15 +2670,20 @@ export const generateGameTexture = async (terrainData, options = {}) => {
         }
       }
       let dropped = 0;
+      // (each column's land cover cell once, not per pixel. Every strip is read: the mask also holds the
+      // mapped water drawn above, which a look at the image's classes alone would miss)
+      const mw = mask.width; const colWet = new Int32Array(mw);
+      for (let tx = 0; tx < mw; tx++) colWet[tx] = Math.min(n - 1, Math.floor(((tx + 0.5) / mw) * n));
       for (let y0 = 0; y0 < mask.height; y0 += 256) {
         const rows = Math.min(256, mask.height - y0);
-        const im = mctx2.getImageData(0, y0, mask.width, rows); const d = im.data; let changed = false;
+        const im = mctx2.getImageData(0, y0, mw, rows); const d = im.data; let changed = false;
         for (let ty = 0; ty < rows; ty++) {
           const rr = Math.min(n - 1, Math.floor(((y0 + ty + 0.5) / mask.height) * n)) * n;
-          for (let tx = 0; tx < mask.width; tx++) {
-            const i = (ty * mask.width + tx) * 4;
+          const off = ty * mw * 4;
+          for (let tx = 0; tx < mw; tx++) {
+            const i = off + tx * 4;
             if (!d[i + 3] || 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2] >= 40) continue;
-            if (wet[rr + Math.min(n - 1, Math.floor(((tx + 0.5) / mask.width) * n))]) continue;
+            if (wet[rr + colWet[tx]]) continue;
             d[i + 3] = 0; changed = true; dropped++;
           }
         }
