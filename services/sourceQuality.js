@@ -150,19 +150,156 @@ export function measureSource(heights, px, cellM, roads, { hillAt = null } = {})
   };
 }
 
-/** Scores out of 100 for one source's measures: { bench, tilt, bumps, detail, total, weights }. */
-export function scoreSource(m, nativeResM) {
+// ── The ground itself ───────────────────────────────────────────────────────
+// What a source's heights are like with no road in the picture: how fine the
+// detail in them really is (a source can hand out coarse data on a fine grid:
+// GPXZ's 1 m grid over Sint Eustatius is 30 m data in flat blocks, and scored
+// 100 for detail and 99 overall), and their flaws: terraces, straight seam
+// lines where pieces of a survey meet (alxti: "GPXZ has a bunch of weird grid
+// lines"), spikes and pits, noise on flat ground.
+const CURVE_EPS_M = 0.003;        // a second difference under this: the ground runs straight on
+const FLAT_EPS_M = 0.002;         // a step under this to a neighbour: level
+const WATER_SHARE = 0.15;         // one height over this share of the square: water, left out of the run lengths
+const TERRACE_FLAT_SHARE = 0.4;   // this much dead-level ground with steps between: terraces
+const TERRACE_STEP_M = 0.15;
+const SEAM_RATIO = 5;             // a row or column whose crease is this many times the usual one ...
+const SEAM_MIN_M = 0.02;          // ... and at least this much: a seam
+const SEAM_ALONG_SHARE = 0.8;     // ... at this share of its points, all the way across
+const SPIKE_M = 0.5;              // a point this far over or under all eight neighbours: a spike or a pit
+const NOISE_SLOPE = 0.08;         // noise is read on ground gentler than this
+
+/**
+ * The ground's own measures: { effectiveResM, flatShare, terraced, seams: { rows, cols, count },
+ * spikesPerHa, noiseM, coverage }. effectiveResM: the usual length over which the ground runs
+ * straight (no curvature), in metres: the grid's own step for a real fine survey, the coarse
+ * step for coarse data resampled onto a fine grid, the block's width for terraces.
+ */
+export function measureGround(heights, px, cellM) {
+  const z = (r, c) => heights[r * px + c];
+  const ok = (v) => Number.isFinite(v);
+  let valid = 0;
+  // the commonest height (to the centimetre): open water when it covers much of the square
+  const counts = new Map();
+  for (let i = 0; i < px * px; i++) { const v = heights[i]; if (!ok(v)) continue; valid++; const k = Math.round(v * 100); counts.set(k, (counts.get(k) || 0) + 1); }
+  let waterK = null; let top = 0;
+  for (const [k, n] of counts) if (n > top) { top = n; waterK = k; }
+  if (!(valid > 0 && top / valid > WATER_SHARE)) waterK = null;
+  const isWater = (v) => waterK !== null && Math.round(v * 100) === waterK;
+  // run lengths of "no curvature", along rows and along columns, weighted by length
+  const runHist = new Float64Array(px + 1);
+  const addRuns = (get) => {
+    for (let a = 0; a < px; a++) {
+      let run = 0;
+      for (let b = 1; b < px - 1; b++) {
+        const p0 = get(a, b - 1); const p1 = get(a, b); const p2 = get(a, b + 1);
+        const straight = ok(p0) && ok(p1) && ok(p2) && !isWater(p1) && Math.abs(p0 - 2 * p1 + p2) < CURVE_EPS_M;
+        if (straight) run++;
+        else { if (run > 0) runHist[Math.min(px, run + 2)] += run + 2; else if (ok(p1) && !isWater(p1)) runHist[1] += 1; run = 0; }
+      }
+      if (run > 0) runHist[Math.min(px, run + 2)] += run + 2;
+    }
+  };
+  addRuns((a, b) => z(a, b)); addRuns((a, b) => z(b, a));
+  let total = 0; for (let k = 1; k <= px; k++) total += runHist[k];
+  let acc = 0; let runCells = 1;
+  for (let k = 1; k <= px && total > 0; k++) { acc += runHist[k]; if (acc >= total / 2) { runCells = k; break; } }
+  const effectiveResM = Math.max(cellM, runCells * cellM);
+  // level ground, steps, spikes and noise
+  let land = 0; let flat = 0; let spikes = 0; const steps = []; const resid = [];
+  for (let r = 1; r < px - 1; r++) for (let c = 1; c < px - 1; c++) {
+    const v = z(r, c); if (!ok(v) || isWater(v)) continue;
+    const e = z(r, c + 1); const w = z(r, c - 1); const n = z(r - 1, c); const s2 = z(r + 1, c);
+    if (!ok(e) || !ok(w) || !ok(n) || !ok(s2)) continue;
+    land++;
+    const dx = Math.abs(e - v); const dy = Math.abs(s2 - v);
+    if (dx < FLAT_EPS_M && dy < FLAT_EPS_M && Math.abs(v - w) < FLAT_EPS_M && Math.abs(v - n) < FLAT_EPS_M) flat++;
+    else if ((land & 7) === 0) steps.push(Math.max(dx, dy));
+    let hi = -Infinity; let lo = Infinity;
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) { if (!dr && !dc) continue; const q = z(r + dr, c + dc); if (ok(q)) { if (q > hi) hi = q; if (q < lo) lo = q; } }
+    if (v > hi + SPIKE_M || v < lo - SPIKE_M) spikes++;
+    if (Math.abs(e - w) / (2 * cellM) < NOISE_SLOPE && Math.abs(s2 - n) / (2 * cellM) < NOISE_SLOPE && (land & 3) === 0) resid.push(Math.abs(v - (e + w + n + s2) / 4));
+  }
+  const flatShare = land ? flat / land : 0;
+  const terraced = flatShare > TERRACE_FLAT_SHARE && steps.length > 20 && quantile(steps, 0.95) > TERRACE_STEP_M;
+  const noiseM = resid.length > 50 ? 1.4826 * median(resid) : NaN;
+  // seams: a whole row (or column) creased far more than the others. Not read on terraces: steps are everywhere there.
+  const seamsOf = (get) => {
+    const crease = new Float64Array(px);
+    for (let a = 1; a < px - 1; a++) {
+      let sum = 0; let n = 0;
+      for (let b = 0; b < px; b += 2) { const p0 = get(a - 1, b); const p1 = get(a, b); const p2 = get(a + 1, b); if (ok(p0) && ok(p1) && ok(p2) && !isWater(p1)) { sum += Math.abs(p0 - 2 * p1 + p2); n++; } }
+      crease[a] = n > px / 8 ? sum / n : NaN;
+    }
+    const usual = median([...crease].filter(Number.isFinite));
+    const found = [];
+    const mark = Math.max(SEAM_MIN_M / 2, 3 * Math.max(usual, 1e-4));
+    for (let a = 1; a < px - 1; a++) {
+      if (!(crease[a] > SEAM_MIN_M && crease[a] > SEAM_RATIO * Math.max(usual, 1e-4))) continue;
+      // (a seam runs the whole way across, creased at nearly every point of it, and is a line, not a band:
+      // a street or a wall along the grid's own direction is creased here and there, and is metres wide)
+      let hit = 0; let n = 0;
+      for (let b = 0; b < px; b++) { const p0 = get(a - 1, b); const p1 = get(a, b); const p2 = get(a + 1, b); if (ok(p0) && ok(p1) && ok(p2)) { n++; if (Math.abs(p0 - 2 * p1 + p2) > mark) hit++; } }
+      if (!(n > px / 2 && hit / n >= SEAM_ALONG_SHARE)) continue;
+      const wide = (k) => k >= 1 && k < px - 1 && crease[k] > SEAM_RATIO * Math.max(usual, 1e-4);
+      if (wide(a - 3) || wide(a + 3)) continue;
+      // (one seam, not each of the two rows it shows in)
+      if (found.length && a - found[found.length - 1] <= 2) continue;
+      found.push(a);
+    }
+    return found;
+  };
+  const rows = terraced ? [] : seamsOf((a, b) => z(a, b));
+  const cols = terraced ? [] : seamsOf((a, b) => z(b, a));
+  const ha = (land * cellM * cellM) / 10000;
+  return {
+    effectiveResM, flatShare, terraced, seams: { rows: rows.map((a) => a * cellM), cols: cols.map((a) => a * cellM), count: rows.length + cols.length },
+    spikesPerHa: ha > 0 ? spikes / ha : 0, noiseM, coverage: valid / (px * px), water: waterK !== null,
+  };
+}
+
+/** What is wrong with a source's ground, in words: [] when nothing is. */
+export function flawsOf(g) {
+  if (!g) return [];
+  const out = [];
+  if (g.terraced) out.push(`Terraced: flat blocks about ${Math.round(g.effectiveResM)} m wide with steps between them (${Math.round(g.flatShare * 100)} % of the ground is dead level). Coarse data on a fine grid.`);
+  if (g.seams.count) out.push(`${g.seams.count} straight seam line${g.seams.count === 1 ? '' : 's'} across the square (where pieces of the survey meet).`);
+  if (g.spikesPerHa >= 1) out.push(`Spikes and pits: about ${Math.round(g.spikesPerHa)} per hectare.`);
+  if (g.noiseM > 0.08) out.push(`Noisy on gentle ground: about ${Math.round(g.noiseM * 100)} cm of grain.`);
+  return out;
+}
+
+/** How free of flaws a ground is, out of 100. */
+export function cleanScore(g) {
+  if (!g) return NaN;
+  let v = 100;
+  if (g.terraced) v -= 70;
+  v -= Math.min(40, g.seams.count * 8);
+  v -= Math.min(30, g.spikesPerHa * 3);
+  if (g.noiseM > 0.05) v -= 30 * clamp01((g.noiseM - 0.05) / 0.25);
+  return Math.max(0, Math.round(v));
+}
+
+/** Scores out of 100 for one source's measures: { bench, tilt, bumps, detail, clean, total, weights }. */
+export function scoreSource(m, nativeResM, g = null) {
   const tilt = Number.isFinite(m.tiltMedian) ? 100 * clamp01(1 - (m.tiltMedian - 0.02) / 0.18) : NaN;
   const bumps = Number.isFinite(m.bumpRmsM) ? 100 * clamp01(1 - (m.bumpRmsM - 0.01) / 0.11) : NaN;
-  const detail = Number.isFinite(nativeResM) ? 100 * clamp01(1 - Math.log(Math.max(1, nativeResM)) / Math.log(30)) : NaN;
+  // (the detail that is in the data: a fine grid of coarse data counts as coarse)
+  // (measured up to 30 m: past that a flat town reads as coarse as the square is wide)
+  const stated = Number.isFinite(nativeResM) ? nativeResM : 0;
+  const res = g && Number.isFinite(g.effectiveResM) ? Math.max(stated, Math.min(g.effectiveResM, Math.max(30, stated))) : nativeResM;
+  const detail = Number.isFinite(res) ? 100 * clamp01(1 - Math.log(Math.max(1, res)) / Math.log(30)) : NaN;
+  const clean = cleanScore(g);
   // (benches count where a fair part of the square's roads is on hillsides: a few embankment points in a flat town are no hillside roads)
   const hasBench = m.hillStations >= Math.max(MIN_HILL_STATIONS, MIN_HILL_SHARE * m.stations) && Number.isFinite(m.benchShare);
   const bench = hasBench ? 100 * m.benchShare : NaN;
-  const weights = hasBench ? { bench: 0.4, tilt: 0.25, bumps: 0.2, detail: 0.15 } : { bench: 0, tilt: 0.4, bumps: 0.3, detail: 0.3 };
-  const parts = { bench, tilt, bumps, detail };
+  // (no roads in the square: the ground alone, its detail and its flaws)
+  const roads = m.stations > 0;
+  const weights = !roads ? { bench: 0, tilt: 0, bumps: 0, detail: 0.5, clean: 0.5 }
+    : hasBench ? { bench: 0.35, tilt: 0.2, bumps: 0.15, detail: 0.15, clean: 0.15 } : { bench: 0, tilt: 0.3, bumps: 0.25, detail: 0.2, clean: 0.25 };
+  const parts = { bench, tilt, bumps, detail, clean };
   let sum = 0; let wsum = 0;
   for (const k of Object.keys(weights)) if (Number.isFinite(parts[k]) && weights[k] > 0) { sum += parts[k] * weights[k]; wsum += weights[k]; }
-  return { ...parts, total: wsum > 0 && m.stations > 0 ? Math.round(sum / wsum) : NaN, weights };
+  return { ...parts, total: wsum > 0 && (roads || g) ? Math.round(sum / wsum) : NaN, weights, roads, resM: res };
 }
 
 // The cross-section to draw: the station where the ground falls most across a
@@ -214,12 +351,20 @@ export function compareSources(sources, roads, sideM) {
   const rows = sources.map((s) => {
     if (!s.heights) return { ...s, m: null, score: null };
     const m = measureSource(s.heights, s.px, s.cellM, roads, { hillAt });
-    return { ...s, m, score: scoreSource(m, s.nativeResM) };
+    const g = measureGround(s.heights, s.px, s.cellM);
+    return { ...s, m, g, flaws: flawsOf(g), score: scoreSource(m, s.nativeResM, g) };
   });
   const scored = rows.filter((r) => Number.isFinite(r.score?.total)).sort((a, b) => b.score.total - a.score.total);
   const best = scored[0] || null;
-  let verdict = 'No roads in this square to measure: move the selection onto a road and try again.';
-  if (best) {
+  let verdict = 'Nothing to measure in this square.';
+  const noRoads = best && !best.score.roads;
+  if (noRoads) {
+    const second = scored[1];
+    const lead = 'No roads in this square, so the sources are compared on their ground alone (detail and flaws).';
+    verdict = !second ? `${lead} ${best.label} is the only one measured.`
+      : best.score.total - second.score.total < 5 ? `${lead} ${best.label} and ${second.label} are about equal.`
+        : `${lead} ${best.label} has the best ground here (${best.score.total} of 100, against ${second.score.total} for ${second.label}).`;
+  } else if (best) {
     const second = scored[1];
     const word = best.score.total >= 80 ? 'Roads sit well on this ground with little shaping.'
       : best.score.total >= 55 ? 'Roads will need some shaping (Ready terrain) to sit right.'
@@ -228,6 +373,8 @@ export function compareSources(sources, roads, sideM) {
     else if (best.score.total - second.score.total < 5) verdict = `${best.label} and ${second.label} are about equal for roads here. ${word}`;
     else verdict = `${best.label} holds the roads best here (${best.score.total} of 100, against ${second.score.total} for ${second.label}). ${word}`;
   }
+  // (a flaw worth saying of the one that came out on top)
+  if (best?.flaws?.length) verdict += ` Note: ${best.label} has flaws here (see below).`;
   // (best: every source within 5 points of the top one)
   const bestKeys = best ? scored.filter((r) => best.score.total - r.score.total < 5).map((r) => r.key) : [];
   return { sources: rows, best: best?.key || null, bestKeys, verdict, section: pickSection(rows, sideM), long: pickLongSection(rows, roads) };
@@ -290,6 +437,18 @@ function roadMap(src, sideM) {
  * The report page (one self-contained HTML string).
  * result from compareSources; meta { center, sideM, appVersion, generatedAt, roadCount, osmSource }.
  */
+// The line under a source's name: the detail measured in its data ("~1 m", "~30 m: coarse data on a 1 m grid"),
+// then what the source's own line added (free; a count of calls is left to the table).
+function cardLine(s) {
+  const res = s.score?.resM;
+  if (!Number.isFinite(res)) return s.detail || '';
+  const shown = res < 10 ? res.toFixed(1).replace(/\.0$/, '') : String(Math.round(res));
+  const coarse = Number.isFinite(s.nativeResM) && res > Math.max(3, s.nativeResM * 3) ? `: coarse data on a ${s.nativeResM < 10 ? s.nativeResM.toFixed(1).replace(/\.0$/, '') : Math.round(s.nativeResM)} m grid` : '';
+  const tail = String(s.detail || '').replace(/^~[\d.,]+\s*m\s*(·\s*)?/, '').trim();
+  const extra = tail && !/call/i.test(tail) ? ` · ${tail}` : '';
+  return `~${shown} m${coarse}${extra}`;
+}
+
 export function qualityReportHtml(result, meta) {
   const { sources, verdict, section, long } = result;
   const measured = sources.filter((s) => s.m);
@@ -297,20 +456,28 @@ export function qualityReportHtml(result, meta) {
     <div class="tile${result.bestKeys.includes(s.key) ? ' best' : ''}">
       <div class="name"><span class="sw s${SERIES[s.key] || 1}"></span>${esc(s.label)}${result.bestKeys.includes(s.key) ? ` <span class="badge">${result.bestKeys.length > 1 ? 'equal best' : 'best here'}</span>` : ''}</div>
       <div class="score">${Number.isFinite(s.score?.total) ? s.score.total : '–'}<small>${Number.isFinite(s.score?.total) ? ' / 100' : ''}</small></div>
-      <div class="muted">${esc(s.m ? s.detail || '' : s.note || 'not available here')}</div>
+      <div class="muted">${esc(s.m ? cardLine(s) : s.note || 'not available here')}</div>
     </div>`).join('');
-  const maps = sources.map((s) => `<figure>${roadMap(s, meta.sideM)}<figcaption><b>${esc(s.label)}</b> ${esc(s.detail || s.note || '')}</figcaption></figure>`).join('');
+  const maps = sources.map((s) => `<figure>${roadMap(s, meta.sideM)}<figcaption><b>${esc(s.label)}</b> ${esc(s.m ? cardLine(s) : s.note || '')}</figcaption></figure>`).join('');
   const parts = [
     ['bench', 'Road bench', 'On hillsides: is there a level strip a road wide where the map says the road is? This matters most.'],
     ['tilt', 'Level across', 'How little the ground leans across the lanes.'],
     ['bumps', 'Smooth along', 'How little the ground ripples along the road.'],
-    ['detail', 'Detail', "The source's own resolution."],
+    ['detail', 'Detail', 'How fine the detail in the data really is, measured in the heights themselves: a fine grid filled with coarse data counts as coarse.'],
+    ['clean', 'Free of flaws', 'Terraces, straight seam lines, spikes and pits, noise: see the list below.'],
   ];
   const partRows = parts.map(([k, name, what]) => `<tr><th scope="row">${name}<div class="muted">${what}</div></th>${sources.map((s) => `<td>${s.score ? bar(s.score[k], `s${SERIES[s.key] || 1}`) : '<span class="muted">–</span>'}</td>`).join('')}</tr>`).join('');
   const row = (name, f) => `<tr><th scope="row">${name}</th>${sources.map((s) => `<td>${s.m ? f(s) : '–'}</td>`).join('')}</tr>`;
   const anyBench = measured.some((s) => s.score?.weights.bench > 0);
+  const noRoadsHere = measured.length > 0 && measured.every((s) => !s.score?.roads);
+  const flawList = measured.map((s) => `<li><b><span class="sw s${SERIES[s.key] || 1}"></span> ${esc(s.label)}:</b> ${s.flaws?.length ? s.flaws.map(esc).join(' ') : 'none found.'}</li>`).join('');
   const details = [
-    row('Resolution of the source', (s) => `${fmt(s.nativeResM, s.nativeResM < 10 ? 1 : 0)} m`),
+    row('Resolution the source states', (s) => `${fmt(s.nativeResM, s.nativeResM < 10 ? 1 : 0)} m`),
+    row('Detail measured in the data', (s) => (s.g ? `${fmt(s.g.effectiveResM, s.g.effectiveResM < 10 ? 1 : 0)} m` : 'n/a')),
+    row('Ground that is dead level', (s) => (s.g ? `${fmt(100 * s.g.flatShare)} %${s.g.water ? ' (water left out)' : ''}` : 'n/a')),
+    row('Straight seam lines', (s) => (s.g ? String(s.g.seams.count) : 'n/a')),
+    row('Spikes and pits per hectare', (s) => (s.g ? fmt(s.g.spikesPerHa, 1) : 'n/a')),
+    row('Grain on gentle ground', (s) => (s.g && Number.isFinite(s.g.noiseM) ? `${fmt(100 * s.g.noiseM, 1)} cm` : 'n/a')),
     row('Road points measured (every 2 m)', (s) => String(s.m.stations)),
     row('… of them on a hillside', (s) => String(s.m.hillStations)),
     row('Hillside points with a road bench', (s) => (s.m.hillStations ? `${fmt(100 * s.m.benchShare)} %` : 'n/a')),
@@ -339,6 +506,7 @@ main{max-width:980px;margin:0 auto;padding:24px 16px 48px}h1{font-size:24px;marg
 svg.map{width:100%;height:auto;border-radius:8px;border:1px solid var(--line);display:block;background:#888}svg.map line{stroke-width:5;stroke-linecap:round}
 .q0{stroke:#9a9a94}.q1{stroke:#1e9e3c}.q2{stroke:#f0b000}.q3{stroke:#e23b36}.nodata{fill:var(--line)}
 .key{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--ink2);margin:8px 0}.key i{display:inline-block;width:18px;height:5px;border-radius:3px;vertical-align:middle;margin-right:5px}
+ul.flaws{list-style:none;padding:0;margin:8px 0;display:grid;gap:8px}ul.flaws li{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
 .wrap{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:10px}table{border-collapse:collapse;width:100%;min-width:560px}th,td{padding:9px 12px;text-align:left;border-top:1px solid var(--line);vertical-align:middle;font-variant-numeric:tabular-nums}
 thead th{border-top:0;font-size:13px}tbody th{font-weight:600;width:34%}.bar{display:inline-block;width:110px;height:10px;background:var(--line);border-radius:5px;vertical-align:middle;margin-right:8px;overflow:hidden}.fill{display:block;height:100%;border-radius:5px}.num{font-weight:600}
 .chart{position:relative;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px}.chart svg{width:100%;height:auto;display:block}
@@ -351,7 +519,7 @@ details{margin-top:12px}summary{cursor:pointer;font-weight:600}footer{margin-top
 <div class="muted">A ${km} km square at ${esc(meta.center.lat.toFixed(5))}, ${esc(meta.center.lng.toFixed(5))} · ${esc(String(meta.roadCount))} road${meta.roadCount === 1 ? '' : 's'} measured · made ${esc(meta.generatedAt)} with MapNG ${esc(meta.appVersion || '')}</div>
 <p class="verdict">${esc(verdict)}</p>
 <div class="tiles">${hero}</div>
-<p class="muted">The score says how well each source's ground already holds the roads of this square, before MapNG shapes anything. It is about roads only: a low score is not bad terrain, it is terrain that needs shaping under roads.</p>
+<p class="muted">The score has three parts: how well each source's ground already holds the roads of this square before MapNG shapes anything, how fine the detail in its data really is, and how free of flaws it is. A low roads part is not bad terrain, it is terrain that needs shaping under roads.</p>
 
 <h2>The ground, with the roads on it</h2>
 <div class="maps">${maps}</div>
@@ -359,7 +527,11 @@ details{margin-top:12px}summary{cursor:pointer;font-weight:600}footer{margin-top
 
 <h2>What the score is made of</h2>
 <div class="wrap"><table><thead><tr><th></th>${sources.map((s) => `<th><span class="sw s${SERIES[s.key] || 1}"></span> ${esc(s.label)}</th>`).join('')}</tr></thead><tbody>${partRows}</tbody></table></div>
-<p class="muted">${anyBench ? 'Weights: road bench 40 %, level across 25 %, smooth along 20 %, detail 15 %.' : 'This square has too few hillside roads to look for benches, so the score is level across 40 %, smooth along 30 %, detail 30 %.'} A coarse source is smooth along a road because it holds no detail at all, so read "smooth along" together with "level across".</p>
+<p class="muted">${noRoadsHere ? 'No roads were measured in this square: the score is detail 50 %, free of flaws 50 %.' : anyBench ? 'Weights: road bench 35 %, level across 20 %, smooth along 15 %, detail 15 %, free of flaws 15 %.' : 'This square has too few hillside roads to look for benches, so the score is level across 30 %, smooth along 25 %, detail 20 %, free of flaws 25 %.'} A coarse source is smooth along a road because it holds no detail at all, so read "smooth along" together with "level across".</p>
+
+<h2>Flaws in the ground</h2>
+<ul class="flaws">${flawList}</ul>
+<p class="muted">Read from the heights alone, roads or not. Terraces and seam lines show in the pictures above as flat blocks and straight lines.</p>
 
 ${section ? `<h2>Across one road: ${esc(section.road)}</h2>
 <p class="muted">The ground from one side of the road to the other, where it crosses the steepest hillside in the square. A source that holds the road shows a flat step at the middle; one that does not shows a plain slope.</p>

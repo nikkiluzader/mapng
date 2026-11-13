@@ -97,11 +97,29 @@ export async function gpxzPatch(center, apiKey, { sideM = 512, px = 192, signal 
   const out = new Float32Array(px * px);
   for (let j = 0; j < px; j++) for (let i = 0; i < px; i++) {
     const lng = b.w + ((i + 0.5) / px) * (b.e - b.w), lat = b.n - ((j + 0.5) / px) * (b.n - b.s);
-    const a = Math.floor(((lng - x0) / (x1 - x0)) * W), c = Math.floor(((y1 - lat) / (y1 - y0)) * H);
-    const h = a >= 0 && c >= 0 && a < W && c < H ? ras[c * W + a] : NaN;
-    out[j * px + i] = h === nd ? NaN : h;
+    out[j * px + i] = bilinearAt(ras, W, H, ((lng - x0) / (x1 - x0)) * W - 0.5, ((y1 - lat) / (y1 - y0)) * H - 0.5, nd);
   }
   return out;
+}
+
+/**
+ * A raster's value at pixel coordinates (fx, fy), between its four nearest pixel centres; NaN off the raster
+ * or beside no-data. The patch used to take the nearest pixel: where the raster's pixels are not the patch's
+ * size, that repeats a row and a column every few pixels, which a hillshade draws as a grid of thin lines
+ * (alxti: "GPXZ has a bunch of weird grid lines"), and where the raster is coarse (GPXZ with no lidar under it
+ * hands out 30 m data) it draws flat blocks with steps between them, a staircase the 30 m source beside it
+ * did not show (Sint Eustatius). Neither was in the data.
+ */
+export function bilinearAt(ras, W, H, fx, fy, nd = null) {
+  if (!(fx >= -0.5 && fy >= -0.5 && fx <= W - 0.5 && fy <= H - 0.5)) return NaN;
+  const x = Math.max(0, Math.min(W - 1, fx)); const y = Math.max(0, Math.min(H - 1, fy));
+  const x0 = Math.min(W - 2 < 0 ? 0 : W - 2, Math.floor(x)); const y0 = Math.min(H - 2 < 0 ? 0 : H - 2, Math.floor(y));
+  const x1 = Math.min(W - 1, x0 + 1); const y1 = Math.min(H - 1, y0 + 1);
+  const u = x - x0; const v = y - y0;
+  const a = ras[y0 * W + x0]; const b2 = ras[y0 * W + x1]; const c = ras[y1 * W + x0]; const d = ras[y1 * W + x1];
+  const bad = (q) => q === nd || !Number.isFinite(q);
+  if (bad(a) || bad(b2) || bad(c) || bad(d)) return NaN;
+  return (a * (1 - u) + b2 * u) * (1 - v) + (c * (1 - u) + d * u) * v;
 }
 
 /** A hillshade of heights (px x px, cell metres) as a data URL. */

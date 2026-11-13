@@ -57,8 +57,63 @@ test('roads of the square: drivable ways in metres from its north-west corner; b
   assert.ok(Math.abs(x0) < 1e-6 && Math.abs(y0) < 1e-6 && Math.abs(x1 - side) < 1e-6 && Math.abs(y1 - side) < 1e-6);
 });
 
-test('no roads in the square: says so, scores nothing', () => {
-  const r = compareSources([{ key: 'standard', label: 'Global 30 m', nativeResM: 30, heights: grid(() => 1), px: PX, cellM: 1 }], [], PX);
-  assert.equal(r.best, null);
-  assert.match(r.verdict, /No roads/);
+test('no roads in the square: says so, and compares the sources on their ground alone', () => {
+  const rough = (x, y) => 100 + 6 * Math.sin(x / 9) * Math.cos(y / 7) + 0.3 * Math.sin(x / 2.3 + y / 3.1);
+  const coarseOf = (x, y) => { const X = Math.floor(x / 30) * 30 + 15; const Y = Math.floor(y / 30) * 30 + 15; return 100 + 6 * Math.sin(X / 9) * Math.cos(Y / 7); };
+  const r = compareSources([
+    { key: 'standard', label: 'Global 30 m', nativeResM: 30, heights: grid(rough), px: PX, cellM: 1 },
+    { key: 'mapterhorn', label: 'Mapterhorn', nativeResM: 1, heights: grid(rough), px: PX, cellM: 1 },
+    { key: 'gpxz', label: 'GPXZ', nativeResM: 1, heights: grid(coarseOf), px: PX, cellM: 1 },
+  ], [], PX);
+  assert.match(r.verdict, /No roads in this square/);
+  assert.equal(r.best, 'mapterhorn');
+  const by = Object.fromEntries(r.sources.map((s) => [s.key, s]));
+  assert.ok(by.mapterhorn.score.total >= 90, `fine ground ${by.mapterhorn.score.total}`);
+  // the user's island: a 1 m grid filled with 30 m blocks is not fine data, and it is flawed
+  assert.ok(by.gpxz.g.terraced && by.gpxz.g.effectiveResM >= 25, JSON.stringify(by.gpxz.g));
+  assert.ok(by.gpxz.score.detail <= 10 && by.gpxz.score.total <= 30, `blocks score ${by.gpxz.score.total}`);
+  assert.match(by.gpxz.flaws.join(' '), /Terraced/);
+  assert.deepEqual(by.mapterhorn.flaws, []);
+  const html = qualityReportHtml(r, { center: { lat: 1, lng: 2 }, sideM: PX, roadCount: 0, generatedAt: '2026-11-13', appVersion: 'test' });
+  assert.match(html, /Flaws in the ground/);
+  assert.match(html, /coarse data on a 1 m grid/);
+  assert.ok(!/call used/.test(html));
+});
+
+test('the ground\'s own measures: real detail, spikes, noise; a fine survey is clean', async () => {
+  const { measureGround, cleanScore, flawsOf } = await import('../services/sourceQuality.js');
+  const fine = (x, y) => 50 + 4 * Math.sin(x / 11) + 3 * Math.cos(y / 13) + 0.3 * Math.sin(x / 2.3 + y / 3.1);
+  const g = measureGround(grid(fine), PX, 1);
+  assert.ok(g.effectiveResM <= 2 && !g.terraced && g.seams.count === 0 && cleanScore(g) >= 95, JSON.stringify(g));
+  // 30 m data resampled smoothly onto the 1 m grid: no flaw, but its detail is 30 m
+  const knots = (x) => { const k = Math.floor(x / 30); const t = x / 30 - k; const f = (q) => 50 + 5 * Math.sin(q * 1.9); return f(k) * (1 - t) + f(k + 1) * t; };
+  const smooth = measureGround(grid((x, y) => knots(x) + 0.5 * knots(y)), PX, 1);
+  assert.ok(smooth.effectiveResM >= 20 && !smooth.terraced, JSON.stringify(smooth));
+  // spikes
+  const spiky = grid(fine); for (let k = 0; k < 60; k++) spiky[(20 + k * 3) * PX + 30 + k * 3] += 4;
+  const sp = measureGround(spiky, PX, 1);
+  assert.ok(sp.spikesPerHa > 5 && cleanScore(sp) < 85 && /Spikes/.test(flawsOf(sp).join(' ')), JSON.stringify(sp.spikesPerHa));
+  // noise on gentle ground
+  let seed = 7; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 - 0.5; };
+  const noisy = measureGround(grid((x, y) => 50 + 0.01 * x + rnd() * 0.6), PX, 1);
+  assert.ok(noisy.noiseM > 0.1 && /Noisy/.test(flawsOf(noisy).join(' ')), `grain ${noisy.noiseM}`);
+  // a lake in the square is not a terrace
+  const lake = measureGround(grid((x, y) => (Math.hypot(x - 128, y - 128) < 90 ? 40 : fine(x, y))), PX, 1);
+  assert.ok(!lake.terraced && lake.water, JSON.stringify({ t: lake.terraced, w: lake.water, f: lake.flatShare }));
+});
+
+test('a raster is read between its pixels, not at the nearest one', async () => {
+  const { bilinearAt } = await import('../services/sourceCompare.js');
+  const ras = new Float32Array([0, 10, 20, 30]);   // 2 x 2
+  assert.equal(bilinearAt(ras, 2, 2, 0, 0), 0);
+  assert.equal(bilinearAt(ras, 2, 2, 0.5, 0), 5);
+  assert.equal(bilinearAt(ras, 2, 2, 0.5, 0.5), 15);
+  assert.equal(bilinearAt(ras, 2, 2, 1, 1), 30);
+  assert.ok(Number.isNaN(bilinearAt(ras, 2, 2, 3, 0)), 'off the raster');
+  assert.ok(Number.isNaN(bilinearAt(new Float32Array([0, -9999, 20, 30]), 2, 2, 0.5, 0.5, -9999)), 'beside no-data');
+  // a coarse raster read onto a fine grid has no repeated rows
+  const W = 8; const coarse = new Float32Array(W * W).map((_, i) => Math.sin(i % W) + Math.floor(i / W));
+  const rows = []; for (let j = 0; j < 64; j++) rows.push(bilinearAt(coarse, W, W, 3.3, (j + 0.5) / 8 - 0.5));
+  let repeats = 0; for (let j = 1; j < rows.length; j++) if (rows[j] === rows[j - 1]) repeats++;
+  assert.ok(repeats <= 8, `${repeats} repeated rows`);
 });
