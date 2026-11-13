@@ -13,7 +13,12 @@ const MIN_Z = 12;   // z12: Copernicus GLO-30 outside lidar (the ground filter's
 const MAX_Z = 18;
 const HIT_TTL_S = 30 * 24 * 3600;      // tiles change only with a Mapterhorn release
 const MISS_TTL_S = 7 * 24 * 3600;
-const FRESH_PER_MINUTE = 600;          // upstream fetches per address per minute (a 16 km map is ~1,000 tiles)
+// Tiles fetched from Mapterhorn for one address in a minute. A 16 km map at zoom 17 is over 4,000 tiles, and
+// the app asks 12 at a time: at 600 a minute, 9,100 of a day's 725,000 tile requests were turned away (429).
+// The app then fetches those straight from Mapterhorn, so the limit spared Mapterhorn nothing and only kept
+// the tiles out of our storage, to be fetched from them again by the next map there. 2,400 lets one big map
+// through; it still stops the cache being used as an open mirror.
+const FRESH_PER_MINUTE = 2400;
 const PATH_RE = /^\/api\/mapterhorn\/(\d{1,2})\/(\d{1,6})\/(\d{1,6})\.webp$/;
 const USER_AGENT = 'MapNG tile cache (https://mapng.com; one request per tile, then served from our storage)';
 

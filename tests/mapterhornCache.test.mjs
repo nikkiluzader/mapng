@@ -59,7 +59,8 @@ test('upstream errors are not cached; crawling is capped per address', async () 
   assert.equal(r.status, 502); assert.equal(e.puts(), 0);
   const ok = async () => new Response(new Uint8Array([0]), { status: 200 });
   let limited = 0;
-  for (let i = 0; i < 700; i++) {
+  // (2,400 new tiles a minute for one address: one big map's worth)
+  for (let i = 0; i < 2500; i++) {
     const p = `/api/mapterhorn/17/${i}/5.webp`;
     const res = await handleMapterhornTiles(req(p, '9.9.9.9'), e, ctx(), new URL(`https://mapng.com${p}`), { fetchImpl: ok, cache: null });
     if (res.status === 429) limited++;
