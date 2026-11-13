@@ -117,3 +117,23 @@ test('a raster is read between its pixels, not at the nearest one', async () => 
   let repeats = 0; for (let j = 1; j < rows.length; j++) if (rows[j] === rows[j - 1]) repeats++;
   assert.ok(repeats <= 8, `${repeats} repeated rows`);
 });
+
+test('the flaws are marked where they are: spikes, a seam, terraced blocks, noisy patches', async () => {
+  const { measureGround } = await import('../services/sourceQuality.js');
+  const fine = (x, y) => 50 + 4 * Math.sin(x / 11) + 3 * Math.cos(y / 13) + 0.3 * Math.sin(x / 2.3 + y / 3.1);
+  // a spike at (100.5, 60.5) and a seam: everything south of row 150 stands 0.4 m higher
+  const h = grid((x, y) => fine(x, y) + (y > 150 ? 0.4 : 0)); h[60 * PX + 100] += 5;
+  const g = measureGround(h, PX, 1);
+  assert.ok(g.marks.spikes.some(([x, y]) => Math.abs(x - 100.5) < 1 && Math.abs(y - 60.5) < 1), JSON.stringify(g.marks.spikes.slice(0, 3)));
+  assert.ok(g.seams.rows.some((y) => Math.abs(y - 150) <= 2) && g.seams.cols.length === 0, JSON.stringify(g.seams));
+  // noise in the east half only
+  let seed = 3; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 - 0.5; };
+  const n = measureGround(grid((x, y) => 50 + 0.01 * y + (x > 128 ? rnd() * 0.8 : 0)), PX, 1);
+  assert.ok(n.marks.noisy.length > 50 && n.marks.noisy.every(([x]) => x >= 112), `${n.marks.noisy.length} noisy blocks`);
+  // terraces
+  const t = measureGround(grid((x, y) => 20 + 3 * Math.sin(Math.floor(x / 30) * 0.7) + 2 * Math.cos(Math.floor(y / 30) * 0.9)), PX, 1);
+  assert.ok(t.terraced && t.marks.terraces.length > 100, `${t.marks.terraces.length} terraced blocks`);
+  const r = compareSources([{ key: 'gpxz', label: 'GPXZ', nativeResM: 1, heights: h, px: PX, cellM: 1 }], [], PX);
+  const html = qualityReportHtml(r, { center: { lat: 1, lng: 2 }, sideM: PX, roadCount: 0, generatedAt: '2026-11-13', appVersion: 'test' });
+  assert.match(html, /class="f-spike"/); assert.match(html, /class="f-seam"/);
+});

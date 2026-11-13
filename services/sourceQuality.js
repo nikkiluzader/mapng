@@ -167,6 +167,8 @@ const SEAM_MIN_M = 0.02;          // ... and at least this much: a seam
 const SEAM_ALONG_SHARE = 0.8;     // ... at this share of its points, all the way across
 const SPIKE_M = 0.5;              // a point this far over or under all eight neighbours: a spike or a pit
 const NOISE_SLOPE = 0.08;         // noise is read on ground gentler than this
+const NOISE_MARK_M = 0.08;        // a block with this much grain is marked in the flaw picture
+const FLAW_BLOCK_M = 16;          // the flaw picture's blocks
 
 /**
  * The ground's own measures: { effectiveResM, flatShare, terraced, seams: { rows, cols, count },
@@ -206,18 +208,25 @@ export function measureGround(heights, px, cellM) {
   const effectiveResM = Math.max(cellM, runCells * cellM);
   // level ground, steps, spikes and noise
   let land = 0; let flat = 0; let spikes = 0; const steps = []; const resid = [];
+  // where: the spikes' places, and per block of FLAW_BLOCK_M the level share and the grain (for the flaw picture)
+  const spikeAt = []; const nb = Math.max(1, Math.ceil((px * cellM) / FLAW_BLOCK_M)); const bCells = Math.max(1, Math.round(FLAW_BLOCK_M / cellM));
+  const bLand = new Uint32Array(nb * nb); const bFlat = new Uint32Array(nb * nb); const bRes = new Float32Array(nb * nb); const bResN = new Uint32Array(nb * nb);
   for (let r = 1; r < px - 1; r++) for (let c = 1; c < px - 1; c++) {
     const v = z(r, c); if (!ok(v) || isWater(v)) continue;
     const e = z(r, c + 1); const w = z(r, c - 1); const n = z(r - 1, c); const s2 = z(r + 1, c);
     if (!ok(e) || !ok(w) || !ok(n) || !ok(s2)) continue;
     land++;
+    const bi = Math.min(nb - 1, Math.floor(r / bCells)) * nb + Math.min(nb - 1, Math.floor(c / bCells)); bLand[bi]++;
     const dx = Math.abs(e - v); const dy = Math.abs(s2 - v);
-    if (dx < FLAT_EPS_M && dy < FLAT_EPS_M && Math.abs(v - w) < FLAT_EPS_M && Math.abs(v - n) < FLAT_EPS_M) flat++;
+    if (dx < FLAT_EPS_M && dy < FLAT_EPS_M && Math.abs(v - w) < FLAT_EPS_M && Math.abs(v - n) < FLAT_EPS_M) { flat++; bFlat[bi]++; }
     else if ((land & 7) === 0) steps.push(Math.max(dx, dy));
     let hi = -Infinity; let lo = Infinity;
     for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) { if (!dr && !dc) continue; const q = z(r + dr, c + dc); if (ok(q)) { if (q > hi) hi = q; if (q < lo) lo = q; } }
-    if (v > hi + SPIKE_M || v < lo - SPIKE_M) spikes++;
-    if (Math.abs(e - w) / (2 * cellM) < NOISE_SLOPE && Math.abs(s2 - n) / (2 * cellM) < NOISE_SLOPE && (land & 3) === 0) resid.push(Math.abs(v - (e + w + n + s2) / 4));
+    if (v > hi + SPIKE_M || v < lo - SPIKE_M) { spikes++; if (spikeAt.length < 300) spikeAt.push([(c + 0.5) * cellM, (r + 0.5) * cellM]); }
+    if (Math.abs(e - w) / (2 * cellM) < NOISE_SLOPE && Math.abs(s2 - n) / (2 * cellM) < NOISE_SLOPE) {
+      const d = Math.abs(v - (e + w + n + s2) / 4); bRes[bi] += d; bResN[bi]++;
+      if ((land & 3) === 0) resid.push(d);
+    }
   }
   const flatShare = land ? flat / land : 0;
   const terraced = flatShare > TERRACE_FLAT_SHARE && steps.length > 20 && quantile(steps, 0.95) > TERRACE_STEP_M;
@@ -250,8 +259,18 @@ export function measureGround(heights, px, cellM) {
   };
   const rows = terraced ? [] : seamsOf((a, b) => z(a, b));
   const cols = terraced ? [] : seamsOf((a, b) => z(b, a));
+  // the blocks to mark: terraces (where the ground is terraced at all: the blocks that are mostly dead level), grain
+  const size = bCells * cellM; const terraces = []; const noisy = [];
+  for (let b = 0; b < nb * nb; b++) {
+    if (bLand[b] < bCells * bCells * 0.3) continue;
+    const at = [(b % nb) * size, Math.floor(b / nb) * size, size];
+    if (terraced && bFlat[b] / bLand[b] > 0.5) terraces.push(at);
+    // (the mean of |residual| against a normal's deviation: x 1.25)
+    else if (bResN[b] > bLand[b] * 0.05 && 1.25 * (bRes[b] / bResN[b]) > NOISE_MARK_M) noisy.push(at);
+  }
   const ha = (land * cellM * cellM) / 10000;
   return {
+    marks: { spikes: spikeAt, terraces, noisy }, noisyShare: noisy.length / (nb * nb),
     effectiveResM, flatShare, terraced, seams: { rows: rows.map((a) => a * cellM), cols: cols.map((a) => a * cellM), count: rows.length + cols.length },
     spikesPerHa: ha > 0 ? spikes / ha : 0, noiseM, coverage: valid / (px * px), water: waterK !== null,
   };
@@ -263,8 +282,11 @@ export function flawsOf(g) {
   const out = [];
   if (g.terraced) out.push(`Terraced: flat blocks about ${Math.round(g.effectiveResM)} m wide with steps between them (${Math.round(g.flatShare * 100)} % of the ground is dead level). Coarse data on a fine grid.`);
   if (g.seams.count) out.push(`${g.seams.count} straight seam line${g.seams.count === 1 ? '' : 's'} across the square (where pieces of the survey meet).`);
+  const spikes = g.marks?.spikes?.length || 0;
   if (g.spikesPerHa >= 1) out.push(`Spikes and pits: about ${Math.round(g.spikesPerHa)} per hectare.`);
+  else if (spikes >= 3) out.push(`${spikes} spikes or pits.`);
   if (g.noiseM > 0.08) out.push(`Noisy on gentle ground: about ${Math.round(g.noiseM * 100)} cm of grain.`);
+  else if (g.noisyShare >= 0.02) out.push(`Noisy patches on about ${Math.max(1, Math.round(g.noisyShare * 100))} % of the square.`);
   return out;
 }
 
@@ -276,6 +298,7 @@ export function cleanScore(g) {
   v -= Math.min(40, g.seams.count * 8);
   v -= Math.min(30, g.spikesPerHa * 3);
   if (g.noiseM > 0.05) v -= 30 * clamp01((g.noiseM - 0.05) / 0.25);
+  if (!(g.noiseM > 0.08) && g.noisyShare >= 0.02) v -= Math.min(20, g.noisyShare * 60);
   return Math.max(0, Math.round(v));
 }
 
@@ -433,6 +456,20 @@ function roadMap(src, sideM) {
   return `<svg class="map" viewBox="0 0 ${sideM} ${sideM}" role="img" aria-label="${esc(src.label)}: hillshade with the roads">${img}${lines}</svg>`;
 }
 
+// The flaw picture: the hillshade with what measureGround found drawn where it is.
+function flawMap(src, sideM) {
+  const img = src.image ? `<image href="${src.image}" x="0" y="0" width="${sideM}" height="${sideM}" preserveAspectRatio="none"/>` : `<rect width="${sideM}" height="${sideM}" class="nodata"/>`;
+  const g = src.g; let marks = '';
+  if (g) {
+    for (const [x, y, w] of g.marks?.terraces || []) marks += `<rect class="f-terrace" x="${x}" y="${y}" width="${w}" height="${w}"/>`;
+    for (const [x, y, w] of g.marks?.noisy || []) marks += `<rect class="f-noise" x="${x}" y="${y}" width="${w}" height="${w}"/>`;
+    for (const y of g.seams.rows) marks += `<line class="f-seam" x1="0" y1="${y.toFixed(1)}" x2="${sideM}" y2="${y.toFixed(1)}"/>`;
+    for (const x of g.seams.cols) marks += `<line class="f-seam" x1="${x.toFixed(1)}" y1="0" x2="${x.toFixed(1)}" y2="${sideM}"/>`;
+    for (const [x, y] of g.marks?.spikes || []) marks += `<circle class="f-spike" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(sideM / 70).toFixed(1)}"/>`;
+  }
+  return `<svg class="map" viewBox="0 0 ${sideM} ${sideM}" role="img" aria-label="${esc(src.label)}: hillshade with the flaws found marked">${img}${marks}</svg>`;
+}
+
 /**
  * The report page (one self-contained HTML string).
  * result from compareSources; meta { center, sideM, appVersion, generatedAt, roadCount, osmSource }.
@@ -470,6 +507,7 @@ export function qualityReportHtml(result, meta) {
   const row = (name, f) => `<tr><th scope="row">${name}</th>${sources.map((s) => `<td>${s.m ? f(s) : '–'}</td>`).join('')}</tr>`;
   const anyBench = measured.some((s) => s.score?.weights.bench > 0);
   const noRoadsHere = measured.length > 0 && measured.every((s) => !s.score?.roads);
+  const flawMaps = measured.map((s) => `<figure>${flawMap(s, meta.sideM)}<figcaption><b>${esc(s.label)}</b> ${s.flaws?.length ? 'flaws marked' : 'nothing to mark'}</figcaption></figure>`).join('');
   const flawList = measured.map((s) => `<li><b><span class="sw s${SERIES[s.key] || 1}"></span> ${esc(s.label)}:</b> ${s.flaws?.length ? s.flaws.map(esc).join(' ') : 'none found.'}</li>`).join('');
   const details = [
     row('Resolution the source states', (s) => `${fmt(s.nativeResM, s.nativeResM < 10 ? 1 : 0)} m`),
@@ -506,6 +544,7 @@ main{max-width:980px;margin:0 auto;padding:24px 16px 48px}h1{font-size:24px;marg
 svg.map{width:100%;height:auto;border-radius:8px;border:1px solid var(--line);display:block;background:#888}svg.map line{stroke-width:5;stroke-linecap:round}
 .q0{stroke:#9a9a94}.q1{stroke:#1e9e3c}.q2{stroke:#f0b000}.q3{stroke:#e23b36}.nodata{fill:var(--line)}
 .key{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--ink2);margin:8px 0}.key i{display:inline-block;width:18px;height:5px;border-radius:3px;vertical-align:middle;margin-right:5px}
+.f-seam{stroke:#e5484d;stroke-width:3;stroke-dasharray:10 6;vector-effect:non-scaling-stroke;stroke-width:2}.f-spike{fill:none;stroke:#e5484d;stroke-width:2;vector-effect:non-scaling-stroke}.f-terrace{fill:#f0a020;opacity:.38}.f-noise{fill:#c040d0;opacity:.3}
 ul.flaws{list-style:none;padding:0;margin:8px 0;display:grid;gap:8px}ul.flaws li{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
 .wrap{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:10px}table{border-collapse:collapse;width:100%;min-width:560px}th,td{padding:9px 12px;text-align:left;border-top:1px solid var(--line);vertical-align:middle;font-variant-numeric:tabular-nums}
 thead th{border-top:0;font-size:13px}tbody th{font-weight:600;width:34%}.bar{display:inline-block;width:110px;height:10px;background:var(--line);border-radius:5px;vertical-align:middle;margin-right:8px;overflow:hidden}.fill{display:block;height:100%;border-radius:5px}.num{font-weight:600}
@@ -530,6 +569,8 @@ details{margin-top:12px}summary{cursor:pointer;font-weight:600}footer{margin-top
 <p class="muted">${noRoadsHere ? 'No roads were measured in this square: the score is detail 50 %, free of flaws 50 %.' : anyBench ? 'Weights: road bench 35 %, level across 20 %, smooth along 15 %, detail 15 %, free of flaws 15 %.' : 'This square has too few hillside roads to look for benches, so the score is level across 30 %, smooth along 25 %, detail 20 %, free of flaws 25 %.'} A coarse source is smooth along a road because it holds no detail at all, so read "smooth along" together with "level across".</p>
 
 <h2>Flaws in the ground</h2>
+<div class="maps">${flawMaps}</div>
+<div class="key"><span><i style="background:#e5484d;height:2px"></i>seam line</span><span><i style="background:none;border:2px solid #e5484d;border-radius:50%;width:10px;height:10px;box-sizing:border-box"></i>spike or pit</span><span><i style="background:#f0a020"></i>terraced (flat blocks with steps)</span><span><i style="background:#c040d0"></i>noisy ground</span></div>
 <ul class="flaws">${flawList}</ul>
 <p class="muted">Read from the heights alone, roads or not. Terraces and seam lines show in the pictures above as flat blocks and straight lines.</p>
 
