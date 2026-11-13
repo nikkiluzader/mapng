@@ -17,6 +17,7 @@
     "@fontsource-variable/noto-sans": "^5.3.0",
     "@fontsource-variable/overpass": "^5.3.0",
     "@fontsource-variable/overpass-mono": "^5.3.0",
+    "@photostructure/tz-lookup": "11.7.0",
     "@tresjs/cientos": "^4.3.1",
     "@tresjs/core": "^4.0.0",
     "@vue-leaflet/vue-leaflet": "^0.10.0",

@@ -49,6 +49,7 @@ import { BUILDING_LITE_FROM_M, buildingTileScene } from './buildingTiles.js';
 import { viewDistanceMeters, viewDistanceChoice, fogDensityFor } from './viewDistance.js';
 import { HERO_ROADS_FILE, HERO_ROADS_LUA } from './heroRoadsLua.js';
 import { ensureTexture, hasTexture } from './textureOnDemand.js';
+import { civilTimeAt } from './timeZone.js';
 import { parallelMap, parallelThreads } from './parallel.js';
 import { measureStructures, roadLinesFromDecals } from './structures/metrics.js';
 import { buildStructureGraph } from './structures/graph.js';
@@ -757,7 +758,10 @@ async function generateHeightmapPng(terrainData, maxSize = Number.POSITIVE_INFIN
     }
   }
 
-  const pngData = encode({ width: outW, height: outH, data, depth: 16, channels: 1 });
+  // (the desktop app's own process writes it on many cores, desktop/runner/fastPng.mjs: 6 s to under 1 s at 8192)
+  const pngData = typeof globalThis.__mapngEncodeGray16 === 'function'
+    ? await globalThis.__mapngEncodeGray16(data, outW, outH)
+    : encode({ width: outW, height: outH, data, depth: 16, channels: 1 });
   return new Blob([new Uint8Array(pngData)], { type: 'image/png' });
 }
 
@@ -14122,10 +14126,14 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // moon, stars and the sunset→sunrise night-light window come from
   // TimeOfDay's latitude/longitude/date. Freeroam overwrites that date with
   // info.json defaultDate (June 20 when missing), so both carry the export
-  // day — the season the user is looking at. utcOffset stays unset: the
-  // engine then derives it (and DST) from longitude, keeping clock ≈ sun.
+  // day — the season the user is looking at.
   const exportDay = new Date();
   const skyDate = { year: exportDay.getFullYear(), month: exportDay.getMonth() + 1, day: exportDay.getDate() };
+  // utcOffset: the place's own civil time on that day, daylight saving included (services/timeZone.js). Left
+  // unset the engine guesses it from the longitude, an hour or two off wherever clocks do not follow the sun
+  // (France, Spain, China): the level's clock and its sun disagreed. A BeamNG developer's report.
+  const civilTime = await civilTimeAt(center?.lat, center?.lng, skyDate);
+  console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Time of day: ${civilTime ? `${civilTime.zone}, UTC${civilTime.utcOffset >= 0 ? '+' : ''}${civilTime.utcOffset} on the export day` : 'no time zone found for this place; the game works the offset out from the longitude'}.`);
 
   // mapng.json: what made this level, so the desktop app can list MapNG
   // levels and rebuild them with a later version (its levels sidebar)
@@ -15117,6 +15125,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         latitude: roundTo(center.lat, 6),
         longitude: roundTo(center.lng, 6),
         ...skyDate,
+        // (the docs' own example writes it as text)
+        ...(civilTime ? { utcOffset: String(civilTime.utcOffset) } : {}),
       },
       {
         __parent: 'sky_and_sun',

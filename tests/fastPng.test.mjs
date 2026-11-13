@@ -42,3 +42,15 @@ test('the desktop cache asks for the archive list again, not for the archives th
   assert.ok(!MANIFEST_REQUEST.test('https://mapng.com/api/osm-tiles/osm-all/planet-3-4-3-2026-11-12.pmtiles'));
   assert.ok(!MANIFEST_REQUEST.test('https://mapng.com/api/mapterhorn/17/1/1.webp'));
 });
+
+test('a 16-bit grey heightmap written in pieces decodes to exactly the heights given', async () => {
+  const { encodeGray16 } = await import('../desktop/runner/fastPng.mjs');
+  for (const [w, h] of [[1, 1], [513, 300], [2048, 2100]]) {
+    const src = new Uint16Array(w * h); for (let i = 0; i < src.length; i++) src[i] = (i * 7919 + (i >> 3) * 31) & 0xffff;
+    src[0] = 0; src[src.length - 1] = 65535;
+    const back = decode(await encodeGray16(src, w, h));
+    assert.equal(back.width, w); assert.equal(back.height, h); assert.equal(back.depth, 16); assert.equal(back.channels, 1);
+    assert.ok(Buffer.from(back.data.buffer, back.data.byteOffset, back.data.byteLength).equals(Buffer.from(src.buffer)), `${w} x ${h}`);
+  }
+  await assert.rejects(() => encodeGray16(new Uint16Array(10), 4, 4), /are not/);
+});

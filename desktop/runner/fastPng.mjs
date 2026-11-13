@@ -69,6 +69,37 @@ export async function encodePng(rgba, width, height, { opaque = false } = {}) {
   ]);
 }
 
+/** 16-bit grey samples (Uint16Array, width * height: a level's heightmap) -> a PNG Buffer, written the same way. */
+export async function encodeGray16(samples, width, height) {
+  if (samples.length !== width * height) throw new Error(`encodeGray16: ${samples.length} samples are not ${width} x ${height}`);
+  const row = width * 2 + 1; const rowsPerStrip = Math.max(1, Math.floor(STRIP_BYTES / row));
+  const jobs = [];
+  for (let y0 = 0; y0 < height; y0 += rowsPerStrip) {
+    const rows = Math.min(rowsPerStrip, height - y0);
+    const out = Buffer.allocUnsafe(rows * row);
+    for (let r = 0; r < rows; r++) {
+      const y = y0 + r; let o = r * row; out[o++] = y === 0 ? 0 : 2;
+      let s = y * width; let up = s - width;
+      // (big-endian samples; "Up" per byte: this row's byte less the one above it)
+      if (y === 0) for (let x = 0; x < width; x++, s++) { const v = samples[s]; out[o++] = v >>> 8; out[o++] = v & 255; }
+      else for (let x = 0; x < width; x++, s++, up++) { const v = samples[s]; const u = samples[up]; out[o++] = (v >>> 8) - (u >>> 8); out[o++] = (v & 255) - (u & 255); }
+    }
+    const last = y0 + rows >= height;
+    jobs.push(deflateRaw(out, last).then((deflated) => ({ deflated, adler: adlerOf(out), len: out.length })));
+  }
+  const parts = await Promise.all(jobs);
+  let adler = [1, 0]; let first = true;
+  for (const p of parts) { adler = first ? p.adler : adlerJoin(adler, p.adler, p.len); first = false; }
+  const sum = Buffer.alloc(4); sum.writeUInt32BE((((adler[1] << 16) | adler[0]) >>> 0), 0);
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(width, 0); ihdr.writeUInt32BE(height, 4); ihdr[8] = 16; ihdr[9] = 0;
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    ...chunk('IHDR', [ihdr]),
+    ...chunk('IDAT', [Buffer.from([0x78, 0x01]), ...parts.map((p) => p.deflated), sum]),
+    ...chunk('IEND', []),
+  ]);
+}
+
 const BIG_PIXELS = 512 * 512;   // (a small picture: the canvas's own encoder is quick enough)
 
 /** A canvas (@napi-rs/canvas) as a PNG Buffer: on many cores when it is big, the canvas's own encoder when small. */

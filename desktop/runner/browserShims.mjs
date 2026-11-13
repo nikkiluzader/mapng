@@ -3,7 +3,9 @@
 // Image, ImageData and createImageBitmap, and blob: URLs kept in memory so
 // images and fetch() can read them back. (scripts/sweep/polyfill.mjs stubs
 // the images instead; the desktop app needs the real ones.)
-import { canvasToPng } from './fastPng.mjs';
+import { canvasToPng, encodeGray16 } from './fastPng.mjs';
+// (the level export's heightmap picture, written on many cores in this process: exportBeamNGLevel.js asks for it here)
+globalThis.__mapngEncodeGray16 = encodeGray16;
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
