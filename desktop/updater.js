@@ -85,7 +85,15 @@ export function startUpdater({ settings, busy, ready = () => true }) {
         state = 'checking';
       }
       autoUpdater.allowPrerelease = tests;
-      await autoUpdater.checkForUpdates();
+      try {
+        await autoUpdater.checkForUpdates();
+      } catch (error) {
+        // A test build that is still being built: its tag is on GitHub (the updater sees it) before its files
+        // are. Nothing to offer yet, not a failed check.
+        if (!(tests && /CHANNEL_FILE_NOT_FOUND|Cannot find .*\.yml/i.test(String(error?.code || '') + String(error?.message || '')))) throw error;
+        state = 'idle';
+        if (manual) await ask({ message: fill(u().latest, { have: app.getVersion() }) });
+      }
     } catch (error) {
       quiet = false;
       state = 'idle';
