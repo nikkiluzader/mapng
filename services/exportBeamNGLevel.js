@@ -6233,11 +6233,18 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   // street over a cut-and-cover box: North 3rd Street over Deck Park's I-10
   // dropped 10 m into the tunnel)
   const TUBE_ALONG_COS = 0.5;
-  const tubeAt = (x, y, dx = 0, dy = 0) => {
+  // (... and so does a road that lies along it far over its roof, or deep inside it: only a road ending in a
+  // mouth is on the tube's floor. Route de la Sassière climbs the hillside 20 m over the D 902's tunnel, along
+  // it for 20 m: its kerbs were put on the tunnel's floor and the ground under them dug down to it, a slot
+  // of hillside hanging into the tube 170 m from its mouth.)
+  const TUBE_MOUTH_REACH_M = 60;
+  const TUBE_OVER_ROOF_M = 4;
+  const tubeAt = (x, y, dx = 0, dy = 0, groundZ = NaN) => {
     for (const t of tunnels.tunnels) {
       if (t.kind === 'gallery') continue;
       const n = nearestOnTunnel(t, x, y, t.W + (t.maxExtra || 0) + 1);
       if (!n || n.beyond || n.into < 0.3) continue;
+      if (n.into > TUBE_MOUTH_REACH_M || (Number.isFinite(groundZ) && groundZ > n.z + t.need + TUBE_OVER_ROOF_M)) continue;
       const q = t.line[n.i];
       const L = Math.hypot(dx, dy);
       if (L > 1e-6 && Math.abs((dx * q.tx + dy * q.ty) / L) < TUBE_ALONG_COS) continue;
@@ -6365,7 +6372,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
         const before = segWorld[Math.max(0, k - 1)]; const after = segWorld[Math.min(segment.length - 1, k + 1)];
         const deckPart = bridges.bySeg.get(segIndex);
         const carried = bridges.approaches?.get(segIndex);
-        const bore = tunnels.bySeg.get(segIndex) || tubeAt(wx, wy, after[0] - before[0], after[1] - before[1]);
+        const bore = tunnels.bySeg.get(segIndex) || tubeAt(wx, wy, after[0] - before[0], after[1] - before[1], groundZ);
         if (bore && !tunnels.bySeg.has(segIndex)) inTubeSeg.add(segIndex);
         const wz = deckPart ? deckHeightAt(deckPart, wx, wy) + 0.1
           : carried && distanceToLine(carried.xy, wx, wy) < 1 ? deckHeightAt(carried, wx, wy) + 0.1
