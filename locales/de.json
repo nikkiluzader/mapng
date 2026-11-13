@@ -1697,7 +1697,8 @@
     "hintRawOff": "Straßen hier werden wieder geglättet.",
     "statRaw": "Nicht geglättet: {pct}% des Quadrats",
     "lockedPinned": "Der Bereichsrahmen ist hier fixiert, damit du zum Zeichnen zoomen und verschieben kannst (Leertaste halten und ziehen, um die Karte mit gewähltem Werkzeug zu bewegen).",
-    "unlock": "Lösen"
+    "unlock": "Lösen",
+    "hintTooSmall": "Diese Linie schließt eine Fläche, aber sie ist zu klein, um sie bei dieser Kartengröße zu schattieren. Zeichne um eine größere Fläche (etwa {metres} m breit oder mehr)."
   },
   "build": {
     "title": "Was gebaut wird",

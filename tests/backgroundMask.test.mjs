@@ -151,3 +151,23 @@ test('No smoothing strokes: their own raster, eased edges, smooth-again strokes,
   assert.equal(w((96 + 10) / N, 64 / N), 0);
   assert.equal(rawWeightLookup(mask({ raw: [{ ...raw[0], on: false }] })), null);
 });
+
+test('a line that closes an area too small to count is told apart from one that closes nothing', async () => {
+  const { closesOnlySliver, openLines, snapLineEnds, MIN_AREA_CELLS_ACROSS } = await import('../services/backgroundMask.js');
+  const N = 512;
+  // glitter_shitter's loop on a 16 km map (2026-11-13): out from the box's edge, round 350 m by 250 m, back to the edge
+  const px = [[575, 622], [632, 622], [690, 580], [810, 500], [990, 410], [1130, 465], [1235, 625], [1130, 632], [975, 680], [870, 740], [632, 812], [575, 815]];
+  const dense = [];
+  for (let i = 0; i + 1 < px.length; i++) { const [a, b] = [px[i], px[i + 1]]; const n = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 4); for (let k = 0; k < n; k++) dense.push([a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n]); }
+  const loop = (scale) => snapLineEnds(dense.map(([x, y]) => [Math.max(-1, ((x - 632) / 52) * scale), ((y - 622) / 52) * scale + 200]), [], N, 2);
+  assert.equal(openLines([loop(1)], N).pop(), true, 'not counted as an area');
+  assert.equal(closesOnlySliver([loop(1)], N), true, 'but it does close one');
+  // the same loop three times the size is an area
+  assert.equal(openLines([loop(3)], N).pop(), false);
+  assert.equal(closesOnlySliver([loop(3)], N), false);
+  // a line that ends in the open closes nothing, small or not
+  const stray = [[100, 100], [140, 120], [180, 100]];
+  assert.equal(openLines([stray], N).pop(), true);
+  assert.equal(closesOnlySliver([stray], N), false);
+  assert.ok(MIN_AREA_CELLS_ACROSS >= 6 && MIN_AREA_CELLS_ACROSS <= 8);
+});

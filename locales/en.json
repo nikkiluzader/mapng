@@ -1702,7 +1702,8 @@
     "hintRawOff": "Roads here are smoothed again.",
     "statRaw": "No smoothing on {pct}% of the square",
     "lockedPinned": "The area box is locked here so you can zoom and pan to draw (hold Space and drag to move the map with a tool picked).",
-    "unlock": "Unlock"
+    "unlock": "Unlock",
+    "hintTooSmall": "This line does close an area, but one too small to shade on a map this size. Draw round a bigger area (about {metres} m across or more)."
   },
   "build": {
     "title": "What to build",

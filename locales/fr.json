@@ -1697,7 +1697,8 @@
     "hintRawOff": "Ici, les routes sont à nouveau lissées.",
     "statRaw": "Sans lissage sur {pct} % du carré",
     "lockedPinned": "Le cadre est verrouillé ici pour zoomer et vous déplacer en dessinant (maintenez Espace et faites glisser pour bouger la carte avec un outil choisi).",
-    "unlock": "Déverrouiller"
+    "unlock": "Déverrouiller",
+    "hintTooSmall": "Cette ligne ferme bien une zone, mais trop petite pour être ombrée sur une carte de cette taille. Entourez une zone plus grande (environ {metres} m de large ou plus)."
   },
   "build": {
     "title": "Que construire",

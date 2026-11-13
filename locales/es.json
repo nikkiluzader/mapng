@@ -1697,7 +1697,8 @@
     "hintRawOff": "Aquí las carreteras se vuelven a suavizar.",
     "statRaw": "Sin suavizar en el {pct}% del cuadrado",
     "lockedPinned": "El recuadro está fijado aquí para que puedas hacer zoom y moverte al dibujar (mantén Espacio y arrastra para mover el mapa con una herramienta elegida).",
-    "unlock": "Desbloquear"
+    "unlock": "Desbloquear",
+    "hintTooSmall": "Esta línea sí cierra una zona, pero es demasiado pequeña para sombrearla en un mapa de este tamaño. Dibuja alrededor de una zona mayor (de unos {metres} m de ancho o más)."
   },
   "build": {
     "title": "Qué crear",

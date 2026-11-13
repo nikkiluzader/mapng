@@ -3,7 +3,7 @@
 // mouse tools. Rules and raster: services/backgroundMask.js; state:
 // composables/useBackgroundEditor.js; tools: components/controls/BackgroundAreas.vue.
 import L from 'leaflet';
-import { rasterizeMask, rasterizeRaw, makeProjector, snapLineEnds, openLines, roadLines } from '../../services/backgroundMask.js';
+import { rasterizeMask, rasterizeRaw, makeProjector, snapLineEnds, openLines, roadLines, closesOnlySliver, MIN_AREA_CELLS_ACROSS } from '../../services/backgroundMask.js';
 
 const N = 512;          // editor raster (cells across the square)
 const SNAP_PX = 14;     // line ends this close (screen px) to an edge or a line snap shut
@@ -269,6 +269,14 @@ export function attachBackgroundLayer(map, opts) {
     const latlngs = cells.map((c) => P.toLatLng(c).map((v) => Number(v.toFixed(7))));
     const open = openLines([...others, cells], N).pop();
     edit((m) => { m.lines = [...(m.lines || []), latlngs]; return m; }, { bounds: bounds() });
+    // (closed, but round an area too small for this map's size: said as that)
+    if (open && closesOnlySliver([...others, cells], N)) {
+      const b = bounds();
+      const sideM = b ? Math.abs(b.north - b.south) * 111320 : 0;
+      const metres = Math.max(10, Math.round((MIN_AREA_CELLS_ACROSS * sideM) / N / 10) * 10);
+      setHint(t('backgroundAreas.hintTooSmall', { metres }), true);
+      return;
+    }
     setHint(open ? t('backgroundAreas.hintOpen') : t('backgroundAreas.hintClosed'), open);
   }
   function onClick(e) {

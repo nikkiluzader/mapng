@@ -104,6 +104,20 @@ export function labelAreas(walls, n) {
 }
 
 /** Which lines close nothing: removing one doesn't change how many areas there are. */
+/**
+ * Whether the last line does close an area, only one too small to count (SLIVER cells or fewer once the
+ * line's own cells are taken off it): on a 16 km map a cell is 31 m, and a loop 350 m by 250 m leaves ten.
+ * The editor then says so, instead of "this line doesn't close an area" (glitter_shitter, 2026-11-13: "the
+ * lines aren't connected").
+ */
+export function closesOnlySliver(cellLines, n) {
+  if (!cellLines.length) return false;
+  const withLine = labelAreas(rasterLines(cellLines, n), n);
+  const without = labelAreas(rasterLines(cellLines.slice(0, -1), n), n);
+  return withLine.count === without.count && withLine.areas.length > without.areas.length;
+}
+/** The smallest width, in cells, an area needs to count for sure: its line's cells off both sides, and SLIVER. */
+export const MIN_AREA_CELLS_ACROSS = Math.ceil(Math.sqrt(SLIVER)) + 3;
 export function openLines(cellLines, n) {
   const all = labelAreas(rasterLines(cellLines, n), n).count;
   return cellLines.map((_, i) => labelAreas(rasterLines(cellLines.filter((__, j) => j !== i), n), n).count === all);

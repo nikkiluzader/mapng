@@ -1697,7 +1697,8 @@
     "hintRawOff": "Qui le strade vengono di nuovo levigate.",
     "statRaw": "Senza levigatura sul {pct}% del quadrato",
     "lockedPinned": "Il riquadro è bloccato qui così puoi zoomare e spostarti per disegnare (tieni premuto Spazio e trascina per muovere la mappa con uno strumento scelto).",
-    "unlock": "Sblocca"
+    "unlock": "Sblocca",
+    "hintTooSmall": "Questa linea chiude un'area, ma troppo piccola per essere ombreggiata su una mappa di queste dimensioni. Disegna attorno a un'area più grande (circa {metres} m di larghezza o più)."
   },
   "build": {
     "title": "Cosa costruire",

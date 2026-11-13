@@ -1697,7 +1697,8 @@
     "hintRawOff": "Drogi tutaj są znowu wygładzane.",
     "statRaw": "Bez wygładzania na {pct}% kwadratu",
     "lockedPinned": "Ramka obszaru jest tu zablokowana, więc możesz przybliżać i przesuwać mapę podczas rysowania (przytrzymaj Spację i przeciągnij, aby przesunąć mapę z wybranym narzędziem).",
-    "unlock": "Odblokuj"
+    "unlock": "Odblokuj",
+    "hintTooSmall": "Ta linia zamyka obszar, ale zbyt mały, by go zacieniować na mapie tej wielkości. Narysuj linię wokół większego obszaru (około {metres} m szerokości lub więcej)."
   },
   "build": {
     "title": "Co budować",
