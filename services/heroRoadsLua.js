@@ -7,7 +7,11 @@ export const HERO_ROADS_LUA = String.raw`-- MapNG: Hero Roads (experimental). Wr
 --
 -- It turns MapNG's paved road surfaces (the DecalRoads named dr_..._b) into BeamNG Hero Roads: a real road
 -- mesh with a crown, shoulders and its own markings, built by the game's Hero Road Editor code. The roads are
--- built a few each frame after the level has loaded, and removed when the level is left: they are not saved.
+-- built a few each frame after the level has loaded, and removed when the level is left.
+--
+-- They are ordinary, unbaked Hero Roads: open the World Editor (F11) > Hero Road and they are there to edit.
+-- They are not saved with the level: each load builds them again from MapNG's roads. To keep edits, use the
+-- editor's own Save Session and Bake.
 --
 -- Hero Roads carry nothing for traffic: the game's road map (lua/ge/map.lua) is read from DecalRoads that are
 -- drivable, and every decal a Hero Road makes is marked not drivable. So MapNG's DecalRoads stay in the level
@@ -18,15 +22,16 @@ export const HERO_ROADS_LUA = String.raw`-- MapNG: Hero Roads (experimental). Wr
 local M = {}
 
 local PER_FRAME = 3            -- roads built a frame
-local NODE_GAP_M = 6           -- a Hero Road node about this often along MapNG's line
+local NODE_GAP_M = 4           -- a Hero Road node about this often along MapNG's line
 local SHOULDER_M = 0.3
-local OVER_GROUND_M = 1.0      -- a line this far over the terrain is a bridge deck or ramp: left as it is
+local OVER_GROUND_M = 1.0      -- a line this far over or under the terrain is a bridge deck, ramp or tunnel: left as it is
 local MIN_WIDTH_M = 3.0
+local CLEAR_M = 0.03           -- the deck's lowest edge over the highest ground under it
 
 local gm = nil
 local queue, at = nil, 0
 local built, skipped, failed = 0, 0, 0
-local lanesSeen = {}          -- 'forward+backward' -> roads, for status()
+local lanesSeen = {}           -- 'forward+backward' -> roads, for status()
 local firstError = nil
 local started, done = false, false
 local t0 = 0
@@ -51,8 +56,8 @@ local function lanesOf(road, width)
   return f, b, lht == '1'
 end
 
-local layersOf = {}           -- 'dr_<road>_s<n>_' -> the names of that road's DecalRoad layers
-local hiddenByUs = {}         -- the layers this script hid (shown again when the Hero Roads are removed)
+local layersOf = {}            -- 'dr_<road>_s<n>_' -> the names of that road's DecalRoad layers
+local hiddenByUs = {}          -- the layers this script hid (shown again when the Hero Roads are removed)
 
 local function collect()
   local list = {}
@@ -72,12 +77,14 @@ end
 
 -- MapNG's own surface and paint for a road that now has a Hero Road: hidden, kept for traffic.
 local function hideLayers(baseName)
-  local prefix = baseName:match('^(dr_.*_s%d+_)b$')
+  local prefix = baseName and baseName:match('^(dr_.*_s%d+_)b$')
   for _, name in ipairs(prefix and layersOf[prefix] or {}) do
     local o = scenetree.findObject(name)
     if o and not o.hidden then o.hidden = true; hiddenByUs[#hiddenByUs + 1] = name end
   end
 end
+
+local function groundAt(x, y) return core_terrain.getTerrainHeight(vec3(x, y, 0)) end
 
 -- One MapNG road surface -> one Hero Road as wide as it, or nil and why.
 local function buildOne(name)
@@ -87,19 +94,24 @@ local function buildOne(name)
   local n = road:getNodeCount()
   local width = road:getNodeWidth(math.floor(n / 2))
   if width < MIN_WIDTH_M then return nil, 'narrow' end
-  local nodes, last = {}, nil
+  local half = width / 2
+
+  -- MapNG's line, thinned to a node every few metres
+  local line, last = {}, nil
   for i = 0, n - 1 do
     local p = road:getNodePosition(i)
-    local ground = core_terrain.getTerrainHeight(vec3(p.x, p.y, 0))
-    if ground and p.z - ground > OVER_GROUND_M then return nil, 'off the ground' end
+    local ground = groundAt(p.x, p.y)
+    -- (a bridge deck or ramp over the ground, or a tunnel under it: the Zion tunnel's road was rebuilt on top of
+    -- the mountain before this looked both ways)
+    if ground and math.abs(p.z - ground) > OVER_GROUND_M then return nil, 'not on the ground' end
     if not last or (p - last):length() >= NODE_GAP_M or i == n - 1 then
       -- (the last node is always kept; one that would sit almost on the node before it replaces it)
-      if i == n - 1 and last and #nodes > 1 and (p - last):length() < NODE_GAP_M * 0.4 then nodes[#nodes] = nil end
-      nodes[#nodes + 1] = vec3(p.x, p.y, ground or p.z)
+      if i == n - 1 and last and #line > 1 and (p - last):length() < NODE_GAP_M * 0.4 then line[#line] = nil end
+      line[#line + 1] = vec3(p.x, p.y, ground or p.z)
       last = p
     end
   end
-  if #nodes < 2 then return nil, 'too short' end
+  if #line < 2 then return nil, 'too short' end
 
   gm.addNewGroup('MapNG ' .. name:sub(4))
   local groups = gm.getGroups()
@@ -112,6 +124,28 @@ local function buildOne(name)
   local total = lanesLeft + lanesRight
   gm.applyProfilePreset(g, total >= 4 and 'highway' or 'city')
   g.shoulderWidthM = SHOULDER_M
+
+  -- The deck's height. A Hero Road is a mesh over the ground, highest along its crown and falling to its edges:
+  -- set at the centre line's ground height it lay under the terrain wherever the ground is not dead level
+  -- across the road (a BeamNG developer's hill road, 2026-11-13: "most of them are under terrain"). Each node
+  -- takes the highest ground across the road's width there, plus what the crown and shoulders fall by, so the
+  -- deck's lowest edge clears the ground.
+  local fall = half * math.abs(tonumber(g.crossfallPct) or 2.5) / 100 + SHOULDER_M * math.abs(tonumber(g.shoulderFallPct) or 6) / 100
+  local nodes = {}
+  for i = 1, #line do
+    local a, b = line[math.max(1, i - 1)], line[math.min(#line, i + 1)]
+    local dx, dy = b.x - a.x, b.y - a.y
+    local len = math.sqrt(dx * dx + dy * dy)
+    local nx, ny = 0, 0
+    if len > 0.01 then nx, ny = -dy / len, dx / len end
+    local top = line[i].z
+    for _, o in ipairs({ -1, -0.5, 0.5, 1 }) do
+      local h = groundAt(line[i].x + nx * half * o, line[i].y + ny * half * o)
+      if h and h > top and h - line[i].z < OVER_GROUND_M * 2 then top = h end
+    end
+    nodes[i] = vec3(line[i].x, line[i].y, top + fall + CLEAR_M)
+  end
+
   g.nodes, g.widths, g.nmls = nodes, {}, {}
   for i = 1, #nodes do g.widths[i] = width; g.nmls[i] = vec3(0, 0, 1) end
   -- (the lanes carry the width: the editor's code works the deck out from lanes and shoulders)
@@ -119,6 +153,7 @@ local function buildOne(name)
   g.isRoadLaneLines = math.max(lanesLeft, lanesRight) > 1
   if lanesLeft == 0 or lanesRight == 0 then g.isRoadCenterLine = false end
   g.geometryMode = 'spline'    -- MapNG's line is already the shape wanted; no re-engineered curves
+  g.mapngSource = name         -- (which MapNG road it stands for)
   gm.ensureCornerArray(g)
   g.isDirty = true
   local key = forward .. '+' .. backward
@@ -145,8 +180,8 @@ local function start()
       return t
     end
   end
-  queue, at, built, skipped, failed, firstError = collect(), 0, 0, 0, 0, nil
-  lanesSeen = {}
+  queue = collect()
+  at, built, skipped, failed, firstError, lanesSeen = 0, 0, 0, 0, nil, {}
   t0 = os.clock()
   log('I', 'mapngHeroRoads', string.format('Building Hero Roads from %d MapNG road surfaces', #queue))
   say(string.format('MapNG: building Hero Roads (0/%d)...', #queue), 6)
@@ -158,14 +193,14 @@ local function step()
     at = at + 1
     local ok, g, why = pcall(buildOne, queue[at])
     if not ok then failed = failed + 1; firstError = firstError or tostring(g)
-    elseif g then made[#made + 1] = queue[at]
+    elseif g then made[#made + 1] = g
     else skipped = skipped + 1 end
   end
   if #made > 0 then
     local ok, err = pcall(gm.updateDirtyGroups, false)
     if ok then
       built = built + #made
-      for _, name in ipairs(made) do hideLayers(name) end
+      for _, g in ipairs(made) do hideLayers(g.mapngSource) end
     else failed = failed + #made; firstError = firstError or tostring(err) end
   end
   if at % 30 < PER_FRAME then say(string.format('MapNG: building Hero Roads (%d/%d)...', at, #queue), 6) end

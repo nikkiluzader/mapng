@@ -8150,7 +8150,7 @@ function buildBeamNGExportReport({
     `- Include rocks: ${formatBool(options?.includeRocks)}`,
     `- Street parking assumed where none is mapped: ${formatBool(options?.assumeParking !== false)}`,
     `- View distance: ${viewDistanceChoice(options?.viewDistance) === 'auto' ? 'auto (the map\'s width, 4 km at least, 16 km at most)' : `${viewDistanceChoice(options?.viewDistance)} m`} (LevelInfo visibleDistance)`,
-    `- Road surfaces: ${options?.roadSurface === 'hero' ? 'Hero Roads (experimental): built by a script when the level loads, over MapNG\'s decal roads; not saved with the level' : 'decal roads'}`,
+    `- Road surfaces: ${options?.roadSurface === 'hero' ? 'Hero Roads (experimental): built by a script when the level loads, over MapNG\'s decal roads (hidden under them, kept for traffic); editable in the World Editor > Hero Road, rebuilt from MapNG\'s roads at each load' : 'decal roads'}`,
     `- Include sidewalks: ${formatBool(options?.includeSidewalks !== false)}${options?.includeSidewalks !== false ? ` (${options?.sidewalkStyle === 'decal' ? 'as decals: flat strips on the ground, no curbs' : `as meshes: raised slabs with curbs, ${Math.round((CURB_HEIGHTS_M[options?.curbHeight] ?? CURB_HEIGHTS_M.standard) * 100)} cm high`})` : ''}`,
     ...(() => {
       // What to build (services/buildContent.js): the features switched off and the OSM left out for them
