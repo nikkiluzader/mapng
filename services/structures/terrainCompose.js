@@ -25,6 +25,9 @@ const DECK_CLEAR_M = 0.5;      // terrain at least this far under a deck's under
 const DECK_REACH_M = 1.5;      // past a deck's half width
 const ABUTMENT_M = 8;
 const CORE_STEP_M = 2;          // road cores this far apart in height are on two levels
+// (which of two roads keeps its surface where a tunnel road left on the ground passes under another)
+const ROAD_RANK = { motorway: 9, trunk: 8, primary: 7, secondary: 6, tertiary: 5, unclassified: 4, residential: 4, living_street: 3, service: 2 };
+const SUNK_UNDER_M = 0.5;        // a tunnel road left on the ground this far under a road passes under it
 const CORE_OUTER = 0.6;         // ...where the lower road may take the upper's outer core only
 const SIDE_WARP_M = 12;         // a side road leaves its through road's edge at that road's grade across it, level again this far on
 const SIDE_WARP_MAX = 0.2;
@@ -100,7 +103,7 @@ export function composeTerrain(graph, grid) {
     const key = Math.floor(c / TILE) * 65536 + Math.floor(r / TILE);
     let t = tiles.get(key);
     if (!t) {
-      t = { h: new Float32Array(TILE * TILE), w: new Float32Array(TILE * TILE).fill(Infinity), q: new Float32Array(TILE * TILE).fill(1), n: new Uint8Array(TILE * TILE), cap: new Float32Array(TILE * TILE).fill(Infinity) };
+      t = { h: new Float32Array(TILE * TILE), w: new Float32Array(TILE * TILE).fill(Infinity), q: new Float32Array(TILE * TILE).fill(1), n: new Uint8Array(TILE * TILE), tn: new Uint8Array(TILE * TILE), rk: new Uint8Array(TILE * TILE), cap: new Float32Array(TILE * TILE).fill(Infinity) };
       tiles.set(key, t);
     }
     return t;
@@ -251,6 +254,9 @@ export function composeTerrain(graph, grid) {
       if (skip && skip(k, i)) { stats.skipped = (stats.skipped || 0) + 1; continue; }
       const planes = portalPlanes[k];
       const yielding = !!yields.get(k)?.[i];
+      // (a tunnel road that was not built as a tube: a road in a cutting, see below)
+      const sunkRoad = e.tunnel ? 1 : 0;
+      const rank = ROAD_RANK[String(e.highway || '').replace(/_link$/, '')] || 1;
       const squares = (squareEnds.get(k) || []).filter((q) => q.pieces.has(i));
       // a deck's ends on fill are abutments: fill under the deck (below)
       const abutment = kind === 'deck' && Math.min(toAbutment[k][i], toAbutment[k][i + 1]) < ABUTMENT_M;
@@ -387,13 +393,22 @@ export function composeTerrain(graph, grid) {
           // (only in the upper road's outer margin: its centre stays its own)
           const q = d / core;   // how far out in this road's core (0 centre, 1 edge)
           const bothCores = out < -500 && t.w[j] < -500;
-          const twoLevels = bothCores && Math.abs(target - t.h[j]) > CORE_STEP_M;
-          if (twoLevels) {
+          // A tunnel road left on the ground (too little cover for a tube) passing under a road: one of the
+          // two keeps its whole surface there, the road of the higher class (an avenue over an underground
+          // car park's ramp; a primary road's underpass under a side street), the road above between equals.
+          // Shared by nearest line, each cut half through the other: a slot 2 m deep and 3 m wide across the
+          // avenue (its Mesh Roads deck gone with it), a fin of ground 2 m high across the underpass.
+          const underRoad = bothCores && (sunkRoad === 1) !== (t.tn[j] === 1) && Math.abs(target - t.h[j]) > SUNK_UNDER_M
+            && (sunkRoad === 1) === (target < t.h[j]);
+          const twoLevels = bothCores && !underRoad && Math.abs(target - t.h[j]) > CORE_STEP_M;
+          if (underRoad) {
+            if (sunkRoad ? rank > t.rk[j] : rank >= t.rk[j]) { t.w[j] = out; t.h[j] = target; t.q[j] = q; t.n[j] = 1; t.tn[j] = sunkRoad; t.rk[j] = rank; }
+          } else if (twoLevels) {
             const lowerIsNew = target < t.h[j];
             const upperQ = lowerIsNew ? t.q[j] : q;
             const take = upperQ > CORE_OUTER ? lowerIsNew : out < t.w[j] - 1e-3;
-            if (take) { t.w[j] = out; t.h[j] = target; t.q[j] = q; t.n[j] = 1; }
-          } else if (out < t.w[j] - 1e-3) { t.w[j] = out; t.h[j] = target; t.q[j] = q; t.n[j] = 1; }
+            if (take) { t.w[j] = out; t.h[j] = target; t.q[j] = q; t.n[j] = 1; t.tn[j] = sunkRoad; t.rk[j] = rank; }
+          } else if (out < t.w[j] - 1e-3) { t.w[j] = out; t.h[j] = target; t.q[j] = q; t.n[j] = 1; t.tn[j] = sunkRoad; t.rk[j] = rank; }
           else if (!twoLevels && Math.abs(out - t.w[j]) <= 1e-3) { t.h[j] = (t.h[j] * t.n[j] + target) / (t.n[j] + 1); t.n[j] = Math.min(255, t.n[j] + 1); }
         }
       }

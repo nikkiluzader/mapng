@@ -97,3 +97,32 @@ test('a road into a tunnel: no corridor past the portal; a tunnel builder\'s gro
   assert.ok(!written.has(idx(-20, 9)) && !written.has(idx(-20, -9)), 'the kept ground untouched');
   assert.ok(written.has(idx(-20, 6)), 'beside it the side slope is composed');
 });
+
+test('a tunnel road left on the ground does not dig through the road that crosses over it', () => {
+  // flat ground at 10; an avenue along x at 10, a car park ramp (tunnel-tagged, built as a cutting) along y at 8
+  const width = 201; const height = 201; const worldSize = 200;
+  const hm = new Float32Array(width * height).fill(10);
+  const lineOf = (dx, dy, half, tunnel) => {
+    const n = 41; const x = []; const y = []; const s = [];
+    for (let i = 0; i < n; i++) { x.push(dx * (i - 20) * 2); y.push(dy * (i - 20) * 2); s.push(i * 2); }
+    return { x: Float64Array.from(x), y: Float64Array.from(y), s: Float64Array.from(s), g: new Float64Array(n).fill(10), half, highway: tunnel ? 'service' : 'tertiary', tunnel };
+  };
+  for (const order of [[0, 1], [1, 0]]) {
+    const both = [lineOf(1, 0, 3.25, false), lineOf(0, 1, 1.8, true)]; const edges = order.map((k) => both[k]);
+    const graph = {
+      edges,
+      profile: { z: edges.map((e) => new Float64Array(e.s.length).fill(e.tunnel ? 8 : 10)) },
+      classes: { segments: edges.map((e, k) => ({ edge: k, i0: 0, i1: e.s.length - 1, kind: e.tunnel ? 'cutting' : 'ground' })) },
+    };
+    const out = composeTerrain(graph, { heightMap: hm, width, height, worldSize, minHeight: 0 });
+    // the avenue's whole surface is its own where the ramp passes under it
+    for (let x = -6; x <= 6; x++) for (const y of [-3, -1.5, 0, 1.5, 3]) assert.ok(Math.abs(out.heightAt(x, y) - 10) < 0.05, `avenue at ${x},${y}: ${out.heightAt(x, y).toFixed(2)} (order ${order})`);
+    // the ramp's cutting is there on either side of it
+    for (const y of [-20, 20]) assert.ok(Math.abs(out.heightAt(0, y) - 8) < 0.05, `cutting at 0,${y}: ${out.heightAt(0, y).toFixed(2)}`);
+    // a primary road's underpass under a side street: the underpass keeps its whole surface instead
+    const major = [{ ...both[0], highway: 'residential' }, { ...both[1], highway: 'primary_link', half: 2.8 }]; const es = order.map((k) => major[k]);
+    const g2 = { edges: es, profile: { z: es.map((e) => new Float64Array(e.s.length).fill(e.tunnel ? 8 : 10)) }, classes: { segments: es.map((e, k) => ({ edge: k, i0: 0, i1: e.s.length - 1, kind: e.tunnel ? 'cutting' : 'ground' })) } };
+    const o2 = composeTerrain(g2, { heightMap: hm, width, height, worldSize, minHeight: 0 });
+    for (let y = -6; y <= 6; y++) for (const x of [-2, -1, 0, 1, 2]) assert.ok(Math.abs(o2.heightAt(x, y) - 8) < 0.05, `underpass at ${x},${y}: ${o2.heightAt(x, y).toFixed(2)} (order ${order})`);
+  }
+});
