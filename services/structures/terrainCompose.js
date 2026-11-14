@@ -27,6 +27,7 @@ const ABUTMENT_M = 8;
 const CORE_STEP_M = 2;          // road cores this far apart in height are on two levels
 // (which of two roads keeps its surface where a tunnel road left on the ground passes under another)
 const ROAD_RANK = { motorway: 9, trunk: 8, primary: 7, secondary: 6, tertiary: 5, unclassified: 4, residential: 4, living_street: 3, service: 2 };
+const END_UNDER_DECK_M = 0.06;     // the ground a ground road's end shapes under the deck it runs on from: this far under the road's line
 const SUNK_UNDER_M = 0.5;        // a tunnel road left on the ground this far under a road passes under it
 const CORE_OUTER = 0.6;         // ...where the lower road may take the upper's outer core only
 const SIDE_WARP_M = 12;         // a side road leaves its through road's edge at that road's grade across it, level again this far on
@@ -258,6 +259,14 @@ export function composeTerrain(graph, grid) {
       const sunkRoad = e.tunnel ? 1 : 0;
       const rank = ROAD_RANK[String(e.highway || '').replace(/_link$/, '')] || 1;
       const squares = (squareEnds.get(k) || []).filter((q) => q.pieces.has(i));
+      // A ground road's rounded end reaching back over a deck it runs on from (the next piece, or a road met
+      // at that end, is a deck) carries the road's line on, a little under it. Laid flat at the end's own
+      // height it stood over the bridge's last 3.5 m where the road climbs off the bridge: the bank 17 to
+      // 20 cm over the end of the deck, a kerb across the road at many bridge ends, measured in game. (Not
+      // left out: some bridge meshes end short of their stretch, and the ground there is the road.)
+      const lastSeg = i + 2 === e.s.length;
+      const deckBefore = kind !== 'deck' && (i > 0 ? kindOf[k][i - 1] === 'deck' : (nodeKinds.get(e.from) || []).includes('deck'));
+      const deckAfter = kind !== 'deck' && (!lastSeg ? kindOf[k][i + 2] === 'deck' || kindOf[k][i + 1] === 'deck' : (nodeKinds.get(e.to) || []).includes('deck'));
       // a deck's ends on fill are abutments: fill under the deck (below)
       const abutment = kind === 'deck' && Math.min(toAbutment[k][i], toAbutment[k][i + 1]) < ABUTMENT_M;
       const wingFill = kind !== 'deck' && Math.min(toDeck[k][i], toDeck[k][i + 1]) < WING_FILL_M;
@@ -317,7 +326,11 @@ export function composeTerrain(graph, grid) {
           const u = Math.max(0, Math.min(1, uRaw));
           const d = Math.hypot(ax + vx * u - x, ay + vy * u - y);
           if (d > reach) continue;
-          let zc = zk[i] + (zk[i + 1] - zk[i]) * u - (abutment ? DECK_UNDER_M + DECK_ABUT_CLEAR_M : 0) - (dropAt(i) + (dropAt(i + 1) - dropAt(i)) * u);
+          // (past this piece's end where a deck begins: the road's line carried on at its grade and a little
+          // under it, not this end's own height laid flat. See deckBefore above.)
+          const overDeck = (deckBefore && uRaw < 0) || (deckAfter && uRaw > 1);
+          const ue = overDeck ? uRaw : u;
+          let zc = zk[i] + (zk[i + 1] - zk[i]) * ue - (overDeck ? END_UNDER_DECK_M : 0) - (abutment ? DECK_UNDER_M + DECK_ABUT_CLEAR_M : 0) - (dropAt(i) + (dropAt(i + 1) - dropAt(i)) * u);
           // (banked: the left of the line higher by bank per metre, out to the core's edge)
           if (bank) zc += bank * Math.max(-core, Math.min(core, (-(x - ax) * vy + (y - ay) * vx) / Math.sqrt(L2)));
           const key = Math.floor(c / TILE) * 65536 + Math.floor(r / TILE);

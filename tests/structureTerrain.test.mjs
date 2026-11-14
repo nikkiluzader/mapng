@@ -126,3 +126,20 @@ test('a tunnel road left on the ground does not dig through the road that crosse
     for (let y = -6; y <= 6; y++) for (const x of [-2, -1, 0, 1, 2]) assert.ok(Math.abs(o2.heightAt(x, y) - 8) < 0.05, `underpass at ${x},${y}: ${o2.heightAt(x, y).toFixed(2)} (order ${order})`);
   }
 });
+
+test('a ground road\'s rounded end does not lie over the end of the bridge it runs on from', () => {
+  // a road along x: a bridge from x = -30 to 0 over a hollow, ground road from x = 0 on; the bank a little over
+  // the road's line; the road climbs 3 % (so the ground road's end height is over the deck's last metres)
+  const width = 201; const height = 201; const worldSize = 200;
+  const hm = new Float32Array(width * height);
+  for (let r = 0; r < height; r++) for (let c = 0; c < width; c++) { const x = c - 100; hm[r * width + c] = x < -4 ? 4 : 10.3; }
+  const mk = (x0, x1) => { const n = Math.round((x1 - x0) / 3) + 1; const x = Array.from({ length: n }, (_, i) => x0 + ((x1 - x0) * i) / (n - 1)); return { x: Float64Array.from(x), y: new Float64Array(n), s: Float64Array.from(x, (v) => v - x0), g: Float64Array.from(x, (v) => (v < -4 ? 4 : 10.3)), half: 3.5, highway: 'residential', from: `n${x0}`, to: `n${x1}` }; };
+  const zOf = (x) => 10 + 0.03 * x;
+  const edges = [mk(-30, 0), mk(0, 45)];
+  const graph = { edges, profile: { z: edges.map((e) => Float64Array.from(e.x, zOf)) }, classes: { segments: [{ edge: 0, i0: 0, i1: edges[0].s.length - 1, kind: 'deck' }, { edge: 1, i0: 0, i1: edges[1].s.length - 1, kind: 'ground' }] } };
+  const out = composeTerrain(graph, { heightMap: hm, width, height, worldSize, minHeight: 0 });
+  // under the deck's last metres the ground is just under the deck's surface (the road's line carried on), not the ground road's end height on top of it
+  for (const x of [-3, -2, -1.5, -1]) assert.ok(out.heightAt(x, 0) < zOf(x) - 0.02 && out.heightAt(x, 0) > zOf(x) - 0.2, `ground ${out.heightAt(x, 0).toFixed(2)} at x ${x}, the deck at ${zOf(x).toFixed(2)}`);
+  // the ground road itself stands on its ground from its first point on
+  for (const x of [0, 1, 3, 10]) assert.ok(Math.abs(out.heightAt(x, 0) - zOf(x)) < 0.06, `ground road at x ${x}: ${out.heightAt(x, 0).toFixed(2)} against ${zOf(x).toFixed(2)}`);
+});
