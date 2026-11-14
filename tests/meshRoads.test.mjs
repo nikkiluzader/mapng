@@ -67,13 +67,16 @@ test('at a junction the through road is one deck and the side road ends inside i
   const endY = Math.min(...side.nodes.map((nd) => nd[1]));
   assert.ok(endY < 3.6 && endY > 2, `the side road ends at y ${endY}`);
   // (the through deck where the side road meets it: its middle; its own two ends come down to the road, below)
-  const mainZ = main.nodes[main.nodes.length >> 1][2];
-  // ... a node stands on the main deck's edge, at its height ...
+  const mid = main.nodes[main.nodes.length >> 1];
+  // (the main road lies on the hillside's 8 % and leans with it: its surface at y is its middle + 8 % of y)
+  assert.ok(Math.abs(mid[6] / mid[7] + 0.08) < 0.003, `the main deck leans with its ground: ${mid.slice(5)}`);
+  const mainAt = (y) => mid[2] + 0.08 * y;
+  // ... a node stands on the main deck's edge, at its height there ...
   const edge = side.nodes.find((nd) => Math.abs(nd[1] - 4) < 0.05);
-  assert.ok(edge && Math.abs(edge[2] - mainZ) < 0.005, `edge node ${edge}`);
+  assert.ok(edge && Math.abs(edge[2] - mainAt(edge[1])) < 0.005, `edge node ${edge}`);
   // ... and the end inside is just under the main deck's surface
   const end = side.nodes.find((nd) => nd[1] === endY);
-  assert.ok(end[2] < mainZ - 0.01 && end[2] > mainZ - 0.03, `end ${end[2]} under ${mainZ}`);
+  assert.ok(end[2] < mainAt(endY) - 0.01 && end[2] > mainAt(endY) - 0.03, `end ${end[2]} under ${mainAt(endY)}`);
 });
 
 test('a deck does not close into a ring through a junction it already crossed', () => {
@@ -207,4 +210,26 @@ test('a lean taken from another deck eases out along the road, and a leaning dec
     assert.ok(Math.abs(leanOf(a) - leanOf(b)) <= 0.0075 * gap + 1e-4, `lean ${leanOf(a)} to ${leanOf(b)} in ${gap} m`);
   }
   assert.ok(leanOf(side.nodes.find((nd) => nd[1] > 4.5 && nd[1] < 6)) > 0.03, 'still leaning just outside the through road');
+});
+
+test('a deck leans with the ground across it: a banked bend keeps its bank, a level road stays level', () => {
+  // a road along x on ground that leans 5 % across it from x = 60 on (level before), the lean coming in over 20 m
+  const bank = (x) => 0.05 * Math.max(0, Math.min(1, (x - 40) / 20));
+  const ground = (x, y) => 10 + bank(x) * y;
+  const { meshRoads } = buildMeshRoads([{ __items: [road('dr_a_s1_b', line(0, 0, 160, 0), { z: () => 10 })] }], ground);
+  const m = meshRoads[0]; const leanOf = (nd) => -nd[6] / nd[7];   // rise per metre toward +y (the road runs along +x)
+  for (const nd of m.nodes) {
+    if (nd[0] < 25) assert.deepEqual(nd.slice(5), [0, 0, 1], `level at x ${nd[0]}`);
+    if (nd[0] > 80 && nd[0] < 150) assert.ok(Math.abs(leanOf(nd) - 0.05) < 0.004, `lean ${leanOf(nd)} at x ${nd[0]}`);
+    // the deck's middle stays just over the ground's middle: leaning with it, not lifted over its high side
+    assert.ok(nd[2] - 10 < 0.06, `deck ${nd[2]} over ground at 10, x ${nd[0]}`);
+  }
+  assert.equal(m.widthSubdivisions, 1);
+  // the lean comes in no faster than 0.75 % a metre
+  for (let i = 1; i < m.nodes.length; i++) assert.ok(Math.abs(leanOf(m.nodes[i]) - leanOf(m.nodes[i - 1])) <= 0.0075 * (m.nodes[i][0] - m.nodes[i - 1][0]) + 1e-4);
+  // ground leaning under 1 %: a level road; a 30 % bank: no more than 10 %
+  const flatish = buildMeshRoads([{ __items: [road('dr_a_s1_b', line(0, 0, 80, 0), { z: () => 10 })] }], (x, y) => 10 + 0.006 * y).meshRoads[0];
+  assert.ok(flatish.nodes.every((nd) => nd[6] === 0 && nd[7] === 1));
+  const steep = buildMeshRoads([{ __items: [road('dr_a_s1_b', line(0, 0, 80, 0), { z: () => 10 })] }], (x, y) => 10 + 0.3 * y).meshRoads[0];
+  assert.ok(steep.nodes.every((nd) => Math.abs(leanOf(nd)) <= 0.1001));
 });
