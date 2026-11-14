@@ -34,7 +34,7 @@
       <div class="grid grid-cols-3 gap-1.5">
         <button
           type="button"
-          class="inline-flex items-center justify-center gap-1 px-1 py-1.5 rounded-md leading-tight text-center whitespace-nowrap bg-brand text-white font-semibold hover:bg-brand-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          class="inline-flex items-center justify-center gap-1 px-1 py-1.5 rounded leading-tight text-center whitespace-nowrap bg-brand text-white font-semibold hover:bg-brand-500 disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="!areaOk || !!busy"
           :title="areaOk ? t('osmFile.pullTitle') : t('osmFile.tooBig')"
           @click="pull"
@@ -43,7 +43,7 @@
         </button>
         <button
           type="button"
-          class="inline-flex items-center justify-center gap-1 px-1 py-1.5 rounded-md leading-tight text-center whitespace-nowrap border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-semibold hover:border-brand hover:text-brand disabled:opacity-50 disabled:cursor-not-allowed"
+          class="inline-flex items-center justify-center gap-1 px-1 py-1.5 rounded leading-tight text-center whitespace-nowrap border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-semibold hover:border-brand hover:text-brand disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="!areaOk || !!busy"
           :title="areaOk ? t('osmFile.downloadTitle') : t('osmFile.tooBig')"
           @click="download"
@@ -54,7 +54,7 @@
           :href="osmExportPageUrl(area)"
           target="_blank"
           rel="noopener noreferrer"
-          class="inline-flex items-center justify-center gap-1 px-1 py-1.5 rounded-md leading-tight text-center whitespace-nowrap border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-semibold hover:border-brand hover:text-brand"
+          class="inline-flex items-center justify-center gap-1 px-1 py-1.5 rounded leading-tight text-center whitespace-nowrap border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-semibold hover:border-brand hover:text-brand"
           :title="t('osmFile.openSiteTitle')"
         ><ExternalLink :size="12" />{{ t('osmFile.openSite') }}</a>
       </div>

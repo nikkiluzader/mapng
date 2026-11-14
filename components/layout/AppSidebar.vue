@@ -19,7 +19,7 @@
       <BaseButton
         size="sm"
         variant="ghost"
-        class="ml-auto text-gray-400 hover:text-brand transition-colors p-1 rounded-full hover:bg-orange-50 dark:hover:bg-gray-800"
+        class="ml-auto text-gray-400 hover:text-brand transition-colors p-1 rounded-full hover:bg-brand-50/60 dark:hover:bg-gray-800"
         :title="t('config.shareDialogTitle')"
         :aria-label="t('config.shareDialogTitle')"
         @click="openShareDialog"
@@ -31,7 +31,7 @@
         v-if="isDesktop"
         size="sm"
         variant="ghost"
-        class="text-gray-400 hover:text-brand transition-colors p-1 rounded-full hover:bg-orange-50 dark:hover:bg-gray-800"
+        class="text-gray-400 hover:text-brand transition-colors p-1 rounded-full hover:bg-brand-50/60 dark:hover:bg-gray-800"
         :title="t('sidebar.reloadTooltip')"
         :aria-label="t('sidebar.reloadTooltip')"
         @click="reloadApp"
@@ -42,7 +42,7 @@
       <BaseButton
         size="sm"
         variant="ghost"
-        class="text-gray-400 hover:text-brand transition-colors p-1 rounded-full hover:bg-orange-50 dark:hover:bg-gray-800"
+        class="text-gray-400 hover:text-brand transition-colors p-1 rounded-full hover:bg-brand-50/60 dark:hover:bg-gray-800"
         :title="t('support.cardTitle')"
         :aria-label="t('support.cardTitle')"
         @click="$emit('show-support')"
@@ -52,7 +52,7 @@
       <BaseButton
         size="sm"
         variant="ghost"
-        :class="['text-gray-400 hover:text-brand transition-colors p-1 rounded-full hover:bg-orange-50 dark:hover:bg-gray-800']"
+        :class="['text-gray-400 hover:text-brand transition-colors p-1 rounded-full hover:bg-brand-50/60 dark:hover:bg-gray-800']"
         :title="t('sidebar.aboutTooltip')"
         @click="$emit('show-about')"
       >

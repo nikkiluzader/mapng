@@ -4,7 +4,7 @@
     <div v-if="show" class="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-sm">
       <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-[calc(100vw-2rem)] max-w-lg overflow-hidden">
         <div class="px-6 py-5 bg-gradient-to-r from-brand to-amber-500 text-white">
-          <h2 class="text-lg font-bold">{{ t('desktopWelcome.title') }}</h2>
+          <h2 class="text-base font-bold">{{ t('desktopWelcome.title') }}</h2>
           <p class="text-xs text-white/90 mt-0.5">{{ t('desktopWelcome.subtitle') }}</p>
         </div>
 
@@ -31,22 +31,22 @@
           </ul>
 
           <label class="flex items-start gap-2 text-caption text-gray-700 dark:text-gray-200 cursor-pointer select-none">
-            <input v-model="updates" type="checkbox" class="mt-0.5 accent-brand" />
+            <input v-model="updates" type="checkbox" :class="[CHECKBOX, 'mt-0.5 shrink-0']" />
             <span>{{ t('desktopWelcome.updates') }}</span>
           </label>
 
           <label class="flex items-start gap-2 text-caption text-gray-700 dark:text-gray-200 cursor-pointer select-none">
-            <input v-model="shareExports" type="checkbox" class="mt-0.5 accent-brand" />
+            <input v-model="shareExports" type="checkbox" :class="[CHECKBOX, 'mt-0.5 shrink-0']" />
             <span>{{ t('hotspots.welcome') }} <button type="button" class="text-brand hover:underline" @click.prevent.stop="openHotspotPrivacy">{{ t('hotspots.privacy.link') }}</button></span>
           </label>
 
           <label class="flex items-start gap-2 text-caption text-gray-700 dark:text-gray-200 cursor-pointer select-none">
-            <input v-model="shareSettings" type="checkbox" class="mt-0.5 accent-brand" />
+            <input v-model="shareSettings" type="checkbox" :class="[CHECKBOX, 'mt-0.5 shrink-0']" />
             <span>{{ t('usage.welcome') }} <a href="https://mapng.com/data.html#usage" target="_blank" rel="noopener" class="text-brand hover:underline" @click.stop>{{ t('usage.readMore') }}</a></span>
           </label>
 
           <div class="flex justify-end">
-            <button type="button" class="px-4 py-2 rounded bg-brand hover:bg-brand-500 text-white text-xs font-semibold transition-colors" @click="done">
+            <button type="button" class="px-4 py-1.5 rounded bg-brand hover:bg-brand-500 text-white text-xs font-semibold transition-colors" @click="done">
               {{ t('desktopWelcome.start') }}
             </button>
           </div>
@@ -59,6 +59,7 @@
 <script setup>
 import { onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { CHECKBOX } from '../base/controlStyles.js';
 import { Cpu, FolderOpen, Library, PackageOpen } from 'lucide-vue-next';
 import { desktopApp } from '../../services/platform/desktop.js';
 import { openHotspotPrivacy, setShareExports } from '../../composables/useExportHotspots.js';

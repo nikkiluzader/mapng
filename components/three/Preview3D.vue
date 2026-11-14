@@ -284,7 +284,7 @@
           </button>
         </div>
         <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300 cursor-pointer">
-          <input type="checkbox" v-model="showContours" class="accent-brand" />
+          <input type="checkbox" v-model="showContours" :class="CHECKBOX" />
           {{ t('preview.contours', { m: contourStep }) }}
         </label>
         <div v-if="terrainView === 'slope'" class="space-y-0.5">
@@ -318,39 +318,21 @@
           </div>
 
           <label class="flex items-center gap-2 cursor-pointer group/check">
-            <div class="relative">
-              <input
-                type="checkbox"
-                v-model="showSurroundings"
-                class="peer sr-only"
-              />
-              <div
-                class="w-9 h-5 bg-gray-200 dark:bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand"
-              ></div>
-            </div>
+            <BaseSwitch :on="showSurroundings" :label="t('preview.surroundingTerrain')" @toggle="showSurroundings = !showSurroundings" />
             <span class="text-xs text-gray-700 dark:text-gray-300 group-hover/check:text-gray-900 dark:group-hover/check:text-white"
               >{{ t('preview.surroundingTerrain') }}</span
             >
           </label>
-          <p v-if="showSurroundings" class="text-micro text-gray-400 dark:text-gray-500 ml-11 -mt-1">{{ t('preview.surroundingDesc') }}</p>
+          <p v-if="showSurroundings" class="text-micro text-gray-400 dark:text-gray-500 ml-[42px] -mt-1">{{ t('preview.surroundingDesc') }}</p>
           <p
             v-if="showSurroundings && surroundingTextureType === 'satellite' && isSurroundingsLoading"
-            class="text-micro text-gray-400 dark:text-gray-500 ml-11 -mt-1"
+            class="text-micro text-gray-400 dark:text-gray-500 ml-[42px] -mt-1"
           >
             {{ t('preview.surroundingsSatelliteProgress', { completed: surroundingsSatelliteProgress.completed, total: surroundingsSatelliteProgress.total }) }}
           </p>
 
           <label class="flex items-center gap-2 cursor-pointer group/check">
-            <div class="relative">
-              <input
-                type="checkbox"
-                v-model="showWireframe"
-                class="peer sr-only"
-              />
-              <div
-                class="w-9 h-5 bg-gray-200 dark:bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand"
-              ></div>
-            </div>
+            <BaseSwitch :on="showWireframe" :label="t('preview.wireframeMode')" @toggle="showWireframe = !showWireframe" />
             <span class="text-xs text-gray-700 dark:text-gray-300 group-hover/check:text-gray-900 dark:group-hover/check:text-white"
               >{{ t('preview.wireframeMode') }}</span
             >
@@ -363,16 +345,7 @@
             </label>
             <div class="grid grid-cols-2 gap-2">
               <label class="flex items-center gap-2 cursor-pointer group/check">
-                <div class="relative">
-                  <input
-                    type="checkbox"
-                    v-model="showWater"
-                    class="peer sr-only"
-                  />
-                  <div
-                    class="w-7 h-4 bg-gray-200 dark:bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-brand"
-                  ></div>
-                </div>
+                <BaseSwitch size="sm" :on="showWater" :label="t('preview.water')" @toggle="showWater = !showWater" />
                 <span class="text-micro capitalize text-gray-700 dark:text-gray-300 group-hover/check:text-gray-900 dark:group-hover/check:text-white font-medium select-none">
                   {{ t('preview.water') }}
                 </span>
@@ -393,16 +366,7 @@
                 </div>
               </div>
               <label v-for="(val, key) in featureVisibility" :key="key" class="flex items-center gap-2 cursor-pointer group/check">
-                <div class="relative">
-                  <input
-                    type="checkbox"
-                    v-model="featureVisibility[key]"
-                    class="peer sr-only"
-                  />
-                  <div
-                    class="w-7 h-4 bg-gray-200 dark:bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-brand"
-                  ></div>
-                </div>
+                <BaseSwitch size="sm" :on="featureVisibility[key]" :label="t(`preview.feature_${key}`)" @toggle="featureVisibility[key] = !featureVisibility[key]" />
                 <span class="text-micro text-gray-700 dark:text-gray-300 group-hover/check:text-gray-900 dark:group-hover/check:text-white font-medium select-none">
                   {{ t(`preview.feature_${key}`) }}
                 </span>
@@ -475,7 +439,8 @@ import SurroundingTerrain3D from "./SurroundingTerrain3D.vue";
 import PostFX from "./PostFX.vue";
 import SceneAtmosphere from "./SceneAtmosphere.vue";
 import { useMainStore } from "../../stores/mainStore";
-import { SELECT_SM, SELECT_XS } from "../base/controlStyles.js";
+import { CHECKBOX, SELECT_SM, SELECT_XS } from "../base/controlStyles.js";
+import BaseSwitch from "../base/BaseSwitch.vue";
 
 import RenderPause from "./RenderPause.vue";
 const props = defineProps(["terrainData"]);

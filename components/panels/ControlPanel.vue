@@ -47,7 +47,7 @@
                 :class="[
                   'rounded border px-3 py-2 text-sm font-medium transition-colors',
                   uploadedAreaMode === 'native'
-                    ? 'border-brand bg-orange-50 dark:bg-orange-900/20 text-brand'
+                    ? 'border-brand bg-brand-50/60 dark:bg-brand/10 text-brand'
                     : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300',
                 ]"
               >
@@ -59,7 +59,7 @@
                 :class="[
                   'rounded border px-3 py-2 text-sm font-medium transition-colors',
                   uploadedAreaMode === 'crop'
-                    ? 'border-brand bg-orange-50 dark:bg-orange-900/20 text-brand'
+                    ? 'border-brand bg-brand-50/60 dark:bg-brand/10 text-brand'
                     : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300',
                 ]"
               >
@@ -285,11 +285,11 @@
       <!-- what is being made (Advanced): the Export step shows only what it needs (composables/useWorkflow.js) -->
       <div v-if="store.advancedMode" class="space-y-1.5" data-testid="workflow-choice">
         <div class="text-micro font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('wizard.making') }}</div>
-        <div role="radiogroup" :aria-label="t('wizard.making')" class="grid grid-cols-3 rounded-md border border-gray-300 dark:border-gray-600 overflow-hidden">
+        <div role="radiogroup" :aria-label="t('wizard.making')" class="grid grid-cols-3 gap-1 p-1 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
           <button
             v-for="w in WORKFLOWS" :key="w" type="button" role="radio" :aria-checked="workflow === w" :data-testid="`workflow-${w}`"
-            class="px-2 py-1.5 text-caption font-semibold border-l first:border-l-0 border-gray-300 dark:border-gray-600 transition-colors"
-            :class="workflow === w ? 'bg-brand text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'"
+            class="px-2 py-1 rounded text-caption transition-colors"
+            :class="workflow === w ? 'bg-brand text-white shadow-sm font-medium' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700'"
             @click="workflow = w"
           >{{ t(`wizard.flow_${w}`) }}</button>
         </div>
@@ -322,7 +322,7 @@
         </p>
         <button
           type="button"
-          class="px-3 py-1 rounded-md bg-brand hover:bg-brand-500 text-white text-caption font-semibold"
+          class="px-3 py-1 rounded bg-brand hover:bg-brand-500 text-white text-caption font-semibold"
           @click="$emit('generate', false, fetchOSM, elevationSource, gpxzApiKey, elevationUnitOverride, metersPerPixel, gapFillSource)"
         >{{ t('wizard.generateAgain') }}</button>
       </div>

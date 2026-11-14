@@ -1,5 +1,5 @@
 <template>
-  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
     <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto custom-scrollbar flex flex-col animate-in zoom-in-95 duration-200">
       <!-- Header -->
       <div class="p-5 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur z-10">
@@ -7,7 +7,7 @@
           <div class="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
             <Code :size="20" class="text-brand" />
           </div>
-          <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('tech.title') }}</h2>
+          <h2 class="text-base font-bold text-gray-900 dark:text-white">{{ t('tech.title') }}</h2>
         </div>
         <button 
           @click="$emit('close')" 

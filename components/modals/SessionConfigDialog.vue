@@ -12,7 +12,7 @@
           <p>{{ t('config.dialogIntro') }}</p>
           <template v-for="section in sections" :key="section.id">
             <div v-if="section.rows.length">
-              <div class="text-micro font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">{{ t(`config.section_${section.id}`) }}</div>
+              <div class="text-micro font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">{{ t(`config.section_${section.id}`) }}</div>
               <dl class="rounded border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-800">
                 <div v-for="row in section.rows" :key="row.label" class="flex gap-3 px-3 py-1.5">
                   <dt class="w-32 shrink-0 text-gray-500 dark:text-gray-400">{{ t(row.label) }}</dt>

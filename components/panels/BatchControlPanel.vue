@@ -69,7 +69,7 @@
       <!-- Tiles Follow Map Center — always visible, independent of the tile layout section -->
       <label class="flex items-center justify-between p-2 rounded bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
         <span>{{ t('batch.tilesFollowCenter') }}</span>
-        <input type="checkbox" v-model="tileFollowCenterLocal" class="accent-brand w-4 h-4 cursor-pointer" />
+        <input type="checkbox" v-model="tileFollowCenterLocal" :class="CHECKBOX" />
       </label>
 
       <!-- Collapsible: per-tile offsets + names -->
@@ -292,6 +292,7 @@ provideSectionGroup();
 import SettingCard from '../base/SettingCard.vue';
 import SettingRow from '../base/SettingRow.vue';
 import SegmentedControl from '../base/SegmentedControl.vue';
+import { CHECKBOX } from '../base/controlStyles.js';
 import SettingSection from '../base/SettingSection.vue';
 import { ref, shallowRef, computed, watch, nextTick, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';

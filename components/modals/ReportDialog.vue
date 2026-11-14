@@ -26,12 +26,12 @@
 
             <label class="block">
               <span class="text-caption font-medium">{{ request.kind === 'manual' || request.kind === 'level' ? t('report.describeManual') : t('report.describe') }}</span>
-              <textarea v-model="description" rows="3" maxlength="4000" class="mt-1 w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand" />
+              <textarea v-model="description" rows="3" maxlength="4000" class="mt-1 w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-brand" />
             </label>
 
             <!-- (a level's report holds its location all through: no unticking it; said under What's included) -->
             <label v-if="preview?.area && request.kind !== 'level'" class="flex items-start gap-2 cursor-pointer select-none">
-              <input v-model="includeArea" type="checkbox" class="mt-0.5 accent-brand" />
+              <input v-model="includeArea" type="checkbox" :class="[CHECKBOX, 'mt-0.5 shrink-0']" />
               <span>{{ t('report.includeArea', { lat: Number(preview.area.lat).toFixed(4), lng: Number(preview.area.lng).toFixed(4) }) }}</span>
             </label>
 
@@ -80,6 +80,7 @@ import { gpuLine } from '../../services/gpuInfo.js';
 /* global __BUILD_HASH__ */
 import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { CHECKBOX } from '../base/controlStyles.js';
 import { CheckCircle2, LifeBuoy, Loader2 } from 'lucide-vue-next';
 import { desktopApp } from '../../services/platform/desktop.js';
 import { webReporter } from '../../services/webReports.js';

@@ -101,7 +101,7 @@
             <p class="mt-0.5 leading-snug">{{ t('app.updated.body') }}</p>
           </div>
           <div class="flex shrink-0 flex-col gap-1.5">
-            <button type="button" class="rounded bg-brand px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90" @click="reloadForUpdate">{{ t('app.updated.reload') }}</button>
+            <button type="button" class="rounded bg-brand px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-500" @click="reloadForUpdate">{{ t('app.updated.reload') }}</button>
             <button type="button" class="rounded px-3 py-1 text-xs underline" @click="updateNoticeHidden = true">{{ t('app.updated.later') }}</button>
           </div>
         </div>

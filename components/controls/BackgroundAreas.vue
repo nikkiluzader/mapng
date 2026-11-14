@@ -19,20 +19,20 @@
       </button>
 
       <div v-if="tool === 'unmask' || tool === 'raw'" class="flex flex-col gap-1.5 rounded-lg border border-gray-200 dark:border-gray-700 p-2">
-        <div class="flex gap-1" role="group" :aria-label="t('backgroundAreas.shape')">
+        <div class="flex gap-1 p-1 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700" role="group" :aria-label="t('backgroundAreas.shape')">
           <button
             v-for="s in shapeButtons" :key="s.id" type="button"
-            :class="[SEG, unmaskShape === s.id ? TOOL_ON : TOOL_OFF]" :aria-pressed="unmaskShape === s.id"
+            :class="[SEG, unmaskShape === s.id ? SEG_ON : SEG_OFF]" :aria-pressed="unmaskShape === s.id"
             @click="setShape(s.id)"
           ><component :is="s.icon" :size="13" />{{ s.label }}</button>
         </div>
-        <div v-if="tool === 'unmask'" class="flex gap-1" role="group" :aria-label="t('backgroundAreas.paintMode')">
-          <button type="button" :class="[SEG, !paintBackground ? TOOL_ON : TOOL_OFF]" :aria-pressed="!paintBackground" @click="paintBackground = false">{{ t('backgroundAreas.modeKeep') }}</button>
-          <button type="button" :class="[SEG, paintBackground ? TOOL_ON : TOOL_OFF]" :aria-pressed="paintBackground" @click="paintBackground = true">{{ t('backgroundAreas.modeBackground') }}</button>
+        <div v-if="tool === 'unmask'" class="flex gap-1 p-1 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700" role="group" :aria-label="t('backgroundAreas.paintMode')">
+          <button type="button" :class="[SEG, !paintBackground ? SEG_ON : SEG_OFF]" :aria-pressed="!paintBackground" @click="paintBackground = false">{{ t('backgroundAreas.modeKeep') }}</button>
+          <button type="button" :class="[SEG, paintBackground ? SEG_ON : SEG_OFF]" :aria-pressed="paintBackground" @click="paintBackground = true">{{ t('backgroundAreas.modeBackground') }}</button>
         </div>
-        <div v-else class="flex gap-1" role="group" :aria-label="t('backgroundAreas.paintMode')">
-          <button type="button" :class="[SEG, !paintSmooth ? TOOL_ON : TOOL_OFF]" :aria-pressed="!paintSmooth" @click="paintSmooth = false">{{ t('backgroundAreas.modeRaw') }}</button>
-          <button type="button" :class="[SEG, paintSmooth ? TOOL_ON : TOOL_OFF]" :aria-pressed="paintSmooth" @click="paintSmooth = true">{{ t('backgroundAreas.modeSmooth') }}</button>
+        <div v-else class="flex gap-1 p-1 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700" role="group" :aria-label="t('backgroundAreas.paintMode')">
+          <button type="button" :class="[SEG, !paintSmooth ? SEG_ON : SEG_OFF]" :aria-pressed="!paintSmooth" @click="paintSmooth = false">{{ t('backgroundAreas.modeRaw') }}</button>
+          <button type="button" :class="[SEG, paintSmooth ? SEG_ON : SEG_OFF]" :aria-pressed="paintSmooth" @click="paintSmooth = true">{{ t('backgroundAreas.modeSmooth') }}</button>
         </div>
         <div v-if="unmaskShape === 'brush'" class="flex items-center justify-between gap-2 text-caption text-gray-600 dark:text-gray-300">
           <span>{{ t('backgroundAreas.brushSize') }}</span>
@@ -87,8 +87,8 @@
     </p>
 
     <Teleport to="body">
-      <div v-if="pendingLock" class="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-gray-900/20 dark:bg-black/40" @click.self="cancelLock">
-        <div role="dialog" aria-modal="true" class="w-full max-w-sm rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-950 p-5 shadow-2xl">
+      <div v-if="pendingLock" class="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60" @click.self="cancelLock">
+        <div role="dialog" aria-modal="true" class="w-full max-w-sm rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 shadow-2xl">
           <h3 class="font-display text-base font-bold italic text-gray-900 dark:text-white mb-2">{{ t('backgroundAreas.lockTitle') }}</h3>
           <p class="text-sm text-gray-700 dark:text-gray-300 mb-2">{{ t('backgroundAreas.lockBody') }}</p>
           <ul class="list-disc pl-5 text-caption text-gray-500 dark:text-gray-400 space-y-0.5 mb-3">
@@ -100,8 +100,8 @@
             <input v-model="dontAsk" type="checkbox" :class="CHECKBOX" />{{ t('backgroundAreas.lockDontAsk') }}
           </label>
           <div class="flex justify-end gap-2 mt-4">
-            <button type="button" class="px-3 py-1.5 rounded-lg text-sm border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:border-brand" @click="cancelLock">{{ t('backgroundAreas.lockCancel') }}</button>
-            <button type="button" class="px-3 py-1.5 rounded-lg text-sm bg-brand text-white hover:bg-brand-500" @click="confirmLock(dontAsk)">{{ t('backgroundAreas.lockOk') }}</button>
+            <button type="button" class="px-3 py-1.5 rounded text-xs border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:border-brand" @click="cancelLock">{{ t('backgroundAreas.lockCancel') }}</button>
+            <button type="button" class="px-4 py-1.5 rounded bg-brand hover:bg-brand-500 text-white text-xs font-semibold" @click="confirmLock(dontAsk)">{{ t('backgroundAreas.lockOk') }}</button>
           </div>
         </div>
       </div>
@@ -135,7 +135,10 @@ const dontAsk = ref(false);
 const TOOL = 'flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-default';
 const TOOL_OFF = 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-brand';
 const TOOL_ON = 'border-brand bg-brand text-white';
-const SEG = 'flex-1 flex items-center justify-center gap-1 px-1.5 py-1 rounded-md border text-caption font-medium transition-colors';
+// (the shape and mode choices: the look of base/SegmentedControl.vue)
+const SEG = 'flex-1 flex items-center justify-center gap-1 px-1.5 py-1 rounded text-caption transition-colors';
+const SEG_ON = 'bg-brand text-white shadow-sm font-medium';
+const SEG_OFF = 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700';
 const shapeButtons = computed(() => [
   { id: 'brush', icon: Brush, label: t('backgroundAreas.shapeBrush') },
   { id: 'rect', icon: Square, label: t('backgroundAreas.shapeRect') },

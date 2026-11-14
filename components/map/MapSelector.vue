@@ -1,5 +1,5 @@
 <template>
-  <div class="w-full h-full bg-gray-100 relative z-0">
+  <div class="w-full h-full bg-gray-100 dark:bg-gray-900 relative z-0">
      <l-map 
         ref="mapRef"
         :center="initialCenter"
@@ -500,14 +500,14 @@ watch(selectedLayer, (v) => { writeStored('mapng_mapLayer', v); syncReliefLayer(
 const layerPanelOpen = ref(readStored('mapng_layerPanelOpen') !== 'false');
 watch(layerPanelOpen, (v) => writeStored('mapng_layerPanelOpen', String(v)));
 const PANEL_ROW = 'flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer';
-const PANEL_HEADING = 'px-1 text-micro font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400';
+const PANEL_HEADING = 'px-1 text-micro font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500';
 watch(satelliteNames, (v) => writeStored('mapng_satelliteLabels', String(v)));
 const isMovingProgrammatically = ref(false);
 
 
 const batchHandleIcon = L.divIcon({
   className: 'mapng-batch-handle',
-  html: '<div style="width:14px;height:14px;border-radius:9999px;background:#FF6600;border:2px solid white;box-shadow:0 0 0 1px rgba(0,0,0,0.25);"></div>',
+  html: '<div style="width:14px;height:14px;border-radius:9999px;background:var(--brand);border:2px solid white;box-shadow:0 0 0 1px rgba(0,0,0,0.25);"></div>',
   iconSize: [14, 14],
   iconAnchor: [7, 7],
 });
@@ -1280,6 +1280,8 @@ onMounted(() => {
 .leaflet-container.leaflet-grab.leaflet-dragging,
 .leaflet-dragging .leaflet-grab { cursor: url("data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cg%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v7M12%2015v7M2%2012h7M15%2012h7%22%20stroke%3D%22%23fff%22%20stroke-width%3D%224%22/%3E%3Cpath%20d%3D%22M12%202v7M12%2015v7M2%2012h7M15%2012h7%22%20stroke%3D%22%231f2937%22%20stroke-width%3D%221.6%22/%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%221.6%22%20fill%3D%22%23FF6600%22%20stroke%3D%22%23fff%22%20stroke-width%3D%221%22/%3E%3C/g%3E%3C/svg%3E") 12 12, crosshair; }
 .leaflet-dragging .leaflet-grab .leaflet-interactive { cursor: url("data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cg%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v7M12%2015v7M2%2012h7M15%2012h7%22%20stroke%3D%22%23fff%22%20stroke-width%3D%224%22/%3E%3Cpath%20d%3D%22M12%202v7M12%2015v7M2%2012h7M15%2012h7%22%20stroke%3D%22%231f2937%22%20stroke-width%3D%221.6%22/%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%221.6%22%20fill%3D%22%23FF6600%22%20stroke%3D%22%23fff%22%20stroke-width%3D%221%22/%3E%3C/g%3E%3C/svg%3E") 12 12, crosshair; }
+/* Background areas (backgroundLayer.js): the cross on an open line's middle */
+.mapng-bg-x { display: flex; align-items: center; justify-content: center; color: #fff; font: 700 14px/1 var(--font-sans); text-shadow: 0 0 2px #000, 0 0 4px rgba(0, 0, 0, 0.9), 0 1px 2px rgba(0, 0, 0, 0.9); pointer-events: none; }
 /* Map tools (MapSelector addMapTools): one look with Leaflet's zoom bar */
 .mapng-zoom-selection { display: flex !important; align-items: center; justify-content: center; color: #374151; }
 .mapng-zoom-selection:hover { color: var(--brand); }

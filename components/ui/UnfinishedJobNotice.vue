@@ -10,7 +10,7 @@
       <p class="font-semibold">{{ t('app.unfinished.title') }}</p>
       <p class="mt-0.5 leading-snug">{{ t(job.kind === 'export' ? 'app.unfinished.export' : 'app.unfinished.generate') }} <span v-if="job.code">{{ t('app.unfinished.kept') }}</span></p>
       <div class="mt-2 flex flex-wrap gap-2">
-        <button v-if="job.code" type="button" class="rounded bg-brand px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90" @click="restore">{{ t('app.unfinished.restore') }}</button>
+        <button v-if="job.code" type="button" class="rounded bg-brand px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-500" @click="restore">{{ t('app.unfinished.restore') }}</button>
         <button type="button" class="rounded border border-amber-400 px-3 py-1.5 text-xs font-semibold hover:bg-amber-100 dark:hover:bg-amber-900" @click="report">{{ t('app.unfinished.report') }}</button>
         <button type="button" class="rounded px-3 py-1.5 text-xs underline" @click="dismiss">{{ t('app.unfinished.dismiss') }}</button>
       </div>

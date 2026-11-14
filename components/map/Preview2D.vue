@@ -5,19 +5,19 @@
   <div class="relative w-full h-full bg-gray-200 dark:bg-gray-900">
     <div ref="mapEl" class="absolute inset-0" />
 
-    <div class="absolute top-4 left-4 z-[500] w-60 space-y-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white/95 dark:bg-gray-800/95 backdrop-blur p-3 shadow-lg text-xs text-gray-700 dark:text-gray-200">
+    <div class="absolute top-4 left-4 z-[500] w-60 space-y-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white/95 dark:bg-gray-800/95 backdrop-blur p-3 shadow-lg text-xs text-gray-700 dark:text-gray-200">
       <label class="flex items-center justify-between gap-2" :class="terrainView === 'normal' ? '' : 'opacity-50'">
         <span>{{ t('preview2d.texture') }}</span>
-        <select v-model="texture" :disabled="terrainView !== 'normal'" class="rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-1.5 py-0.5 text-xs">
+        <select v-model="texture" :disabled="terrainView !== 'normal'" :class="SELECT_XS">
           <option v-for="o in textureOptions" :key="o.id" :value="o.id">{{ o.label }}</option>
         </select>
       </label>
       <!-- the land's photo, or its shape (as the 3D preview's terrain view) -->
-      <div class="flex gap-0.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-900 p-0.5" role="radiogroup" :aria-label="t('preview.terrainView')">
+      <div class="flex gap-1 p-1 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700" role="radiogroup" :aria-label="t('preview.terrainView')">
         <button
           v-for="v in TERRAIN_VIEWS" :key="v" type="button" role="radio" :aria-checked="terrainView === v"
           class="flex-1 rounded px-1 py-1 text-caption transition-colors"
-          :class="terrainView === v ? 'bg-brand text-white font-medium shadow-sm' : 'text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700'"
+          :class="terrainView === v ? 'bg-brand text-white shadow-sm font-medium' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700'"
           @click="terrainView = v"
         >{{ t(`preview.view_${v}`) }}</button>
       </div>
@@ -31,16 +31,16 @@
       </div>
       <label class="flex items-center justify-between gap-2 cursor-pointer">
         <span>{{ t('preview.contours', { m: contourStep }) }}</span>
-        <input type="checkbox" v-model="showContours" class="accent-brand w-4 h-4" />
+        <input type="checkbox" v-model="showContours" :class="CHECKBOX" />
       </label>
       <!-- the export's backdrop: the eight tiles around the map, as satellite imagery -->
       <label v-if="hasBackdrop" class="flex items-center justify-between gap-2 cursor-pointer">
         <span>{{ t('preview2d.backdrop') }}</span>
-        <input type="checkbox" v-model="showBackdrop" class="accent-brand w-4 h-4" />
+        <input type="checkbox" v-model="showBackdrop" :class="CHECKBOX" />
       </label>
       <label class="flex items-center justify-between gap-2 cursor-pointer">
         <span>{{ t('preview2d.features') }}</span>
-        <input type="checkbox" v-model="colourMap" class="accent-brand w-4 h-4" :disabled="!hasFeatures" />
+        <input type="checkbox" v-model="colourMap" :class="CHECKBOX" :disabled="!hasFeatures" />
       </label>
       <p v-if="!hasFeatures" class="text-caption text-amber-700 dark:text-amber-300">{{ t('preview2d.noFeatures') }}</p>
       <ul v-else-if="colourMap" class="space-y-0.5 pt-1 border-t border-gray-100 dark:border-gray-700/60">
@@ -78,7 +78,7 @@
 
     <div
       v-if="hover"
-      class="pointer-events-none absolute z-[600] max-w-xs rounded-md bg-gray-900/90 px-2 py-1 text-xs text-white shadow"
+      class="pointer-events-none absolute z-[600] max-w-xs rounded bg-gray-900/90 px-2 py-1 text-xs text-white shadow"
       :style="{ left: `${hover.x + 14}px`, top: `${hover.y + 14}px` }"
     >
       <div class="flex items-center gap-1.5 font-semibold">
@@ -93,6 +93,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount, toRaw } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { CHECKBOX, SELECT_XS } from '../base/controlStyles.js';
 import L from 'leaflet';
 import { squareOfDrag } from '../../services/modelArea.js';
 import 'leaflet/dist/leaflet.css';

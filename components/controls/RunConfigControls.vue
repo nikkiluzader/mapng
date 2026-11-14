@@ -11,7 +11,7 @@
         </div>
         <BaseButton size="sm" variant="secondary" class="shrink-0" :disabled="sending" @click="$emit('send')">{{ sent ? t('config.newCode') : t('config.send') }}</BaseButton>
       </div>
-      <div v-if="sent" class="rounded bg-orange-50 dark:bg-orange-900/10 border border-brand/40 p-2 space-y-1">
+      <div v-if="sent" class="rounded bg-brand-50/60 dark:bg-brand/5 border border-brand/40 p-2 space-y-1">
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
           <code class="font-mono text-base font-semibold tracking-wider text-gray-900 dark:text-white">{{ sent.id }}</code>
           <button type="button" class="text-micro text-brand hover:underline" @click="copy(sent.id, 'id')">{{ copied === 'id' ? t('config.copiedShort') : t('config.copyCode') }}</button>
@@ -27,7 +27,7 @@
         <div class="text-micro text-gray-500 dark:text-gray-400 leading-snug">{{ t('config.receiveHint') }}</div>
       </div>
       <form class="flex gap-1" @submit.prevent="openCode">
-        <input v-model="codeInput" type="text" maxlength="2000" :placeholder="t('config.codePlaceholder')" class="min-w-0 flex-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-caption focus:outline-none focus:ring-1 focus:ring-brand" />
+        <input v-model="codeInput" type="text" maxlength="2000" :placeholder="t('config.codePlaceholder')" class="min-w-0 flex-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-caption text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-brand" />
         <BaseButton size="sm" variant="secondary" type="submit" :disabled="!codeInput.trim()">{{ t('config.open') }}</BaseButton>
       </form>
     </div>

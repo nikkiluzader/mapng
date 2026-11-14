@@ -16,7 +16,7 @@
           <button
             @click="handleSave"
             :disabled="!hasUnsavedChanges || isSaving"
-            class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-brand text-white hover:bg-brand-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+            class="px-3 py-1.5 text-xs font-semibold rounded bg-brand text-white hover:bg-brand-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
           >
             <Loader2 v-if="isSaving" :size="12" class="animate-spin" />
             <Check v-else :size="12" />
@@ -24,7 +24,7 @@
           </button>
           <button
             @click="requestClose"
-            class="px-3 py-1.5 text-xs font-medium rounded-lg text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            class="px-3 py-1.5 text-xs font-medium rounded text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
           >
             {{ t('common.cancel') }}
           </button>
@@ -76,7 +76,7 @@
                 @change="applyHexInput"
                 maxlength="7"
                 spellcheck="false"
-                class="w-20 text-caption font-mono bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5"
+                class="w-20 text-caption font-mono bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-900 dark:text-white"
               />
               <div class="w-5 h-5 rounded border border-gray-300 dark:border-gray-600" :style="{ background: color }"></div>
             </div>

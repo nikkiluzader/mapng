@@ -9,7 +9,7 @@
             <component :is="headerIcon" :size="20" :class="headerIconClass" />
           </div>
           <div>
-            <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ headerTitle }}</h2>
+            <h2 class="text-base font-bold text-gray-900 dark:text-white">{{ headerTitle }}</h2>
             <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('batchProgress.gridSummary', { cols: gridCols, rows: gridRows, resolution: state.resolution }) }}</p>
           </div>
         </div>
@@ -40,7 +40,7 @@
           </div>
           <div :style="gridStyle" class="gap-1 mx-auto" style="max-width: 400px;">
             <div v-for="tile in state.tiles" :key="tile.id || tile.index" :class="tileClass(tile)"
-              class="aspect-square rounded-sm flex items-center justify-center text-[7px] font-medium transition-all duration-300 select-none overflow-hidden relative"
+              class="aspect-square rounded flex items-center justify-center text-nano font-medium transition-all duration-300 select-none overflow-hidden relative"
               :title="`${tileLabel(tile)}${tile.lastError?.message ? ': ' + tile.lastError.message : ''}`">
               <!-- Snapshot background for completed tiles -->
               <img v-if="tile.snapshot && (tile.status === 'done' || tile.status === 'completed')" :src="tile.snapshot"
@@ -55,7 +55,7 @@
                 <XIcon v-else-if="tile.status === 'failed'" :size="10" />
                 <span v-else class="opacity-40">•</span>
               </template>
-              <div class="absolute bottom-0 left-0 right-0 bg-black/45 text-white text-[8px] leading-none py-0.5 text-center">
+              <div class="absolute bottom-0 left-0 right-0 bg-black/45 text-white text-nano leading-none py-0.5 text-center">
                 {{ tileLabel(tile) }}
               </div>
             </div>
@@ -162,18 +162,18 @@
           </div>
 
           <!-- Combined Level Partial Export Warning -->
-          <div v-if="isCombinedLevelPartial && combinedLevelMade" class="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-3">
-            <p class="text-sm font-medium text-orange-800 dark:text-orange-200">
+          <div v-if="isCombinedLevelPartial && combinedLevelMade" class="bg-brand-50/60 dark:bg-brand/10 border border-brand-200 dark:border-brand-600 rounded-lg p-3">
+            <p class="text-sm font-medium text-brand-800 dark:text-brand-200">
               {{ t('batchProgress.combinedLevelPartialTitle') }}
             </p>
-            <p class="text-xs text-orange-600 dark:text-orange-400 mt-1">
+            <p class="text-xs text-brand-600 dark:text-brand-400 mt-1">
               {{ t('batchProgress.combinedLevelPartialDesc', { count: failedCount, name: levelName }) }}
             </p>
           </div>
 
           <!-- Failed Tiles List -->
           <div v-if="failedTiles.length > 0" class="space-y-2">
-            <h4 class="text-xs font-semibold uppercase tracking-wider text-red-500 dark:text-red-400">{{ t('batchProgress.failedTiles') }}</h4>
+            <h4 class="text-micro font-semibold uppercase tracking-wider text-red-500 dark:text-red-400">{{ t('batchProgress.failedTiles') }}</h4>
             <div class="max-h-32 overflow-y-auto custom-scrollbar space-y-1">
               <div v-for="tile in failedTiles" :key="tile.index"
                 class="flex items-start gap-2 text-xs bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded p-2">
@@ -189,7 +189,7 @@
 
         <div v-if="showDetails" class="space-y-3">
           <div class="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 space-y-2">
-            <h4 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('batchProgress.jobSummary') }}</h4>
+            <h4 class="text-micro font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('batchProgress.jobSummary') }}</h4>
             <div class="text-xs text-gray-600 dark:text-gray-300 space-y-1">
               <p>{{ t('batchProgress.totalQueueWait') }}: <span class="font-medium">{{ formatDuration(jobSummary?.totalWaitMs) }}</span></p>
               <p v-if="jobSummary?.slowestTile">{{ t('batchProgress.slowestTile') }}: <span class="font-medium">{{ jobSummary.slowestTile.label || `R${jobSummary.slowestTile.row + 1}C${jobSummary.slowestTile.col + 1}` }}</span> ({{ formatDuration(jobSummary.slowestTile.totalMs) }})</p>
@@ -220,7 +220,7 @@
           </div>
 
           <div class="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 space-y-2">
-            <h4 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('batchProgress.perTileInstrumentation') }}</h4>
+            <h4 class="text-micro font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('batchProgress.perTileInstrumentation') }}</h4>
             <div class="max-h-56 overflow-y-auto custom-scrollbar space-y-2">
               <div v-for="tile in tilesWithInstrumentation" :key="tile.id || tile.index" class="border border-gray-200 dark:border-gray-700 rounded p-2 bg-white dark:bg-gray-900">
                 <div class="text-xs font-medium text-gray-700 dark:text-gray-200 mb-1">{{ tileLabel(tile) }} · {{ tile.status }}</div>

@@ -6,7 +6,7 @@
   >
     <button
       type="button"
-      class="relative p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:text-brand hover:bg-orange-50 dark:hover:bg-gray-800 transition-colors"
+      class="relative p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:text-brand hover:bg-brand-50/60 dark:hover:bg-gray-800 transition-colors"
       :title="t('levels.open')"
       @click="setOpen(true)"
     >

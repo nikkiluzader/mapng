@@ -57,7 +57,7 @@ onUnmounted(() => { clearInterval(intervalId); stopUsage?.(); });
 <template>
   <!-- Desktop: two rows, always detailed: the machine on top, the running job (export,
        generate, update) below. The web has only the page's own heap. -->
-  <div v-if="desktopApp" class="px-3.5 py-2 rounded-xl bg-black/60 border border-white/10 font-mono text-caption tabular-nums select-none whitespace-nowrap pointer-events-none">
+  <div v-if="desktopApp" class="px-3.5 py-2 rounded-lg bg-black/60 border border-white/10 font-mono text-caption tabular-nums select-none whitespace-nowrap pointer-events-none">
     <template v-if="usage">
       <div class="flex items-center gap-2">
         <span class="text-white/50 uppercase tracking-wider text-nano">{{ t('memoryWidget.cpu') }}</span>

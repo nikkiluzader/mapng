@@ -1,12 +1,12 @@
 <template>
-  <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="$emit('close')">
-    <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+  <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" @click.self="$emit('close')">
+    <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
       <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-gray-800">
         <div class="flex items-center gap-3">
           <div class="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
             <AlertTriangle :size="20" class="text-amber-600 dark:text-amber-500" />
           </div>
-          <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('disclaimer.title') }}</h2>
+          <h2 class="text-base font-bold text-gray-900 dark:text-white">{{ t('disclaimer.title') }}</h2>
         </div>
         <button @click="$emit('close')" class="text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors">
           <X :size="20" />

@@ -16,8 +16,7 @@
         type="checkbox"
         :checked="modelValue && !disabled"
         :disabled="disabled"
-        class="accent-brand w-4 h-4 shrink-0"
-        :class="disabled ? 'cursor-not-allowed' : 'cursor-pointer'"
+        :class="[CHECKBOX, 'shrink-0 disabled:!opacity-100']"
         @change="$emit('update:modelValue', $event.target.checked)"
       />
       <div v-else class="flex items-center gap-1 shrink-0"><slot /></div>
@@ -28,6 +27,8 @@
 </template>
 
 <script setup>
+import { CHECKBOX } from './controlStyles.js';
+
 defineProps({
   label: { type: String, required: true },
   hint: { type: String, default: '' },

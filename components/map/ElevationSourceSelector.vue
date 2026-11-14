@@ -3,7 +3,7 @@
     <div class="space-y-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800/40 p-2.5">
         <select
             v-model="localElevationSource"
-            class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs text-gray-900 dark:text-white focus:ring-1 focus:ring-brand outline-none cursor-pointer"
+            :class="SELECT_SM"
         >
             <option value="mapterhorn">{{ t('map.mapterhornFree') }}</option>
             <option value="default">{{ t('map.standard30m') }}</option>
@@ -126,6 +126,7 @@
 
 <script setup>
 import SettingSection from '../base/SettingSection.vue';
+import { SELECT_SM } from '../base/controlStyles.js';
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Mountain, ChevronDown, AlertTriangle, Sparkles } from 'lucide-vue-next';

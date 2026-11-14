@@ -25,7 +25,7 @@
           @click="pickPreset(p)"
           class="px-2 py-0.5 rounded-full border text-caption transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           :class="activePreset === p
-            ? 'border-brand bg-orange-50 text-orange-800 font-semibold dark:bg-orange-900/30 dark:text-orange-200'
+            ? 'border-brand bg-brand-50/60 text-brand-800 font-semibold dark:bg-brand/15 dark:text-brand-200'
             : 'border-gray-300 text-gray-700 hover:border-brand dark:border-gray-600 dark:text-gray-200'"
         >{{ t(`build.preset_${p}`) }}</button>
         <span v-if="advanced && activePreset === 'custom'" class="px-2 py-0.5 rounded-full border border-dashed border-gray-400 text-caption text-gray-600 dark:text-gray-300">{{ t('build.preset_custom') }}</span>
@@ -45,7 +45,7 @@
               <span class="text-xs truncate" :class="g.onCount ? 'text-gray-800 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'">{{ t(`build.group_${g.id}`) }}</span>
               <span class="text-micro text-gray-500 dark:text-gray-400 shrink-0">{{ g.onCount === g.items.length ? t('build.allOn') : g.onCount === 0 ? t('build.off') : t('build.someOn', { n: g.onCount, of: g.items.length }) }}</span>
             </button>
-            <Switch :on="g.onCount > 0" :label="t('build.groupAll', { group: t(`build.group_${g.id}`) })" :disabled="!hasOsmData" @toggle="toggleGroup(g)" />
+            <BaseSwitch :on="g.onCount > 0" :label="t('build.groupAll', { group: t(`build.group_${g.id}`) })" :disabled="!hasOsmData" @toggle="toggleGroup(g)" />
           </div>
           <div v-if="open[g.id]" class="pb-1.5 pl-4 space-y-0.5">
             <div v-for="it in g.items" :key="it.id">
@@ -57,13 +57,13 @@
                   :aria-expanded="!!tagsOpen[it.id]" @click="tagsOpen[it.id] = !tagsOpen[it.id]"
                 >{{ t('build.tagsN', { n: it.tags.length }) }}</button>
                 <span class="text-micro text-gray-500 dark:text-gray-400 shrink-0 tabular-nums">{{ it.detail }}</span>
-                <Switch small :on="it.on" :label="t(`build.item_${it.id}`)" :disabled="!hasOsmData" @toggle="setBuilt(it.id, !it.on)" />
+                <BaseSwitch size="sm" :on="it.on" :label="t(`build.item_${it.id}`)" :disabled="!hasOsmData" @toggle="setBuilt(it.id, !it.on)" />
               </div>
               <ul v-if="showOsmTags && tagsOpen[it.id]" class="ml-2 mb-1 pl-2 border-l border-gray-200 dark:border-gray-600 space-y-0.5">
                 <li v-for="tg in it.tags" :key="tg.tag" class="flex items-center gap-1.5">
                   <code class="text-micro flex-1 min-w-0 truncate" :class="it.on && tg.on ? 'text-gray-700 dark:text-gray-200' : 'text-gray-400 dark:text-gray-500 line-through'">{{ tg.tag }}</code>
                   <span class="text-micro text-gray-500 tabular-nums">{{ tg.count.toLocaleString() }}</span>
-                  <Switch small :on="it.on && tg.on" :label="tg.tag" :disabled="!it.on" @toggle="setTagOn(tg.tag, !tg.on)" />
+                  <BaseSwitch size="sm" :on="it.on && tg.on" :label="tg.tag" :disabled="!it.on" @toggle="setTagOn(tg.tag, !tg.on)" />
                 </li>
               </ul>
             </div>
@@ -72,10 +72,10 @@
       </div>
       <div class="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 border-t border-gray-100 dark:border-gray-700/60">
         <label class="flex items-center gap-1.5 text-caption text-gray-600 dark:text-gray-300 cursor-pointer">
-          <Switch small :on="showOsmTags" :label="t('build.showTags')" @toggle="showOsmTags = !showOsmTags" />{{ t('build.showTags') }}
+          <BaseSwitch size="sm" :on="showOsmTags" :label="t('build.showTags')" @toggle="showOsmTags = !showOsmTags" />{{ t('build.showTags') }}
         </label>
         <label class="flex items-center gap-1.5 text-caption text-gray-600 dark:text-gray-300 cursor-pointer">
-          <Switch small :on="colourMap" :label="t('build.colourMap')" @toggle="colourMap = !colourMap" />{{ t('build.colourMap') }}
+          <BaseSwitch size="sm" :on="colourMap" :label="t('build.colourMap')" @toggle="colourMap = !colourMap" />{{ t('build.colourMap') }}
         </label>
         <span v-if="excludeTags.length" class="text-micro text-gray-500 dark:text-gray-400">{{ t('build.tagsLeftOut', { n: excludeTags.length }) }}
           <button type="button" class="underline hover:text-brand" @click="excludeTags = []">{{ t('build.keepAllTags') }}</button></span>
@@ -91,18 +91,18 @@
     <!-- Fine-tuning (Advanced) -->
     <template v-if="advanced && contentTab === 'tune'">
       <section class="space-y-1.5" :class="treesBuilt ? '' : 'opacity-50'">
-        <h4 class="text-micro font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('build.group_green') }}</h4>
+        <h4 class="text-micro font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('build.group_green') }}</h4>
         <div class="flex items-center justify-between gap-2">
           <span class="text-xs font-medium text-gray-800 dark:text-gray-100">{{ t('exportPanel.ui.forestDensity') }}</span>
           <span v-if="!treesBuilt" class="text-micro text-gray-500">{{ t('build.offInFeatures', { what: t('build.item_trees') }) }}</span>
         </div>
-        <div role="radiogroup" :aria-label="t('exportPanel.ui.forestDensity')" class="grid grid-cols-4 rounded border border-gray-300 dark:border-gray-600 overflow-hidden">
+        <div role="radiogroup" :aria-label="t('exportPanel.ui.forestDensity')" class="grid grid-cols-4 gap-1 p-1 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
           <button
             v-for="k in FOREST_DENSITY_KEYS" :key="k" type="button" role="radio"
             :aria-checked="forestDensity === k" :disabled="!treesBuilt || !hasOsmData"
             @click="$emit('update:forestDensity', k)"
-            class="py-1 text-caption border-r last:border-r-0 border-gray-200 dark:border-gray-600 transition-colors disabled:cursor-not-allowed"
-            :class="forestDensity === k ? 'bg-brand text-white font-semibold' : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'"
+            class="px-1 py-1 rounded text-caption transition-colors disabled:cursor-not-allowed"
+            :class="forestDensity === k ? 'bg-brand text-white shadow-sm font-medium' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700'"
           >{{ t(`exportPanel.ui.forestDensity_${k}`) }}</button>
         </div>
         <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t(`exportPanel.ui.forestDensityHint_${forestDensity}`) }}</p>
@@ -130,7 +130,7 @@
                   <select
                     :value="row.off ? 'off' : row.swappedTo ? `to:${row.swappedTo}` : 'keep'"
                     :disabled="!treesBuilt" :aria-label="t('build.trees.choiceFor', { kind: treeGroupName(row.group) })"
-                    class="max-w-[9.5rem] rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-micro py-0.5 pl-1 pr-5"
+                    :class="[SELECT_XS, 'max-w-[9.5rem]']"
                     @change="setTreeChoice(row.group, $event.target.value)"
                   >
                     <option value="keep">{{ t('build.trees.keepIt') }}</option>
@@ -160,13 +160,13 @@
         </div>
       </section>
       <section class="space-y-1.5 pt-1" :class="roadsBuilt ? '' : 'opacity-50'">
-        <h4 class="text-micro font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('build.group_roads') }}</h4>
+        <h4 class="text-micro font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('build.group_roads') }}</h4>
         <div class="flex items-start gap-2">
           <div class="flex-1 min-w-0">
             <div class="text-xs font-medium text-gray-800 dark:text-gray-100">{{ t('exportPanel.ui.assumeParking') }}</div>
             <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ roadsBuilt ? t('exportPanel.ui.assumeParkingHint') : t('build.offInFeatures', { what: t('build.item_roadSurfaces') }) }}</p>
           </div>
-          <Switch :on="assumeParking && roadsBuilt" :label="t('exportPanel.ui.assumeParking')" :disabled="!roadsBuilt || !hasOsmData" @toggle="$emit('update:assumeParking', !assumeParking)" />
+          <BaseSwitch :on="assumeParking && roadsBuilt" :label="t('exportPanel.ui.assumeParking')" :disabled="!roadsBuilt || !hasOsmData" @toggle="$emit('update:assumeParking', !assumeParking)" />
         </div>
         <!-- road surfaces: MapNG's decal roads, or (experimental) BeamNG Hero Roads built by a script when the level loads (heroRoadsLua.js) -->
         <div class="flex items-start gap-2">
@@ -176,7 +176,7 @@
           </div>
           <select
             data-testid="road-surface" :value="roadSurface" :disabled="!roadsBuilt || !hasOsmData" :aria-label="t('exportPanel.ui.roadSurface')"
-            class="max-w-[11rem] rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-micro py-0.5 pl-1 pr-5"
+            :class="[SELECT_XS, 'max-w-[11rem]']"
             @change="$emit('update:roadSurface', $event.target.value)"
           >
             <option value="decal">{{ t('exportPanel.ui.roadSurface_decal') }}</option>
@@ -198,41 +198,41 @@
             <div class="text-xs font-medium text-gray-800 dark:text-gray-100">{{ t('exportPanel.ui.decalSidewalks') }}</div>
             <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ roadsBuilt ? t('exportPanel.ui.decalSidewalksHint') : t('build.offInFeatures', { what: t('build.item_roadSurfaces') }) }}</p>
           </div>
-          <Switch :on="decalSidewalks && roadsBuilt" :label="t('exportPanel.ui.decalSidewalks')" :disabled="!roadsBuilt || !hasOsmData" @toggle="$emit('update:decalSidewalks', !decalSidewalks)" />
+          <BaseSwitch :on="decalSidewalks && roadsBuilt" :label="t('exportPanel.ui.decalSidewalks')" :disabled="!roadsBuilt || !hasOsmData" @toggle="$emit('update:decalSidewalks', !decalSidewalks)" />
         </div>
         <!-- the raised sidewalks' height over the road (beamngSidewalks.js CURB_HEIGHTS_M); nothing to set for decals -->
         <div :class="decalSidewalks ? 'opacity-50' : ''">
           <span class="text-xs font-medium text-gray-800 dark:text-gray-100">{{ t('exportPanel.ui.curbHeight') }}</span>
-          <div role="radiogroup" :aria-label="t('exportPanel.ui.curbHeight')" class="mt-1 grid grid-cols-3 rounded border border-gray-300 dark:border-gray-600 overflow-hidden">
+          <div role="radiogroup" :aria-label="t('exportPanel.ui.curbHeight')" class="mt-1 grid grid-cols-3 gap-1 p-1 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
             <button
               v-for="k in CURB_HEIGHT_KEYS" :key="k" type="button" role="radio"
               :aria-checked="curbHeight === k" :disabled="!roadsBuilt || !hasOsmData || decalSidewalks"
               @click="$emit('update:curbHeight', k)"
-              class="py-1 text-caption border-r last:border-r-0 border-gray-200 dark:border-gray-600 transition-colors disabled:cursor-not-allowed"
-              :class="curbHeight === k ? 'bg-brand text-white font-semibold' : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'"
+              class="px-1 py-1 rounded text-caption transition-colors disabled:cursor-not-allowed"
+              :class="curbHeight === k ? 'bg-brand text-white shadow-sm font-medium' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700'"
             >{{ t(`exportPanel.ui.curbHeight_${k}`) }}</button>
           </div>
           <p class="mt-1 text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.curbHeightHint') }}</p>
         </div>
       </section>
       <section class="space-y-1.5 pt-1" :class="bridgesBuilt ? '' : 'opacity-50'">
-        <h4 class="text-micro font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('build.group_structures') }}</h4>
+        <h4 class="text-micro font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('build.group_structures') }}</h4>
         <div class="flex items-start gap-2">
           <div class="flex-1 min-w-0">
             <div class="text-xs font-medium text-gray-800 dark:text-gray-100">{{ t('exportPanel.lidarDecks') }}</div>
             <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ bridgesBuilt ? t('exportPanel.ui.lidarDecksHint') : t('build.offInFeatures', { what: t('build.item_bridges') }) }}</p>
           </div>
-          <Switch :on="lidarDecks && bridgesBuilt" :label="t('exportPanel.lidarDecks')" :disabled="!bridgesBuilt || !hasOsmData" @toggle="$emit('update:lidarDecks', !lidarDecks)" />
+          <BaseSwitch :on="lidarDecks && bridgesBuilt" :label="t('exportPanel.lidarDecks')" :disabled="!bridgesBuilt || !hasOsmData" @toggle="$emit('update:lidarDecks', !lidarDecks)" />
         </div>
       </section>
       <section class="space-y-1.5 pt-1">
-        <h4 class="text-micro font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('build.limits') }}</h4>
+        <h4 class="text-micro font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('build.limits') }}</h4>
         <div class="flex items-start gap-2">
           <div class="flex-1 min-w-0">
             <div class="text-xs font-medium text-gray-800 dark:text-gray-100">{{ t('exportPanel.ui.buildEverything') }}</div>
             <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.buildEverythingHint') }}</p>
           </div>
-          <Switch :on="!safeCaps" :label="t('exportPanel.ui.buildEverything')" @toggle="$emit('update:safeCaps', !safeCaps)" />
+          <BaseSwitch :on="!safeCaps" :label="t('exportPanel.ui.buildEverything')" @toggle="$emit('update:safeCaps', !safeCaps)" />
         </div>
       </section>
     </template>
@@ -244,13 +244,15 @@
 <script setup>
 import { useMeasureRoadWidths } from '../../composables/useMeasureRoadWidths.js';
 import { WIDTH_SOURCE_TAG } from '../../services/satRoadWidth.js';
-import { computed, reactive, defineComponent, h, toRaw } from 'vue';
+import { computed, reactive, toRaw } from 'vue';
 import { treeTable, treeModelLabel, sampleElevations } from '../../services/treeTable.js';
 import { TREE_KIND_IDS } from '../../services/beamngTrees.js';
 import { useI18n } from 'vue-i18n';
 import { ChevronRight } from 'lucide-vue-next';
 import SettingCard from '../base/SettingCard.vue';
 import SectionToggleAll from '../base/SectionToggleAll.vue';
+import BaseSwitch from '../base/BaseSwitch.vue';
+import { SELECT_XS } from '../base/controlStyles.js';
 import { useMainStore } from '../../stores/mainStore';
 import { CONTENT_GROUPS, PRESET_IDS, osmTagCounts } from '../../services/buildContent.js';
 import { GROUP_COLOURS } from '../../services/buildContentColours.js';
@@ -335,24 +337,6 @@ const toggleTreeModel = (type) => {
   emit('update:treeModelsOff', [...off]);
 };
 const treeShare = (s) => (s < 0.01 ? '<1%' : `${Math.round(s * 100)}%`);
-
-// A small switch (role="switch"), the panel's one on/off control here.
-const Switch = defineComponent({
-  props: { on: Boolean, small: Boolean, disabled: Boolean, label: String },
-  emits: ['toggle'],
-  setup(p, { emit }) {
-    return () => {
-      const w = p.small ? 28 : 34; const ht = p.small ? 16 : 20; const k = ht - 6;
-      return h('button', {
-        type: 'button', role: 'switch', 'aria-checked': String(!!p.on), 'aria-label': p.label, disabled: p.disabled,
-        class: ['relative shrink-0 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:cursor-not-allowed disabled:opacity-50',
-          p.on ? 'bg-brand' : 'bg-gray-400 dark:bg-gray-600'],
-        style: { width: `${w}px`, height: `${ht}px` },
-        onClick: (e) => { e.preventDefault(); if (!p.disabled) emit('toggle'); },
-      }, [h('span', { class: 'absolute top-[3px] rounded-full bg-white transition-all', style: { width: `${k}px`, height: `${k}px`, left: p.on ? `${w - k - 3}px` : '3px' } })]);
-    };
-  },
-});
 
 const open = reactive({});
 const tagsOpen = reactive({});

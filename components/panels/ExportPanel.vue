@@ -51,7 +51,7 @@
                 :title="canPaintTexture ? t('exportPanel.texturePaint.open') : t('exportPanel.texturePaint.needsTexture')"
                 :class="['p-1 rounded border transition-colors shrink-0',
                   hasPaintedTexture
-                    ? 'border-brand text-brand bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/40'
+                    ? 'border-brand text-brand bg-brand-50/60 dark:bg-brand/10 hover:bg-brand-50 dark:hover:bg-brand/20'
                     : 'border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:text-brand hover:border-brand',
                   'disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-gray-500 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600']"
               >
@@ -293,7 +293,7 @@
           <!-- Once, after a first export: share where exports are (only a ~5 km cell) for the hotspot map -->
           <div
             v-if="askShareExports"
-            class="w-full flex items-start gap-2 p-2 rounded border border-brand/40 bg-orange-50 dark:bg-orange-900/10"
+            class="w-full flex items-start gap-2 p-2 rounded border border-brand/40 bg-brand-50/60 dark:bg-brand/5"
           >
             <Flame :size="14" class="shrink-0 mt-0.5 text-brand" />
             <div class="min-w-0 flex-1 space-y-1.5">
@@ -307,7 +307,7 @@
           </div>
           <div
             v-else-if="askShareSettings"
-            class="w-full flex items-start gap-2 p-2 rounded border border-brand/40 bg-orange-50 dark:bg-orange-900/10"
+            class="w-full flex items-start gap-2 p-2 rounded border border-brand/40 bg-brand-50/60 dark:bg-brand/5"
           >
             <BarChart3 :size="14" class="shrink-0 mt-0.5 text-brand" />
             <div class="min-w-0 flex-1 space-y-1.5">

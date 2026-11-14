@@ -1,13 +1,13 @@
 <template>
-  <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="$emit('close')">
-    <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+  <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" @click.self="$emit('close')">
+    <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
       <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-gray-800">
         <div class="flex items-center gap-3">
           <div class="p-2 bg-brand rounded-lg shadow-sm">
             <Layers :size="20" class="text-white" />
           </div>
           <div>
-            <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('about.title') }}</h2>
+            <h2 class="text-base font-bold text-gray-900 dark:text-white">{{ t('about.title') }}</h2>
             <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('about.subtitle') }}</p>
           </div>
         </div>
@@ -17,7 +17,7 @@
       </div>
       
       <div class="p-6 overflow-y-auto custom-scrollbar space-y-6 text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-        <div class="bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-900/30 rounded-lg p-4 text-orange-900 dark:text-orange-100">
+        <div class="bg-brand-50/60 dark:bg-brand/10 border border-brand-100 dark:border-brand/15 rounded-lg p-4 text-brand-900 dark:text-brand-100">
           <p class="font-medium">{{ t('about.hero') }}</p>
         </div>
 

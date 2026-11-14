@@ -11,7 +11,7 @@
       <!-- how wide a square: 512 m, wider, or the whole selection -->
       <label class="flex items-center gap-2 text-gray-600 dark:text-gray-300">
         <span>{{ t('map.compareSize') }}</span>
-        <select v-model="sizeChoice" data-testid="compare-size" class="rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-micro py-0.5 pl-1 pr-5">
+        <select v-model="sizeChoice" data-testid="compare-size" :class="SELECT_XS">
           <option value="512">500 m</option>
           <option value="1024">1 km</option>
           <option value="2048">2 km</option>
@@ -54,6 +54,7 @@
 
 <script setup>
 import SettingSection from '../base/SettingSection.vue';
+import { SELECT_XS } from '../base/controlStyles.js';
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Layers } from 'lucide-vue-next';

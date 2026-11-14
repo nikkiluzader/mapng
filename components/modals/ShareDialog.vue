@@ -5,7 +5,7 @@
   <Teleport to="body">
     <div
       v-if="shareDialogOpen"
-      class="fixed inset-0 z-[10001] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      class="fixed inset-0 z-[10001] flex items-center justify-center bg-black/60 backdrop-blur-sm"
       @click.self="closeShareDialog"
     >
       <div ref="panel" tabindex="-1" class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-[calc(100vw-2rem)] max-w-md max-h-[calc(100vh-2rem)] flex flex-col overflow-hidden outline-none" role="dialog" aria-modal="true" :aria-label="t('config.shareDialogTitle')">

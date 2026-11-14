@@ -47,7 +47,7 @@
           <select
             :value="verticalUnitOverride"
             @change="$emit('update:verticalUnitOverride', $event.target.value)"
-            class="flex-1 min-w-0 text-caption rounded-lg border border-blue-300 dark:border-blue-700 bg-white dark:bg-gray-900 px-2 py-1 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
+            :class="[SELECT_XS, 'flex-1 min-w-0']"
           >
             <option value="auto">{{ t('upload.auto') }} ({{ detectedUnitLabel }})</option>
             <option value="meters">{{ t('upload.meters') }}</option>
@@ -76,7 +76,7 @@
             <select
               :value="noDataMode"
               @change="handleNoDataModeChange($event.target.value)"
-              class="flex-1 min-w-0 text-caption rounded-lg border border-blue-300 dark:border-blue-700 bg-white dark:bg-gray-900 px-2 py-1 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
+              :class="[SELECT_XS, 'flex-1 min-w-0']"
             >
               <option value="auto">{{ t('upload.noDataAuto', { value: formatNoData(detectedNoData) }) }}</option>
               <option value="none">{{ t('upload.noDataNone') }}</option>
@@ -111,7 +111,7 @@
           <select
             :value="ascCoordinateSystem"
             @change="$emit('update:ascCoordinateSystem', $event.target.value)"
-            class="flex-1 min-w-0 text-caption rounded-lg border border-blue-300 dark:border-blue-700 bg-white dark:bg-gray-900 px-2 py-1 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
+            :class="[SELECT_XS, 'flex-1 min-w-0']"
           >
             <option value="auto">{{ t('upload.auto') }}</option>
             <option value="2180">{{ t('upload.crsPl1992') }}</option>
@@ -256,7 +256,7 @@
         <select
           :value="gapFillSource"
           @change="$emit('update:gapFillSource', $event.target.value)"
-          class="flex-1 min-w-0 text-caption rounded-lg border border-blue-300 dark:border-blue-700 bg-white dark:bg-gray-900 px-2 py-1 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
+          :class="[SELECT_XS, 'flex-1 min-w-0']"
         >
           <option :value="GAP_FILL_STANDARD">{{ t('upload.gapFillStandard') }}</option>
           <option :value="GAP_FILL_GPXZ">{{ t('upload.gapFillGpxz') }}</option>
@@ -273,6 +273,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { SELECT_XS } from '../base/controlStyles.js';
 import { Upload, FileUp, X, CircleHelp, Layers, ChevronUp, ChevronDown, Plus } from 'lucide-vue-next';
 import { NODATA_AUTO, NODATA_NONE } from '../../services/nodataDetect.js';
 import { ascNeedsPlacing, ascGroundSize } from '../../services/ascLoader.js';
