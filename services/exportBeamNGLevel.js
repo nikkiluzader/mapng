@@ -85,6 +85,7 @@ import {
   parseMaxspeedMps,
 } from './beamngMapNavigation.js';
 import { resolveRoadRulesAt } from './countryRules.js';
+import { applyRegionalWidths } from './regionalWidths.js';
 import { buildRoadSignProps } from './roadSigns.js';
 import { generateRoadLamps } from './streetLamps.js';
 import { buildIngameProbes } from './ingameProbes.js';
@@ -12598,6 +12599,12 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     countryCode: roadRules?.countryCode ?? null,
     region: roadRules?.region ?? null,
   };
+  // (roads outside the Americas: the lane widths and edge strip usual there, for a map generated before
+  // this, an uploaded OSM file, or map data added after Generate; a road tagged at Generate is left)
+  {
+    const narrowed = applyRegionalWidths(exportTerrainData.osmFeatures, roadRules);
+    if (narrowed) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Road widths: ${narrowed} road(s) given the widths usual outside the Americas.`);
+  }
   if (roadRules) {
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Road rules: ${roadRules.countryName} (${roadRules.countryCode}), ${resolvedRightHandDrive ? 'left' : 'right'}-hand traffic${roadRules.euroSignals ? ', EU signal cycle' : ''}.`);
   }

@@ -2,6 +2,7 @@ import { gpxzChunkGrid } from './gpxzChunks.js';
 import { attachLandCover } from './worldCover.js';
 import { attachTreeSpecies } from './treeSpecies.js';
 import { withMeasuredWidths } from './satRoadWidth.js';
+import { withRegionalWidths } from './regionalWidths.js';
 import { loadDataImage } from './dataCache.js';
 import { backgroundLookup, filterFeaturesByBackground, makeSkipBox, keptBoxes, tileLatLngBox, rawWeightLookup } from './backgroundMask.js';
 import { fetchOSMData, getLastOSMRequestInfo, getOSMQueryParameters } from "./osm.js";
@@ -2415,6 +2416,7 @@ export const fetchTerrainData = async (
       ...(backgroundAt ? { skipBox, keptBoxes: keptBoxes(backgroundAt, backgroundMask.bounds) } : {}),
     }));
     // (Map data > Measure road widths: paved widths read off the satellite picture, before anything is drawn or shaped)
+    osmFeatures = await withRegionalWidths(osmFeatures, finalBounds);
     osmFeatures = await withMeasuredWidths(osmFeatures, { onProgress, signal });
     if (backgroundAt) {
       const before = osmFeatures.length;
@@ -2892,6 +2894,7 @@ export const loadTerrainFromTif = async (
     signal?.throwIfAborted();
     emitProgress('Fetching OpenStreetMap data...');
     osmFeatures = shapeRoads(await fetchOSMData(finalBounds, { onStatus: emitProgress, signal }));
+    osmFeatures = await withRegionalWidths(osmFeatures, finalBounds);
     osmFeatures = await withMeasuredWidths(osmFeatures, { onProgress: emitProgress, signal });
     osmRequestInfo = getLastOSMRequestInfo() || {
       ...getOSMQueryParameters(finalBounds),
@@ -3131,6 +3134,7 @@ export const loadTerrainFromLaz = async (
     signal?.throwIfAborted();
     onProgress?.(`${fetchWord()} OpenStreetMap data...`);
     osmFeatures = shapeRoads(await fetchOSMData(fetchBounds, { onStatus: onProgress, signal }));
+    osmFeatures = await withRegionalWidths(osmFeatures, fetchBounds);
     osmFeatures = await withMeasuredWidths(osmFeatures, { onProgress, signal });
     osmRequestInfo = getLastOSMRequestInfo() || {
       ...getOSMQueryParameters(fetchBounds),

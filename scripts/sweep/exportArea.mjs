@@ -27,6 +27,7 @@ import { snapRoadsToTerrain } from '../../services/roadSnap.js';
 import { measureBenchWidths } from '../../services/benchWidths.js';
 import { measureStreetWidths } from '../../services/streetWidths.js';
 import { roundRoadCorners } from '../../services/roadCurves.js';
+import { withRegionalWidths } from '../../services/regionalWidths.js';
 import { fitTwinCarriageways } from '../../services/twinCarriageways.js';
 import { installCanvasPolyfill } from './polyfill.mjs';
 import { AREAS_DIR, OUT_DIR, REPO } from './env.mjs';
@@ -58,6 +59,8 @@ const raw = !!process.env.RAW;
 // (corners rounded into arcs first, as terrain.js shapeRoads: without it wide
 // roads kinked at every OSM vertex and lost wedges of asphalt there)
 // (PREPROCESSED=1: the OSM is the app's own data-step output, corners, widths and twin carriageways already done)
+// (the widths usual outside the Americas, before anything is shaped: as Generate does, terrain.js)
+await withRegionalWidths(osmFeatures, meta.bounds);
 const rounded = process.env.PREPROCESSED ? osmFeatures : roundRoadCorners(osmFeatures).features;
 let osmRoads = process.env.NOWIDTH || process.env.PREPROCESSED ? rounded : fitTwinCarriageways(measureStreetWidths(rounded).features).features;
 // (how far the lidar road snap moved the roads goes into the checks: a snap that wanders shows there)

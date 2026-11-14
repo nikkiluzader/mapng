@@ -66,7 +66,15 @@ export function parseRoadWidthMeters(value) {
 /**
  * Return a class-based default lane width in meters.
  */
-export function getDefaultLaneWidthMeters(highway) {
+// (written by services/regionalWidths.js on roads outside the Americas: the lane width and the paved strip
+// outside the edge line that are usual there)
+export const LANE_WIDTH_TAG = 'mapng:lane_width';
+export const EDGE_STRIP_TAG = 'mapng:edge_strip';
+const tagMetres = (tags, key) => { const v = Number(tags?.[key]); return Number.isFinite(v) && v >= 0 ? v : null; };
+
+export function getDefaultLaneWidthMeters(highway, tags = null) {
+  const own = tagMetres(tags, LANE_WIDTH_TAG);
+  if (own) return own;
   if (['motorway', 'motorway_link', 'trunk', 'trunk_link'].includes(highway)) return 3.7;
   if (['primary', 'primary_link', 'secondary', 'secondary_link'].includes(highway)) return 3.5;
   if (['tertiary', 'tertiary_link'].includes(highway)) return 3.25;
@@ -157,12 +165,12 @@ export function estimateRoadHalfWidth(tags = {}, highway, isOneWay = false, fall
   // (one lane for both directions, a single-track road: a little wider than a marked lane)
   const singleTrack = taggedLanes === 1 && !isOneWay;
   const estimatedHalf = singleTrack
-    ? (getDefaultLaneWidthMeters(highway) + SINGLE_TRACK_EXTRA_M) / 2
-    : (inferredLanes * getDefaultLaneWidthMeters(highway)) / 2;
+    ? (getDefaultLaneWidthMeters(highway, tags) + SINGLE_TRACK_EXTRA_M) / 2
+    : (inferredLanes * getDefaultLaneWidthMeters(highway, tags)) / 2;
   // lanes counted by the mapper are kept: the class maximum is for roads with no count (a
   // six-lane primary squeezed into 12 m had 2 m lanes), up to TAGGED_LANES_MAX of them
   const tagged = Math.min(lanesFromTotal || lanesFromDir || 0, TAGGED_LANES_MAX);
-  const max = Math.max(limits.max, (tagged * getDefaultLaneWidthMeters(highway)) / 2);
+  const max = Math.max(limits.max, (tagged * getDefaultLaneWidthMeters(highway, tags)) / 2);
 
   return clamp(estimatedHalf || fallbackHalfWidth, singleTrack ? Math.min(limits.min, MEASURED_MIN_HALF_M) : limits.min, max);
 }
@@ -344,7 +352,7 @@ export function estimateRoadCrossSection(tags = {}, highway, isOneWay = false, {
     if (parking === 0) return 0;
     if (!paved) return 0;
     if (urban) return (!isOneWay && PARKING_CLASSES.has(highway)) ? PARKING_LANE_M : 0;
-    return NO_SHOULDER_CLASSES.has(highway) ? 0 : EDGE_STRIP_M;
+    return NO_SHOULDER_CLASSES.has(highway) ? 0 : (tagMetres(tags, EDGE_STRIP_TAG) ?? EDGE_STRIP_M);
   };
   let leftExtra = extraFor('left');
   let rightExtra = extraFor('right');

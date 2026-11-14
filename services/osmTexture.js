@@ -801,7 +801,8 @@ const getLaneLayout = (tags) => {
   const lanesT = laneCounts.lanesTotal;
   const lanesF = laneCounts.lanesForward;
   const lanesB = laneCounts.lanesBackward;
-  const defaultLaneWidth = getDefaultLaneWidth(highway);
+  // (outside the Americas a road carries its own usual lane width: services/regionalWidths.js)
+  const defaultLaneWidth = Number(tags['mapng:lane_width']) || getDefaultLaneWidth(highway);
 
   const layout = {
     totalWidth: parseWidthMeters(tags.width) || 0,

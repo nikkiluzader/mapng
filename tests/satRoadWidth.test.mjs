@@ -110,3 +110,25 @@ test('a measurement wider than the class is not taken; a tagged lane count wins 
   assert.equal(2 * estimateRoadHalfWidth({ lanes: '2' }, 'trunk', false), 7.4);
   assert.equal(2 * estimateRoadHalfWidth({ lanes: '6' }, 'primary', false), 21);
 });
+
+test('outside the Americas a road with no width gets narrower lanes and a narrow edge strip', async () => {
+  const { applyRegionalWidths } = await import('../services/regionalWidths.js');
+  const { estimateRoadHalfWidth, estimateRoadCrossSection } = await import('../services/roadWidth.js');
+  const road = (tags) => ({ type: 'road', tags, geometry: [] });
+  const surface = (f) => { const cs = estimateRoadCrossSection(f.tags, f.tags.highway, false, { urban: false }); return 2 * cs.drivingHalfWidth + cs.leftExtra + cs.rightExtra; };
+  const gb = [road({ highway: 'primary' }), road({ highway: 'tertiary' }), road({ highway: 'primary', width: '8' }), road({ highway: 'trunk' })];
+  assert.equal(applyRegionalWidths(gb, { countryCode: 'GB', region: 'Europe' }), 4);
+  assert.equal(2 * estimateRoadHalfWidth(gb[0].tags, 'primary', false), 6);
+  assert.equal(surface(gb[0]), 6.5, 'a British A road: 9 m before');
+  assert.equal(2 * estimateRoadHalfWidth(gb[1].tags, 'tertiary', false), 5.5);
+  assert.equal(2 * estimateRoadHalfWidth(gb[2].tags, 'primary', false), 8, 'a mapped width stays');
+  assert.equal(2 * estimateRoadHalfWidth(gb[3].tags, 'trunk', false), 14.8, 'trunk lanes as before');
+  // the Americas, and a place whose country is not known: as before
+  for (const rules of [{ countryCode: 'US', region: 'Americas' }, null]) {
+    const us = [road({ highway: 'primary' })];
+    assert.equal(applyRegionalWidths(us, rules), 0);
+    assert.equal(surface(us[0]), 9);
+  }
+  // applied twice changes nothing more
+  assert.equal(applyRegionalWidths(gb, { countryCode: 'GB', region: 'Europe' }), 0);
+});
