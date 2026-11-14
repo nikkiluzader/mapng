@@ -9,6 +9,8 @@
 
 const ROOF_M = 6;            // road surface to the outside of a cut-and-cover roof (5 m headroom + slab)
 const OVER_ROAD_MARGIN_M = 3; // a deck reaches this far past a crossed road's edge
+const OPEN_UNDER_M = 3.5;     // a road this far over a tunnel road left open gets a deck over it
+const OPEN_UNDER_MARGIN_M = 2.5; // ... reaching this much further past its edge than over another road
 const DECK_MIN_H = 1.5;       // lowest a deck stands over the ground (its structure under it)
 
 /**
@@ -66,10 +68,27 @@ export function classifyStructures(graph, { rules = STRUCTURE_RULES } = {}) {
   for (const c of [...(graph.crossings?.crossings || []), ...(graph.crossings?.overlaps || [])]) {
     const up = c[c.upper]; const dn = c[c.upper === 'a' ? 'b' : 'a'];
     // (over a tunnel the road stands on the ground or its roof: no deck)
-    if (edges[dn.edge].tunnel || edges[dn.edge].external) continue;
+    if (edges[dn.edge].external) continue;
+    if (edges[dn.edge].tunnel) {
+      // ... but a tunnel road with too little ground over it for a roof comes out an open cutting (the rules
+      // below): a road far enough over that is a bridge over it, as over any road. Without a deck one of
+      // the two was cut through the other: a short underpass 4.3 m under a main road dug a trench across it.
+      const g = edges[dn.edge].g; const open = g && g[dn.i] - (zAt(dn) + ROOF_M) < 0;
+      if (!open || zAt(up) - zAt(dn) < OPEN_UNDER_M) continue;
+    }
     if (c.rule === 'overlap' && zAt(up) - zAt(dn) < DECK_MIN_H) continue;
     const e = edges[up.edge];
-    const reach = (edges[dn.edge].half || 4) + OVER_ROAD_MARGIN_M;
+    // (over an open tunnel road a little further: its cutting's sides, and a deck long enough to stay one)
+    let reach = (edges[dn.edge].half || 4) + OVER_ROAD_MARGIN_M;
+    if (edges[dn.edge].tunnel) {
+      // (and as far along this road as the cutting runs under it where the two cross at a slant: at 30
+      // degrees a 5.6 m road is under the other for twice its width, and a hump of the upper road's ground
+      // was left standing in the underpass beyond a deck measured square)
+      const d = edges[dn.edge]; const dir = (q, i) => { const a = Math.max(0, i - 1); const b = Math.min(q.s.length - 1, i + 1); const L = Math.hypot(q.x[b] - q.x[a], q.y[b] - q.y[a]) || 1; return [(q.x[b] - q.x[a]) / L, (q.y[b] - q.y[a]) / L]; };
+      const u = dir(e, up.i); const v = dir(d, dn.i);
+      const sin = Math.abs(u[0] * v[1] - u[1] * v[0]);
+      reach = (reach + OPEN_UNDER_MARGIN_M + (e.half || 4) * Math.sqrt(Math.max(0, 1 - sin * sin))) / Math.max(0.35, sin);
+    }
     for (let i = 0; i < e.s.length; i++) if (Math.abs(e.s[i] - up.s) <= reach) overRoad[up.edge][i] = 1;
   }
   const overWater = edges.map((e) => new Uint8Array(e.s.length));
