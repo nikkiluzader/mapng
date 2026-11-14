@@ -69,6 +69,11 @@ Open, by how often it was measured:
 1. **Bridge parapets across side streets** that join a bridge at its end (a canal city: a 1.1 m rail across the
    mouth of each quay street). The bridge builder leaves parapets open for ground roads it finds on the deck
    (`onGroundRoad` in beamngBridges.js); these are not found. Every road mode.
+   The same junctions leave a side street 0.3 to 0.8 m under the bridge deck's edge (its line reaches the
+   bridge's height only at the bridge's middle). Tried: treating bridge decks as surfaces a Mesh Road meets, as
+   it meets another deck. The in-game test said no (6 of 10 bridge areas worse, none better; more bare road at
+   bridge ends), with the surfaces taken from the solved graph, which is not where the built bridge meshes are.
+   It needs the bridge builder's own deck outlines, or the side street lifted in the road solve.
 2. **Sidewalk slabs across a carriageway** (19 to 72 cm) at some junctions and where a footbridge is mapped.
 3. **Tunnel mouths**: terrain steps of 0.75 to 1.5 m at aprons and portals in a freeway-cap area.
 4. **Bridge decks' own steps** (8 to 36 cm inside one bridge mesh, about 15 places in that area).
