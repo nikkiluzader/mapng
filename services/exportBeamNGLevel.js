@@ -6298,6 +6298,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   const roadSplinesByName = new Map();
   const segmentCounterByName = new Map();
   const usedGroupNames = new Map();
+  const takenRoadNames = new Set();
   const LAYER_CODE = {
     Base: 'b',
     'Center Line': 'cl',
@@ -6366,9 +6367,15 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     }
     const rawName = feature.tags?.name || feature.tags?.ref || `road_${feature.id}`;
     const baseName = sanitizeBeamNGObjectName(rawName, `road_${feature.id || 'x'}`);
-    const used = usedGroupNames.get(baseName) || 0;
-    usedGroupNames.set(baseName, used + 1);
-    const cleanName = used > 0 ? sanitizeBeamNGObjectName(`${baseName}_${used + 1}`) : baseName;
+    // (counted without regard to letter case: the game's object names are not case-sensitive. "BRTS Bus Lane"
+    // and "BRTS Bus lane", two roads of one town, both made an object dr_brts_bus_lane_s1_b; the game laid the
+    // second one's fields on the first: 240 m of road moved 670 m across the town, through the ground)
+    let used = usedGroupNames.get(baseName.toLowerCase()) || 0;
+    let cleanName = used > 0 ? sanitizeBeamNGObjectName(`${baseName}_${used + 1}`) : baseName;
+    // (and not a name another road has by itself: "Main Street 2" beside the second "Main Street")
+    while (takenRoadNames.has(cleanName.toLowerCase())) { used++; cleanName = sanitizeBeamNGObjectName(`${baseName}_${used + 1}`); }
+    usedGroupNames.set(baseName.toLowerCase(), used + 1);
+    takenRoadNames.add(cleanName.toLowerCase());
     
     const renderTags = getMergedRoadRenderTags(segmentFeature);
     const { style, isOneWay, urbanRoad, crossSection, drivingHalfWidth, styleHalfWidth } = widthsOf(segmentFeature);
