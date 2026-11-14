@@ -20,7 +20,7 @@ alone have misled this work more than once. Tools are listed at the end.
 ## 1. Mesh Roads and junction heights (in progress)
 
 Done 2026-11-13/14, from in-game profiles (every paved road walked at an even 0.5 m) and drawings of the worst
-places. Places with a step over 8 cm: roundabout town 29 to 4, hilly city 16 to 11.
+places. Places with a step over 8 cm: roundabout town 29 to 4, hilly city 16 to 5.
 - A road ends just inside the deck it crosses or joins instead of running through it (a deck through a crossing
   could lean one way only and stood 15 to 20 cm over a crossed road with a crest).
 - A deck's lean eases out along the road, and leaning decks have a middle line of vertices (a twisted quad folded
@@ -29,13 +29,18 @@ places. Places with a step over 8 cm: roundabout town 29 to 4, hilly city 16 to 
   road moved across a town; this was every road mode, not only Mesh Roads).
 The steps were not, as first thought, crests in the solved road heights: the solved lines have next to none.
 
+- A tunnel road left on the ground and the road over it no longer cut half through each other (a 2 m slot across
+  an avenue over a car park ramp; a 2 m fin across a primary road's underpass): the higher class keeps its surface.
+  This one is terrain, so every road mode.
+
+Eight maps, the older measure: steps over 8 cm 85 to 34 before the terrain fix.
+
 Open, most visible first:
-1. **A slot in the ground under a road** where a tunnel left on the ground (an underground car park's exit ramp,
-   2 m under an avenue) crosses under it: 2 m deep, 3 m wide, across the avenue. Terrain, so every road mode. The
-   road above also loses its whole deck to it. Drawn; not yet traced to the pass that digs it.
-2. **Sidewalk slabs across a carriageway** (three in the roundabout town, 18 to 36 cm): the sidewalk builder.
-3. **Deck meets structure.** Steps where a deck meets a bridge deck or a tunnel floor (24 to 33 cm in the hilly
-   city, more at an interchange), and terrain spikes on roads near tunnel mouths.
+1. **Sidewalk slabs across a carriageway** (three in the roundabout town, 18 to 36 cm): the sidewalk builder.
+2. **Deck meets structure.** Steps where a deck meets a bridge deck or a tunnel floor (24 to 33 cm in the hilly
+   city, more at an interchange), and one 60 cm terrain step on a boulevard there.
+3. **The interchange and the mountain gallery maps**: still 11 and 8 steps over 8 cm; not yet drawn with the new
+   profile tool.
 4. **Junction mouths on by default.** `junctionMouths` (services/structures/junctionMouths.js) holds a side road's
    first metres at the through road's height. Less needed for Mesh Roads now; still worth it for decal roads.
    Needs a full sweep (it changes every export's road heights) and a look in game before the switch is flipped.
