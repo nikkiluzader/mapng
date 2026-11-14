@@ -157,7 +157,7 @@
 
 <main class="wrap">
   <nav class="chips" aria-label="On this page">
-    <a href="#roads">Road surfaces</a><a href="#bridges">Bridge ends</a><a href="#making">What are you making?</a><a href="#models">3D models</a><a href="#elevation">Elevation sources</a><a href="#water">Water and backdrop</a><a href="#speed">Speed</a><a href="#safety">Big maps and failures</a><a href="#more">Smaller things</a><a href="#next">Next</a><a href="#thanks">Thanks</a>
+    <a href="#roads">Road surfaces</a><a href="#bridges">Bridge ends</a><a href="#widths">Road widths</a><a href="#making">What are you making?</a><a href="#models">3D models</a><a href="#elevation">Elevation sources</a><a href="#water">Water and backdrop</a><a href="#speed">Speed</a><a href="#safety">Big maps and failures</a><a href="#more">Smaller things</a><a href="#next">Next</a><a href="#thanks">Thanks</a>
   </nav>
 
   <section id="roads">
@@ -196,6 +196,18 @@
     <p>The terrain is a grid, so its last square before a bridge slopes away from road height. Each deck now has a short lip that laps onto the ground road, just under its surface.</p>
     <p>Places with a step of more than 8 cm, counted in the game: the freeway cap went from 43 to 34 and the interchange from 22 to 17. What is left is listed under <a href="#next">Next</a>: this is better, not finished.</p>
     <p>Also for bridges and tunnels: a road well above an open tunnel road becomes a bridge over it, a tunnel road left on the ground and the road above it no longer cut through each other, a road keeps its height under a gallery roof, and a tagged tunnel under a flat roof past its bore is built as a gallery, open to the valley.</p>
+  </section>
+
+  <section id="widths">
+    <div class="kicker">Roads</div>
+    <h2>📏 Road widths that fit the country</h2>
+    <p>A BeamNG developer's map of the Pennines came out with roads far too wide, and his export report showed why. Three things changed:</p>
+    <ul>
+      <li><b>Narrower roads outside the Americas.</b> MapNG's usual lane widths, and the metre of asphalt outside each edge line, were measured on BeamNG's own levels, which are North American roads. Elsewhere, a road with no width in OpenStreetMap now gets 3.0 m lanes on primary and secondary roads, 2.75 m on smaller ones, and a 0.25 m edge strip. Motorways, mapped widths and the Americas are as before.</li>
+      <li><b>Single-track roads.</b> A lane tagged <code>lanes=1</code> was built with two lanes, 6 m wide. The mapper's count now wins: it is one lane, about 3.5 m.</li>
+      <li><b>Measuring from the satellite picture no longer widens a road.</b> Where the verge or a stone wall is the road's own grey, the measurement read too wide. A width well over the class's usual one is not taken. Changing the switch now makes Generate run again, and the note in Fine-tuning says how many roads were measured out of how many.</li>
+    </ul>
+    <figure><img src="images/road-widths.jpg" alt="The same bend of a British A road in the game twice: 9 metres of asphalt before, with wide strips outside the edge lines, and 6.5 metres after" loading="lazy"><figcaption>The same bend of a British A road in the game: 9.0 m of asphalt before, 6.5 m after. A level made before needs a fresh Generate.</figcaption></figure>
   </section>
 
   <section id="making">
@@ -292,9 +304,9 @@
       <li><b>Tunnel aprons.</b> A slot of up to 1.85 m where a tunnel's apron ends on the freeway-cap test level. The largest fault still measured.</li>
       <li><b>Two parts of one bridge at different heights</b> where a ramp merges (0.94 m on one interstate bridge), and a few bridge ends with 0.5 to 0.9 m between deck and ground.</li>
       <li><b>Mesh Roads</b> at hill junctions and where a deck meets a bridge or a tunnel floor.</li>
-      <li><b>Hero Roads:</b> junctions joined, a bake that travels with the level, and a one-way road with a single lane, which gets one very wide lane.</li>
+      <li><b>Hero Roads:</b> junctions joined, and a bake that travels with the level.</li>
       <li><b>"The roads have waves."</b> On the global 30 m data the two sides of a divided road can ride at different heights. Reproduced, not fixed.</li>
-      <li><b>Roads with no width in the map data</b> that still come out too wide, and a default width you can set.</li>
+      <li><b>A default road width you can set yourself</b>, for places where the new figures still do not fit.</li>
       <li><b>A report that says "partial download"</b> from a 33 km map, with no log to go on.</li>
       <li><b>Still open from 0.3.0:</b> steep foot links as stairs, bus lanes and cycle paths, buildings as separate objects, a fresher planet copy.</li>
     </ul>
@@ -305,7 +317,7 @@
     <h2>🙏 Thanks</h2>
     <p>Nearly everything above started as a message, a screenshot or a report from someone testing MapNG. Thank you:</p>
     <ul>
-      <li><b>Wonly</b> (BeamNG): the Hero Roads feedback (lane widths, hundreds of roads, too many points, how baking works), the hill road that came out under the terrain, and the garbled preview that led to graphics details in reports and the Software Rendering switch.</li>
+      <li><b>Wonly</b> (BeamNG): the Hero Roads feedback (lane widths, hundreds of roads, too many points, how baking works), the hill road that came out under the terrain, the garbled preview that led to graphics details in reports and the Software Rendering switch, and the Pennine map whose report led to the road widths.</li>
       <li><b>mcct</b> (BeamNG): the lake-country level in Poland whose water, console errors and frame rate led to the water and backdrop changes.</li>
       <li><b>Fizz_Mechanic</b>: 3D models as a creator's tool (the picked area, tiles, the point spacing and its cost), smooth roads, and the mountain galleries.</li>
       <li><b>Jevi</b>: JOSM files of several downloads, and road widths.</li>
