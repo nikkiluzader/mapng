@@ -1,7 +1,7 @@
 {
  "_note": "Mesh Roads in-game baselines (scripts/ingame/meshRoadProfile.mjs --save): places with a step over 8 cm and 3 cm, and road samples with no deck.",
  "recorded": "2026-11-14",
- "commit": "1269c88",
+ "commit": "41de737",
  "areas": {
   "lcc": {
    "terrain": "gpxz",
@@ -263,6 +263,90 @@
    "steps3": 13,
    "bareRoad": 47,
    "kinds": {}
+  },
+  "nad_rotary:t30": {
+   "terrain": "t30",
+   "steps8": 4,
+   "steps3": 40,
+   "bareRoad": 17,
+   "kinds": {
+    "structure": 3,
+    "deckToDeck": 1
+   }
+  },
+  "w_sf_russian:t30": {
+   "terrain": "t30",
+   "steps8": 22,
+   "steps3": 130,
+   "bareRoad": 374,
+   "kinds": {
+    "deckTerrain": 8,
+    "structure": 2,
+    "deckToDeck": 8,
+    "oneDeck": 4
+   }
+  },
+  "kingst:t30": {
+   "terrain": "t30",
+   "steps8": 2,
+   "steps3": 24,
+   "bareRoad": 20,
+   "kinds": {
+    "deckToDeck": 2
+   }
+  },
+  "san_marino:t30": {
+   "terrain": "t30",
+   "steps8": 42,
+   "steps3": 128,
+   "bareRoad": 325,
+   "kinds": {
+    "deckTerrain": 10,
+    "structure": 14,
+    "oneDeck": 10,
+    "deckToDeck": 8
+   }
+  },
+  "lcc:t30": {
+   "terrain": "t30",
+   "steps8": 0,
+   "steps3": 3,
+   "bareRoad": 14,
+   "kinds": {}
+  },
+  "val_disere:t30": {
+   "terrain": "t30",
+   "steps8": 10,
+   "steps3": 40,
+   "bareRoad": 55,
+   "kinds": {
+    "deckToDeck": 2,
+    "structure": 3,
+    "oneDeck": 2,
+    "deckTerrain": 3
+   }
+  },
+  "w_sf_russian:mh": {
+   "terrain": "mh",
+   "steps8": 17,
+   "steps3": 113,
+   "bareRoad": 254,
+   "kinds": {
+    "deckTerrain": 5,
+    "structure": 2,
+    "deckToDeck": 9,
+    "oneDeck": 1
+   }
+  },
+  "val_disere:mh": {
+   "terrain": "mh",
+   "steps8": 13,
+   "steps3": 39,
+   "bareRoad": 84,
+   "kinds": {
+    "structure": 9,
+    "deckTerrain": 4
+   }
   }
  }
 }
