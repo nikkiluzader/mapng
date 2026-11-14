@@ -52,22 +52,32 @@ Open, most visible first:
 5. **Frame rate.** Decal roads against Mesh Roads against Hero Roads on the same level. Not measured yet.
 6. **Decide whether Mesh Roads stays experimental** once 1 to 3 are done.
 
-### Mesh Roads work list (night of 2026-11-14)
+### Mesh Roads, night of 2026-11-14 (in desktop test build 0.3.1-dev.9)
 
-Measured with `scratch/night/run.mjs` (export, load in game, walk every paved road at 0.5 m) on 20 areas, then
-on new ones. Baseline: 339 places with a step over 8 cm on 20 areas; most are joins with bridges and tunnels, and
-one hill grid's crossings.
+Measured with `scratch/night/run.mjs` (export, load in game, walk every paved road at 0.5 m). Places with a step
+over 8 cm on the 20 areas of the baseline: 339 to 253, with ground road left without a deck down from as much as
+4,300 samples an area to under 400. Five new areas (a roundabout new town, an alpine valley, mountain hairpins,
+a cul-de-sac suburb, a hill town): 80 to 61. A hill grid alone: 42 to 19.
 
-1. Decks for the on-ground stretches of roads that are partly on a bridge or in a tunnel (they had none).
-2. A crossing found out to the crossed deck's edge whatever the height difference (steep streets across wide ones).
-3. A side road's end inside a through road left out even where its run-on reaches the far edge.
-4. Decks spanning the gap between a bridge's end and its bank.
-5. Deck ends at structures: the height they meet the bridge deck or tunnel floor at.
-6. Terrain standing through decks on their centre line (deck/terrain steps).
-7. New locations: a roundabout new town, an alpine valley, mountain hairpins, a cul-de-sac suburb, a hill town.
-8. Raw-terrain (not levelled) runs on hills: camber and floating decks.
-9. Frame rate against decal roads on the same level.
-10. Screenshots of each fixed class; before/after diagrams kept in scratch/night/.
+Done: decks on the on-ground stretches of roads that touch a bridge or tunnel, up to and a step under the
+structure; crossings and joins met at the other road's edge whatever the height difference; side-road ends left
+out of the through road; the ground's own camber; the bank at a bridge's end no longer over the deck (terrain,
+every road mode). Frame rate on a city grid (221 decks): no measurable difference from decal roads; both sat at
+the frame limiter with about 1.8 ms of render time.
+
+Open, by how often it was measured:
+1. **Bridge parapets across side streets** that join a bridge at its end (a canal city: a 1.1 m rail across the
+   mouth of each quay street). The bridge builder leaves parapets open for ground roads it finds on the deck
+   (`onGroundRoad` in beamngBridges.js); these are not found. Every road mode.
+2. **Sidewalk slabs across a carriageway** (19 to 72 cm) at some junctions and where a footbridge is mapped.
+3. **Tunnel mouths**: terrain steps of 0.75 to 1.5 m at aprons and portals in a freeway-cap area.
+4. **Bridge decks' own steps** (8 to 36 cm inside one bridge mesh, about 15 places in that area).
+5. **Deck to deck, 10 to 25 cm**, on hill towns: the height looked up for another deck's surface is off by about
+   10 cm where that deck leans; and roads stacked in plan on a hillside.
+6. **Raw (unlevelled) terrain on a hill town**: 50 places, most of them the ground through the deck or the deck
+   following a rough line; decks are for levelled terrain first.
+7. Junction mouths in the road solve (still behind its switch): the right fix for side roads that arrive under
+   the through road's edge, which decks now cover with a ramp of up to 0.75 m over their own line.
 
 ## 2. Checks owed on work already on dev
 
@@ -190,6 +200,9 @@ road, a dense hilly city.
   (`EXTRA_OPTS='{"junctionMouths":true}'` adds export options).
 - `scratch/junctions/profile.mjs <zip> <out.json>` with `profile.lua`: loads a level in the running game and saves
   the driving surface every 0.5 m along every paved road (height, what the ray met, terrain) and every deck's nodes.
+- `scratch/night/run.mjs <tag> area[:terrain[:raw]] ...`: all of it for a list of areas, one line each and `rows.json`.
+- `scratch/junctions/around.py prof.json [n]`: the heights round the worst structure steps, as text.
+- `scratch/junctions/xsec.py before.zip after.zip out.png`: deck cross-sections against the ground.
 - `scratch/junctions/gsteps.py prof.json [threshold]`: the steps in such a profile, grouped into places and kinds.
 - `scratch/junctions/gplot.py prof.json road index out.png [title] [reach]`: one place from the game: top view with
   the decks and their node heights, the long section, and the change of slope. Use this one first.
