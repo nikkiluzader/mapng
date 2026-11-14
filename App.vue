@@ -237,7 +237,7 @@ import { useMainStore } from './stores/mainStore';
 import { Loader2, AlertTriangle } from 'lucide-vue-next';
 import MobileRestrictionOverlay from './components/modals/MobileRestrictionOverlay.vue';
 import MemoryWidget from './components/ui/MemoryWidget.vue';
-import { appUpdated } from './services/appUpdate.js';
+import { appUpdated, codeFailed } from './services/appUpdate.js';
 import AboutModal from './components/modals/AboutModal.vue';
 import DisclaimerModal from './components/modals/DisclaimerModal.vue';
 import TechStackModal from './components/modals/TechStackModal.vue';
@@ -1000,6 +1000,15 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
       return;
     }
     console.error("Failed to generate terrain:", error);
+    // The site was updated under this page (a part of the app could not be loaded any more): that is the
+    // failure. The notice with Reload is shown instead of a reason that is none and the offer to send a report.
+    // (Four reports in one night read "out of memory: the satellite picture could not be fitted to a 1024 x
+    // 1024 map (Worker error)": pages opened before a deploy, their resampler's file gone.)
+    if (await codeFailed().catch(() => false)) {
+      markJobEnd();
+      updateNoticeHidden.value = false;
+      return;
+    }
     const byodMessage = String(error?.message || '');
     if (!uploadedElevationFile.value) {
       // (the reason, and the offer to send a report: with the job's log in the desktop app, the page's last lines on the website)
