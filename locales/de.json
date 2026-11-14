@@ -31,6 +31,7 @@
     "desktopApp": "Desktop-App",
     "desktopAppTooltip": "MapNG für Windows und Linux: große und dichte Karten, Level direkt in BeamNG gespeichert, und deine Level werden mit jeder neuen Version aktualisiert",
     "yourData": "Deine Daten",
+    "stats": "Statistik",
     "howBuilt": "So wird es gebaut"
   },
   "mode": {
@@ -1360,7 +1361,7 @@
     "share": "Meine Exportgebiete teilen (anonym)",
     "shareHint": "Fügt das ungefähre Gebiet (ca. 5 km) jedes exportierten Levels zur Hotspot-Karte hinzu. Nie den genauen Ort und nichts über dich.",
     "askTitle": "Diesen Export zur Hotspot-Karte hinzufügen?",
-    "askBody": "MapNG kann zählen, wo Level exportiert werden, und die beliebten Gebiete auf der 2D-Karte zeigen. Geteilt wird nur das ungefähre Gebiet (ca. 5 km), nie der genaue Ort und nichts über dich. Du kannst das jederzeit im Kartenebenen-Feld auf der Karte ändern.",
+    "askBody": "MapNG kann zählen, wo Level exportiert werden, und die beliebten Gebiete auf der 2D-Karte zeigen. Geteilt wird nur das ungefähre Gebiet (ca. 5 km), nie der genaue Ort und nichts über dich. Du kannst das jederzeit im Kartenebenen-Feld auf der Karte ändern. Die Summen sind öffentlich: auf der Karte und nach Ländern zusammengezählt auf mapng.com/stats.html.",
     "askYes": "Anonym teilen",
     "askNo": "Nein danke",
     "welcome": "Das ungefähre Gebiet (ca. 5 km) meiner Exporte anonym für MapNGs Export-Hotspot-Karte teilen",
@@ -1377,9 +1378,9 @@
       "howTitle": "Wie es gespeichert wird",
       "how": "Eine Zeile pro ca. 5-km-Quadrat: wie viele Exporte von der Website kamen, wie viele von der Desktop-App, und das Datum des letzten. Nichts verbindet eine Zeile mit den Personen, die dort exportiert haben. Gegen Spam hält der Server kurz eine unkenntlich gemachte (gehashte) Form deiner IP-Adresse im Arbeitsspeicher, um höchstens 30 Meldungen pro Stunde zuzulassen; sie wird nie gespeichert und ist innerhalb einer Stunde weg.",
       "useTitle": "Wofür es verwendet wird",
-      "use": "Nur für die Hotspot-Karte: Die Ebene zeigt die Zahlen pro Quadrat, und alle können sie einschalten. Der MapNG-Entwickler schaut sich dieselben Summen an, um zu sehen, wo MapNG genutzt wird, zum Beispiel um zu entscheiden, welche Regionen als Nächstes MapNGs eigene, schnellere OSM-Daten bekommen.",
+      "use": "Für die Hotspot-Karte: Die Zahlen pro Quadrat sind das, was die Ebene zeichnet, und jeder kann sie einschalten. Und für MapNGs öffentliche Statistikseite (mapng.com/stats.html), die dieselben Quadrate nach Ländern zusammenzählt. Der MapNG-Entwickler sieht sich dieselben Summen an, um zu erkennen, wo MapNG genutzt wird, etwa um zu entscheiden, welche Regionen als Nächstes MapNGs eigene, schnellere OSM-Daten bekommen.",
       "neverTitle": "Nie verkauft oder weitergegeben",
-      "never": "Deine Daten werden nie verkauft, nie an jemanden weitergegeben und nie für Werbung oder Tracking verwendet. Sie erscheinen nur auf der Hotspot-Karte, als Summen pro Quadrat.",
+      "never": "Deine Daten werden nie verkauft, nie an jemanden weitergegeben und nie für Werbung oder Tracking verwendet. Sie erscheinen nur als Summen: pro Quadrat auf der Hotspot-Karte und pro Land auf der öffentlichen Statistikseite.",
       "controlTitle": "Du hast die Kontrolle",
       "control": "Schalte das Teilen jederzeit mit „Meine Exporte teilen“ im Kartenebenen-Feld auf der Karte ein oder aus. Ausschalten stoppt die Meldungen sofort. Bereits gezählte Exporte lassen sich nicht auf dich zurückführen und können daher nicht einzeln entfernt werden.",
       "statusOn": "Teilen ist bei dir an.",
@@ -1534,7 +1535,7 @@
   },
   "usage": {
     "askTitle": "Teilen, welche Einstellungen du nutzt?",
-    "askBody": "MapNG kann zählen, welche Export-Einstellungen gewählt werden (etwa Spieltextur oder Geländeanpassungen aus), damit der Entwickler weiß, was er verbessern sollte und was niemand nutzt. Gesendet werden nur die Einstellungen: nie der Ort, der Levelname oder etwas über dich. Jederzeit änderbar im Kartenebenen-Feld.",
+    "askBody": "MapNG kann zählen, welche Export-Einstellungen gewählt werden (etwa Spieltextur oder Geländeanpassungen aus), damit der Entwickler weiß, was er verbessern sollte und was niemand nutzt. Gesendet werden nur die Einstellungen: nie der Ort, der Levelname oder etwas über dich. Jederzeit änderbar im Kartenebenen-Feld. Die Summen sind öffentlich auf mapng.com/stats.html.",
     "askYes": "Anonym teilen",
     "askNo": "Nein danke",
     "shareToggle": "Teilen, welche Einstellungen ich nutze (ohne Ort)",

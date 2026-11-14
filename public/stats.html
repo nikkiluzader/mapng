@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MapNG in Numbers</title>
+<meta name="description" content="Live, public counts from MapNG: where people build BeamNG levels, which settings they pick, who visits, what goes wrong. Counts only: no names, no addresses, nothing personal.">
+<link rel="canonical" href="https://mapng.com/stats.html">
+<meta property="og:title" content="MapNG in numbers">
+<meta property="og:description" content="Where people build, which settings they pick, what goes wrong. Live counts, nothing personal.">
+<meta property="og:url" content="https://mapng.com/stats.html">
+<meta property="og:image" content="https://mapng.com/og-image.jpg">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  @font-face { font-family: "Noto Sans"; src: url(/fonts/noto-sans-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass"; src: url(/fonts/overpass-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass Mono"; src: url(/fonts/overpass-mono-latin-wght-normal.woff2) format("woff2"); font-weight: 300 700; font-display: swap; }
+  :root {
+    color-scheme: light;
+    --bg: #f7f7f8; --surface: #ffffff; --surface-2: #f2f2f4; --border: #e3e3e8;
+    --text: #1d1d22; --text-2: #4a4a55; --muted: #6e6e7a;
+    --brand: #ff6600; --brand-ink: #c2410c; --brand-tint: #fff4ec;
+    --ok: #15803d;
+    --s1: #e8590c; --s2: #2f6fb3; --track: #ececf0;
+    --land: #e4e4ea; --land-edge: #ffffff; --sea: #f2f2f4; --dot: #1d1d22;
+    --seq-0: #ffe6d3; --seq-1: #ffc195; --seq-2: #fb9454; --seq-3: #e8590c; --seq-4: #a83a02;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+      --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+      --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+      --ok: #4ade80;
+      --s1: #d95926; --s2: #3987e5; --track: #2a2a32;
+      --land: #2c2c35; --land-edge: #1a1a1f; --sea: #15151a; --dot: #ffffff;
+      --seq-0: #47291a; --seq-1: #7a3c1a; --seq-2: #b14e1b; --seq-3: #e56a22; --seq-4: #ffa868;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+    --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+    --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+    --ok: #4ade80;
+    --s1: #d95926; --s2: #3987e5; --track: #2a2a32;
+    --land: #2c2c35; --land-edge: #1a1a1f; --sea: #15151a; --dot: #ffffff;
+    --seq-0: #47291a; --seq-1: #7a3c1a; --seq-2: #b14e1b; --seq-3: #e56a22; --seq-4: #ffa868;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--brand-ink); }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+  header.top { background: linear-gradient(90deg, #ff6600, #f59e0b); color: #fff; }
+  header.top .wrap { padding-top: 20px; padding-bottom: 44px; }
+  .brand { display: inline-flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; }
+  .brand img { width: 22px; height: 22px; }
+  h1, h2, h3 { font-family: "Overpass", "Noto Sans", system-ui, sans-serif; text-wrap: balance; }
+  h1 { font-size: clamp(30px, 6vw, 46px); line-height: 1.1; margin: 22px 0 10px; letter-spacing: -0.01em; }
+  .lede { font-size: 18px; max-width: 680px; margin: 0; color: rgba(255,255,255,.96); }
+  .mono, .num { font-family: "Overpass Mono", ui-monospace, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+  main { padding-bottom: 64px; }
+  nav.jump { display: flex; gap: 6px; flex-wrap: wrap; margin: 18px 0 0; }
+  nav.jump a { font-size: 13px; text-decoration: none; color: var(--text-2); background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 3px 11px; }
+  nav.jump a:hover { border-color: var(--brand); color: var(--text); }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: -26px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+  .tile .v { font-family: "Overpass", sans-serif; font-size: 32px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; color: var(--text); }
+  .tile .k { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .tiles.small { margin-top: 12px; }
+  .tiles.small .tile .v { font-size: 24px; }
+
+  .promise { display: flex; gap: 12px; align-items: flex-start; background: var(--brand-tint); border-left: 3px solid var(--brand); border-radius: 0 10px 10px 0; padding: 12px 16px; margin-top: 18px; font-size: 15px; color: var(--text); }
+  .promise b { white-space: nowrap; }
+  @media (max-width: 520px) { .promise { display: block; } .promise b { margin-right: 6px; } }
+
+  section { margin-top: 52px; }
+  h2 { font-size: 26px; line-height: 1.2; margin: 0 0 4px; }
+  h3 { font-size: 16px; margin: 0 0 8px; }
+  .sub { color: var(--text-2); margin: 0 0 14px; max-width: 720px; }
+  .src { font-size: 13px; color: var(--muted); margin: 10px 0 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 14px; }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+  .panel > h3 small { font-weight: 400; color: var(--muted); font-family: "Noto Sans", sans-serif; font-size: 13px; margin-left: 4px; }
+  .empty { color: var(--muted); font-size: 14px; padding: 8px 0; }
+
+  /* a ranked list of bars: label and value in ink, the bar carries the size */
+  .bars { display: grid; gap: 7px; }
+  .bar-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; font-size: 14px; align-items: baseline; border-radius: 6px; padding: 2px 4px; margin: 0 -4px; }
+  .bar-row:hover, .bar-row:focus-visible { background: var(--surface-2); outline: none; }
+  .bar-row .l { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+  .bar-row .l .rank { color: var(--muted); display: inline-block; width: 1.6em; }
+  .bar-row .l .tag { font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; margin-right: 6px; }
+  .bar-row .n { color: var(--text-2); font-size: 13px; }
+  .bar-row .t { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; display: flex; gap: 2px; }
+  .bar-row .t i { display: block; height: 100%; background: var(--s1); border-radius: 0 3px 3px 0; min-width: 2px; }
+  .bar-row .t i.b { background: var(--s2); }
+  .legend { display: flex; gap: 14px; font-size: 13px; color: var(--text-2); margin: 0 0 8px; flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: var(--s1); margin-right: 5px; vertical-align: -1px; }
+  .legend i.b { background: var(--s2); }
+
+  .seg { display: inline-flex; flex-wrap: wrap; max-width: 100%; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface); }
+  .seg button { font: inherit; font-size: 13px; padding: 5px 12px; border: 0; background: transparent; color: var(--text-2); cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button[aria-pressed="true"] { background: var(--brand); color: #fff; }
+  .seg button:focus-visible, .btn:focus-visible, select:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  .btn { font: inherit; font-size: 13px; padding: 5px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); cursor: pointer; }
+  .btn:hover { border-color: var(--brand); }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  .map-box { position: relative; background: var(--sea); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-top: 12px; }
+  #map { display: block; width: 100%; height: auto; cursor: crosshair; touch-action: pan-y; }
+  .tip { position: absolute; pointer-events: none; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 13px; line-height: 1.45; box-shadow: 0 4px 14px rgba(0,0,0,.18); white-space: nowrap; z-index: 2; display: none; }
+  .tip b { display: block; }
+  .tip span { color: var(--text-2); }
+  .scale { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-top: 8px; flex-wrap: wrap; }
+  .scale i { width: 26px; height: 10px; display: inline-block; border-radius: 2px; }
+  .picked { margin-top: 10px; font-size: 14px; color: var(--text-2); min-height: 1.6em; }
+  .picked b { color: var(--text); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font-size: 13px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 2px 10px; color: var(--text-2); }
+  .chip b { color: var(--text); font-weight: 600; }
+
+  .picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+  .picker label { display: grid; gap: 3px; font-size: 13px; color: var(--muted); }
+  select { font: inherit; font-size: 14px; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; }
+  .verdict { margin-top: 14px; padding: 12px 14px; border-radius: 10px; background: var(--surface-2); }
+  .verdict .big { font-family: "Overpass", sans-serif; font-size: 26px; font-weight: 700; color: var(--text); }
+  .verdict p { margin: 2px 0 0; font-size: 14px; color: var(--text-2); }
+  input[type="search"] { font: inherit; font-size: 14px; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; width: min(100%, 280px); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-top: 12px; }
+
+  svg.chart { display: block; width: 100%; height: auto; overflow: visible; }
+  svg.chart text { font: 11px "Noto Sans", sans-serif; fill: var(--muted); }
+  svg.chart .grid { stroke: var(--border); stroke-width: 1; }
+  svg.chart .line { fill: none; stroke: var(--s1); stroke-width: 2; stroke-linejoin: round; }
+  svg.chart .area { fill: var(--s1); opacity: .12; }
+  svg.chart .cross { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+  svg.chart .pt { fill: var(--s1); stroke: var(--surface); stroke-width: 2; }
+  svg.chart rect.col { fill: var(--s1); }
+  svg.chart rect.col:hover { opacity: .8; }
+  .chart-box { position: relative; }
+
+  .facts { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 14px; color: var(--text-2); }
+  .facts li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: baseline; }
+  .facts .num { color: var(--text); font-weight: 600; min-width: 4.5em; text-align: right; }
+
+  .never { columns: 2 260px; column-gap: 28px; padding-left: 20px; margin: 8px 0 0; }
+  .never li { break-inside: avoid; margin-bottom: 6px; color: var(--text-2); }
+  details { margin-top: 10px; font-size: 14px; }
+  details summary { cursor: pointer; color: var(--brand-ink); }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); margin-top: 8px; max-height: 340px; overflow-y: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+  th { background: var(--surface-2); position: sticky; top: 0; }
+  td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
+  footer { border-top: 1px solid var(--border); margin-top: 56px; padding-top: 18px; font-size: 14px; color: var(--muted); }
+  footer p { margin: 6px 0; }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/favicon.svg" alt="">MapNG</a>
+    <h1>MapNG in numbers</h1>
+    <p class="lede">Where people build, which settings they pick, who drops by, and what goes wrong. Live counts from an open-source project, shown to everyone because there's no reason not to.</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="tiles" id="hero" aria-live="polite">
+    <div class="tile"><div class="v" id="h-exports">…</div><div class="k">shared exports</div></div>
+    <div class="tile"><div class="v" id="h-countries">…</div><div class="k">countries built in</div></div>
+    <div class="tile"><div class="v" id="h-visitors">…</div><div class="k">visitors on an average day</div></div>
+    <div class="tile"><div class="v" id="h-downloads">…</div><div class="k">desktop app downloads</div></div>
+    <div class="tile"><div class="v" id="h-stars">…</div><div class="k">GitHub stars</div></div>
+  </div>
+
+  <div class="promise"><b>Counts only.</b><span>Nothing on this page is about a person. No names, no accounts, no internet addresses, no exact places, nothing anyone typed. Export areas and settings are here only from people who chose to share them. <a href="/data.html#stats">Exactly where each number comes from</a>.</span></div>
+
+  <nav class="jump" aria-label="Sections">
+    <a href="#world">World map</a><a href="#countries">Top 10s</a><a href="#settings">Settings</a><a href="#rare">How rare is your setup?</a><a href="#geo">Map nerdery</a><a href="#traffic">Traffic</a><a href="#problems">Problem reports</a><a href="#downloads">Downloads</a><a href="#raw">Raw data</a>
+  </nav>
+
+  <section id="world">
+    <h2>Where MapNG is used</h2>
+    <p class="sub">Each country is shaded by the measure you pick. The dots are the roughly 5 km squares people shared an export from. Hover or tap a country.</p>
+    <div class="row">
+      <div class="seg" role="group" aria-label="What the map shows">
+        <button type="button" data-mode="exports" aria-pressed="true">Shared exports</button>
+        <button type="button" data-mode="visits" aria-pressed="false">Visits</button>
+        <button type="button" data-mode="keen" aria-pressed="false">Exports per 1,000 visits</button>
+      </div>
+      <label style="font-size:13px;color:var(--text-2)"><input type="checkbox" id="dots" checked> Export squares</label>
+    </div>
+    <div class="map-box">
+      <canvas id="map" width="1000" height="470" role="img" aria-label="World map shaded by country. The same numbers are in the Top 10 lists and the table below."></canvas>
+      <div class="tip" id="map-tip"></div>
+    </div>
+    <div class="scale" id="map-scale"></div>
+    <div class="picked" id="map-picked">Click a country to keep its numbers here.</div>
+    <details>
+      <summary>Every country as a table</summary>
+      <div class="table-wrap"><table id="country-table"><thead><tr><th>Country</th><th class="r">Shared exports</th><th class="r">Squares</th><th class="r">Visits (30 days)</th><th class="r">Exports per 1,000 visits</th></tr></thead><tbody></tbody></table></div>
+    </details>
+  </section>
+
+  <section id="countries">
+    <h2>Top 10s</h2>
+    <p class="sub">Visits are loads of the website's front page over the last 30 days, by country, as Cloudflare counts them. Exports are shared exports since counting began in November 2026.</p>
+    <div class="grid">
+      <div class="panel"><h3>Most shared exports</h3><div class="legend"><span><i></i>Website</span><span><i class="b"></i>Desktop app</span></div><div class="bars" id="top-exports"></div></div>
+      <div class="panel"><h3>Most visits <small>30 days</small></h3><div class="bars" id="top-visits"></div></div>
+      <div class="panel"><h3>Keenest builders <small>exports per 1,000 visits</small></h3><div class="bars" id="top-keen"></div><p class="src">Countries with at least 300 visits and 3 shared exports.</p></div>
+    </div>
+  </section>
+
+  <section id="settings">
+    <h2>What people build with</h2>
+    <p class="sub" id="settings-sub">From people who turned on <em>Share which settings I use</em>. Totals only: no export is stored on its own.</p>
+    <div class="panel" style="margin-bottom:14px"><h3>The typical MapNG level</h3><div class="chips" id="typical"></div></div>
+    <div class="grid">
+      <div class="panel"><h3>Nearly everyone</h3><div class="bars" id="most-used"></div></div>
+      <div class="panel"><h3>Hardly anyone</h3><div class="bars" id="least-used"></div></div>
+    </div>
+    <h3 style="margin-top:26px">Every setting</h3>
+    <input type="search" id="setting-search" placeholder="Filter: texture, bridges, 8192…" aria-label="Filter settings">
+    <div class="cards" id="all-settings"></div>
+  </section>
+
+  <section id="rare">
+    <h2>How rare is your setup?</h2>
+    <p class="sub">Pick how you'd build. The answer multiplies each choice's share, as if the choices had nothing to do with each other. They do (big maps go with coarser detail), so treat it as a toy.</p>
+    <div class="panel">
+      <div class="picker" id="picker"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" type="button" id="pick-common">Most common</button>
+        <button class="btn" type="button" id="pick-rare">Rarest</button>
+        <button class="btn" type="button" id="pick-random">Surprise me</button>
+      </div>
+      <div class="verdict" aria-live="polite"><div class="big" id="verdict-big">…</div><p id="verdict-text"></p></div>
+    </div>
+  </section>
+
+  <section id="geo">
+    <h2>Map nerdery</h2>
+    <p class="sub">Things you can work out from nothing but a list of 5 km squares.</p>
+    <div class="grid">
+      <div class="panel"><h3>Odds and ends</h3><ul class="facts" id="geo-facts"></ul></div>
+      <div class="panel"><h3>Shared exports by latitude</h3><div class="bars" id="lat-bars"></div></div>
+      <div class="panel"><h3>By part of the world</h3><div class="bars" id="region-bars"></div></div>
+    </div>
+  </section>
+
+  <section id="traffic">
+    <h2>Who drops by</h2>
+    <p class="sub">Cloudflare, which serves mapng.com, counts requests without cookies. These are its totals for the last 30 days.</p>
+    <div class="tiles small" id="traffic-tiles"></div>
+    <div class="panel" style="margin-top:14px">
+      <div class="row" style="justify-content:space-between"><h3 style="margin:0" id="daily-title">Visitors per day</h3>
+        <div class="seg" role="group" aria-label="Measure"><button type="button" data-daily="visitors" aria-pressed="true">Visitors</button><button type="button" data-daily="pageViews" aria-pressed="false">Page views</button><button type="button" data-daily="requests" aria-pressed="false">Requests</button></div></div>
+      <div class="chart-box" id="daily-box"><div class="tip" id="daily-tip"></div></div>
+    </div>
+    <div class="grid" style="margin-top:14px">
+      <div class="panel"><h3>Browsers <small>page views, 30 days</small></h3><div class="bars" id="browsers"></div></div>
+      <div class="panel"><h3>Visitors by day of the week <small>average</small></h3><div class="bars" id="weekdays"></div></div>
+    </div>
+  </section>
+
+  <section id="problems">
+    <h2>What goes wrong</h2>
+    <p class="sub">When something fails, MapNG can offer to send a problem report. The reports themselves are private and stay that way. This is only how many arrived and what sort they were, sorted into fixed groups.</p>
+    <div class="tiles small" id="problem-tiles"></div>
+    <div class="grid" style="margin-top:14px">
+      <div class="panel"><h3>What happened</h3><div class="bars" id="causes"></div></div>
+      <div class="panel"><h3>While doing what</h3><div class="bars" id="kinds"></div></div>
+      <div class="panel"><h3>On which system</h3><div class="bars" id="systems"></div><h3 style="margin-top:16px">Reports per day</h3><div id="report-days"></div></div>
+    </div>
+  </section>
+
+  <section id="downloads">
+    <h2>The desktop app</h2>
+    <p class="sub">Download counts as GitHub publishes them. An install that updates itself counts as a download of the new version.</p>
+    <div class="grid">
+      <div class="panel"><h3>By release</h3><div class="bars" id="releases"></div></div>
+      <div class="panel"><h3>By kind</h3><div class="bars" id="dl-kinds"></div><p class="src" id="dl-note"></p></div>
+    </div>
+  </section>
+
+  <section id="raw">
+    <h2>Take the numbers</h2>
+    <p class="sub">Everything on this page is drawn in your browser from four public files. Nothing else feeds it.</p>
+    <ul>
+      <li><a href="/api/hotspots"><code>/api/hotspots</code></a>: every shared export square, exactly as stored</li>
+      <li><a href="/api/usage"><code>/api/usage</code></a>: every settings total, exactly as stored</li>
+      <li><a href="/api/stats"><code>/api/stats</code></a>: visits, problem report counts and downloads</li>
+      <li><a href="/country_rules.json"><code>/country_rules.json</code></a>: country outlines (Natural Earth), used to name the country a square is in</li>
+    </ul>
+    <h3 style="margin-top:20px">What you will never find here</h3>
+    <ul class="never">
+      <li>A name, account, email or device ID: MapNG has none</li>
+      <li>An internet address</li>
+      <li>An exact location: a square is about 5 km across</li>
+      <li>A level's name or contents</li>
+      <li>Anything from inside a problem report</li>
+      <li>A country with fewer than 25 visits</li>
+      <li>Anything from someone who didn't opt in to sharing exports or settings</li>
+    </ul>
+    <p class="src">The code that makes these numbers: <a href="https://github.com/nikkiluzader/mapng/blob/main/worker/publicStats.js"><code>worker/publicStats.js</code></a> and <a href="https://github.com/nikkiluzader/mapng/blob/main/worker/hotspots.js"><code>worker/hotspots.js</code></a>. The full account of what MapNG collects: <a href="/data.html">Your data and MapNG</a>.</p>
+  </section>
+
+  <footer>
+    <p id="asof">Loading the live numbers…</p>
+    <p><a href="/">Back to MapNG</a> · <a href="/data.html">Your data</a> · <a href="https://github.com/nikkiluzader/mapng">GitHub</a></p>
+  </footer>
+</main>
+
+<script>
+(() => {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const fmt = (n) => Math.round(n).toLocaleString('en');
+  const short = (n) => (n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + ' M' : n >= 1e4 ? Math.round(n / 1e3) + 'k' : fmt(n));
+  const WORDS = [[1e18, 'quintillion'], [1e15, 'quadrillion'], [1e12, 'trillion'], [1e9, 'billion'], [1e6, 'million']];
+  const huge = (n) => { for (const [size, word] of WORDS) if (n >= size) return `${(n / size).toFixed(n / size >= 10 ? 0 : 1)} ${word}`; return fmt(n >= 100 ? Math.round(n / 10) * 10 : n); };
+  const pct = (a, b) => (b ? (100 * a / b >= 10 ? Math.round(100 * a / b) : (100 * a / b).toFixed(1)) + ' %' : '');
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const getJson = async (url) => { try { const r = await fetch(url); return r.ok ? await r.json() : null; } catch { return null; } };
+
+  /** A number that counts up to its value once. */
+  const countUp = (el, value, text = fmt) => {
+    if (!el) return;
+    if (calm || !(value > 0)) { el.textContent = value == null ? '–' : text(value); return; }
+    const t0 = performance.now();
+    const step = (t) => { const k = Math.min(1, (t - t0) / 900); el.textContent = text(value * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  };
+
+  /**
+   * A ranked list of bars. rows: [{ label, value, value2?, note?, tag?, title? }]; value2 is a second
+   * part of the same bar (the desktop app's share of an export count).
+   */
+  const bars = (el, rows, { max, rank = false, text = fmt, empty = 'Nothing counted yet.' } = {}) => {
+    if (!el) return;
+    if (!rows.length) { el.innerHTML = `<div class="empty">${esc(empty)}</div>`; return; }
+    const top = max || Math.max(...rows.map((r) => r.value + (r.value2 || 0)), 1);
+    el.innerHTML = rows.map((r, i) => {
+      const a = (100 * r.value / top).toFixed(2); const b = r.value2 ? (100 * r.value2 / top).toFixed(2) : 0;
+      const shown = r.note != null ? r.note : text(r.value + (r.value2 || 0));
+      return `<div class="bar-row" tabindex="0" title="${esc(r.title || `${r.label}: ${shown}`)}"><span class="l">${rank ? `<span class="rank num">${i + 1}</span>` : ''}${r.tag ? `<span class="tag mono">${esc(r.tag)}</span>` : ''}${esc(r.label)}</span><span class="n num">${esc(shown)}</span><div class="t">${r.value > 0 ? `<i style="width:${a}%"></i>` : ''}${b ? `<i class="b" style="width:${b}%"></i>` : ''}</div></div>`;
+    }).join('');
+  };
+  const tile = (v, k) => `<div class="tile"><div class="v">${esc(v)}</div><div class="k">${esc(k)}</div></div>`;
+
+  // ---- countries: outlines (the app's own file), and which one a point is in ----
+  const decodeRing = (enc, scale) => { const ring = []; let x = 0; let y = 0; for (let i = 0; i + 1 < enc.length; i += 2) { x += enc[i]; y += enc[i + 1]; ring.push([x / scale, y / scale]); } return ring; };
+  const inRings = (rings, lng, lat) => {
+    let inside = false;
+    for (const ring of rings) for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i]; const [xj, yj] = ring[j];
+      if ((yi > lat) !== (yj > lat) && lng < (xj - xi) * (lat - yi) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  };
+  const countryAt = (countries, lat, lng, reach = 0.6) => {
+    const near = countries.filter((c) => lng >= c.bbox[0] - reach && lng <= c.bbox[2] + reach && lat >= c.bbox[1] - reach && lat <= c.bbox[3] + reach);
+    for (const c of near) if (inRings(c.rings, lng, lat)) return c;
+    if (!reach) return null;
+    // (a square whose middle is just off the coast: the nearest outline within reach)
+    let best = null; let bestD = reach * reach;
+    for (const c of near) for (const ring of c.rings) for (const [x, y] of ring) { const d = (x - lng) ** 2 + (y - lat) ** 2; if (d < bestD) { bestD = d; best = c; } }
+    return best;
+  };
+  const regionName = new Intl.DisplayNames(['en'], { type: 'region' });
+  const nameOf = (code, countries) => countries.get(code)?.name || (() => { try { return regionName.of(code); } catch { return code; } })();
+
+  // ---- what the settings and their values are called ----
+  const SETTING = { platform: 'Made with', elevationSource: 'Elevation source', resolution: 'Map size', metersPerPixel: 'Detail', mapData: 'Map data', overtureBuildings: 'Extra buildings (Overture)', advancedMode: 'Mode', rawTerrain: 'Raw terrain', seaLevelOffset: 'Sea level', baseTexture: 'Ground picture', groundMaterials: 'Ground materials', roads: 'Roads', roadSurface: 'Road surface', buildings: 'Buildings', water: 'Water', trees: 'Trees', forestDensity: 'Forest density', rocks: 'Rocks', safeCaps: 'Safe size limits', bridges: 'Bridges', tunnels: 'Tunnels', measuredBridgeHeights: 'Measured bridge heights', terrainEdits: 'Terrain edits', shapeTerrain: 'Shape the terrain', shapeRoads: 'Shape roads', shapeBridges: 'Shape bridges', shapeOverpasses: 'Shape overpasses', shapeTunnels: 'Shape tunnels', shapeExtras: 'Shape extras', shapeDetail: 'Shape detail', backdrop: 'Surroundings' };
+  const VALUE = {
+    platform: { web: 'the website', desktop: 'the desktop app' },
+    elevationSource: { default: 'Amazon (global 30 m)', mapterhorn: 'Mapterhorn', none: 'flat', kron86: 'NMT Poland', usgs: 'USGS', gpxz: 'GPXZ', upload: 'an uploaded file' },
+    resolution: { other: 'another size' },
+    metersPerPixel: { under1: 'under 1 m', 1: '1 m', '1to2': '1 to 2 m', '2to4': '2 to 4 m', over4: 'over 4 m' },
+    advancedMode: { on: 'Advanced', off: 'Basic' },
+    seaLevelOffset: { zero: 'unchanged', changed: 'changed' },
+    baseTexture: { game: 'game texture', hybrid: 'hybrid', osm: 'drawn from the map', satellite: 'satellite', none: 'none' },
+    groundMaterials: { osm: 'from the map', none: 'none' },
+    roads: { decal: 'on', none: 'off' },
+    roadSurface: { decal: 'decal roads', hero: 'Hero Roads', mesh: 'Mesh Roads' },
+    forestDensity: { light: 'light', normal: 'normal', dense: 'dense', veryDense: 'very dense' },
+    terrainEdits: { all: 'all', custom: 'hand-picked', none: 'none' },
+    backdrop: { off: 'none', global30m: 'Amazon (global 30 m)', usgs1m: 'USGS', gpxz: 'GPXZ', mapterhorn: 'Mapterhorn', kron86: 'NMT Poland' },
+  };
+  const settingName = (s) => SETTING[s] || s;
+  const valueName = (s, v) => VALUE[s]?.[v] || (s === 'resolution' ? `${Number(v).toLocaleString('en')} px` : v);
+
+  // ============================================================================
+  Promise.all([getJson('/api/stats'), getJson('/api/usage'), getJson('/api/hotspots'), getJson('/country_rules.json')]).then(([stats, usage, hot, rules]) => {
+    const list = (rules?.countries || []).map((c) => ({ code: c.c, name: c.n, region: c.r, left: c.l === 1, bbox: c.b, rings: (c.p || []).map((r) => decodeRing(r, rules.scale || 1000)) }));
+    // (a few codes have several outlines, a country and its far islands: the biggest names them all)
+    const byCode = new Map();
+    for (const c of list) { const have = byCode.get(c.code); if (!have || c.rings.length > have.rings.length) byCode.set(c.code, c); }
+    for (const c of list) c.name = byCode.get(c.code).name;
+
+    // ---- export squares -> countries ----
+    const CELL = 0.05;
+    const cells = (hot?.cells || []).map(([y, x, web, desktop, day]) => ({ lat: -90 + (y + 0.5) * CELL, lng: -180 + (x + 0.5) * CELL, web, desktop, n: web + desktop, day }));
+    const per = new Map();     // code -> { web, desktop, squares }
+    for (const c of cells) {
+      const country = list.length ? countryAt(list, c.lat, c.lng) : null;
+      c.code = country?.code || '';
+      const e = per.get(c.code) || { web: 0, desktop: 0, squares: 0 };
+      e.web += c.web; e.desktop += c.desktop; e.squares += 1; per.set(c.code, e);
+    }
+    const visits = new Map(stats?.visits?.countries || []);
+    const exportsOf = (code) => { const e = per.get(code); return e ? e.web + e.desktop : 0; };
+    const keenOf = (code) => { const v = visits.get(code) || 0; const e = exportsOf(code); return v >= 300 && e >= 3 ? 1000 * e / v : 0; };
+    const totalExports = cells.reduce((n, c) => n + c.n, 0);
+    const builtIn = [...per.keys()].filter(Boolean).length;
+
+    // ---- the top tiles ----
+    const days = stats?.visits?.days || [];
+    const whole = days.slice(0, -1).length ? days.slice(0, -1) : days;      // (today is not over yet)
+    const avgVisitors = whole.length ? whole.slice(-7).reduce((n, d) => n + d.visitors, 0) / Math.min(7, whole.length) : null;
+    countUp($('h-exports'), hot ? totalExports : null);
+    countUp($('h-countries'), hot && list.length ? builtIn : null);
+    countUp($('h-visitors'), avgVisitors);
+    countUp($('h-downloads'), stats?.downloads ? stats.downloads.total : null);
+    countUp($('h-stars'), stats?.downloads ? stats.downloads.stars : null);
+
+    // ---- the world map ----
+    const canvas = $('map'); const ctx = canvas.getContext('2d');
+    const LAT0 = 84; const LAT1 = -57; const W = 1000; const H = Math.round(W * (LAT0 - LAT1) / 360);
+    const px = (lng) => (lng + 180) / 360 * W; const py = (lat) => (LAT0 - lat) / (LAT0 - LAT1) * H;
+    // (outlines thinned for drawing: a point every 0.12 degrees is plenty at this size)
+    const thin = (ring) => { const out = [ring[0]]; for (const p of ring) { const q = out[out.length - 1]; if (Math.abs(p[0] - q[0]) + Math.abs(p[1] - q[1]) > 0.12) out.push(p); } return out.length > 2 ? out : null; };
+    const shapes = list.map((c) => ({ c, rings: c.rings.map(thin).filter(Boolean) }));
+    const MODES = {
+      exports: { of: exportsOf, label: 'shared exports', text: fmt },
+      visits: { of: (code) => visits.get(code) || 0, label: 'visits in 30 days', text: fmt },
+      keen: { of: keenOf, label: 'exports per 1,000 visits', text: (v) => v.toFixed(1) },
+    };
+    let mode = 'exports'; let hover = null; let picked = null; let showDots = true;
+    const stepOf = (v, max) => (v > 0 ? Math.min(4, Math.floor(5 * Math.log(1 + v) / Math.log(1 + max + 1e-9))) : -1);
+    const draw = () => {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      if (canvas.width !== W * dpr) { canvas.width = W * dpr; canvas.height = H * dpr; }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.fillStyle = css('--sea'); ctx.fillRect(0, 0, W, H);
+      const m = MODES[mode]; const max = Math.max(0, ...list.map((c) => m.of(c.code)));
+      const seq = [0, 1, 2, 3, 4].map((i) => css(`--seq-${i}`));
+      const land = css('--land'); const edge = css('--land-edge'); const ink = css('--text');
+      for (const s of shapes) {
+        ctx.beginPath();
+        for (const ring of s.rings) { ring.forEach(([x, y], i) => (i ? ctx.lineTo(px(x), py(y)) : ctx.moveTo(px(x), py(y)))); ctx.closePath(); }
+        const step = stepOf(m.of(s.c.code), max);
+        ctx.fillStyle = step < 0 ? land : seq[step]; ctx.fill('evenodd');
+        const strong = s.c.code === hover?.code || s.c.code === picked?.code;
+        ctx.lineWidth = strong ? 1.6 : 0.5; ctx.strokeStyle = strong ? ink : edge; ctx.stroke();
+      }
+      if (showDots) {
+        ctx.fillStyle = css('--dot'); ctx.strokeStyle = css('--surface'); ctx.lineWidth = 0.8;
+        for (const c of cells) { const r = Math.min(4.5, 1.3 + Math.sqrt(c.n) * 0.45); ctx.beginPath(); ctx.arc(px(c.lng), py(c.lat), r, 0, 6.3); ctx.globalAlpha = 0.85; ctx.fill(); ctx.globalAlpha = 1; ctx.stroke(); }
+      }
+      // (the scale under the map: five steps of one colour, each about so many and up)
+      const edges = [0, 1, 2, 3, 4].map((i) => Math.expm1(i / 5 * Math.log(1 + max)));
+      $('map-scale').innerHTML = max > 0
+        ? `<span>${esc(m.label)}:</span>` + seq.map((col, i) => `<i style="background:${col}"></i><span class="num">${i === 0 ? 'under ' + m.text(Math.max(edges[1], mode === 'keen' ? 0.1 : 1)) : m.text(edges[i]) + '+'}</span>`).join('') + `<i style="background:${land}"></i><span>none</span>`
+        : `<span>Nothing to show for this measure yet.</span>`;
+    };
+    const describe = (c) => {
+      const e = per.get(c.code); const v = visits.get(c.code); const k = keenOf(c.code);
+      const bits = [];
+      bits.push(e ? `${fmt(e.web + e.desktop)} shared export${e.web + e.desktop === 1 ? '' : 's'} in ${fmt(e.squares)} square${e.squares === 1 ? '' : 's'}` : 'no shared exports yet');
+      if (stats?.visits) bits.push(v ? `${fmt(v)} visits in 30 days` : 'under 25 visits');
+      if (k) bits.push(`${k.toFixed(1)} exports per 1,000 visits`);
+      return bits;
+    };
+    const at = (ev) => { const r = canvas.getBoundingClientRect(); const x = (ev.clientX - r.left) / r.width * W; const y = (ev.clientY - r.top) / r.height * H; return { c: list.length ? countryAt(list, LAT0 - y / H * (LAT0 - LAT1), x / W * 360 - 180, 0) : null, x: ev.clientX - r.left, y: ev.clientY - r.top, w: r.width }; };
+    const tip = $('map-tip');
+    canvas.addEventListener('pointermove', (ev) => {
+      const p = at(ev);
+      if (p.c?.code !== hover?.code) { hover = p.c; draw(); }
+      if (!p.c) { tip.style.display = 'none'; return; }
+      tip.innerHTML = `<b>${esc(p.c.name)}</b>${describe(p.c).map((t) => `<span>${esc(t)}</span>`).join('<br>')}`;
+      tip.style.display = 'block';
+      tip.style.left = Math.max(4, Math.min(p.w - tip.offsetWidth - 4, p.x + 14)) + 'px'; tip.style.top = Math.max(4, p.y - tip.offsetHeight - 10) + 'px';
+    });
+    canvas.addEventListener('pointerleave', () => { hover = null; tip.style.display = 'none'; draw(); });
+    canvas.addEventListener('click', (ev) => {
+      const p = at(ev); picked = p.c && p.c.code === picked?.code ? null : p.c; draw();
+      $('map-picked').innerHTML = picked ? `<b>${esc(picked.name)}</b>: ${esc(describe(picked).join(' · '))}` : 'Click a country to keep its numbers here.';
+    });
+    document.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => { mode = b.dataset.mode; document.querySelectorAll('[data-mode]').forEach((o) => o.setAttribute('aria-pressed', String(o === b))); draw(); }));
+    $('dots').addEventListener('change', (ev) => { showDots = ev.target.checked; draw(); });
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+    draw();
+
+    // ---- every country as a table ----
+    const codes = [...new Set([...per.keys(), ...visits.keys()])].filter(Boolean).sort((a, b) => exportsOf(b) - exportsOf(a) || (visits.get(b) || 0) - (visits.get(a) || 0));
+    $('country-table').querySelector('tbody').innerHTML = codes.map((code) => { const e = per.get(code); const k = keenOf(code); return `<tr><td>${esc(nameOf(code, byCode))}</td><td class="r">${e ? fmt(e.web + e.desktop) : ''}</td><td class="r">${e ? fmt(e.squares) : ''}</td><td class="r">${visits.has(code) ? fmt(visits.get(code)) : ''}</td><td class="r">${k ? k.toFixed(1) : ''}</td></tr>`; }).join('');
+
+    // ---- top 10s ----
+    const named = (code) => ({ label: nameOf(code, byCode), tag: code });
+    bars($('top-exports'), [...per.entries()].filter(([code]) => code).sort((a, b) => (b[1].web + b[1].desktop) - (a[1].web + a[1].desktop)).slice(0, 10).map(([code, e]) => ({ ...named(code), value: e.web, value2: e.desktop, title: `${nameOf(code, byCode)}: ${fmt(e.web)} from the website, ${fmt(e.desktop)} from the desktop app` })), { rank: true, empty: hot ? 'No shared exports yet.' : "The export squares couldn't be loaded." });
+    bars($('top-visits'), [...visits.entries()].slice(0, 10).map(([code, n]) => ({ ...named(code), value: n })), { rank: true, empty: "Visit counts aren't available right now." });
+    bars($('top-keen'), codes.map((code) => [code, keenOf(code)]).filter(([, k]) => k > 0).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([code, k]) => ({ ...named(code), value: k, note: k.toFixed(1), title: `${nameOf(code, byCode)}: ${fmt(exportsOf(code))} shared exports, ${fmt(visits.get(code))} visits` })), { rank: true, empty: 'Not enough of both numbers yet.' });
+
+    // ---- settings ----
+    const by = {};
+    for (const [name, value, count] of usage?.rows || []) (by[name] ||= {})[value] = count;
+    const allValues = stats?.settingValues || {};
+    const names = (usage?.settings || Object.keys(by)).filter((n) => by[n]);
+    const totalOf = (n) => Object.values(by[n] || {}).reduce((a, b) => a + b, 0);
+    const valuesOf = (n) => [...new Set([...(allValues[n] || []), ...Object.keys(by[n] || {})])].map((v) => [v, by[n]?.[v] || 0]).sort((a, b) => b[1] - a[1]);
+    if (usage?.exports) $('settings-sub').innerHTML = `From <b>${fmt(usage.exports)}</b> exports by people who turned on <em>Share which settings I use</em>. Totals only: no export is stored on its own.`;
+    $('typical').innerHTML = names.length ? names.map((n) => { const [v, c] = valuesOf(n)[0]; return `<span class="chip" title="${esc(pct(c, totalOf(n)))} of ${esc(fmt(totalOf(n)))}">${esc(settingName(n))}: <b>${esc(valueName(n, v))}</b></span>`; }).join('') : '<div class="empty">No settings shared yet.</div>';
+    const pairs = names.filter((n) => totalOf(n) >= 20).flatMap((n) => valuesOf(n).map(([v, c]) => ({ label: `${settingName(n)}: ${valueName(n, v)}`, share: c / totalOf(n), count: c, total: totalOf(n) })));
+    const asRow = (p) => ({ label: p.label, value: p.share, note: p.count ? pct(p.count, p.total) : 'never', title: `${p.label}: ${fmt(p.count)} of ${fmt(p.total)} shared exports` });
+    bars($('most-used'), [...pairs].sort((a, b) => b.share - a.share).slice(0, 10).map(asRow), { max: 1, empty: 'Not enough shared yet.' });
+    bars($('least-used'), [...pairs].sort((a, b) => a.share - b.share).slice(0, 10).map(asRow), { max: 1, empty: 'Not enough shared yet.' });
+    const cards = $('all-settings');
+    const drawCards = (q = '') => {
+      const want = q.trim().toLowerCase();
+      const show = names.filter((n) => !want || `${n} ${settingName(n)} ${valuesOf(n).map(([v]) => `${v} ${valueName(n, v)}`).join(' ')}`.toLowerCase().includes(want));
+      cards.innerHTML = show.length ? show.map((n) => `<div class="panel"><h3>${esc(settingName(n))} <small>${esc(fmt(totalOf(n)))}</small></h3><div class="bars" data-setting="${esc(n)}"></div></div>`).join('') : '<div class="empty">No setting matches that.</div>';
+      cards.querySelectorAll('[data-setting]').forEach((el) => { const n = el.dataset.setting; bars(el, valuesOf(n).map(([v, c]) => ({ label: valueName(n, v), value: c, note: c ? `${fmt(c)} · ${pct(c, totalOf(n))}` : 'never' })), { max: totalOf(n) }); });
+    };
+    drawCards();
+    $('setting-search').addEventListener('input', (ev) => drawCards(ev.target.value));
+
+    // ---- how rare is your setup? ----
+    const PICK = ['platform', 'resolution', 'metersPerPixel', 'elevationSource', 'baseTexture', 'backdrop', 'terrainEdits', 'safeCaps', 'advancedMode', 'forestDensity', 'buildings', 'trees'].filter((n) => by[n] && totalOf(n) >= 20);
+    const picker = $('picker');
+    picker.innerHTML = PICK.map((n) => `<label>${esc(settingName(n))}<select data-pick="${esc(n)}">${valuesOf(n).map(([v, c]) => `<option value="${esc(v)}">${esc(valueName(n, v))} (${esc(c ? pct(c, totalOf(n)) : 'never')})</option>`).join('')}</select></label>`).join('');
+    const selects = [...picker.querySelectorAll('select')];
+    const verdict = () => {
+      if (!selects.length) { $('verdict-big').textContent = 'Not enough shared yet'; return; }
+      let p = 1; let never = false;
+      for (const s of selects) { const n = s.dataset.pick; const c = by[n]?.[s.value] || 0; if (!c) never = true; p *= c / totalOf(n); }
+      const total = usage?.exports || 0;
+      if (never) { $('verdict-big').textContent = 'Nobody yet'; $('verdict-text').textContent = 'At least one of these choices has never been shared. You would be the first.'; return; }
+      const oneIn = 1 / p;
+      $('verdict-big').textContent = oneIn < 1.5 ? 'Almost everyone' : `About 1 in ${huge(oneIn)}`;
+      const expect = p * total;
+      $('verdict-text').textContent = expect >= 1 ? `Of the ${fmt(total)} shared exports, around ${fmt(Math.max(1, expect))} would look like this.` : `Of the ${fmt(total)} shared exports, probably none looks like this: it would take about ${huge(oneIn)} to expect one.`;
+    };
+    selects.forEach((s) => s.addEventListener('change', verdict));
+    const setAll = (choose) => { selects.forEach((s) => { const vals = valuesOf(s.dataset.pick).filter(([, c]) => c > 0); if (vals.length) s.value = choose(vals)[0]; }); verdict(); };
+    $('pick-common').addEventListener('click', () => setAll((v) => v[0]));
+    $('pick-rare').addEventListener('click', () => setAll((v) => v[v.length - 1]));
+    $('pick-random').addEventListener('click', () => setAll((v) => v[Math.floor(Math.random() * v.length)]));
+    verdict();
+
+    // ---- map nerdery ----
+    const facts = [];
+    if (cells.length) {
+      const where = (c) => `${Math.abs(c.lat).toFixed(1)}° ${c.lat >= 0 ? 'N' : 'S'}`;
+      const inCountry = (c) => (c.code ? ', in ' + nameOf(c.code, byCode) : '');
+      const north = cells.reduce((a, b) => (b.lat > a.lat ? b : a)); const south = cells.reduce((a, b) => (b.lat < a.lat ? b : a));
+      const busiest = cells.reduce((a, b) => (b.n > a.n ? b : a));
+      const sum = (f) => cells.filter(f).reduce((n, c) => n + c.n, 0);
+      const week = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+      const once = cells.filter((c) => c.n === 1).length;
+      facts.push([fmt(cells.length), `squares with at least one shared export, of ${(3600 * 7200 / 1e6).toFixed(1)} million on the grid`]);
+      facts.push([where(north), 'the northernmost square' + inCountry(north)]);
+      facts.push([where(south), 'the southernmost square' + inCountry(south)]);
+      facts.push([fmt(busiest.n), `shared exports from the busiest square${busiest.code ? ', in ' + nameOf(busiest.code, byCode) : ''}`]);
+      facts.push([pct(once, cells.length), 'of squares were built in exactly once']);
+      facts.push([pct(sum((c) => c.lat >= 0), totalExports), 'of shared exports are north of the equator']);
+      facts.push([pct(sum((c) => byCode.get(c.code)?.left), totalExports), 'are in countries that drive on the left']);
+      facts.push([fmt(cells.filter((c) => c.day >= week).length), 'squares had a shared export in the last 7 days']);
+      facts.push([pct(sum(() => true) - cells.reduce((n, c) => n + c.web, 0), totalExports), 'came from the desktop app']);
+    }
+    $('geo-facts').innerHTML = facts.length ? facts.map(([n, t]) => `<li><span class="num">${esc(n)}</span><span>${esc(t)}</span></li>`).join('') : '<li class="empty">No shared exports yet.</li>';
+    const bands = [];
+    for (let lat = 70; lat >= -50; lat -= 10) { const n = cells.filter((c) => c.lat >= lat && c.lat < lat + 10).reduce((a, c) => a + c.n, 0); bands.push({ label: lat >= 0 ? `${lat}° to ${lat + 10}° N` : `${-lat - 10}° to ${-lat}° S`, value: n }); }
+    while (bands.length && !bands[0].value) bands.shift();
+    while (bands.length && !bands[bands.length - 1].value) bands.pop();
+    bars($('lat-bars'), bands, { empty: 'No shared exports yet.' });
+    const regions = {};
+    for (const c of cells) { const r = byCode.get(c.code)?.region || 'At sea or unknown'; regions[r] = (regions[r] || 0) + c.n; }
+    bars($('region-bars'), Object.entries(regions).sort((a, b) => b[1] - a[1]).map(([label, value]) => ({ label, value, note: `${fmt(value)} · ${pct(value, totalExports)}` })), { empty: 'No shared exports yet.' });
+
+    // ---- traffic ----
+    if (days.length) {
+      const sum = (k) => days.reduce((n, d) => n + d[k], 0);
+      const best = days.reduce((a, b) => (b.visitors > a.visitors ? b : a));
+      const gb = sum('bytes') / 1e9;
+      $('traffic-tiles').innerHTML = [
+        tile(fmt(sum('pageViews')), 'page views'),
+        tile(short(sum('requests')), 'requests answered'),
+        tile(gb >= 1000 ? (gb / 1000).toFixed(2) + ' TB' : fmt(gb) + ' GB', 'of map data and pages served'),
+        tile(pct(sum('cachedBytes'), sum('bytes')), "of that from Cloudflare's cache"),
+        tile(fmt(best.visitors), `visitors on the busiest day (${new Date(best.date + 'T12:00:00Z').toLocaleDateString('en', { month: 'short', day: 'numeric' })})`),
+        tile(fmt(sum('blocked')), 'requests turned away as attacks'),
+      ].join('');
+      const DAILY = { visitors: 'Visitors per day', pageViews: 'Page views per day', requests: 'Requests per day' };
+      const box = $('daily-box'); const dtip = $('daily-tip');
+      const drawDaily = (key) => {
+        $('daily-title').textContent = DAILY[key];
+        const w = 960; const h = 240; const L = 46; const R = 12; const T = 10; const B = 26;
+        const max = Math.max(...days.map((d) => d[key]), 1); const nice = Math.pow(10, Math.floor(Math.log10(max))); const top = Math.ceil(max / nice) * nice;
+        const x = (i) => L + (w - L - R) * (days.length > 1 ? i / (days.length - 1) : 0.5); const y = (v) => T + (h - T - B) * (1 - v / top);
+        const pts = days.map((d, i) => `${x(i).toFixed(1)},${y(d[key]).toFixed(1)}`);
+        const ticks = [0, 0.25, 0.5, 0.75, 1].map((k) => k * top);
+        const every = Math.ceil(days.length / 8);
+        box.querySelector('svg')?.remove();
+        box.insertAdjacentHTML('afterbegin', `<svg class="chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(DAILY[key])}, last ${days.length} days">
+          ${ticks.map((t) => `<line class="grid" x1="${L}" x2="${w - R}" y1="${y(t)}" y2="${y(t)}"/><text x="${L - 6}" y="${y(t) + 4}" text-anchor="end">${short(t)}</text>`).join('')}
+          ${days.map((d, i) => (i % every === 0 ? `<text x="${x(i)}" y="${h - 6}" text-anchor="middle">${new Date(d.date + 'T12:00:00Z').toLocaleDateString('en', { month: 'short', day: 'numeric' })}</text>` : '')).join('')}
+          <path class="area" d="M${x(0)},${y(0)} L${pts.join(' L')} L${x(days.length - 1)},${y(0)} Z"/>
+          <path class="line" d="M${pts.join(' L')}"/>
+          <line class="cross" x1="0" x2="0" y1="${T}" y2="${h - B}" style="display:none"/><circle class="pt" r="4.5" style="display:none"/>
+          <rect x="${L}" y="${T}" width="${w - L - R}" height="${h - T - B}" fill="transparent"/></svg>`);
+        const svg = box.querySelector('svg'); const cross = svg.querySelector('.cross'); const pt = svg.querySelector('.pt');
+        const move = (ev) => {
+          const r = svg.getBoundingClientRect(); const sx = (ev.clientX - r.left) / r.width * w;
+          const i = Math.max(0, Math.min(days.length - 1, Math.round((sx - L) / (w - L - R) * (days.length - 1)))); const d = days[i];
+          cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i)); cross.style.display = '';
+          pt.setAttribute('cx', x(i)); pt.setAttribute('cy', y(d[key])); pt.style.display = '';
+          dtip.innerHTML = `<b>${esc(new Date(d.date + 'T12:00:00Z').toLocaleDateString('en', { weekday: 'short', month: 'short', day: 'numeric' }))}</b><span>${esc(fmt(d[key]))} ${esc(DAILY[key].split(' per ')[0].toLowerCase())}</span>`;
+          dtip.style.display = 'block';
+          const tx = x(i) / w * r.width; dtip.style.left = Math.max(0, Math.min(r.width - dtip.offsetWidth, tx + 12)) + 'px'; dtip.style.top = Math.max(0, y(d[key]) / h * r.height - dtip.offsetHeight - 10) + 'px';
+        };
+        svg.addEventListener('pointermove', move);
+        svg.addEventListener('pointerleave', () => { cross.style.display = 'none'; pt.style.display = 'none'; dtip.style.display = 'none'; });
+      };
+      drawDaily('visitors');
+      document.querySelectorAll('[data-daily]').forEach((b) => b.addEventListener('click', () => { document.querySelectorAll('[data-daily]').forEach((o) => o.setAttribute('aria-pressed', String(o === b))); drawDaily(b.dataset.daily); }));
+      const views = (stats.visits.browsers || []).reduce((n, [, c]) => n + c, 0);
+      bars($('browsers'), (stats.visits.browsers || []).map(([label, value]) => ({ label: label === 'other' ? 'Everything else (bots, tools, unknown)' : label, value, note: pct(value, views) })));
+      const wd = Array.from({ length: 7 }, () => [0, 0]);
+      for (const d of whole) { const k = (new Date(d.date + 'T12:00:00Z').getUTCDay() + 6) % 7; wd[k][0] += d.visitors; wd[k][1] += 1; }
+      bars($('weekdays'), ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((label, i) => ({ label, value: wd[i][1] ? wd[i][0] / wd[i][1] : 0 })));
+    } else {
+      $('traffic-tiles').innerHTML = `<div class="empty">Visit counts aren't available right now.</div>`;
+      $('daily-box').closest('.panel').style.display = 'none';
+      bars($('browsers'), [], { empty: 'Not available right now.' }); bars($('weekdays'), [], { empty: 'Not available right now.' });
+    }
+
+    // ---- problem reports ----
+    const rep = stats?.reports;
+    const CAUSE = { memory: 'Ran out of memory', closed: 'The page closed mid-job', download: "A download didn't arrive", disk: 'The disk filled up', graphics: 'A graphics problem', crash: 'The app crashed', byHand: 'Sent by hand, nothing failed', other: 'Something else' };
+    const KIND = { generate: 'Generating a map', export: 'Exporting a level', crash: 'Just running (a crash)', rebuild: 'Rebuilding a level', manual: 'Nothing: a note from the Help menu', level: "Nothing: a level's report, sent by hand", other: 'Something else' };
+    const SYSTEM = { windows: 'Desktop app on Windows', linux: 'Desktop app on Linux', web: 'The website', other: 'Something else' };
+    const tally = (obj, names2) => Object.entries(obj || {}).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: names2[k] || k, value: v, note: `${fmt(v)} · ${pct(v, rep.total)}` }));
+    if (rep?.total) {
+      const dayKeys = Object.keys(rep.byDay).sort();
+      const last7 = Array.from({ length: 7 }, (_, i) => new Date(Date.now() - i * 86400000).toISOString().slice(0, 10)).reduce((n, d) => n + (rep.byDay[d] || 0), 0);
+      $('problem-tiles').innerHTML = [tile(fmt(rep.total), 'reports sent so far'), tile(fmt(last7), 'in the last 7 days'), tile(totalExports && usage?.exports ? `1 per ${fmt(Math.max(1, usage.exports / rep.total))}` : '–', 'shared exports, roughly'), tile(dayKeys[0] ? new Date(dayKeys[0] + 'T12:00:00Z').toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' }) : '–', 'first report')].join('');
+      bars($('causes'), tally(rep.byCause, CAUSE)); bars($('kinds'), tally(rep.byKind, KIND)); bars($('systems'), tally(rep.bySystem, SYSTEM));
+      const span = []; for (let i = 20; i >= 0; i--) { const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10); span.push([d, rep.byDay[d] || 0]); }
+      const mx = Math.max(...span.map(([, n]) => n), 1); const cw = 100 / span.length;
+      $('report-days').innerHTML = `<svg class="chart" viewBox="0 0 100 34" preserveAspectRatio="none" style="height:70px" role="img" aria-label="Problem reports per day, last 21 days">${span.map(([d, n], i) => `<rect class="col" x="${(i * cw + 0.4).toFixed(2)}" y="${(30 - 28 * n / mx).toFixed(2)}" width="${(cw - 0.8).toFixed(2)}" height="${(28 * n / mx).toFixed(2)}" rx="0.6"><title>${esc(new Date(d + 'T12:00:00Z').toLocaleDateString('en', { month: 'short', day: 'numeric' }))}: ${n} report${n === 1 ? '' : 's'}</title></rect>`).join('')}<line class="grid" x1="0" x2="100" y1="30" y2="30"/></svg><p class="src">The last 21 days; most in a day: ${fmt(mx)}.</p>`;
+    } else {
+      $('problem-tiles').innerHTML = `<div class="empty">${stats ? 'No reports counted yet.' : "The counts couldn't be loaded."}</div>`;
+      ['causes', 'kinds', 'systems'].forEach((id) => bars($(id), [], { empty: '–' }));
+    }
+
+    // ---- downloads ----
+    const dl = stats?.downloads;
+    if (dl?.releases?.length) {
+      const of = (r) => r.windowsInstaller + r.windowsPortable + r.linux;
+      const stable = dl.releases.filter((r) => !r.test && of(r) > 0).sort((a, b) => (a.day < b.day ? 1 : -1));
+      const tests = dl.releases.filter((r) => r.test);
+      const rows = stable.slice(0, 12).map((r) => ({ label: r.tag.replace(/^v/, ''), value: of(r), title: `${r.tag} (${r.day}): ${fmt(r.windowsInstaller)} Windows installer, ${fmt(r.windowsPortable)} Windows portable, ${fmt(r.linux)} Linux` }));
+      if (tests.length) rows.push({ label: `Test builds (${tests.length})`, value: tests.reduce((n, r) => n + of(r), 0) });
+      bars($('releases'), rows);
+      const k = (key) => dl.releases.reduce((n, r) => n + r[key], 0);
+      bars($('dl-kinds'), [{ label: 'Windows installer', value: k('windowsInstaller') }, { label: 'Windows, no installing (zip)', value: k('windowsPortable') }, { label: 'Linux (AppImage)', value: k('linux') }].map((r) => ({ ...r, note: `${fmt(r.value)} · ${pct(r.value, dl.total)}` })));
+      $('dl-note').textContent = `${fmt(dl.releases.length)} releases so far, ${fmt(dl.forks)} forks of the code.`;
+    } else { bars($('releases'), [], { empty: "GitHub's counts aren't available right now." }); bars($('dl-kinds'), [], { empty: '–' }); }
+
+    const when = stats?.at || usage?.at || hot?.at;
+    $('asof').textContent = when ? `Numbers as of ${new Date(when).toLocaleString('en')}. Visits and reports refresh hourly; exports and settings within 10 minutes.` : "The live numbers couldn't be loaded right now. Please try again in a little while.";
+  });
+})();
+</script>
+</body>
+</html>

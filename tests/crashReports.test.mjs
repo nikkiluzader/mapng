@@ -27,8 +27,12 @@ test('a report is stored privately with its log and dump, and read back only wit
   const r = await post(env, { kind: 'export', appVersion: '0.2.4', error: 'out of memory', log: 'a\nb', minidump: Buffer.from('MDMP').toString('base64'), area: { lat: 1, lng: 2 } }, '9.9.9.1');
   const { id } = await r.json();
   assert.match(id, /^MR-[A-Z0-9]{6}$/);
-  // (beside the day's counter of reports and alert emails)
-  const keys = [...env.OSM_TILES.store.keys()].filter((k) => !k.includes('/_counters/'));
+  // (beside the day's counter of reports and alert emails, and the public stats page's totals,
+  // which hold the report's headings and nothing of the report: tests/publicStats.test.mjs)
+  const tally = JSON.parse(env.OSM_TILES.store.get('crash-reports/_stats.json').value);
+  assert.deepEqual([tally.total, tally.byKind, tally.byCause], [1, { export: 1 }, { memory: 1 }]);
+  assert.ok(!JSON.stringify(tally).includes(id));
+  const keys = [...env.OSM_TILES.store.keys()].filter((k) => !k.includes('/_counters/') && !k.endsWith('/_stats.json'));
   assert.equal(keys.length, 3);
   assert.ok(keys.every((k) => k.startsWith('crash-reports/') && k.includes(id)));
   assert.equal(mails.length, 1);

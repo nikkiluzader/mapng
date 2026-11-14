@@ -144,12 +144,14 @@ This helps keep community resource hubs focused on curated, polished releases wh
 - **What is never sent:** no name, account, email or device ID; no level name, settings or map data; no exact coordinates.
 - **Where it is stored:** in MapNG's own Cloudflare account, in a SQLite-backed Cloudflare Durable Object that only the MapNG developer can access (`worker/hotspots.js`).
 - **How it is stored:** one row per grid square with the web and desktop export counts and the date of the latest. Nothing links a row to a person. To stop spam, a hashed form of the sender's IP address is kept in memory only, to allow at most 30 reports an hour; it is never written to storage. Workers request logging is off.
-- **How it is used:** only for the hotspot overlay, which anyone can turn on, and for the developer to see where MapNG is used (for example, which regions get MapNG's own OSM tiles next).
-- **Never sold or shared:** the data is never sold, never shared with anyone and never used for advertising or tracking. It only appears as totals per square on the hotspot map.
+- **How it is used:** for the hotspot overlay, which anyone can turn on; added up by country on the public [stats page](https://mapng.com/stats.html); and for the developer to see where MapNG is used (for example, which regions get MapNG's own OSM tiles next).
+- **Never sold or passed on:** the data is never sold, never passed to anyone and never used for advertising or tracking. It only appears as totals: per square on the hotspot map, per country on the stats page.
 - Turning sharing off stops reports at once. Counts already added can't be traced back to anyone, so they can't be removed individually.
 - The whole table is public at [mapng.com/api/hotspots](https://mapng.com/api/hotspots), and [mapng.com/data.html](https://mapng.com/data.html) explains every field, the pipeline, and every other service MapNG connects to.
 
 **Settings stats** are a separate opt-in (**Share which settings I use** in the Map layers box). After an export, MapNG sends which settings you picked, from fixed lists only: never a location, level name or key. Only a running total per setting is stored, public at [mapng.com/api/usage](https://mapng.com/api/usage).
+
+**The public stats page**, [mapng.com/stats.html](https://mapng.com/stats.html), shows these counts to everyone, with visits per country (Cloudflare's totals), how many problem reports arrived and of what kind, and the desktop app's download counts. Counts only: nothing from inside a report, no place finer than a ~5 km square, nothing about a person ([details](https://mapng.com/data.html#stats)).
 
 **Send codes** keep your settings for 24 hours so someone can open them; **desktop problem reports** are sent only when you choose Send. Both are explained on the [data page](https://mapng.com/data.html).
 

@@ -31,6 +31,7 @@
     "desktopApp": "Application de bureau",
     "desktopAppTooltip": "MapNG pour Windows et Linux : cartes grandes et denses, niveaux enregistrés directement dans BeamNG, et vos niveaux mis à jour à chaque nouvelle version",
     "yourData": "Vos données",
+    "stats": "Statistiques",
     "howBuilt": "Comment il est fait"
   },
   "mode": {
@@ -1360,7 +1361,7 @@
     "share": "Partager mes zones d'export (anonyme)",
     "shareHint": "Ajoute la zone approximative (~5 km) de chaque niveau exporté à la carte des zones. Jamais l'endroit exact, et rien sur vous.",
     "askTitle": "Ajouter cet export à la carte des zones ?",
-    "askBody": "MapNG peut compter où les niveaux sont exportés et montrer les zones actives sur la carte 2D. Seule la zone approximative (~5 km) est partagée, jamais l'endroit exact, et rien sur vous. Vous pouvez changer cela à tout moment dans l'encadré Couches de carte.",
+    "askBody": "MapNG peut compter où les niveaux sont exportés et montrer les zones actives sur la carte 2D. Seule la zone approximative (~5 km) est partagée, jamais l'endroit exact, et rien sur vous. Vous pouvez changer cela à tout moment dans l'encadré Couches de carte. Les totaux sont publics : sur la carte, et additionnés par pays sur mapng.com/stats.html.",
     "askYes": "Partager anonymement",
     "askNo": "Non merci",
     "welcome": "Partager anonymement la zone approximative (~5 km) de mes exports pour la carte des zones d'export de MapNG",
@@ -1377,9 +1378,9 @@
       "howTitle": "Comment c'est stocké",
       "how": "Une ligne par carré d'environ 5 km : combien d'exports viennent du site, combien de l'application de bureau, et la date du plus récent. Rien ne relie une ligne aux personnes qui y ont exporté. Contre le spam, le serveur garde brièvement en mémoire une forme brouillée (hachée) de votre adresse IP pour limiter à 30 envois par heure ; elle n'est jamais enregistrée et disparaît dans l'heure.",
       "useTitle": "À quoi ça sert",
-      "use": "Uniquement pour la carte des zones d'export : les totaux par carré sont ce que dessine la couche, que chacun peut activer. Le développeur de MapNG consulte ces mêmes totaux pour voir où MapNG est utilisé, par exemple pour choisir quelles régions recevront ensuite les données OSM propres et plus rapides de MapNG.",
+      "use": "Pour la carte des zones d'export : les décomptes par carré sont ce que dessine le calque, et chacun peut l'activer. Et pour la page publique de statistiques de MapNG (mapng.com/stats.html), qui additionne ces mêmes carrés par pays. Le développeur de MapNG regarde les mêmes totaux pour voir où MapNG est utilisé, par exemple pour choisir quelles régions recevront ensuite les données OSM propres à MapNG, plus rapides.",
       "neverTitle": "Jamais vendu ni partagé",
-      "never": "Vos données ne sont jamais vendues, jamais partagées avec qui que ce soit, et jamais utilisées pour la publicité ou le pistage. Elles n'apparaissent que sur la carte des zones, en totaux par carré.",
+      "never": "Vos données ne sont jamais vendues, jamais transmises à qui que ce soit, et jamais utilisées pour la publicité ou le pistage. Elles n'apparaissent que sous forme de totaux : par carré sur la carte des zones d'export, et par pays sur la page publique de statistiques.",
       "controlTitle": "Vous gardez la main",
       "control": "Activez ou désactivez le partage à tout moment avec « Partager mes exports » dans l'encadré Couches de carte. Le désactiver arrête les envois immédiatement. Les comptes déjà ajoutés ne peuvent pas être reliés à vous, et ne peuvent donc pas être retrouvés et retirés un par un.",
       "statusOn": "Le partage est activé pour vous.",
@@ -1534,7 +1535,7 @@
   },
   "usage": {
     "askTitle": "Partager les réglages que vous utilisez ?",
-    "askBody": "MapNG peut compter les réglages d'export choisis (comme Texture de jeu, ou modifications du terrain désactivées), pour que le développeur sache quoi améliorer et ce que personne n'utilise. Seuls les réglages sont envoyés : jamais l'emplacement, le nom du niveau ni rien sur vous. Modifiable à tout moment dans l'encadré Couches de carte.",
+    "askBody": "MapNG peut compter les réglages d'export choisis (comme Texture de jeu, ou modifications du terrain désactivées), pour que le développeur sache quoi améliorer et ce que personne n'utilise. Seuls les réglages sont envoyés : jamais l'emplacement, le nom du niveau ni rien sur vous. Modifiable à tout moment dans l'encadré Couches de carte. Les totaux sont publics sur mapng.com/stats.html.",
     "askYes": "Partager anonymement",
     "askNo": "Non merci",
     "shareToggle": "Partager les réglages que j'utilise (sans emplacement)",

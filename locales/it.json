@@ -31,6 +31,7 @@
     "desktopApp": "App desktop",
     "desktopAppTooltip": "MapNG per Windows e Linux: mappe grandi e dense, livelli salvati direttamente in BeamNG e i tuoi livelli aggiornati a ogni nuova versione",
     "yourData": "I tuoi dati",
+    "stats": "Statistiche",
     "howBuilt": "Come è fatto"
   },
   "mode": {
@@ -1360,7 +1361,7 @@
     "share": "Condividi le aree delle mie esportazioni (in forma anonima)",
     "shareHint": "Aggiunge alla mappa delle aree più utilizzate la zona approssimativa (~5 km) di ogni livello esportato. Non viene mai condiviso il punto esatto né alcun dato personale.",
     "askTitle": "Aggiungere questa esportazione alla mappa delle aree più utilizzate?",
-    "askBody": "MapNG può contare dove vengono esportati i livelli e mostrare le aree più attive sulla mappa 2D. Viene condivisa solo l'area approssimativa (~5 km), mai il punto esatto, e nulla su di te. Puoi cambiarlo quando vuoi nel riquadro Layer mappa.",
+    "askBody": "MapNG può contare dove vengono esportati i livelli e mostrare le aree più attive sulla mappa 2D. Viene condivisa solo l'area approssimativa (~5 km), mai il punto esatto, e nulla su di te. Puoi cambiarlo quando vuoi nel riquadro Layer mappa. I totali sono pubblici: sulla mappa e sommati per paese su mapng.com/stats.html.",
     "askYes": "Condividi in forma anonima",
     "askNo": "No, grazie",
     "welcome": "Condividi in forma anonima l’area approssimativa (~5 km) delle mie esportazioni per la mappa delle aree più utilizzate di MapNG.",
@@ -1377,9 +1378,9 @@
       "howTitle": "Come vengono archiviati",
       "how": "Una riga per ogni quadrato di circa 5 km: quante esportazioni provengono dal sito web, quante dall’app desktop e la data dell’ultima esportazione. Nessun dato collega una riga alle persone che hanno esportato in quell’area. Per impedire lo spam, il server conserva temporaneamente in memoria una versione offuscata (hash) dell’indirizzo IP, per consentire al massimo 30 report all’ora; non viene mai scritta su disco e scompare entro un’ora.",
       "useTitle": "Come vengono utilizzati",
-      "use": "I dati vengono utilizzati solo per la mappa delle aree più utilizzate: i conteggi per quadrato sono quelli mostrati dalla sovrapposizione, che chiunque può attivare. Lo sviluppatore di MapNG utilizza gli stessi totali per capire dove viene usato MapNG e, per esempio, scegliere quali regioni riceveranno in seguito i dati OSM più veloci del progetto.",
+      "use": "Per la mappa delle zone di esportazione: i conteggi per quadrato sono ciò che il livello disegna, e chiunque può attivarlo. E per la pagina pubblica delle statistiche di MapNG (mapng.com/stats.html), che somma gli stessi quadrati per paese. Lo sviluppatore di MapNG guarda gli stessi totali per vedere dove MapNG viene usato, ad esempio per scegliere quali regioni riceveranno per prime i dati OSM propri di MapNG, più veloci.",
       "neverTitle": "Mai venduti o condivisi",
-      "never": "I tuoi dati non vengono mai venduti, condivisi con altri o utilizzati per pubblicità o tracciamento. L’unico luogo in cui compaiono è la mappa delle aree più utilizzate, come totali per quadrato.",
+      "never": "I tuoi dati non vengono mai venduti, mai passati a nessuno e mai usati per pubblicità o tracciamento. Compaiono solo come totali: per quadrato sulla mappa delle zone di esportazione e per paese sulla pagina pubblica delle statistiche.",
       "controlTitle": "Hai il controllo",
       "control": "Attiva o disattiva la condivisione quando vuoi con «Condividi le mie esportazioni» nel riquadro Layer mappa. Disattivarla ferma subito gli invii. I conteggi già aggiunti non sono riconducibili a te, quindi non possono essere individuati e rimossi singolarmente.",
       "statusOn": "La condivisione è attiva.",
@@ -1534,7 +1535,7 @@
   },
   "usage": {
     "askTitle": "Condividere quali impostazioni usi?",
-    "askBody": "MapNG può contare quali impostazioni di esportazione vengono scelte (come Texture di gioco o modifiche al terreno disattivate), così lo sviluppatore sa cosa migliorare e cosa non usa nessuno. Vengono inviate solo le impostazioni: mai la posizione, il nome del livello o qualcosa su di te. Modificabile in qualsiasi momento nel riquadro Layer mappa.",
+    "askBody": "MapNG può contare quali impostazioni di esportazione vengono scelte (come Texture di gioco o modifiche al terreno disattivate), così lo sviluppatore sa cosa migliorare e cosa non usa nessuno. Vengono inviate solo le impostazioni: mai la posizione, il nome del livello o qualcosa su di te. Modificabile in qualsiasi momento nel riquadro Layer mappa. I totali sono pubblici su mapng.com/stats.html.",
     "askYes": "Condividi in forma anonima",
     "askNo": "No grazie",
     "shareToggle": "Condividi quali impostazioni uso (senza posizione)",

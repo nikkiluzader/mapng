@@ -4,6 +4,7 @@
 // public access and the tile route serves only osm/*.pmtiles); an email to
 // the developer when the CRASH_MAIL send_email binding is configured; read
 // back only with the CRASH_ADMIN_TOKEN secret (public/crash-reports.html).
+import { countReport } from './publicStats.js';
 
 const PREFIX = 'crash-reports/';
 const MAX_BODY_BYTES = 12 * 1024 * 1024;      // a report with its log and crash dump
@@ -200,6 +201,8 @@ export async function handleCrashReports(request, env, ctx, url, json) {
       } catch { summary.hasDump = false; }
     }
     await Promise.all(writes);
+    // (the public stats page counts it: its kind, system and cause from fixed lists, nothing else)
+    ctx.waitUntil(countReport(env, summary).catch(() => {}));
     ctx.waitUntil(notify(env, summary, new URL(`/crash-reports.html#${id}`, url.origin).toString()));
     return json({ ok: true, id }, 200);
   }

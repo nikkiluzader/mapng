@@ -31,6 +31,7 @@
     "desktopApp": "App de escritorio",
     "desktopAppTooltip": "MapNG para Windows y Linux: mapas grandes y densos, niveles guardados directamente en BeamNG y tus niveles actualizados con cada nueva versión",
     "yourData": "Tus datos",
+    "stats": "Estadísticas",
     "howBuilt": "Cómo se hace"
   },
   "mode": {
@@ -1360,7 +1361,7 @@
     "share": "Compartir mis zonas de exportación (anónimo)",
     "shareHint": "Añade la zona aproximada (~5 km) de cada nivel que exportes al mapa de zonas. Nunca el lugar exacto ni nada sobre ti.",
     "askTitle": "¿Añadir esta exportación al mapa de zonas?",
-    "askBody": "MapNG puede contar dónde se exportan niveles y mostrar las zonas más activas en el mapa 2D. Solo se comparte la zona aproximada (~5 km), nunca el lugar exacto ni nada sobre ti. Puedes cambiarlo cuando quieras en el cuadro Capas del mapa.",
+    "askBody": "MapNG puede contar dónde se exportan niveles y mostrar las zonas más activas en el mapa 2D. Solo se comparte la zona aproximada (~5 km), nunca el lugar exacto ni nada sobre ti. Puedes cambiarlo cuando quieras en el cuadro Capas del mapa. Los totales son públicos: en el mapa y sumados por país en mapng.com/stats.html.",
     "askYes": "Compartir de forma anónima",
     "askNo": "No, gracias",
     "welcome": "Compartir de forma anónima la zona aproximada (~5 km) de mis exportaciones para el mapa de zonas de MapNG",
@@ -1377,9 +1378,9 @@
       "howTitle": "Cómo se guarda",
       "how": "Una fila por cuadrado de ~5 km: cuántas exportaciones vinieron de la web, cuántas de la app de escritorio y la fecha de la última. Nada vincula una fila con las personas que exportaron allí. Para evitar spam, el servidor guarda brevemente en memoria una versión codificada (hash) de tu IP para permitir como máximo 30 envíos por hora; nunca se escribe en disco y desaparece en menos de una hora.",
       "useTitle": "Para qué se usa",
-      "use": "Solo para el mapa de zonas: los recuentos por cuadrado son lo que dibuja la capa, y cualquiera puede activarla. El desarrollador de MapNG mira esos mismos totales para saber dónde se usa MapNG, por ejemplo para elegir qué regiones reciben después los datos OSM propios y más rápidos de MapNG.",
+      "use": "Para el mapa de zonas de exportación: los recuentos por cuadrado son lo que dibuja la capa, y cualquiera puede activarla. Y para la página pública de estadísticas de MapNG (mapng.com/stats.html), que suma esos mismos cuadrados por país. El desarrollador de MapNG mira los mismos totales para ver dónde se usa MapNG, por ejemplo para elegir qué regiones reciben a continuación los datos OSM propios y más rápidos de MapNG.",
       "neverTitle": "Nunca se vende ni se comparte",
-      "never": "Tus datos nunca se venden, nunca se comparten con nadie y nunca se usan para publicidad ni seguimiento. Solo aparecen en el mapa de zonas, como totales por cuadrado.",
+      "never": "Tus datos nunca se venden, nunca se pasan a nadie y nunca se usan para publicidad ni seguimiento. Solo aparecen como totales: por cuadrado en el mapa de zonas de exportación y por país en la página pública de estadísticas.",
       "controlTitle": "Tú decides",
       "control": "Activa o desactiva compartir cuando quieras con «Compartir mis exportaciones» en el cuadro Capas del mapa. Al desactivarlo, los envíos se detienen al instante. Los recuentos ya añadidos no se pueden vincular contigo, así que no se pueden localizar ni borrar uno a uno.",
       "statusOn": "Compartir está activado.",
@@ -1534,7 +1535,7 @@
   },
   "usage": {
     "askTitle": "¿Compartir qué ajustes usas?",
-    "askBody": "MapNG puede contar qué ajustes de exportación se eligen (como Textura del juego o las modificaciones del terreno desactivadas), para que el desarrollador sepa qué mejorar y qué no usa nadie. Solo se envían los ajustes: nunca la ubicación, el nombre del nivel ni nada sobre ti. Cámbialo cuando quieras en el cuadro Capas del mapa.",
+    "askBody": "MapNG puede contar qué ajustes de exportación se eligen (como Textura del juego o las modificaciones del terreno desactivadas), para que el desarrollador sepa qué mejorar y qué no usa nadie. Solo se envían los ajustes: nunca la ubicación, el nombre del nivel ni nada sobre ti. Cámbialo cuando quieras en el cuadro Capas del mapa. Los totales son públicos en mapng.com/stats.html.",
     "askYes": "Compartir de forma anónima",
     "askNo": "No, gracias",
     "shareToggle": "Compartir qué ajustes uso (sin ubicación)",

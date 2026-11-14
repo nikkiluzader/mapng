@@ -33,6 +33,7 @@ import {
 import { handleHotspots, handleUsage } from './hotspots.js';
 import { handleCrashReports } from './crashReports.js';
 import { handleAdmin } from './admin.js';
+import { handlePublicStats } from './publicStats.js';
 import { handleShareCodes } from './shareCodes.js';
 import { handleMapterhornTiles } from './mapterhornCache.js';
 import { handleTerrariumTiles } from './terrariumRelay.js';
@@ -264,6 +265,10 @@ export default {
 
     if (url.pathname.startsWith('/api/admin/')) {
       return handleAdmin(request, env, ctx, url, jsonResponse);
+    }
+
+    if (url.pathname === '/api/stats') {
+      return handlePublicStats(request, env, ctx, jsonResponse);
     }
 
     if (url.pathname === '/api/usage') {
