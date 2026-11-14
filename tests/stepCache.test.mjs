@@ -62,3 +62,20 @@ test('already-compressed entries are stored, not deflated again; the rest still 
   assert.equal(back.file('levels/x/info.json')._data.compression.magic, '\x08\x00', 'deflated');
   assert.equal((await back.file('levels/x/preview.png').async('uint8array')).length, 5000);
 });
+
+test('a terrain\'s fingerprint never turns all its map features into one text', async () => {
+  const { terrainFingerprint, featuresHash } = await import('../services/stepCache.js');
+  const feats = Array.from({ length: 1700 }, (_, i) => ({ id: i, type: 'building', geometry: [{ lat: i, lng: -i }], tags: { name: `b${i}` } }));
+  // (a list that refuses to be written out whole, as a 33 km city's did: past the longest string there is)
+  const guarded = feats.slice(); guarded.toJSON = () => { throw new RangeError('Invalid string length'); };
+  const td = (osmFeatures) => ({ width: 4, height: 4, heightMap: new Float32Array(16), osmFeatures });
+  const a = terrainFingerprint(td(guarded));
+  assert.equal(a, terrainFingerprint(td(feats)), 'the same features, the same fingerprint');
+  // one feature changed, anywhere in the list: another fingerprint
+  for (const at of [0, 499, 500, 1699]) {
+    const other = feats.slice(); other[at] = { ...other[at], tags: { name: 'changed' } };
+    assert.notEqual(terrainFingerprint(td(other)), a, `feature ${at}`);
+  }
+  assert.notEqual(featuresHash(feats.slice(0, 1699)), featuresHash(feats));
+  assert.equal(featuresHash(null), featuresHash([]));
+});

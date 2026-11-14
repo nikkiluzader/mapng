@@ -45,6 +45,20 @@ const sizeOf = (v) => {
 const copy = (v) => (typeof structuredClone === 'function' ? structuredClone(v) : v);
 
 /**
+ * A hash of a list of map features, one feature at a time. As one JSON text the features of a 33 km city were
+ * past the longest string there is ("Invalid string length", a desktop report: half a million buildings,
+ * 21,000 km of roads, the export stopping at its first cached step).
+ */
+export function featuresHash(features) {
+  const list = Array.isArray(features) ? features : [];
+  let h = stepHash('features', String(list.length));
+  // (a few hundred at a time: one hash call each would be slow on two million features)
+  for (let i = 0; i < list.length; i += FEATURES_PER_HASH) h = stepHash(h, JSON.stringify(list.slice(i, i + FEATURES_PER_HASH)));
+  return h;
+}
+const FEATURES_PER_HASH = 500;
+
+/**
  * A terrain's fingerprint for step keys: its heights, map features, land
  * cover and ground classes, and every small field (bounds, sizes, rules ...).
  * Texture URLs count as they are (a new Generate's are new).
@@ -59,7 +73,7 @@ export function terrainFingerprint(td) {
     if (typeof v === 'object') { try { const j = JSON.stringify(v); if (j.length < 200000) small[k] = j; else small[k] = `#${j.length}`; } catch { /* not plain */ } continue; }
     small[k] = v;
   }
-  return stepHash(td.heightMap || null, JSON.stringify(td.osmFeatures || []), td.landCover?.grid || null,
+  return stepHash(td.heightMap || null, featuresHash(td.osmFeatures), td.landCover?.grid || null,
     ArrayBuffer.isView(td.groundClasses) ? td.groundClasses : (td.groundClasses?.cls || td.groundClasses?.grid || JSON.stringify(td.groundClasses ?? null)), small);
 }
 
