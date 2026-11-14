@@ -150,3 +150,35 @@ test('the page can hide a source and enlarge its pictures', () => {
   const script = html.slice(html.lastIndexOf('<script>') + 8, html.lastIndexOf('</script>'));
   assert.doesNotThrow(() => new Function(script));
 });
+
+test('lines in the ground: the knots of coarse data are no seams; columns repeated one way are stripes; one misfit is a seam', async () => {
+  const { measureGround, flawsOf } = await import('../services/sourceQuality.js');
+  const px = 600;
+  // rolling ground known every 30 m
+  const coarse = (x, y) => 40 * Math.sin(x / 190) + 30 * Math.cos(y / 140) + 8 * Math.sin((x + y) / 55);
+  const knot = (v) => Math.floor(v / 30);
+  // (1) 30 m data read a metre apart, bent at every 30 m line both ways
+  const bil = new Float32Array(px * px);
+  for (let r = 0; r < px; r++) for (let c = 0; c < px; c++) {
+    const i = knot(c), j = knot(r); const u = c / 30 - i, v = r / 30 - j;
+    bil[r * px + c] = coarse(i * 30, j * 30) * (1 - u) * (1 - v) + coarse(i * 30 + 30, j * 30) * u * (1 - v) + coarse(i * 30, j * 30 + 30) * (1 - u) * v + coarse(i * 30 + 30, j * 30 + 30) * u * v;
+  }
+  const g1 = measureGround(bil, px, 1);
+  assert.equal(g1.seams.count, 0, JSON.stringify(g1.seams));
+  assert.equal(g1.stripes, null);
+  assert.equal(g1.knots, true);
+  assert.ok(!flawsOf(g1).some((t) => /seam|Striped/.test(t)));
+  // (2) smooth north to south, each column's height repeated over 7 m east to west
+  const striped = new Float32Array(px * px);
+  for (let r = 0; r < px; r++) for (let c = 0; c < px; c++) striped[r * px + c] = coarse(Math.floor(c / 7) * 7, r);
+  const g2 = measureGround(striped, px, 1);
+  assert.ok(g2.stripes && g2.stripes.dir === 'north-south' && g2.stripes.count > 40 && Math.abs(g2.stripes.spacingM - 7) <= 1, JSON.stringify(g2.stripes));
+  assert.equal(g2.seams.count, 0);
+  assert.ok(flawsOf(g2).some((t) => /^Striped: about \d+ thin lines running north-south/.test(t)));
+  // (3) smooth ground, its southern half 0.6 m off: one seam
+  const seam = new Float32Array(px * px);
+  for (let r = 0; r < px; r++) for (let c = 0; c < px; c++) seam[r * px + c] = coarse(c, r) + (r >= 300 ? 0.6 : 0);
+  const g3 = measureGround(seam, px, 1);
+  assert.equal(g3.seams.count, 1, JSON.stringify(g3.seams));
+  assert.equal(g3.stripes, null);
+});

@@ -165,6 +165,8 @@ const TERRACE_STEP_M = 0.15;
 const SEAM_RATIO = 5;             // a row or column whose crease is this many times the usual one ...
 const SEAM_MIN_M = 0.02;          // ... and at least this much: a seam
 const SEAM_ALONG_SHARE = 0.8;     // ... at this share of its points, all the way across
+const LINE_ALONG_SHARE = 0.5;     // a line creased along this share of its length counts towards a pattern of lines
+const PATTERN_LINES = 5;          // this many lines one way: a pattern (knots of coarse data, or stripes), not seams
 const SPIKE_M = 0.5;              // a point this far over or under all eight neighbours: a spike or a pit
 const NOISE_SLOPE = 0.08;         // noise is read on ground gentler than this
 const NOISE_MARK_M = 0.08;        // a block with this much grain is marked in the flaw picture
@@ -255,10 +257,33 @@ export function measureGround(heights, px, cellM) {
       if (found.length && a - found[found.length - 1] <= 2) continue;
       found.push(a);
     }
-    return found;
+    // every line creased along at least half its length, strictly a seam or not: what tells a seam from a pattern
+    const lines = [];
+    for (let a = 1; a < px - 1; a++) {
+      if (!(crease[a] > mark)) continue;
+      let hit = 0; let n = 0;
+      for (let b = 0; b < px; b += 2) { const p0 = get(a - 1, b); const p1 = get(a, b); const p2 = get(a + 1, b); if (ok(p0) && ok(p1) && ok(p2) && !isWater(p1)) { n++; if (Math.abs(p0 - 2 * p1 + p2) > mark) hit++; } }
+      if (n > px / 8 && hit / n >= LINE_ALONG_SHARE && !(lines.length && a - lines[lines.length - 1] <= 2)) lines.push(a);
+    }
+    return { found, lines };
   };
-  const rows = terraced ? [] : seamsOf((a, b) => z(a, b));
-  const cols = terraced ? [] : seamsOf((a, b) => z(b, a));
+  const none = { found: [], lines: [] };
+  const across = terraced ? none : seamsOf((a, b) => z(a, b));     // lines running east-west (rows)
+  const along = terraced ? none : seamsOf((a, b) => z(b, a));      // lines running north-south (columns)
+  // What the lines are. A seam is a line or two where pieces of a survey meet. Many lines are a pattern:
+  //  - both ways and about as many each way: the knots of coarse data laid on a fine grid (30 m data read a metre
+  //    apart bends at every 30 m line, both ways). Not a flaw of its own: the detail measure already says "coarse".
+  //    A 4 km square of 30 m data had seven of its hundred-odd knot lines marked as seams.
+  //  - one way only: stripes in the data (a far-north 30 m model repeats columns: thin north-south lines every
+  //    few metres, plain in the hillshade, of which the seam test found one).
+  const nr = across.lines.length; const nc = along.lines.length;
+  const knots = nr >= PATTERN_LINES && nc >= PATTERN_LINES && Math.max(nr, nc) <= 3 * Math.min(nr, nc);
+  const gapM = (list) => { const g = []; for (let i = 1; i < list.length; i++) g.push((list[i] - list[i - 1]) * cellM); return g.length ? median(g) : NaN; };
+  let stripes = null;
+  if (!knots && nc >= PATTERN_LINES && nc >= 4 * Math.max(1, nr)) stripes = { dir: 'north-south', count: nc, spacingM: gapM(along.lines), at: along.lines.map((a) => a * cellM) };
+  else if (!knots && nr >= PATTERN_LINES && nr >= 4 * Math.max(1, nc)) stripes = { dir: 'east-west', count: nr, spacingM: gapM(across.lines), at: across.lines.map((a) => a * cellM) };
+  const rows = knots || stripes?.dir === 'east-west' ? [] : across.found;
+  const cols = knots || stripes?.dir === 'north-south' ? [] : along.found;
   // the blocks to mark: terraces (where the ground is terraced at all: the blocks that are mostly dead level), grain
   const size = bCells * cellM; const terraces = []; const noisy = [];
   for (let b = 0; b < nb * nb; b++) {
@@ -272,6 +297,7 @@ export function measureGround(heights, px, cellM) {
   return {
     marks: { spikes: spikeAt, terraces, noisy }, noisyShare: noisy.length / (nb * nb),
     effectiveResM, flatShare, terraced, seams: { rows: rows.map((a) => a * cellM), cols: cols.map((a) => a * cellM), count: rows.length + cols.length },
+    stripes, knots,
     spikesPerHa: ha > 0 ? spikes / ha : 0, noiseM, coverage: valid / (px * px), water: waterK !== null,
   };
 }
@@ -281,6 +307,7 @@ export function flawsOf(g) {
   if (!g) return [];
   const out = [];
   if (g.terraced) out.push(`Terraced: flat blocks about ${Math.round(g.effectiveResM)} m wide with steps between them (${Math.round(g.flatShare * 100)} % of the ground is dead level). Coarse data on a fine grid.`);
+  if (g.stripes) out.push(`Striped: about ${g.stripes.count} thin lines running ${g.stripes.dir}${Number.isFinite(g.stripes.spacingM) ? `, about ${Math.max(1, Math.round(g.stripes.spacingM))} m apart` : ''}. A pattern in the data itself, not in the ground.`);
   if (g.seams.count) out.push(`${g.seams.count} straight seam line${g.seams.count === 1 ? '' : 's'} across the square (where pieces of the survey meet).`);
   const spikes = g.marks?.spikes?.length || 0;
   if (g.spikesPerHa >= 1) out.push(`Spikes and pits: about ${Math.round(g.spikesPerHa)} per hectare.`);
@@ -296,6 +323,7 @@ export function cleanScore(g) {
   let v = 100;
   if (g.terraced) v -= 70;
   v -= Math.min(40, g.seams.count * 8);
+  if (g.stripes) v -= 30;
   v -= Math.min(30, g.spikesPerHa * 3);
   if (g.noiseM > 0.05) v -= 30 * clamp01((g.noiseM - 0.05) / 0.25);
   if (!(g.noiseM > 0.08) && g.noisyShare >= 0.02) v -= Math.min(20, g.noisyShare * 60);
@@ -465,6 +493,8 @@ function flawMap(src, sideM) {
     for (const [x, y, w] of g.marks?.noisy || []) marks += `<rect class="f-noise" x="${x}" y="${y}" width="${w}" height="${w}"/>`;
     for (const y of g.seams.rows) marks += `<line class="f-seam" x1="0" y1="${y.toFixed(1)}" x2="${sideM}" y2="${y.toFixed(1)}"/>`;
     for (const x of g.seams.cols) marks += `<line class="f-seam" x1="${x.toFixed(1)}" y1="0" x2="${x.toFixed(1)}" y2="${sideM}"/>`;
+    // (stripes: a tick at the square's edge for each, at most sixty: lines right across would hide the ground they are in)
+    for (const v of (g.stripes?.at || []).filter((_, i, all) => i % Math.ceil(all.length / 60) === 0)) marks += g.stripes.dir === 'north-south' ? `<line class="f-seam" x1="${v.toFixed(1)}" y1="0" x2="${v.toFixed(1)}" y2="${(sideM * 0.04).toFixed(1)}"/>` : `<line class="f-seam" x1="0" y1="${v.toFixed(1)}" x2="${(sideM * 0.04).toFixed(1)}" y2="${v.toFixed(1)}"/>`;
     for (const [x, y] of g.marks?.spikes || []) marks += `<circle class="f-spike" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(sideM / 70).toFixed(1)}"/>`;
   }
   return `<svg class="map" viewBox="0 0 ${sideM} ${sideM}" role="img" aria-label="${esc(src.label)}: hillshade with the flaws found marked">${img}${marks}</svg>`;
