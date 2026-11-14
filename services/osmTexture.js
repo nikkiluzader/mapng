@@ -239,6 +239,19 @@ const colorOfSurface = (surface) => {
   return null;
 };
 
+// A road the base picture shows: one that is there, on the ground. Not a road that is only planned
+// (highway=proposed, or proposed=yes on a way given its future class: a trail still to be built was painted
+// as asphalt, reported by a tester), and not one in a tunnel (its line painted over
+// the hill above it; a road that runs over the tunnel is its own way and is painted as itself). An
+// avalanche gallery and a passage through a building are roads at ground level and stay.
+export const isPaintedRoad = (tags) => {
+  if (!tags) return true;
+  if (tags.highway === "proposed" || tags.proposed === "yes") return false;
+  const tunnel = String(tags.tunnel ?? "").toLowerCase();
+  if (tunnel && tunnel !== "no" && tunnel !== "avalanche_protector" && tunnel !== "building_passage") return false;
+  return true;
+};
+
 // Underground (a tunnel's outline, a culverted stream, an underground car
 // park): not the surface the texture shows, so not drawn at all.
 export const isUndergroundArea = (tags) => !!tags && (tags.man_made === "tunnel" || !!tags.tunnel
@@ -1659,7 +1672,7 @@ const renderFeaturesToCanvas = (
   }
 
   // 2. Draw Roads (with priority sorting)
-  const roads = features.filter((f) => f.type === "road");
+  const roads = features.filter((f) => f.type === "road" && isPaintedRoad(f.tags));
   const roadPriority = {
     motorway: 100,
     motorway_link: 100,
