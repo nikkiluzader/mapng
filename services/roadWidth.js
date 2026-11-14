@@ -140,6 +140,7 @@ export const racewayHalfWidth = (tags = {}) => RACEWAY_HALF_M[racewayKind(tags)]
 
 const TAGGED_LANES_MAX = 10;
 const SINGLE_TRACK_EXTRA_M = 0.5;
+const SINGLE_TRACK_MIN_M = 3.5;
 /**
  * Estimate road half-width in meters from OSM tags and roadway class.
  *
@@ -165,7 +166,7 @@ export function estimateRoadHalfWidth(tags = {}, highway, isOneWay = false, fall
   // (one lane for both directions, a single-track road: a little wider than a marked lane)
   const singleTrack = taggedLanes === 1 && !isOneWay;
   const estimatedHalf = singleTrack
-    ? (getDefaultLaneWidthMeters(highway, tags) + SINGLE_TRACK_EXTRA_M) / 2
+    ? Math.max(SINGLE_TRACK_MIN_M, getDefaultLaneWidthMeters(highway, tags) + SINGLE_TRACK_EXTRA_M) / 2
     : (inferredLanes * getDefaultLaneWidthMeters(highway, tags)) / 2;
   // lanes counted by the mapper are kept: the class maximum is for roads with no count (a
   // six-lane primary squeezed into 12 m had 2 m lanes), up to TAGGED_LANES_MAX of them

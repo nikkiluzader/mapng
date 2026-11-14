@@ -120,6 +120,9 @@ test('outside the Americas a road with no width gets narrower lanes and a narrow
   assert.equal(applyRegionalWidths(gb, { countryCode: 'GB', region: 'Europe' }), 4);
   assert.equal(2 * estimateRoadHalfWidth(gb[0].tags, 'primary', false), 6);
   assert.equal(surface(gb[0]), 6.5, 'a British A road: 9 m before');
+  const lane = [road({ highway: 'unclassified', lanes: '1' })];
+  applyRegionalWidths(lane, { countryCode: 'GB', region: 'Europe' });
+  assert.equal(2 * estimateRoadHalfWidth(lane[0].tags, 'unclassified', false), 3.5, 'a single-lane road is never under 3.5 m');
   assert.equal(2 * estimateRoadHalfWidth(gb[1].tags, 'tertiary', false), 5.5);
   assert.equal(2 * estimateRoadHalfWidth(gb[2].tags, 'primary', false), 8, 'a mapped width stays');
   assert.equal(2 * estimateRoadHalfWidth(gb[3].tags, 'trunk', false), 14.8, 'trunk lanes as before');

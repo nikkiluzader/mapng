@@ -9,6 +9,10 @@
 import { resolveRoadRulesAt } from './countryRules.js';
 import { LANE_WIDTH_TAG, EDGE_STRIP_TAG } from './roadWidth.js';
 
+// (beside Poland's design rules, a tester's chart: main roads, class G, 3.5 m by the rule and 3.25 or 3.0 where
+// room is short; collector roads, Z, 3.0 m; local roads, L, 2.75 m; access roads, D, 2.5 m. Main roads are kept
+// at 3.0 m: the roads testers measured on the satellite picture are at or under it, an English A road 5.5 to
+// 6.5 m across, a Polish main road 6.45 m. A single-lane road is never under 3.5 m: services/roadWidth.js.)
 const LANE_M = {
   primary: 3.0, primary_link: 3.0, secondary: 3.0, secondary_link: 3.0,
   tertiary: 2.75, tertiary_link: 2.75, unclassified: 2.75, residential: 2.75, living_street: 2.75,
