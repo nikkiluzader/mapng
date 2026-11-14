@@ -48,6 +48,10 @@ const MAX_DEPTH_M = 3;
 // carriageways 0.7 m apart at an interchange were pulled to one height).
 const SAME_LEVEL_M = 0.45;
 const END_LEVEL_M = 2.0;         // ... and an end that shares its point with another deck, within this
+const CROSS_TUCK_M = 0.5;      // a road crossing a deck ends at least this far inside that deck's edge
+const CROSS_SINK_M = 0.02;     // ... and this far under its surface there (two tops at one height flicker)
+const END_ZONE_M = 6;          // near an end that meets another deck the road is at that deck's level
+const SCAN_M = 0.25;          // how finely a road's line is looked along for the decks it lies in
 const TILT_EDGE_M = 0.25;       // a deck is tilted to another's slope by no more than lifts its edge this much
 const END_NEED_M = 0.05;        // a deck's end with no deck beyond it: this far over the road's own line
 const DECAL_OVER_DECK_M = 0.02;
@@ -95,7 +99,7 @@ function resample(nodes, gap) {
  * { meshRoads, stats: { decks, skipped, lifted, nodes } }; the decals are changed in place.
  */
 export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined } = {}) {
-  const stats = { decks: 0, skipped: 0, lifted: 0, nodes: 0, joined: 0 };
+  const stats = { decks: 0, skipped: 0, lifted: 0, nodes: 0, joined: 0, crossings: 0 };
   // one piece for each paved road surface on the ground: its line resampled, each node { x, y, base, hw }
   let pieces = [];
   for (const group of groups) {
@@ -292,7 +296,7 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined } = {
   const slopeAt = [0, 0];      // set by deckAt: the found deck's rise a metre east and a metre north
   const deckAt = (x, y, near, reach, not = -1) => {
     const list = cells.get(key(Math.floor(x / CELL_M), Math.floor(y / CELL_M)));
-    let best = -Infinity;
+    let best = -Infinity; let bestSide = false;
     slopeAt[0] = 0; slopeAt[1] = 0;
     if (!list) return best;
     for (let q = 0; q < list.length; q += 2) {
@@ -309,8 +313,11 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined } = {
       const t = Math.max(0, Math.min(1, raw));
       if (Math.hypot(x - (a[0] + dx * t), y - (a[1] + dy * t)) > d.hw[i - 1] + (d.hw[i] - d.hw[i - 1]) * t) continue;
       const z = d.z[i - 1] + (d.z[i] - d.z[i - 1]) * t;
-      if (Math.abs(z - near) <= reach && (best === -Infinity || Math.abs(z - near) < Math.abs(best - near))) {
-        best = z;
+      // (a stretch the point lies beside counts before one it lies past the end of: taken by height alone, a
+      // point beside a node 3 m along a climbing deck was given the node's own height, 18 cm off at 6 %)
+      const side = raw >= 0 && raw <= 1;
+      if (Math.abs(z - near) <= reach && (best === -Infinity || (side && !bestSide) || (side === bestSide && Math.abs(z - near) < Math.abs(best - near)))) {
+        best = z; bestSide = side;
         // (how that deck's surface rises there: along its line, level across)
         const g = (d.z[i] - d.z[i - 1]) / L2;
         slopeAt[0] = g * dx; slopeAt[1] = g * dy;
@@ -322,29 +329,96 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined } = {
   // The heights, the wider roads first. A node inside a deck already set takes that deck's height (a side road's
   // end inside the through road, two roads crossing): one surface, no step. The other nodes take what they need
   // over their own line, and both are eased along the road at RAMP_SLOPE.
-  decks.forEach((d, k) => {
+  // (by index, not forEach: a deck cut at a crossing puts its far part in the list right after itself)
+  for (let k = 0; k < decks.length; k++) {
+    const d = decks[k];
     // (tried: a road counted as in another deck as soon as its edge reached it. Worse in game: 35 steps over
     // 8 cm where this had 20, roads beside each other on a slope pulled to one height)
     // (an end that shares its point with another deck is at that deck's level whatever their lines say there:
     // a side street 0.44 m under the road it joins was taken for another level and left as a wall across itself)
     const under = (x, y, base, flag = 0) => deckAt(x, y, base, flag === 1 ? END_LEVEL_M : SAME_LEVEL_M, k);
-    // A node where the road passes a set deck's edge: on the edge, at that deck's height. Without it the road's
-    // own deck ran from its last node inside to its first outside (5 m off, at its own height) and stood over
-    // or under the other deck's edge by the slope between them: a step of 10 to 20 cm, measured in game.
-    const nodes = d.pts.map((q, i) => ({ x: q[0], y: q[1], base: d.base[i], hw: d.hw[i], need: d.need[i], low: d.low[i], flag: d.flag[i] }));
-    const out = [nodes[0]];
-    for (let i = 1; i < nodes.length; i++) {
-      const a = nodes[i - 1]; const b = nodes[i];
-      const ina = under(a.x, a.y, a.base, a.flag) > -Infinity; const inb = under(b.x, b.y, b.base, b.flag) > -Infinity;
-      if (ina !== inb) {
-        let lo = 0; let hi = 1;   // (lo: the inside end)
-        const at = (t) => { const u = ina ? t : 1 - t; return { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u, base: a.base + (b.base - a.base) * u, hw: a.hw + (b.hw - a.hw) * u, need: Math.max(a.need, b.need), low: Math.min(a.low, b.low) }; };
-        for (let it = 0; it < 10; it++) { const mid = (lo + hi) / 2; const q = at(mid); if (under(q.x, q.y, q.base) > -Infinity) lo = mid; else hi = mid; }
-        const q = at(lo);
-        if (Math.hypot(q.x - a.x, q.y - a.y) > EDGE_NODE_MIN_M && Math.hypot(q.x - b.x, q.y - b.y) > EDGE_NODE_MIN_M) out.push(q);
+    // Where the road lies inside decks already set, found along its whole line (not node to node: a road
+    // passing from one deck straight into the next, 5 m between its nodes, was never seen to leave the first).
+    // - It does not go on through such a deck: it ends just inside that deck's edge, on either side of a
+    //   crossing, or at its own end in a through road, and what lay inside is left out. One deck through a
+    //   crossing lay level across the other and could lean one way only; where the crossed road had a crest or
+    //   a change of slope at the junction it stood 15 to 20 cm over that road's deck on one side: a step across
+    //   the crossed road's lane, measured in game at 14 junctions of two towns. Each end is as far inside as
+    //   puts both its corners inside, and a little under that deck's surface; left out only where all of it
+    //   lies wholly under the other deck.
+    // - A node stands where it passes each such edge, at that deck's height. Without it the road's own deck ran
+    //   from its last node inside to its first outside (5 m off, at its own height) and stood over or under the
+    //   other deck's edge by the slope between them: a step of 10 to 20 cm, measured in game.
+    let out = d.ready;
+    if (!out) {
+      const nodes = d.pts.map((q, i) => ({ x: q[0], y: q[1], base: d.base[i], hw: d.hw[i], need: d.need[i], low: d.low[i], flag: d.flag[i] }));
+      const S = [0];
+      for (let i = 1; i < nodes.length; i++) S.push(S[i - 1] + Math.hypot(nodes[i].x - nodes[i - 1].x, nodes[i].y - nodes[i - 1].y));
+      const total = S[S.length - 1];
+      const meet0 = nodes[0].flag === 1; const meet1 = nodes[nodes.length - 1].flag === 1;
+      const at = (s) => {
+        let i = 1; while (i < nodes.length - 1 && S[i] < s) i++;
+        const a = nodes[i - 1]; const b = nodes[i]; const L = S[i] - S[i - 1] || 1; const u = Math.max(0, Math.min(1, (s - S[i - 1]) / L));
+        // (near an end that meets another deck: at that deck's level whatever the two lines say there)
+        const flag = (meet0 && s < END_ZONE_M) || (meet1 && s > total - END_ZONE_M) ? 1 : 0;
+        return { s, x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u, base: a.base + (b.base - a.base) * u, hw: a.hw + (b.hw - a.hw) * u, need: Math.max(a.need, b.need), low: Math.min(a.low, b.low), flag, ux: (b.x - a.x) / L, uy: (b.y - a.y) / L };
+      };
+      const inside = (s) => { const q = at(s); return under(q.x, q.y, q.base, q.flag) > -Infinity; };
+      const whole = (s) => { const q = at(s); return under(q.x, q.y, q.base, q.flag) > -Infinity && under(q.x - q.uy * q.hw, q.y + q.ux * q.hw, q.base, q.flag) > -Infinity && under(q.x + q.uy * q.hw, q.y - q.ux * q.hw, q.base, q.flag) > -Infinity; };
+      const spans = []; let open = null; let ps = 0; let pin = inside(0); if (pin) open = 0;
+      for (let s = SCAN_M; ps < total; s += SCAN_M) {
+        const ss = Math.min(s, total); const now = inside(ss);
+        if (now !== pin) {
+          let lo = pin ? ps : ss; let hi = pin ? ss : ps;   // (lo: the inside end)
+          for (let it = 0; it < 8; it++) { const mid = (lo + hi) / 2; if (inside(mid)) lo = mid; else hi = mid; }
+          if (now) open = lo; else { spans.push([open, lo]); open = null; }
+        }
+        ps = ss; pin = now;
       }
-      out.push(b);
+      if (open !== null) spans.push([open, total]);
+      const drops = []; const edges = [];
+      for (const [a, b] of spans) {
+        const from0 = a <= 0; const to1 = b >= total;
+        if (from0 && to1) continue;   // (all of it inside other decks: left as it is)
+        let sa = from0 ? 0 : a + CROSS_TUCK_M; let sb = to1 ? total : b - CROSS_TUCK_M;
+        while (!from0 && sa < b && !whole(sa)) sa += SCAN_M;
+        while (!to1 && sb > a && !whole(sb)) sb -= SCAN_M;
+        let clear = sa < sb - 0.05 && (from0 || sa < b) && (to1 || sb > a);
+        for (let s = sa; clear && s <= sb; s += 1) if (!whole(s)) clear = false;
+        if (clear && !whole(sb)) clear = false;
+        if (!from0) edges.push(a);
+        if (!to1) edges.push(b);
+        if (clear) drops.push([sa, sb]);
+      }
+      const parts = []; let p = 0;
+      for (const [a, b] of [...drops, [total, total]]) {
+        if (a > p + 0.05 || (a === total && p === 0)) parts.push([p, a]);
+        p = b;
+      }
+      const lists = [];
+      for (const [a, b] of parts) {
+        const list = [];
+        if (a > 0) list.push({ ...at(a), flag: 1, sink: true });
+        for (let i = 0; i < nodes.length; i++) {
+          if (S[i] < a - 1e-9 || S[i] > b + 1e-9) continue;
+          if ((a > 0 && S[i] - a < EDGE_NODE_MIN_M) || (b < total && b - S[i] < EDGE_NODE_MIN_M)) continue;
+          list.push({ ...nodes[i], s: S[i] });
+        }
+        if (b < total) list.push({ ...at(b), flag: 1, sink: true });
+        for (const e of edges) {
+          if (e <= a || e >= b || list.some((q) => Math.abs(q.s - e) < EDGE_NODE_MIN_M)) continue;
+          list.push({ ...at(e), flag: 0 });
+        }
+        list.sort((u, v) => u.s - v.s);
+        if (list.length >= 2 && list[list.length - 1].s - list[0].s > 0.5) lists.push(list);
+      }
+      if (!lists.length) lists.push(nodes);
+      stats.crossings += drops.length;
+      out = lists[0];
+      const stem = d.name.replace(/_b$/, '');
+      for (let j = lists.length - 1; j >= 1; j--) decks.splice(k + 1, 0, { name: `${stem}_x${j}_b`, ready: lists[j] });
     }
+    d.sink = Uint8Array.from(out, (q) => (q.sink ? 1 : 0));
     const n = out.length;
     d.pts = out.map((q) => [q.x, q.y]);
     d.base = Float64Array.from(out, (q) => q.base); d.hw = Float64Array.from(out, (q) => q.hw);
@@ -360,14 +434,19 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined } = {
     // the ground along one side.
     d.nrm = [];
     for (let i = 0; i < n; i++) {
+      const a = d.pts[Math.max(0, i - 1)]; const b = d.pts[Math.min(n - 1, i + 1)];
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const nx = -(b[1] - a[1]) / L; const ny = (b[0] - a[0]) / L;
+      // (the other deck's height under this road's two edges, where it lies under both: its true lean across
+      // this road, also where that deck's slope changes under it)
+      const zl = under(d.pts[i][0] + nx * d.hw[i], d.pts[i][1] + ny * d.hw[i], d.base[i], d.flag[i]);
+      const zr = under(d.pts[i][0] - nx * d.hw[i], d.pts[i][1] - ny * d.hw[i], d.base[i], d.flag[i]);
       const other = under(d.pts[i][0], d.pts[i][1], d.base[i], d.flag[i]);
       if (other > -Infinity) {
-        r[i] = other - d.base[i]; fixed[i] = 1;
-        const a = d.pts[Math.max(0, i - 1)]; const b = d.pts[Math.min(n - 1, i + 1)];
-        const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
-        const nx = -(b[1] - a[1]) / L; const ny = (b[0] - a[0]) / L;
+        r[i] = other - d.base[i] - (d.sink[i] ? CROSS_SINK_M : 0); fixed[i] = 1;
         const lim = TILT_EDGE_M / Math.max(1, d.hw[i]);
-        const g = Math.max(-lim, Math.min(lim, slopeAt[0] * nx + slopeAt[1] * ny));
+        const lean = zl > -Infinity && zr > -Infinity ? (zl - zr) / (2 * d.hw[i]) : slopeAt[0] * nx + slopeAt[1] * ny;
+        const g = Math.max(-lim, Math.min(lim, lean));
         const len = Math.hypot(g, 1);
         d.nrm[i] = [(-g * nx) / len, (-g * ny) / len, 1 / len];
       } else if (d.flag[i] === 2) {
@@ -386,7 +465,7 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined } = {
     for (let i = 0; i < n; i++) if (!fixed[i] && cap[i] < r[i]) r[i] = cap[i];
     for (let i = 0; i < n; i++) d.z[i] = d.base[i] + r[i];
     indexDeck(d, k);
-  });
+  }
 
   const r3 = (v) => Math.round(v * 1000) / 1000;
   const meshRoads = decks.map((d) => {

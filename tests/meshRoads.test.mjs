@@ -63,14 +63,17 @@ test('at a junction the through road is one deck and the side road ends inside i
   assert.equal(meshRoads.length, 2);
   const main = meshRoads.find((m) => m.name === 'mr_main_s1'); const side = meshRoads.find((m) => m.name === 'mr_side_s1');
   assert.ok(main && side);
-  // the side road runs on into the junction (no wedge) ...
-  assert.ok(Math.min(...side.nodes.map((nd) => nd[1])) < -1);
-  // ... and every node of it inside the main deck is at the main deck's height
+  // the side road ends just inside the main deck's edge (no wedge; none of it left across the main road's lanes) ...
+  const endY = Math.min(...side.nodes.map((nd) => nd[1]));
+  assert.ok(endY < 3.6 && endY > 2, `the side road ends at y ${endY}`);
   // (the through deck where the side road meets it: its middle; its own two ends come down to the road, below)
   const mainZ = main.nodes[main.nodes.length >> 1][2];
-  for (const nd of side.nodes) if (Math.abs(nd[1]) < 3.9) assert.ok(Math.abs(nd[2] - mainZ) < 0.005, `side node at y ${nd[1]}: ${nd[2]} vs ${mainZ}`);
-  // a node stands on the main deck's edge
-  assert.ok(side.nodes.some((nd) => Math.abs(nd[1] - 4) < 0.05));
+  // ... a node stands on the main deck's edge, at its height ...
+  const edge = side.nodes.find((nd) => Math.abs(nd[1] - 4) < 0.05);
+  assert.ok(edge && Math.abs(edge[2] - mainZ) < 0.005, `edge node ${edge}`);
+  // ... and the end inside is just under the main deck's surface
+  const end = side.nodes.find((nd) => nd[1] === endY);
+  assert.ok(end[2] < mainZ - 0.01 && end[2] > mainZ - 0.03, `end ${end[2]} under ${mainZ}`);
 });
 
 test('a deck does not close into a ring through a junction it already crossed', () => {
@@ -140,4 +143,50 @@ test('a deck\'s end with no deck beyond it comes down to the road', () => {
   const n = meshRoads[0].nodes;
   assert.ok(n[0][2] <= 10.051 && n[n.length - 1][2] <= 10.051, `ends ${n[0][2]}, ${n[n.length - 1][2]}`);
   assert.ok(n[n.length >> 1][2] > 10.1, `middle ${n[n.length >> 1][2]}`);
+});
+
+test('a road crossing another ends inside it on either side: no deck standing over a crossed road with a crest', () => {
+  // the wide road has a crest at the crossing (level from the west, falling 5 % to the east); the narrow one
+  // crosses it at 70 degrees, climbing 4 %
+  const crest = (x) => 10 - 0.05 * Math.max(0, x);
+  const dx = Math.cos(70 * Math.PI / 180); const dy = Math.sin(70 * Math.PI / 180);
+  const climb = (x, y) => 10 + 0.04 * (x * dx + y * dy);
+  const groups = [{ __items: [
+    road('dr_wide_s1_b', line(-60, 0, 0, 0), { width: 8, z: crest }), road('dr_wide_s2_b', line(0, 0, 60, 0), { width: 8, z: crest }),
+    road('dr_cross_s1_b', line(-40 * dx, -40 * dy, 0, 0), { z: climb }), road('dr_cross_s2_b', line(0, 0, 40 * dx, 40 * dy), { z: climb }),
+  ] }];
+  const { meshRoads, stats } = buildMeshRoads(groups, (x, y) => (Math.abs(y) < 4 ? crest(x) : climb(x, y)));
+  assert.equal(stats.crossings, 1);
+  const wide = meshRoads.filter((m) => m.name.startsWith('mr_wide')); const cross = meshRoads.filter((m) => m.name.startsWith('mr_cross'));
+  assert.equal(wide.length, 1); assert.equal(cross.length, 2);
+  const names = new Set(meshRoads.map((m) => m.name)); assert.equal(names.size, meshRoads.length);
+  for (const m of cross) {
+    // each part ends inside the wide deck, all of its end: both corners under it, none of it past the middle
+    const end = m.nodes.reduce((a, b) => (Math.abs(a[1]) < Math.abs(b[1]) ? a : b));
+    assert.ok(Math.abs(end[1]) < 3.6 && Math.abs(end[1]) > 0.5, `end at y ${end[1]}`);
+    for (const sgn of [-1, 1]) assert.ok(Math.abs(end[1] + sgn * 3 * dx) < 4, 'a corner of the end is outside the crossed deck');
+    // ... at the crossed deck's height there, leaning with it
+    assert.ok(Math.abs(end[2] - (crest(end[0]) + 0.03 - 0.02)) < 0.01, `end height ${end[2]} over ${crest(end[0])}`);
+  }
+  // what is left of the crossing road inside the crossed deck lies in that deck's surface, edge to edge
+  for (const m of cross) for (const nd of m.nodes) if (Math.abs(nd[1]) < 4) {
+    for (const o of [-3, 3]) {
+      const x = nd[0] - dy * o; const z = nd[2] - o * (nd[5] * -dy + nd[6] * dx) / nd[7];
+      assert.ok(Math.abs(z - (crest(x) + 0.03)) < 0.08, `edge of node ${nd.slice(0, 3)}: ${z} over a deck at ${crest(x) + 0.03}`);
+    }
+  }
+});
+
+test('a lane running along inside a wider deck is left out where that deck covers it whole', () => {
+  // (two decks at one height over each other flicker)
+  const lane = [[-40, 12], [-20, 2], [20, 2], [40, 12]].flatMap((p, i, a) => (i ? line(a[i - 1][0], a[i - 1][1], p[0], p[1]).slice(1) : [p]));
+  const groups = [{ __items: [road('dr_wide_s1_b', line(-60, 0, 60, 0), { width: 14 }), road('dr_lane_s1_b', lane, { width: 6 })] }];
+  const { meshRoads, stats } = buildMeshRoads(groups, flat);
+  assert.equal(stats.crossings, 1);
+  assert.equal(meshRoads.length, 3);
+  // ... but not where a part of it would be left uncovered: the same lane half out of the deck's edge
+  const half = [{ __items: [road('dr_wide_s1_b', line(-60, 0, 60, 0), { width: 14 }), road('dr_lane_s1_b', lane.map(([x, y]) => [x, y + 3.5]), { width: 6 })] }];
+  const b = buildMeshRoads(half, flat);
+  assert.equal(b.stats.crossings || 0, 0);
+  assert.equal(b.meshRoads.length, 2);
 });
