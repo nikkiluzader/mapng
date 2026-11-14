@@ -23,6 +23,7 @@ const SIGMA_M = 12;                    // smoothing: at least ...
 const SIGMA_SHARE = 25;                // ... a 25th of the chain ...
 const SIGMA_MAX_M = 40;                // ... at most
 const JOIN_M = 0.5;                    // part ends this close are one joint
+const RUN_ON_COS = 0.3;                // two parts at a joint run on into each other within about 70 degrees
 const VERTICAL_CURVE_M = 40;           // grade changes ease in over this far (a vertical curve)
 
 // A grade `slope` reached over `d` m, easing in over VERTICAL_CURVE_M (a
@@ -1080,6 +1081,7 @@ export function buildDeckGeometry(deck, { groundAt, roadLines = [], groundRoads:
     const slab = Math.min(DECK_DEPTH_M, depth);
     const girders = depth >= DECK_DEPTH_M + GIRDER_D_M - 1e-6;
     const nrm = leftNormals(xy);
+    const ownEnds = new Set();   // ends at a joint of two that are this part's own end all the same
     // across a plain join, the normal of both parts together; at a fork,
     // the incoming deck's (all ends square to it: edges meeting flush)
     for (const k of [0, xy.length - 1]) {
@@ -1100,6 +1102,15 @@ export function buildDeckGeometry(deck, { groundAt, roadLines = [], groundRoads:
       const beyond = other.k === 0 ? o[1] : o[o.length - 2];
       const before = k === 0 ? beyond : xy[k - 1];
       const after = k === 0 ? xy[1] : beyond;
+      // Two parts that end side by side at one point (a ramp joining the main road where the bridge ends)
+      // are not one road running on into the other: each ends square, with its cap. Mitred as a join, the
+      // cross-section there turned across the road and the parapets made a wall over every lane (an
+      // interstate bridge's end, a metre high).
+      {
+        const d1 = [xy[k][0] - before[0], xy[k][1] - before[1]]; const d2 = [after[0] - xy[k][0], after[1] - xy[k][1]];
+        const l1 = Math.hypot(d1[0], d1[1]) || 1; const l2 = Math.hypot(d2[0], d2[1]) || 1;
+        if ((d1[0] * d2[0] + d1[1] * d2[1]) / (l1 * l2) < RUN_ON_COS) { ownEnds.add(k); continue; }
+      }
       const len = Math.hypot(after[0] - before[0], after[1] - before[1]) || 1;
       nrm[k] = [-(after[1] - before[1]) / len, (after[0] - before[0]) / len];
     }
@@ -1228,7 +1239,7 @@ export function buildDeckGeometry(deck, { groundAt, roadLines = [], groundRoads:
     // end caps at the deck's own ends only (not at joins or forks), down to
     // the ground where it is close
     for (const k of [0, xy.length - 1]) {
-      if ((atJoint.get(key(xy[k])) || []).length !== 1) continue;
+      if ((atJoint.get(key(xy[k])) || []).length !== 1 && !ownEnds.has(k)) continue;
       const j = k === 0 ? 1 : xy.length - 2;
       const d = [(xy[k][0] - xy[j][0]), (xy[k][1] - xy[j][1]), 0];
       const len = Math.hypot(d[0], d[1]) || 1;
