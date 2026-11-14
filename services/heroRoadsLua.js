@@ -230,6 +230,16 @@ local function buildDirty()
 end
 local function reloadCollision() sinceReload = 0; be:reloadCollision() end
 
+local stubbed = {}
+local function unstub()
+  if editor then
+    if stubbed.setDirty then editor.setDirty = nil end
+    if stubbed.getNodes then editor.getNodes = nil end
+    if stubbed.table and next(editor) == nil then editor = nil end
+  end
+  stubbed = {}
+end
+
 local function start()
   local ok, mod = pcall(require, 'editor/heroRoadEditor/groupMgr')
   if not ok or not mod then
@@ -240,9 +250,12 @@ local function start()
   end
   gm = mod
   -- (two editor helpers the road code calls; they exist only once the World Editor has been opened)
-  editor = editor or {}
-  if not editor.setDirty then editor.setDirty = function() end end
+  -- (what is added here is taken away again once the roads are built, in unstub: a global "editor" left behind
+  -- reads to the rest of the game as the World Editor's own table, with most of it missing)
+  if editor == nil then editor = {}; stubbed.table = true end
+  if not editor.setDirty then editor.setDirty = function() end; stubbed.setDirty = true end
   if not editor.getNodes then
+    stubbed.getNodes = true
     editor.getNodes = function(road)
       local t = {}
       for i = 0, road:getNodeCount() - 1 do t[#t + 1] = { pos = road:getNodePosition(i), width = road:getNodeWidth(i), depth = road:getNodeDepth(i) } end
@@ -277,6 +290,7 @@ local function step()
   if at % 30 < PER_FRAME then say(string.format('MapNG: building Hero Roads (%d/%d)...', at, #queue), 6) end
   if at >= #queue then
     done = true
+    unstub()
     reloadCollision()
     local okLift, nLines = pcall(liftLines)
     if not okLift then firstError = firstError or tostring(nLines); nLines = 0 end
