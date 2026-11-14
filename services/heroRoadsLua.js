@@ -444,7 +444,9 @@ local function step()
       built = built + #made
       sinceReload = sinceReload + #made
       if sinceReload >= RELOAD_EVERY then reloadCollision() end
-      for _, g in ipairs(made) do for _, source in ipairs(g.mapngSources) do hideLayers(source) end end
+      for _, g in ipairs(made) do
+        for _, source in ipairs(g.mapngSources) do hideLayers(source) end
+      end
     else failed = failed + #made; firstError = firstError or tostring(err) end
   end
   if at % 30 < PER_FRAME then say(string.format('MapNG: building Hero Roads (%d/%d)...', at, #queue), 6) end
