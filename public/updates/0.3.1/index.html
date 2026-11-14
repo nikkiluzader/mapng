@@ -201,13 +201,19 @@
   <section id="widths">
     <div class="kicker">Roads</div>
     <h2>📏 Road widths that fit the country</h2>
-    <p>A BeamNG developer's map of the Pennines came out with roads far too wide, and his export report showed why. Three things changed:</p>
+    <p>A BeamNG developer's map of the Pennines came out with roads far too wide, and his export report showed why: MapNG's usual lane widths, and the metre of asphalt outside each edge line, were measured on BeamNG's own levels, which are North American roads. A road's width is now taken from, in this order:</p>
+    <ol>
+      <li><b>A width mapped in OpenStreetMap.</b> It always wins.</li>
+      <li><b>The satellite picture</b>, if you switch on <b>Map data &gt; Measure road widths</b>, wherever the road's edges are clear in it.</li>
+      <li><b>The country's own figures.</b> A new library holds the lane width usual for each road class, and the paved strip outside the edge line, for the ten countries MapNG is used from most: the United States, Russia, Poland, Germany, the United Kingdom, France, the Netherlands, Italy, Canada and Brazil. Each was read from the country's design rules, and its sources are listed beside it in the code.</li>
+      <li><b>The region's figures</b> for any other country, and MapNG's usual ones where the place is not known.</li>
+    </ol>
+    <figure><img src="images/road-widths.jpg" alt="The same bend of a British A road in the game twice: 9 metres of asphalt before, with wide strips outside the edge lines, and 6 metres after" loading="lazy"><figcaption>The same bend of a British A road in the game: 9.0 m of asphalt before, 6.0 m after. A level made before needs a fresh Generate.</figcaption></figure>
     <ul>
-      <li><b>Narrower roads outside the Americas.</b> MapNG's usual lane widths, and the metre of asphalt outside each edge line, were measured on BeamNG's own levels, which are North American roads. Elsewhere, a road with no width in OpenStreetMap now gets 3.0 m lanes on primary and secondary roads, 2.75 m on smaller ones, and a 0.25 m edge strip. Motorways, mapped widths and the Americas are as before.</li>
-      <li><b>Single-track roads.</b> A lane tagged <code>lanes=1</code> was built with two lanes, 6 m wide. The mapper's count now wins: it is one lane, about 3.5 m.</li>
-      <li><b>Measuring from the satellite picture no longer widens a road.</b> Where the verge or a stone wall is the road's own grey, the measurement read too wide. A width well over the class's usual one is not taken. Changing the switch now makes Generate run again, and the note in Fine-tuning says how many roads were measured out of how many.</li>
+      <li><b>Single-track roads.</b> A lane tagged <code>lanes=1</code> was built with two lanes, 6 m wide. The mapper's count now wins: one lane, 3.5 m (4.5 m in Russia, by its rule).</li>
+      <li><b>Measuring from the satellite picture</b> no longer widens a road: where the verge or a stone wall is the road's own grey, it read too wide. Changing the switch now makes Generate run again, and the note in Fine-tuning says how many roads were measured out of how many. The desktop app measures every road; the website keeps a limit on how many pictures it downloads.</li>
+      <li><b>The figures are a starting point.</b> A design rule and the road outside your window can differ, and a rule's classes do not map exactly onto the map's road types. If your country's roads come out wrong, say so on Discord with a measurement.</li>
     </ul>
-    <figure><img src="images/road-widths.jpg" alt="The same bend of a British A road in the game twice: 9 metres of asphalt before, with wide strips outside the edge lines, and 6.5 metres after" loading="lazy"><figcaption>The same bend of a British A road in the game: 9.0 m of asphalt before, 6.5 m after. A level made before needs a fresh Generate.</figcaption></figure>
   </section>
 
   <section id="making">
@@ -272,6 +278,8 @@
       <li><b>"Extremely heavy."</b> Maps past anything MapNG has been tried on are rated that way before you start, and the website warns before a map a browser tab will not finish.</li>
       <li><b>A page older than the site.</b> Four reports in one night read "out of memory" on a small map. Their pages had been open since before an update, and a part of the app they needed was gone. Such a page now shows the update notice with Reload.</li>
       <li><b>A full disk</b> is said plainly, instead of "ENOSPC: no space left on device".</li>
+      <li><b>Elevation where Amazon cannot be reached.</b> A 1 km Generate failed with every elevation tile missing while the satellite tiles arrived: the global elevation tiles come straight from Amazon's storage, which some networks cannot reach. MapNG now fetches them through mapng.com when the direct download fails.</li>
+      <li><b>The disclaimer says what a heavy map can do</b>: use all of a computer's memory or fill its disk, and freeze or crash the browser, the app, the game or the computer. MapNG is free software with no warranty, used at your own risk.</li>
       <li><b>Graphics problems.</b> A problem report now includes your graphics card and driver, Help has a <b>Software Rendering</b> switch for cards that garble the preview, and running out of graphics memory has a clear message.</li>
     </ul>
   </section>
@@ -284,6 +292,11 @@
       <li><b>Street parking is no longer assumed.</b> A town street with no parking tags is built at its driving width, so residential streets come out narrower.</li>
       <li><b>Planned roads and roads in tunnels are not painted</b> on the ground texture. A proposed trail in a canyon had been painted as asphalt.</li>
       <li><b>The lock on the location map</b> works at any time, also with an Area Mask drawn.</li>
+      <li><b>Generate could be pressed with GPXZ chosen and no key.</b> It is disabled until there is one.</li>
+      <li><b>The 3D preview remembers its settings</b>: sky, sun, detail, water, wireframe and surroundings.</li>
+      <li><b>Dark mode</b> reaches the 3D preview's switches, the map's tooltips, and the browser's own scrollbars and lists; the progress bar's track shows in light mode again.</li>
+      <li><b>Uploaded files' details</b> (grid, resolution, units, coverage) are shown in all seven languages, and a dozen texts that were still in English are translated.</li>
+      <li><b>Grass tufts.</b> Dry grass and lawns drew two tufts squeezed into each blade card; each card now has one.</li>
       <li><b>Background areas are called Area Mask</b>, and a line round an area too small for the map says so.</li>
       <li><b>Your own OSM file:</b> a JOSM file made of several downloads is read whole.</li>
       <li><b>A mapped kerb gets no rail.</b></li>
@@ -306,7 +319,7 @@
       <li><b>Mesh Roads</b> at hill junctions and where a deck meets a bridge or a tunnel floor.</li>
       <li><b>Hero Roads:</b> junctions joined, and a bake that travels with the level.</li>
       <li><b>"The roads have waves."</b> On the global 30 m data the two sides of a divided road can ride at different heights. Reproduced, not fixed.</li>
-      <li><b>A default road width you can set yourself</b>, for places where the new figures still do not fit.</li>
+      <li><b>More countries in the road width library</b>, and a default width you can set yourself where the figures still do not fit.</li>
       <li><b>A report that says "partial download"</b> from a 33 km map, with no log to go on.</li>
       <li><b>Still open from 0.3.0:</b> steep foot links as stairs, bus lanes and cycle paths, buildings as separate objects, a fresher planet copy.</li>
     </ul>
@@ -317,7 +330,7 @@
     <h2>🙏 Thanks</h2>
     <p>Nearly everything above started as a message, a screenshot or a report from someone testing MapNG. Thank you:</p>
     <ul>
-      <li><b>Wonly</b> (BeamNG): the Hero Roads feedback (lane widths, hundreds of roads, too many points, how baking works), the hill road that came out under the terrain, the garbled preview that led to graphics details in reports and the Software Rendering switch, and the Pennine map whose report led to the road widths.</li>
+      <li><b>Wonly</b> (BeamNG): the Hero Roads feedback (lane widths, hundreds of roads, too many points, how baking works), the hill road that came out under the terrain, the garbled preview that led to graphics details in reports and the Software Rendering switch, the Pennine map whose report led to the road widths, Poland's lane width chart, and the grass tufts.</li>
       <li><b>mcct</b> (BeamNG): the lake-country level in Poland whose water, console errors and frame rate led to the water and backdrop changes.</li>
       <li><b>Fizz_Mechanic</b>: 3D models as a creator's tool (the picked area, tiles, the point spacing and its cost), smooth roads, and the mountain galleries.</li>
       <li><b>Jevi</b>: JOSM files of several downloads, and road widths.</li>
