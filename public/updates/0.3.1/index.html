@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MapNG 0.3.1: Smoother Roads, Sounder Bridge Ends</title>
+<meta name="description" content="MapNG 0.3.1: two experimental road surfaces (Mesh Roads and baked Hero Roads), bridge ends that meet the ground, a Generate step that asks what you are making, 3D models of a picked area, a quality report for elevation sources, a much faster desktop app, and fixes from testers&#39; reports.">
+<link rel="canonical" href="https://mapng.com/updates/0.3.1/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MapNG 0.3.1: smoother roads, sounder bridge ends">
+<meta property="og:description" content="Mesh Roads and baked Hero Roads, bridge ends that meet the ground, 3D models of a picked area, an elevation quality report, a faster desktop app.">
+<meta property="og:url" content="https://mapng.com/updates/0.3.1/">
+<meta property="og:image" content="https://mapng.com/updates/0.3.1/images/hero-roads.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  /* BeamNG.drive's UI fonts, as the app (public/fonts, SIL OFL) */
+  @font-face { font-family: "Noto Sans"; src: url(/fonts/noto-sans-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass"; src: url(/fonts/overpass-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass Mono"; src: url(/fonts/overpass-mono-latin-wght-normal.woff2) format("woff2"); font-weight: 300 700; font-display: swap; }
+  :root {
+    --bg: #f7f7f8; --surface: #ffffff; --surface-2: #f2f2f4; --border: #e3e3e8;
+    --text: #1d1d22; --text-2: #4a4a55; --muted: #6e6e7a;
+    --brand: #ff6600; --brand-ink: #c2410c; --brand-tint: #fff4ec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+      --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+      --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+    --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+    --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.65 "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--brand-ink); }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 16px; }
+  h1, h2, h3 { font-family: "Overpass", "Noto Sans", system-ui, sans-serif; letter-spacing: -0.01em; }
+
+  /* hero: a plain band (a small release: no in-game shot) */
+  .hero { position: relative; color: #fff; background: linear-gradient(135deg, #1b1b22 0%, #2a1c12 60%, #7a3300 100%); }
+  .hero::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.15) 45%, rgba(0,0,0,.75) 100%); }
+  .hero .wrap { position: relative; padding-top: 18px; padding-bottom: 46px; min-height: min(46vh, 360px); display: flex; flex-direction: column; }
+  .brand { display: inline-flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; }
+  .brand img { width: 22px; height: 22px; }
+  .hero .spacer { flex: 1; }
+  .tag { display: inline-block; align-self: flex-start; background: var(--brand); color: #fff; font: 700 13px/1 "Overpass", sans-serif; letter-spacing: .08em; text-transform: uppercase; padding: 7px 12px; border-radius: 4px; transform: skewX(-12deg); }
+  .tag span { display: inline-block; transform: skewX(12deg); }
+  .hero h1 { font-size: clamp(34px, 7vw, 60px); line-height: 1.05; margin: 14px 0 10px; font-style: italic; text-shadow: 0 2px 18px rgba(0,0,0,.5); }
+  .hero p { margin: 0; font-size: 18px; max-width: 640px; color: rgba(255,255,255,.92); text-shadow: 0 1px 8px rgba(0,0,0,.6); }
+  .hero .cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 15px; text-decoration: none; }
+  .btn.primary { background: var(--brand); color: #fff; }
+  .btn.ghost { background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.35); backdrop-filter: blur(4px); }
+  .credit { position: absolute; right: 16px; top: 20px; max-width: 46%; text-align: right; font-size: 12px; line-height: 1.3; color: rgba(255,255,255,.75); text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+  @media (max-width: 560px) { .credit { display: none; } }
+
+  /* quick jump chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: -20px 0 0; position: relative; }
+  .chips a { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; font-size: 14px; color: var(--text); text-decoration: none; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  .chips a:hover { border-color: var(--brand); color: var(--brand-ink); }
+
+  main { padding-bottom: 72px; }
+  section { margin-top: 64px; scroll-margin-top: 16px; }
+  .kicker { font: 700 13px/1 "Overpass", sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--brand-ink); }
+  h2 { font-size: clamp(26px, 4.4vw, 34px); line-height: 1.15; margin: 8px 0 12px; }
+  h3 { font-size: 20px; margin: 30px 0 6px; }
+  p, li { color: var(--text-2); }
+  li { margin: 4px 0; }
+  b, strong { color: var(--text); }
+  code { font-family: "Overpass Mono", ui-monospace, monospace; background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; font-size: .9em; color: var(--text); }
+
+  figure { margin: 18px 0 0; }
+  figure img { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); box-shadow: 0 6px 24px rgba(0,0,0,.08); }
+  figcaption { margin-top: 8px; font-size: 14px; color: var(--muted); }
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: center; }
+  .split.narrow-img { grid-template-columns: minmax(0, 380px) minmax(0, 1fr); }
+  @media (max-width: 720px) { .split, .split.narrow-img { grid-template-columns: 1fr; } }
+
+  ol.callouts { list-style: none; padding: 0; margin: 16px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; counter-reset: c; }
+  ol.callouts li { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px 10px 48px; margin: 0; counter-increment: c; }
+  ol.callouts li::before { content: counter(c); position: absolute; left: 12px; top: 10px; width: 26px; height: 26px; border-radius: 50%; background: var(--brand); color: #fff; font: 800 14px/26px "Overpass", sans-serif; text-align: center; }
+
+  .note { background: var(--brand-tint); border-left: 3px solid var(--brand); border-radius: 0 8px 8px 0; padding: 12px 14px; color: var(--text); font-size: 15px; margin-top: 18px; }
+  .regions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; list-style: none; margin: 12px 0 0; }
+  .regions li { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-size: 14px; margin: 0; color: var(--text); }
+  .polish { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 14px; }
+  .polish div { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; font-size: 15px; color: var(--text-2); }
+  .polish b { display: block; margin-bottom: 2px; }
+
+  .outro { margin-top: 72px; text-align: center; }
+  .outro figure img { border-radius: 14px; }
+  .outro p { max-width: 620px; margin: 18px auto 0; }
+  footer { border-top: 1px solid var(--border); margin-top: 56px; padding-top: 18px; font-size: 14px; color: var(--muted); }
+  footer p { color: var(--muted); }
+
+  /* the cliff profile (inline SVG; series colours checked for colour-blind separation in both modes) */
+  .chart { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 14px 8px; margin-top: 18px; position: relative; }
+  .chart .legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 14px; color: var(--text-2); margin: 0 0 6px 4px; }
+  .chart .legend i { display: inline-block; width: 18px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  .profile { width: 100%; height: auto; display: block; --s1: #2f6fd6; --s2: #e85d00; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .profile, :root:not([data-theme="light"]) .chart .legend { --s1: #5b93ea; --s2: #e2650a; } }
+  :root[data-theme="dark"] .profile, :root[data-theme="dark"] .chart .legend { --s1: #5b93ea; --s2: #e2650a; }
+  .profile .g { stroke: var(--border); stroke-width: 1; }
+  .profile .t { fill: var(--muted); font: 12px "Noto Sans", sans-serif; }
+  .profile .lab { fill: var(--text); font: 600 13px "Noto Sans", sans-serif; }
+  .profile .cliff { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 4; }
+  .profile .s1, .profile .s2 { fill: none; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+  .profile .s1 { stroke: var(--s1); } .profile .s2 { stroke: var(--s2); }
+  .profile .xh { stroke: var(--muted); stroke-width: 1; }
+  .tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; font-size: 13px; color: var(--text); box-shadow: 0 4px 14px rgba(0,0,0,.12); white-space: nowrap; display: none; }
+  .tip i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+  table.nums { border-collapse: collapse; width: 100%; margin-top: 14px; font-size: 15px; }
+  table.nums th, table.nums td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  table.nums td.n { font-variant-numeric: tabular-nums; }
+  table.nums th { color: var(--muted); font-weight: 600; }
+  .bts { font-size: 14px; color: var(--muted); }
+  /* diagrams (inline SVG): colours from the page tokens, both modes */
+  .dia { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-top: 18px; }
+  .dia svg { width: 100%; height: auto; display: block; --d1: #2f6fd6; --d2: #e85d00; --d3: #3a9a4a; --dg: #b9cf9f; --dw: #9cc3e6; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .dia svg { --d1: #5b93ea; --d2: #ff8a3d; --d3: #5fbf6d; --dg: #4a5a3c; --dw: #2c4a66; } }
+  :root[data-theme="dark"] .dia svg { --d1: #5b93ea; --d2: #ff8a3d; --d3: #5fbf6d; --dg: #4a5a3c; --dw: #2c4a66; }
+  .dia text { fill: var(--text); font: 13px "Noto Sans", sans-serif; }
+  .dia .sm { fill: var(--muted); font-size: 12px; }
+  .dia .box { fill: var(--surface-2); stroke: var(--border); }
+  .dia .boxb { fill: var(--brand-tint); stroke: var(--brand); }
+  .dia .arrow { stroke: var(--muted); stroke-width: 1.5; fill: none; marker-end: url(#ah); }
+  .refs { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .refs figcaption a { color: var(--muted); }
+  .pair2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+  @media (max-width: 720px) { .pair2 { grid-template-columns: 1fr; } }
+  .stat { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-top: 16px; }
+  .stat div { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+  .stat b { display: block; font: 800 26px/1.1 "Overpass", sans-serif; color: var(--brand-ink); }
+  .stat span { font-size: 14px; color: var(--muted); }
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/favicon.svg" alt="">MapNG</a>
+    <div class="spacer"></div>
+    <span class="tag"><span>Update · 0.3.1</span></span>
+    <h1>Smoother roads, sounder bridge ends</h1>
+    <p>Two days after 0.3.0, a round built almost entirely from testers' reports: two experimental road surfaces for a smoother ride, bridge ends that meet the ground, a Generate step that asks what you are making, 3D models of a picked area, a quality report for elevation sources, and a much faster desktop app.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>
+      <a class="btn ghost" href="/">Open mapng.com</a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <nav class="chips" aria-label="On this page">
+    <a href="#roads">Road surfaces</a><a href="#bridges">Bridge ends</a><a href="#making">What are you making?</a><a href="#models">3D models</a><a href="#elevation">Elevation sources</a><a href="#water">Water and backdrop</a><a href="#speed">Speed</a><a href="#safety">Big maps and failures</a><a href="#more">Smaller things</a><a href="#next">Next</a><a href="#thanks">Thanks</a>
+  </nav>
+
+  <section id="roads">
+    <div class="kicker">The headline</div>
+    <h2>🛣️ Two new road surfaces to try: Mesh Roads and Hero Roads</h2>
+    <p>MapNG's roads have always been painted onto the terrain. The terrain is a grid of squares a metre or more across, so on a hill a painted road rides every square's edge. The best community maps get a smooth ride from road <i>meshes</i> laid over the ground. Under <b>Fine-tuning &gt; Road surfaces</b> there are now three choices: Decal roads (as before, and still the default), and two experimental ones.</p>
+    <h3>Mesh Roads (experimental)</h3>
+    <p>Each paved road also gets one of BeamNG's own Mesh Road objects under it, saved in the level and there to edit in the World Editor. MapNG's lane markings are drawn on top. Pieces of a road are joined into one deck, the through road goes first at a junction, and a deck leans with the ground across it.</p>
+    <figure><img src="images/mesh-roads.jpg" alt="Two views in the game with Mesh Roads: a steep city junction where streets meet on a slope, and a road cut along a bare mountainside" loading="lazy"><figcaption>Mesh Roads in the game: a steep city junction and a mountain road.</figcaption></figure>
+    <p>To know whether a change helps, every paved road of a test level is now walked in the game half a metre at a time, and every place where the surface steps by more than 8 cm is counted. Over one night's work on 20 test areas that count went from 339 to 253. It is not zero: junctions on hills and joins to bridges still have steps, which is why this stays experimental.</p>
+    <figure><img src="images/mesh-section.jpg" alt="Two drawings of the same bridge end, before and after: a top view with the decks shaded and a long section of the driving surface. Before, the surface jumps up 17 cm where the bridge meets the road; after, it runs through level" loading="lazy"><figcaption>Behind the scenes: one bridge end in a new town, measured in the game before and after. Top view on the left, the driving surface along the road on the right, and under it the change of slope every half metre (the dotted lines are 8 cm).</figcaption></figure>
+    <h3>Hero Roads (experimental): built once, then baked</h3>
+    <p>BeamNG's newer Hero Road tool makes a road mesh with a crown and shoulders. With this choice the level builds Hero Roads from MapNG's roads the first time it loads. A BeamNG developer tested it on a large map and sent three pieces of feedback, all in this version:</p>
+    <ul>
+      <li><b>Lanes are the real width.</b> MapNG's road surface includes its paved shoulders, and all of it was being shared out among the lanes: a road with 3.5 m lanes came out with 4.1 m lanes. Lanes now get the driving width and the rest becomes the Hero Road's shoulder.</li>
+      <li><b>Far fewer roads and points.</b> MapNG cuts a road at every junction, so his map showed over 400 roads in the editor. Pieces that run on into each other are now one Hero Road, and a node is kept only where the road's shape needs one. On a test town: 229 roads became 88, and 2,419 nodes became 1,172.</li>
+      <li><b>Baked, so later loads are instant.</b> After building, the level runs the editor's own Bake on every road: each becomes ordinary mesh files with levels of detail. The first load of the test town took 42 seconds to build and bake; the second load placed the baked meshes with nothing to rebuild.</li>
+    </ul>
+    <figure><img src="images/hero-roads.jpg" alt="Baked Hero Roads in the game: a roundabout with five arms seen from above, and a view along a road at driver height with a dashed centre line" loading="lazy"><figcaption>Baked Hero Roads on the second load of a level, with MapNG's own lane markings on top.</figcaption></figure>
+    <figure><img src="images/hero-far.jpg" alt="A whole 1 km town seen from far above in the game: every street still shows as a road" loading="lazy"><figcaption>From far away the baked roads stay drawn.</figcaption></figure>
+    <p>The baked files are kept in the game's user folder, so a level shared with a friend bakes once on their PC too. To edit the roads in the Hero Road tool, type <code>mainLevel.heroRoads().edit()</code> in the game's console. Junctions are not joined yet: each Hero Road ends square.</p>
+  </section>
+
+  <section id="bridges">
+    <div class="kicker">Bridges</div>
+    <h2>🌉 Bridge ends that meet the ground</h2>
+    <p>For this version every paved road of three test levels (a motorway interchange, a river town and a freeway cap with tunnels) was walked in the game at half-metre steps. Most of each bridge was smooth. The ends were not, and three causes turned up.</p>
+    <h3>A wall across the motorway</h3>
+    <p>Where a ramp lane and the main carriageway shared a bridge and ended at the same point, MapNG took them for one road running on into the other and joined their ends. The join twisted the parapets across the road: a concrete wall 0.9 m high over every lane. Two parts are now joined only when one really continues from the other.</p>
+    <figure><img src="images/bridge-wall.jpg" alt="The end of a motorway bridge in the game, before and after: before, a low concrete wall runs across all lanes between the two side parapets; after, the lanes run through" loading="lazy"><figcaption>The same bridge end before and after. This was in 0.3.0 too.</figcaption></figure>
+    <h3>A gap between the bridge and the road</h3>
+    <p>The ground under a bridge is kept low, and the ground of the road beyond it is raised to road height. The stretch just past a bridge's last point was being treated as still under the bridge, so where the ground there lay more than 1.5 m down nothing was filled in: a slot between the end of the deck and the road. That happened at one end of a bridge only, never at its start.</p>
+    <figure><img src="images/bridge-end-section.jpg" alt="Two drawings of an avenue bridge over a freeway, before and after. Before, the driving surface drops 2.5 metres for about 4 metres between the end of the deck and the ground; after, it is level" loading="lazy"><figcaption>Behind the scenes: an avenue bridge over a freeway. Before, the driving surface (black) falls 2.5 m into a 3.6 m slot after the deck; after, deck and ground meet.</figcaption></figure>
+    <figure><img src="images/bridge-end.jpg" alt="Another bridge end in the game, before and after: before, a triangular hole lies between the end of the deck and the approach road; after, the lanes run from the deck onto the ground" loading="lazy"><figcaption>A second place, where another bridge crosses at an angle: the hole beside the lanes is closed.</figcaption></figure>
+    <h3>A notch where the road steps onto a deck</h3>
+    <p>The terrain is a grid, so its last square before a bridge slopes away from road height. Each deck now has a short lip that laps onto the ground road, just under its surface.</p>
+    <p>Places with a step of more than 8 cm, counted in the game: the freeway cap went from 43 to 34 and the interchange from 22 to 17. What is left is listed under <a href="#next">Next</a>: this is better, not finished.</p>
+    <p>Also for bridges and tunnels: a road well above an open tunnel road becomes a bridge over it, a tunnel road left on the ground and the road above it no longer cut through each other, a road keeps its height under a gallery roof, and a tagged tunnel under a flat roof past its bore is built as a gallery, open to the valley.</p>
+  </section>
+
+  <section id="making">
+    <div class="kicker">Workflow</div>
+    <h2>🧭 Generate asks what you are making</h2>
+    <p>A BeamNG developer put it plainly: there are so many options now that it is easy to get lost. The Generate step now starts with one question: a <b>BeamNG level</b>, <b>Assets</b> (heightmaps, textures, 3D models), or <b>Both</b>. The Export step then shows only what belongs to that answer.</p>
+    <figure><img src="images/what-are-you-making.jpg" alt="MapNG with the Generate step open: three buttons, BeamNG level, Assets and Both, above a review of the area, resolution, elevation, terrain and map data" loading="lazy"><figcaption>The Generate step, with the choice at the top and a review of what will be fetched.</figcaption></figure>
+    <p>Generate also paints only the ground texture you chose. The others are made when you first ask for them, with a small sign in the view bar while one is being prepared.</p>
+  </section>
+
+  <section id="models">
+    <div class="kicker">Assets</div>
+    <h2>🧊 3D models: a picked area, in tiles, at a spacing you choose</h2>
+    <p>From a tester who builds maps with MapNG's models. A GLB or Collada export can now be of an area picked on the 2D preview instead of the whole map, cut into tiles, and at a point spacing you choose. The panel shows the points and the file size before you download. Models come out in the level's own frame, so a model and the level line up, and a 2 km map keeps its full detail.</p>
+    <figure><img src="images/models.jpg" alt="The Export step with the 3D models section open: Area 108 by 108 m of the map with Pick on the 2D preview and Whole map, Tiles set to One file, Point spacing Auto every 1 m, and a line giving the number of points and the size; on the 2D preview an orange dashed square marks the picked area" loading="lazy"><figcaption>3D models: the picked area is the dashed square on the 2D preview.</figcaption></figure>
+  </section>
+
+  <section id="elevation">
+    <div class="kicker">Elevation</div>
+    <h2>📐 See which elevation source is best, before you generate</h2>
+    <h3>Compare sources here, at any size</h3>
+    <p>"Compare sources here" has its own section now. It shows every source the place has, including USGS 1 m in the United States and Poland's national survey, at a size you choose up to the whole selection. GPXZ can be compared over all of it too: the number of calls is shown first, and what it downloads is kept for Generate.</p>
+    <figure><img src="images/compare-size.jpg" alt="The Compare sources here panel: a Size choice set to Whole selection, 2 km, hillshade pictures for Global 30 m and Mapterhorn, and buttons to add GPXZ, which uses 2 calls, and USGS 1 m, which is free" loading="lazy"><figcaption>Compare sources: the whole selection, with the GPXZ calls counted before you spend them.</figcaption></figure>
+    <h3>A quality report</h3>
+    <p>"See quality report" opens a page that scores each source for your square from 0 to 100: how well its ground already holds the roads, how fine its detail really is, and how free of flaws it is. Flaws (seams, stripes, flat shelves) are marked on a picture of each source. It runs at every comparison size up to 4 km, and 8 km in the desktop app.</p>
+    <figure><img src="images/quality-report.jpg" alt="An elevation source quality report for a 4 km square in a mountain canyon: Mapterhorn scores 83 of 100 and is marked best here, Global 30 m scores 47, and two hillshade pictures show the roads coloured green, yellow or red by how level they lie" loading="lazy"><figcaption>A quality report for a 4 km canyon. Roads are coloured by how level they lie across.</figcaption></figure>
+    <ul>
+      <li><b>Survey sheets joined.</b> Where two sheets of a national survey meet with a small step (seen as dashed lines across Poland's 1 m data), they are joined with one slope and eased where they disagree.</li>
+      <li><b>Coasts on the global 30 m data.</b> The sea reaches the mapped shore, harbours stand, a pier over the sea stays at the water, and there are no pits along the coast.</li>
+      <li><b>USGS 1 m</b> reads just the map's own box instead of whole 10 km tiles, and <b>one big map's lidar tiles</b> are cached whole, not a seventh of them.</li>
+    </ul>
+  </section>
+
+  <section id="water">
+    <div class="kicker">Water</div>
+    <h2>💧 Water and the land around your map</h2>
+    <p>A BeamNG developer's lake-country level in Poland ran at 6 frames a second with errors in the console and broken water. Changed since:</p>
+    <ul>
+      <li><b>Water in the surroundings is lighter.</b> Coarse lake tiles, no small far-off ponds or streams, and no occlusion queries on water.</li>
+      <li><b>A reservoir mapped as sometimes dry</b> is a lake where the elevation data shows it full.</li>
+      <li><b>The surroundings have more sources.</b> Mapterhorn's free lidar and Poland's 1 m model can be the backdrop's elevation, and a source is offered only where it has data. "Map data not yet available" tiles no longer end up in the satellite picture.</li>
+    </ul>
+  </section>
+
+  <section id="speed">
+    <div class="kicker">Speed</div>
+    <h2>⚡ A faster desktop app</h2>
+    <p>Every Generate and Export step was looked at for work that could use more cores. Measured here on an 8 km map:</p>
+    <ul>
+      <li><b>Big pictures are written on many cores.</b> An 8 km texture took 10.9 seconds to save and now takes 0.7.</li>
+      <li><b>Generate</b> on the global 30 m data: 78 seconds before, 54 now. The next texture is painted while the last one is being saved.</li>
+      <li><b>Export:</b> 112 seconds before, 88 now, from lake beds, paint cuts and crossings without repeated work. The heightmap is written on many cores.</li>
+      <li><b>The game texture's</b> satellite detail runs on worker threads, and its steep-rock and shadowed-water passes lost their per-pixel waste.</li>
+    </ul>
+  </section>
+
+  <section id="safety">
+    <div class="kicker">Big maps</div>
+    <h2>🛟 Very large maps, and when something goes wrong</h2>
+    <ul>
+      <li><b>"Invalid string length" on a huge city.</b> Someone sent a report from a 33 km city with 990,000 map features, whose export stopped part-way. Run again here on that version, it stopped at the same step: the buildings step handed every feature to its helpers as one piece of text, longer than the longest text the engine can hold. Features now travel in pieces, there and in two other places that did the same.</li>
+      <li><b>"Extremely heavy."</b> Maps past anything MapNG has been tried on are rated that way before you start, and the website warns before a map a browser tab will not finish.</li>
+      <li><b>A page older than the site.</b> Four reports in one night read "out of memory" on a small map. Their pages had been open since before an update, and a part of the app they needed was gone. Such a page now shows the update notice with Reload.</li>
+      <li><b>A full disk</b> is said plainly, instead of "ENOSPC: no space left on device".</li>
+      <li><b>Graphics problems.</b> A problem report now includes your graphics card and driver, Help has a <b>Software Rendering</b> switch for cards that garble the preview, and running out of graphics memory has a clear message.</li>
+    </ul>
+  </section>
+
+  <section id="more">
+    <div class="kicker">Also</div>
+    <h2>🔧 Smaller things</h2>
+    <ul>
+      <li><b>Road widths from the satellite picture.</b> Map data has a new choice to measure road widths from the satellite picture. It is off unless you choose it.</li>
+      <li><b>Street parking is no longer assumed.</b> A town street with no parking tags is built at its driving width, so residential streets come out narrower.</li>
+      <li><b>Planned roads and roads in tunnels are not painted</b> on the ground texture. A proposed trail in a canyon had been painted as asphalt.</li>
+      <li><b>The lock on the location map</b> works at any time, also with an Area Mask drawn.</li>
+      <li><b>Background areas are called Area Mask</b>, and a line round an area too small for the map says so.</li>
+      <li><b>Your own OSM file:</b> a JOSM file made of several downloads is read whole.</li>
+      <li><b>A mapped kerb gets no rail.</b></li>
+      <li><b>Levels carry the place's UTC offset</b>, so the time of day is the place's own.</li>
+      <li><b>Roads whose names differ only in letter case</b> no longer share one object name in the game, which merged two roads.</li>
+      <li><b>Hero Roads keep MapNG's own road markings</b>, drawn by each country's rules.</li>
+      <li><b>Test builds.</b> Help &gt; Get Test Builds offers the desktop builds made between releases. Eleven went out between 0.3.0 and this version.</li>
+      <li><b>MapNG's own map data</b> covers the strip along its archives' edges, and a failed read from storage is tried again.</li>
+      <li><b>A page on <a href="/how-its-built.html">how MapNG is built</a>.</b></li>
+    </ul>
+  </section>
+
+  <section id="next">
+    <div class="kicker">Next</div>
+    <h2>🚧 Left open for the update after this one</h2>
+    <p>Measured or reported, understood, and not in 0.3.1:</p>
+    <ul>
+      <li><b>Tunnel aprons.</b> A slot of up to 1.85 m where a tunnel's apron ends on the freeway-cap test level. The largest fault still measured.</li>
+      <li><b>Two parts of one bridge at different heights</b> where a ramp merges (0.94 m on one interstate bridge), and a few bridge ends with 0.5 to 0.9 m between deck and ground.</li>
+      <li><b>Mesh Roads</b> at hill junctions and where a deck meets a bridge or a tunnel floor.</li>
+      <li><b>Hero Roads:</b> junctions joined, a bake that travels with the level, and a one-way road with a single lane, which gets one very wide lane.</li>
+      <li><b>"The roads have waves."</b> On the global 30 m data the two sides of a divided road can ride at different heights. Reproduced, not fixed.</li>
+      <li><b>Roads with no width in the map data</b> that still come out too wide, and a default width you can set.</li>
+      <li><b>A report that says "partial download"</b> from a 33 km map, with no log to go on.</li>
+      <li><b>Still open from 0.3.0:</b> steep foot links as stairs, bus lanes and cycle paths, buildings as separate objects, a fresher planet copy.</li>
+    </ul>
+  </section>
+
+  <section id="thanks">
+    <div class="kicker">Credit</div>
+    <h2>🙏 Thanks</h2>
+    <p>Nearly everything above started as a message, a screenshot or a report from someone testing MapNG. Thank you:</p>
+    <ul>
+      <li><b>Wonly</b> (BeamNG): the Hero Roads feedback (lane widths, hundreds of roads, too many points, how baking works), the hill road that came out under the terrain, and the garbled preview that led to graphics details in reports and the Software Rendering switch.</li>
+      <li><b>mcct</b> (BeamNG): the lake-country level in Poland whose water, console errors and frame rate led to the water and backdrop changes.</li>
+      <li><b>Fizz_Mechanic</b>: 3D models as a creator's tool (the picked area, tiles, the point spacing and its cost), smooth roads, and the mountain galleries.</li>
+      <li><b>Jevi</b>: JOSM files of several downloads, and road widths.</li>
+      <li><b>alxti</b>: the proposed trail painted as asphalt, and what the quality report should measure.</li>
+      <li><b>glitter_shitter</b>: "the roads have waves", with reports and screenshots from a 16 km city.</li>
+      <li><b>dutch_guy_2003, lominsa, .splatplays, kreunz, uranium.boom, SailorSunny405</b>: reports, screenshots, test levels, answers to each other's questions, and the test builds tried one after another.</li>
+      <li><b>Everyone who pressed Send report.</b> The huge-city export, the "out of memory" on stale pages and the full disk were all found from reports sent from the app and the website.</li>
+    </ul>
+    <p>Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a> and the <a href="https://overturemaps.org/">Overture Maps Foundation</a>. Elevation: Mapzen / AWS Terrain Tiles, <a href="https://mapterhorn.com/attribution">Mapterhorn and its open-data sources</a>, USGS 3DEP, Poland's GUGiK, and GPXZ where you use it.</p>
+  </section>
+
+  <div class="outro">
+    <p><b>Heads-up:</b> the Windows build still isn't code-signed. If SmartScreen warns you, choose <b>More info</b>, then <b>Run anyway</b>.</p>
+    <p>Found something? Use <b>Send report</b> (on a level, or when something fails), post in the <a href="https://discord.gg/j6ZvcF8rgk">MapNG Discord</a> or open a <a href="https://github.com/nikkiluzader/mapng/issues">GitHub issue</a>. 🧡</p>
+    <div class="cta" style="display:flex;gap:10px;justify-content:center;margin-top:18px;flex-wrap:wrap">
+      <a class="btn primary" href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>
+      <a class="btn" style="border:1px solid var(--border);color:var(--text)" href="/">Open mapng.com</a>
+    </div>
+  </div>
+
+  <footer>
+    <p>MapNG is free and open source. <a href="https://github.com/nikkiluzader/mapng">GitHub</a> · <a href="/data.html">Your data</a> · <a href="/updates/0.3.0/">Previous update (0.3.0)</a> · <a href="/">mapng.com</a></p>
+  </footer>
+</main>
+</body>
+</html>
