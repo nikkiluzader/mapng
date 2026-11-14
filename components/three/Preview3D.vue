@@ -608,8 +608,19 @@ const SUN_PRESETS = {
 
 // 'full' renders the native heightmap grid (capped at 2048 mesh; the
 // full-resolution normal map carries detail beyond that) — heavier on GPU/RAM,
-// so it is opt-in and not persisted.
-const meshQuality = ref('medium');
+// so it is opt-in.
+// The preview's own settings, remembered from one visit to the next (as the look, the terrain view and the
+// contour lines already were). A stored value that is not one of the choices any more is not taken.
+const remembered = (key, fallback, { among = null, store = (v) => String(v), read = (s) => s } = {}) => {
+  let first = fallback;
+  try { const s = localStorage.getItem(key); if (s !== null) { const v = read(s); if (!among || among.includes(v)) first = v; } } catch { /* private mode */ }
+  const r = ref(first);
+  watch(r, (v) => { try { localStorage.setItem(key, store(v)); } catch { /* private mode */ } });
+  return r;
+};
+const onOff = { read: (s) => s === 'true' };
+// (Full detail is remembered as Max Safe: a graphics card it is too much for would fail again at every opening)
+const meshQuality = remembered('mapng_preview3d_meshQuality', 'medium', { among: ['medium', 'high', 'full'], store: (v) => (v === 'full' ? 'high' : v) });
 const meshQualityOptions = [
   { value: 'medium', labelKey: 'preview.qualityBalanced' },
   { value: 'high', labelKey: 'preview.qualityMaxSafe' },
@@ -618,7 +629,7 @@ const meshQualityOptions = [
 // SurroundingTerrain3D has its own low/medium/high fetch profiles; 'full'
 // center-tile detail doesn't warrant re-downloading surrounding tiles.
 const surroundingQuality = computed(() => (meshQuality.value === 'full' ? 'high' : meshQuality.value));
-const preset = ref("Kloofendal Pure Sky");
+const preset = remembered('mapng_preview3d_sky', "Kloofendal Pure Sky");
 // Visual quality: Cinematic (ambient occlusion, bloom, grade, haze) or
 // Standard (as before: lighter on the GPU). The first time, Standard where
 // the GPU is a software one (no hardware acceleration), else Cinematic;
@@ -635,7 +646,7 @@ const softwareGpu = (() => {
 const visualQuality = ref((() => { try { return localStorage.getItem(QUALITY_KEY) || (softwareGpu ? 'standard' : 'cinematic'); } catch { return 'cinematic'; } })());
 watch(visualQuality, (v) => { try { localStorage.setItem(QUALITY_KEY, v); } catch { /* private mode */ } });
 const cinematic = computed(() => visualQuality.value === 'cinematic');
-const sunPosition = ref("Mid Morning");
+const sunPosition = remembered('mapng_preview3d_sun', "Mid Morning");
 // (the same choice as the export panel's Base Texture: composables/useBaseTexture.js;
 // a touched-up texture previews as hybrid)
 const { baseTexture: sharedBaseTexture, setBaseTexture } = useBaseTexture();
@@ -655,19 +666,18 @@ const previewTextureFor = (value) => {
 const textureType = ref(previewTextureFor(sharedBaseTexture.value));
 // the terrain view and contour lines (remembered)
 const isDesktopApp = !!desktopApp;
-const readPref = (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
 // (the terrain view and the contour lines: one choice with the 2D preview, composables/useTerrainView.js)
 const contourStep = computed(() => contourInterval((Number(props.terrainData?.maxHeight) || 0) - (Number(props.terrainData?.minHeight) || 0)));
 // (only a click changes the shared choice; a fallback shown here does not)
 const pickTexture = (value) => { textureType.value = value; setBaseTexture(value); };
 watch(sharedBaseTexture, (value) => { const next = previewTextureFor(value); if (next !== textureType.value) textureType.value = next; });
 watch(() => props.terrainData, () => { textureType.value = previewTextureFor(sharedBaseTexture.value); });
-const surroundingTextureType = ref("none");
-const showWireframe = ref(false);
-const showWater = ref(true);
+const surroundingTextureType = remembered('mapng_preview3d_surroundingTexture', "none");
+const showWireframe = remembered('mapng_preview3d_wireframe', false, onOff);
+const showWater = remembered('mapng_preview3d_water', true, onOff);
 const waterLevelOffsetMeters = ref(0);
-const showSurroundings = ref(false);
-const showSceneSettings = ref(false);
+const showSurroundings = remembered('mapng_preview3d_surroundings', false, onOff);
+const showSceneSettings = remembered('mapng_preview3d_sceneSettings', false, onOff);
 
 // "Preview only" note: the preview is a quick, light look at the data; the
 // exported level is built at full detail. Dismissed once, it stays dismissed.
@@ -716,7 +726,7 @@ const presets = Object.keys(hdrPresets);
 const sunPositionOptions = Object.keys(SUN_PRESETS);
 // (the sky: 2K for Cinematic, 1K for Standard: the light it gives is blurred
 // anyway, and turning it into a cube is the biggest part of the first open)
-const currentHdrFile = computed(() => `/hdr/${hdrPresets[preset.value]}`.replace('_2k.hdr', cinematic.value ? '_2k.hdr' : '_1k.hdr'));
+const currentHdrFile = computed(() => `/hdr/${hdrPresets[preset.value] || hdrPresets["Kloofendal Pure Sky"]}`.replace('_2k.hdr', cinematic.value ? '_2k.hdr' : '_1k.hdr'));
 const activeSunPreset = computed(() => SUN_PRESETS[sunPosition.value] || SUN_PRESETS.Noon);
 
 // Blender-style "infinite zoom": stock OrbitControls dollies a fraction of the
