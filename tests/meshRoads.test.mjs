@@ -233,3 +233,72 @@ test('a deck leans with the ground across it: a banked bend keeps its bank, a le
   const steep = buildMeshRoads([{ __items: [road('dr_a_s1_b', line(0, 0, 80, 0), { z: () => 10 })] }], (x, y) => 10 + 0.3 * y).meshRoads[0];
   assert.ok(steep.nodes.every((nd) => Math.abs(leanOf(nd)) <= 0.1001));
 });
+
+test('a road partly on a bridge gets a deck on each stretch that lies on the ground, up to the bridge', () => {
+  // a 120 m road; a bridge from x = 50 to 70 (the ground 5 m under it there)
+  const ground = (x) => (x > 50 && x < 70 ? 5 : 10);
+  const onStructure = (x) => x >= 50 && x <= 70;
+  const a = road('dr_a_s1_b', line(0, 0, 120, 0), { extra: { overObjects: true } });
+  const { meshRoads, stats } = buildMeshRoads([{ __items: [a] }], ground, { onStructure });
+  assert.equal(meshRoads.length, 2); assert.equal(stats.cut, 1);
+  assert.equal(new Set(meshRoads.map((m) => m.name)).size, 2);
+  const xs = meshRoads.map((m) => [Math.min(...m.nodes.map((nd) => nd[0])), Math.max(...m.nodes.map((nd) => nd[0]))]).sort((p, q) => p[0] - q[0]);
+  assert.ok(xs[0][0] === 0 && xs[0][1] > 48 && xs[0][1] <= 50, `first deck ${xs[0]}`);
+  assert.ok(xs[1][0] >= 70 && xs[1][0] < 72 && xs[1][1] === 120, `second deck ${xs[1]}`);
+  // without the structures known, such a road is left alone as before
+  assert.equal(buildMeshRoads([{ __items: [road('dr_a_s1_b', line(0, 0, 120, 0), { extra: { overObjects: true } })] }], ground).meshRoads.length, 0);
+});
+
+test('a short stretch where the ground is off the road\'s line, no structure there, is bridged by the deck', () => {
+  const dip = (x) => (x > 40 && x < 52 ? 8.2 : 10);        // 12 m of ground 1.8 m low
+  const one = buildMeshRoads([{ __items: [road('dr_a_s1_b', line(0, 0, 120, 0))] }], dip, { onStructure: () => false });
+  assert.equal(one.meshRoads.length, 1);
+  assert.ok(Math.max(...one.meshRoads[0].nodes.map((nd) => nd[0])) === 120);
+  // ... a long one is no flaw: the road is off the ground there (a ramp the terrain was not built for)
+  const long = (x) => (x > 40 && x < 90 ? 8.2 : 10);
+  assert.equal(buildMeshRoads([{ __items: [road('dr_a_s1_b', line(0, 0, 120, 0))] }], long, { onStructure: () => false }).meshRoads.length, 2);
+});
+
+test('a side street climbing steeply to a wide street meets its surface at its edge, not half a metre under it', () => {
+  // the wide street (14 m) is level at 12 along x; the side street climbs 13 % to its middle from the south
+  const side = (x, y) => 12 + 0.13 * y;              // y < 0: lower
+  const groups = [{ __items: [
+    road('dr_wide_s1_b', line(-60, 0, 0, 0), { width: 14, z: () => 12 }), road('dr_wide_s2_b', line(0, 0, 60, 0), { width: 14, z: () => 12 }),
+    road('dr_side_s1_b', line(0, -80, 0, 0), { z: side }),
+  ] }];
+  const { meshRoads } = buildMeshRoads(groups, (x, y) => (Math.abs(y) < 7 ? 12 : side(x, y)));
+  const s = meshRoads.find((m) => m.name === 'mr_side_s1');
+  const edge = s.nodes.find((nd) => Math.abs(nd[1] + 7) < 0.1);
+  assert.ok(edge, `a node on the wide street's edge: ${s.nodes.map((nd) => nd[1].toFixed(1))}`);
+  assert.ok(Math.abs(edge[2] - 12.03) < 0.02, `at the wide street's height: ${edge[2]} (its own line there: ${side(0, -7)})`);
+  // ... and comes up to it over a ramp, no step along it
+  for (let i = 1; i < s.nodes.length; i++) { const a = s.nodes[i - 1]; const b = s.nodes[i]; assert.ok(Math.abs((b[2] - a[2]) / Math.max(0.3, b[1] - a[1])) < 0.2, `${a.slice(1, 3)} to ${b.slice(1, 3)}`); }
+});
+
+test('a street climbing steeply across a wide street meets its surface at both of its edges', () => {
+  // the wide street (12 m) level at 20 along x; the other climbs 13 % straight across it
+  const climb = (x, y) => 20 + 0.13 * y;
+  const groups = [{ __items: [
+    road('dr_wide_s1_b', line(-60, 0, 60, 0), { width: 12, z: () => 20 }),
+    road('dr_up_s1_b', line(0, -80, 0, 80), { width: 6, z: climb }),
+  ] }];
+  const { meshRoads, stats } = buildMeshRoads(groups, (x, y) => (Math.abs(y) < 6 ? 20 : climb(x, y)));
+  assert.equal(stats.crossings, 1);
+  const parts = meshRoads.filter((m) => m.name.startsWith('mr_up'));
+  assert.equal(parts.length, 2);
+  for (const m of parts) {
+    const edge = m.nodes.find((nd) => Math.abs(Math.abs(nd[1]) - 6) < 0.3);
+    assert.ok(edge, `${m.name}: a node on the wide street's edge (${m.nodes.map((nd) => nd[1].toFixed(1))})`);
+    assert.ok(Math.abs(edge[2] - 20.03) < 0.03, `${m.name}: its edge node at ${edge[2]}, the wide street at 20.03 (own line ${climb(0, edge[1]).toFixed(2)})`);
+  }
+});
+
+test('a gap in the ground between a bridge\'s end and the bank is spanned by the deck', () => {
+  // the bridge from x = 50 to 70; the ground 3 m down under it and for 2 m beyond each end
+  const ground = (x) => (x > 48 && x < 72 ? 7 : 10);
+  const { meshRoads } = buildMeshRoads([{ __items: [road('dr_a_s1_b', line(0, 0, 120, 0), { extra: { overObjects: true } })] }], ground, { onStructure: (x) => x >= 50 && x <= 70 });
+  const xs = meshRoads.map((m) => [Math.min(...m.nodes.map((nd) => nd[0])), Math.max(...m.nodes.map((nd) => nd[0]))]).sort((p, q) => p[0] - q[0]);
+  assert.equal(xs.length, 2);
+  assert.ok(xs[0][1] > 48.9 && xs[0][1] <= 50, `the first deck reaches the bridge: ${xs[0]}`);
+  assert.ok(xs[1][0] >= 70 && xs[1][0] < 71.1, `the second starts at it: ${xs[1]}`);
+});

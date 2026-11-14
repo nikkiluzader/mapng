@@ -32,6 +32,12 @@ export const MESH_ROAD_MATERIAL_DEF = {
 
 const NODE_GAP_M = 5;          // a deck node about this often (the docs: reasonably even spacing, few nodes)
 const MIN_WIDTH_M = 3;
+const RUN_STEP_M = 1;            // how finely a road is looked along for the stretches that lie on the ground
+const RUN_MIN_M = 2;             // a shorter stretch on the ground gets no deck (a bridge road has 3.5 m of ground road at each end)
+const FLAW_MAX_M = 20;           // the ground off the road's line for no longer than this, with no structure there: bridged
+const ON_GROUND_M = 0.35;          // the ground this near the road's line: the road is on the ground, whatever the graph calls it
+const ABUTMENT_GAP_M = 8;         // the ground off the road's line this far or less beyond a structure's end: the deck spans it
+const STRUCTURE_LEVEL_M = 2;     // a road within this of a structure's height there is on it (not the road under a bridge)
 const OVER_GROUND_M = 1.0;     // a road line this far over or under the ground is a bridge, ramp or tunnel: no deck
 const CLEAR_M = 0.03;          // the deck over the highest ground under it
 // The ground the deck must clear is looked at over this share of the road's half-width. At the very edge the
@@ -50,7 +56,9 @@ const SAME_LEVEL_M = 0.45;
 const END_LEVEL_M = 2.0;         // ... and an end that shares its point with another deck, within this
 const CROSS_TUCK_M = 0.5;      // a road crossing a deck ends at least this far inside that deck's edge
 const CROSS_SINK_M = 0.02;     // ... and this far under its surface there (two tops at one height flicker)
-const END_ZONE_M = 6;          // near an end that meets another deck the road is at that deck's level
+const END_ZONE_MIN_M = 2; const END_ZONE_MAX_M = 25;   // how near an end that meets another deck the road is looked for in it at any height
+const RUN_ON_SKIP_M = 4.5;         // an end's run-on is not asked to lie wholly under the deck it ends in
+const SPAN_GROW_M = 15;           // how far a stretch inside another deck is followed out to that deck's edge at any height
 const SCAN_M = 0.25;          // how finely a road's line is looked along for the decks it lies in
 const CAMBER_AT = [-0.9, -0.675, -0.45, -0.225, 0, 0.225, 0.45, 0.675, 0.9];   // where the ground is read across a road, in half widths
 const CAMBER_SPAN = 5;           // ... and how many of those in a row make the half width a lean is read from
@@ -103,7 +111,42 @@ function resample(nodes, gap) {
  * the decals over them lifted onto them. drapeAt(x, y): the drawn terrain's height. Returns
  * { meshRoads, stats: { decks, skipped, lifted, nodes } }; the decals are changed in place.
  */
-export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined } = {}) {
+/**
+ * Where a solved road graph (the export's structureGraph) has a bridge deck or a tunnel: a test
+ * (x, y, z) -> is a road at that height on one there. null without a solved graph.
+ */
+export function structureTest(graph) {
+  const z = graph?.profile?.z; const segs = graph?.classes?.segments;
+  if (!z || !segs) return null;
+  const KINDS = new Set(['deck', 'boredTunnel', 'cutAndCover', 'external']);
+  const grid = new Map(); const CELL = 8;
+  for (const s of segs) {
+    if (!KINDS.has(s.kind)) continue;
+    const e = graph.edges[s.edge]; const zz = z[s.edge]; if (!e || !zz) continue;
+    for (let i = s.i0; i < s.i1; i++) {
+      const seg = [e.x[i], e.y[i], zz[i], e.x[i + 1], e.y[i + 1], zz[i + 1], (e.half || 3) + 0.5];
+      const x0 = Math.floor((Math.min(seg[0], seg[3]) - seg[6]) / CELL); const x1 = Math.floor((Math.max(seg[0], seg[3]) + seg[6]) / CELL);
+      const y0 = Math.floor((Math.min(seg[1], seg[4]) - seg[6]) / CELL); const y1 = Math.floor((Math.max(seg[1], seg[4]) + seg[6]) / CELL);
+      for (let cx = x0; cx <= x1; cx++) for (let cy = y0; cy <= y1; cy++) { const k = cx * 65536 + cy; if (!grid.has(k)) grid.set(k, []); grid.get(k).push(seg); }
+    }
+  }
+  if (!grid.size) return () => false;
+  return (x, y, zq) => {
+    const list = grid.get(Math.floor(x / CELL) * 65536 + Math.floor(y / CELL));
+    if (!list) return false;
+    for (const s of list) {
+      const dx = s[3] - s[0]; const dy = s[4] - s[1]; const L2 = dx * dx + dy * dy || 1;
+      // (beside the structure, not within its half width of its end: a deck stopped 3.5 m short of a bridge)
+      const raw = ((x - s[0]) * dx + (y - s[1]) * dy) / L2; const slack = 0.25 / Math.sqrt(L2);
+      if (raw < -slack || raw > 1 + slack) continue;
+      const t = Math.max(0, Math.min(1, raw));
+      if (Math.hypot(x - (s[0] + dx * t), y - (s[1] + dy * t)) <= s[6] && Math.abs(zq - (s[2] + (s[5] - s[2]) * t)) < STRUCTURE_LEVEL_M) return true;
+    }
+    return false;
+  };
+}
+
+export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined, onStructure = null } = {}) {
   const stats = { decks: 0, skipped: 0, lifted: 0, nodes: 0, joined: 0, crossings: 0 };
   // one piece for each paved road surface on the ground: its line resampled, each node { x, y, base, hw }
   let pieces = [];
@@ -111,14 +154,60 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined } = {
     for (const decal of group.__items || []) {
       if (decal?.class !== 'DecalRoad' || !isBase(String(decal.name || '')) || !Array.isArray(decal.nodes) || decal.nodes.length < 2) continue;
       const width = Number(decal.nodes[decal.nodes.length >> 1][3]);
-      if (!isPavedSurface(decal) || !(width >= MIN_WIDTH_M) || decal.overObjects
-        || decal.nodes.some((n) => Math.abs(n[2] - drapeAt(n[0], n[1])) > OVER_GROUND_M)) { stats.skipped++; continue; }
-      const pts = resample(decal.nodes, NODE_GAP_M);
-      if (pts.length < 2) { stats.skipped++; continue; }
+      if (!isPavedSurface(decal) || !(width >= MIN_WIDTH_M)) { stats.skipped++; continue; }
+      // The stretches of the road that lie on the ground get a deck. A road partly on a bridge or in a tunnel
+      // had none at all: the ground road up to a bridge's end lay bare, and where the ground by the abutment
+      // stood 0.33 m under the road's line that was a step off the end of the bridge (measured in game). Where
+      // the structures are known (onStructure) a road is cut at them; a short stretch where the ground is off
+      // the road's line with no structure there (a flaw of the terrain, FLAW_MAX_M at most) is bridged by the
+      // deck, which is what a deck is for.
+      let runs;
+      if (!onStructure) {
+        if (decal.overObjects || decal.nodes.some((n) => Math.abs(n[2] - drapeAt(n[0], n[1])) > OVER_GROUND_M)) { stats.skipped++; continue; }
+        runs = [decal.nodes];
+      } else {
+        const fine = resample(decal.nodes, RUN_STEP_M);
+        // (on a structure where the solved graph says so and the ground is not at the road's line there: a
+        // bridge's stretch in the graph runs a few metres past the built deck onto its abutments, ground road
+        // by any measure, which were left bare between the bridge's end and the next deck)
+        const st = fine.map((q) => !!onStructure(q[0], q[1], q[2]) && Math.abs(q[2] - drapeAt(q[0], q[1])) > ON_GROUND_M);
+        const bad = fine.map((q, i) => st[i] || Math.abs(q[2] - drapeAt(q[0], q[1])) > OVER_GROUND_M);
+        const along = [0]; for (let i = 1; i < fine.length; i++) along.push(along[i - 1] + Math.hypot(fine[i][0] - fine[i - 1][0], fine[i][1] - fine[i - 1][1]));
+        for (let i = 0; i < fine.length;) {
+          if (!bad[i]) { i++; continue; }
+          let j = i; let structure = st[i]; while (j + 1 < fine.length && bad[j + 1]) { j++; structure = structure || st[j]; }
+          if (!structure && i > 0 && j < fine.length - 1 && along[j] - along[i] <= FLAW_MAX_M) for (let q = i; q <= j; q++) bad[q] = false;
+          i = j + 1;
+        }
+        // (... and the ground short of the road's line between a structure's end and the bank it lands on: the
+        // deck runs up to the structure. A canal bridge's deck ended a metre short of its abutment, the ground
+        // between 2.5 m down: a slot across the road at the bridge's end, measured in game)
+        for (let i = 0; i < fine.length; i++) {
+          if (!bad[i] || st[i]) continue;
+          let j = i; while (j + 1 < fine.length && bad[j + 1] && !st[j + 1]) j++;
+          const byStructure = (i > 0 && st[i - 1]) || (j < fine.length - 1 && st[j + 1]);
+          const landed = (i > 0 && !bad[i - 1]) || (j < fine.length - 1 && !bad[j + 1]);
+          if (byStructure && landed && along[j] - along[i] <= ABUTMENT_GAP_M) for (let q = i; q <= j; q++) bad[q] = false;
+          i = j;
+        }
+        runs = [];
+        for (let i = 0; i < fine.length;) {
+          if (bad[i]) { i++; continue; }
+          let j = i; while (j + 1 < fine.length && !bad[j + 1]) j++;
+          if (along[j] - along[i] >= RUN_MIN_M) runs.push(fine.slice(i, j + 1));
+          i = j + 1;
+        }
+        if (!runs.length) { stats.skipped++; continue; }
+        if (runs.length > 1 || runs[0].length < fine.length) stats.cut = (stats.cut || 0) + 1;
+      }
       // (the base line: the road's own height along its line, MapNG's smoothed profile, which the terrain under
       // the road was levelled to; measured on a hill town: the ground on the centre line is within a centimetre
       // of it at 99 % of nodes)
-      pieces.push({ name: String(decal.name), nodes: pts.map((q) => ({ x: q[0], y: q[1], base: q[2], hw: width / 2 })) });
+      const stem = String(decal.name).replace(/_b$/, '');
+      runs.forEach((run, r) => {
+        const pts = resample(run, NODE_GAP_M);
+        if (pts.length >= 2) pieces.push({ name: r ? `${stem}_g${r + 1}_b` : String(decal.name), nodes: pts.map((q) => ({ x: q[0], y: q[1], base: q[2], hw: width / 2 })) });
+      });
     }
   }
 
@@ -401,12 +490,19 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined } = {
         let i = 1; while (i < nodes.length - 1 && S[i] < s) i++;
         const a = nodes[i - 1]; const b = nodes[i]; const L = S[i] - S[i - 1] || 1; const u = Math.max(0, Math.min(1, (s - S[i - 1]) / L));
         // (near an end that meets another deck: at that deck's level whatever the two lines say there)
-        const flag = (meet0 && s < END_ZONE_M) || (meet1 && s > total - END_ZONE_M) ? 1 : 0;
+        const flag = (meet0 && s < zone0) || (meet1 && s > total - zone1) ? 1 : 0;
         return { s, x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u, base: a.base + (b.base - a.base) * u, hw: a.hw + (b.hw - a.hw) * u, need: Math.max(a.need, b.need), low: Math.min(a.low, b.low), camber: (a.camber || 0) + ((b.camber || 0) - (a.camber || 0)) * u, flag, ux: (b.x - a.x) / L, uy: (b.y - a.y) / L };
       };
+      // (how far from an end that meets another deck the road is still in that deck, whatever its own height
+      // says: to the far side of a 14 m road, not a fixed 6 m. A side street climbing 13 % to a wide street
+      // was 0.55 m under it at its edge, counted as another level there, and left as a wall across its mouth)
+      let zone0 = 0; let zone1 = 0;
+      const plainAt = (s) => { const q = at(s); return under(q.x, q.y, q.base, 1) > -Infinity; };
+      if (meet0) { zone0 = END_ZONE_MIN_M; while (zone0 < Math.min(END_ZONE_MAX_M, total) && plainAt(zone0)) zone0 += SCAN_M; zone0 += SCAN_M; }
+      if (meet1) { zone1 = END_ZONE_MIN_M; while (zone1 < Math.min(END_ZONE_MAX_M, total) && plainAt(total - zone1)) zone1 += SCAN_M; zone1 += SCAN_M; }
       const inside = (s) => { const q = at(s); return under(q.x, q.y, q.base, q.flag) > -Infinity; };
-      const whole = (s) => { const q = at(s); return under(q.x, q.y, q.base, q.flag) > -Infinity && under(q.x - q.uy * q.hw, q.y + q.ux * q.hw, q.base, q.flag) > -Infinity && under(q.x + q.uy * q.hw, q.y - q.ux * q.hw, q.base, q.flag) > -Infinity; };
-      const spans = []; let open = null; let ps = 0; let pin = inside(0); if (pin) open = 0;
+      const whole = (s) => { const q = at(s); const f = inSpan(s) ? 1 : q.flag; return under(q.x, q.y, q.base, f) > -Infinity && under(q.x - q.uy * q.hw, q.y + q.ux * q.hw, q.base, f) > -Infinity && under(q.x + q.uy * q.hw, q.y - q.ux * q.hw, q.base, f) > -Infinity; };
+      const spans = []; const inSpan = (s) => spans.some(([a, b]) => s >= a - 1e-6 && s <= b + 1e-6); let open = null; let ps = 0; let pin = inside(0); if (pin) open = 0;
       for (let s = SCAN_M; ps < total; s += SCAN_M) {
         const ss = Math.min(s, total); const now = inside(ss);
         if (now !== pin) {
@@ -417,6 +513,16 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined } = {
         ps = ss; pin = now;
       }
       if (open !== null) spans.push([open, total]);
+      // A stretch found inside another deck is all of the road that lies in that deck's outline at about its
+      // level, not only the part within SAME_LEVEL_M of it: a street climbing 13 % across a 12 m street was
+      // 0.56 m under it at its edge, counted as inside only from a metre in, and ended there at its own height:
+      // a wall of 0.3 to 0.75 m across its lane at the crossed street's edge (32 such on one hill grid).
+      const wide = (s) => { const q = at(s); return under(q.x, q.y, q.base, 1) > -Infinity; };
+      for (const sp of spans) {
+        for (let g = 0; g < SPAN_GROW_M && sp[0] > 0 && wide(Math.max(0, sp[0] - SCAN_M)); g += SCAN_M) sp[0] = Math.max(0, sp[0] - SCAN_M);
+        for (let g = 0; g < SPAN_GROW_M && sp[1] < total && wide(Math.min(total, sp[1] + SCAN_M)); g += SCAN_M) sp[1] = Math.min(total, sp[1] + SCAN_M);
+      }
+      for (let q = spans.length - 1; q > 0; q--) if (spans[q][0] <= spans[q - 1][1] + SCAN_M) { spans[q - 1][1] = Math.max(spans[q - 1][1], spans[q][1]); spans.splice(q, 1); }
       const drops = []; const edges = [];
       for (const [a, b] of spans) {
         const from0 = a <= 0; const to1 = b >= total;
@@ -425,8 +531,11 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined } = {
         while (!from0 && sa < b && !whole(sa)) sa += SCAN_M;
         while (!to1 && sb > a && !whole(sb)) sb -= SCAN_M;
         let clear = sa < sb - 0.05 && (from0 || sa < b) && (to1 || sb > a);
-        for (let s = sa; clear && s <= sb; s += 1) if (!whole(s)) clear = false;
-        if (clear && !whole(sb)) clear = false;
+        // (an end's last metres, its run-on into the junction, may reach the other deck's far edge: a side
+        // street's end left across a steep through street stood 25 cm out of it, its own corners just outside)
+        const lo = from0 ? Math.min(sb, RUN_ON_SKIP_M) : sa; const hi = to1 ? Math.max(sa, total - RUN_ON_SKIP_M) : sb;
+        for (let s = lo; clear && s <= hi; s += 1) if (!whole(s)) clear = false;
+        if (clear && !whole(hi)) clear = false;
         if (!from0) edges.push(a);
         if (!to1) edges.push(b);
         if (clear) drops.push([sa, sb]);
@@ -443,12 +552,12 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined } = {
         for (let i = 0; i < nodes.length; i++) {
           if (S[i] < a - 1e-9 || S[i] > b + 1e-9) continue;
           if ((a > 0 && S[i] - a < EDGE_NODE_MIN_M) || (b < total && b - S[i] < EDGE_NODE_MIN_M)) continue;
-          list.push({ ...nodes[i], s: S[i] });
+          list.push({ ...nodes[i], s: S[i], flag: nodes[i].flag || (inSpan(S[i]) ? 1 : 0) });
         }
         if (b < total) list.push({ ...at(b), flag: 1, sink: true });
         for (const e of edges) {
           if (e <= a || e >= b || list.some((q) => Math.abs(q.s - e) < EDGE_NODE_MIN_M)) continue;
-          list.push({ ...at(e), flag: 0 });
+          list.push({ ...at(e), flag: 1 });
         }
         list.sort((u, v) => u.s - v.s);
         if (list.length >= 2 && list[list.length - 1].s - list[0].s > 0.5) lists.push(list);

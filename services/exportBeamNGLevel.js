@@ -46,7 +46,7 @@ import { DAE_OPTIONS, describeScene, writeDae } from './daeWorker.js';
 import { geoToWorldPoint, getTerrainHeightWorld, terrainDrape, terrainGroundAt } from './terrainLookup.js';
 import { pickFlagCell } from './flagPlacement.js';
 import { BUILDING_LITE_FROM_M, buildingTileScene } from './buildingTiles.js';
-import { buildMeshRoads, MESH_ROAD_MATERIAL, MESH_ROAD_MATERIAL_DEF } from './meshRoads.js';
+import { buildMeshRoads, MESH_ROAD_MATERIAL, MESH_ROAD_MATERIAL_DEF, structureTest } from './meshRoads.js';
 import { viewDistanceMeters, viewDistanceChoice, fogDensityFor } from './viewDistance.js';
 import { HERO_ROADS_FILE, HERO_ROADS_LUA } from './heroRoadsLua.js';
 import { ensureTexture, hasTexture } from './textureOnDemand.js';
@@ -14292,7 +14292,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // (after every road decal is made and the terrain is final: the decals over a deck are lifted onto it)
   let meshRoadStats = null;
   if (roadSurface === 'mesh' && decalRoads.length > 0) {
-    const made = buildMeshRoads(decalRoads, terrainDrape(exportTerrainData, squareSize).drapeAt, { makeId: generatePersistentId });
+    const made = buildMeshRoads(decalRoads, terrainDrape(exportTerrainData, squareSize).drapeAt, { makeId: generatePersistentId, onStructure: structureTest(decalRoads.structureGraph) });
     meshRoadStats = made.stats;
     if (made.meshRoads.length) {
       decalRoads.push({ class: 'SimGroup', name: 'mesh_roads', persistentId: generatePersistentId(), __parent: 'Decal_Roads', __items: made.meshRoads });
