@@ -19,18 +19,28 @@ alone have misled this work more than once. Tools are listed at the end.
 
 ## 1. Mesh Roads and junction heights (in progress)
 
-1. **Round the crests and troughs at junctions.** At interchanges a road runs at its class grade limit to a sharp
-   peak at the junction and straight down again. This is what is left of most steps. Draw the worst junctions of
-   the roundabout town and the hilly city first.
-2. **Junction mouths on by default.** `junctionMouths` (services/structures/junctionMouths.js) holds a side road's
-   first metres at the through road's height. In game on eight maps: steps over 8 cm 85 to 76. Needs a full sweep
-   (it changes every export's road heights) and a look in game before the switch is flipped.
-3. **The half of a crossing with no room.** Where a road cannot reach the plateau within its grade the pin is
-   taken back and that side keeps its peak. Needs its own answer (a longer approach, or a lower plateau).
-4. **Deck meets structure.** Steps where a Mesh Road deck meets a bridge deck or a tunnel floor (7 to 35 cm in
-   several maps, more at an interchange), and sidewalk slabs found lying across a carriageway.
+Done 2026-11-13/14, from in-game profiles (every paved road walked at an even 0.5 m) and drawings of the worst
+places. Places with a step over 8 cm: roundabout town 29 to 4, hilly city 16 to 11.
+- A road ends just inside the deck it crosses or joins instead of running through it (a deck through a crossing
+  could lean one way only and stood 15 to 20 cm over a crossed road with a crest).
+- A deck's lean eases out along the road, and leaning decks have a middle line of vertices (a twisted quad folded
+  into a 10 to 13 cm ridge just outside junctions).
+- Road names that differ only in letter case no longer share an object name (the game merged two roads: 240 m of
+  road moved across a town; this was every road mode, not only Mesh Roads).
+The steps were not, as first thought, crests in the solved road heights: the solved lines have next to none.
+
+Open, most visible first:
+1. **A slot in the ground under a road** where a tunnel left on the ground (an underground car park's exit ramp,
+   2 m under an avenue) crosses under it: 2 m deep, 3 m wide, across the avenue. Terrain, so every road mode. The
+   road above also loses its whole deck to it. Drawn; not yet traced to the pass that digs it.
+2. **Sidewalk slabs across a carriageway** (three in the roundabout town, 18 to 36 cm): the sidewalk builder.
+3. **Deck meets structure.** Steps where a deck meets a bridge deck or a tunnel floor (24 to 33 cm in the hilly
+   city, more at an interchange), and terrain spikes on roads near tunnel mouths.
+4. **Junction mouths on by default.** `junctionMouths` (services/structures/junctionMouths.js) holds a side road's
+   first metres at the through road's height. Less needed for Mesh Roads now; still worth it for decal roads.
+   Needs a full sweep (it changes every export's road heights) and a look in game before the switch is flipped.
 5. **Frame rate.** Decal roads against Mesh Roads against Hero Roads on the same level. Not measured yet.
-6. **Decide whether Mesh Roads stays visible** while it has ledges on hills (it is experimental and off by default).
+6. **Decide whether Mesh Roads stays experimental** once 1 to 3 are done.
 
 ## 2. Checks owed on work already on dev
 
@@ -89,6 +99,8 @@ Not pursued further: "Extremely heavy" warns, nothing blocks.
 Each test: export with `roadSurface: "mesh"`, load in game, walk every paved road line with rays at 0.5 m, and
 draw the worst places before judging. "Steps" are changes of slope over 8 cm in half a metre along the road.
 
+**Note:** `wide.mjs` samples at uneven spacing (0.5 to 1 m), which reads as steps on steep roads; `profile.mjs` is even.
+
 **Already run (eight to ten maps, results in the commit messages):** hairpins, a roundabout town, a stacked
 interchange, mountain galleries, a cliff road with tunnels, flat country, two city bridges, a city grid, a canyon
 road, a dense hilly city.
@@ -139,3 +151,8 @@ road, a dense hilly city.
   its line, before and after.
 - `scratch/meshroads/wide.mjs <tag> <areas...>` with `measure_wide.lua`: the in-game measurement on several maps
   (`EXTRA_OPTS='{"junctionMouths":true}'` adds export options).
+- `scratch/junctions/profile.mjs <zip> <out.json>` with `profile.lua`: loads a level in the running game and saves
+  the driving surface every 0.5 m along every paved road (height, what the ray met, terrain) and every deck's nodes.
+- `scratch/junctions/gsteps.py prof.json [threshold]`: the steps in such a profile, grouped into places and kinds.
+- `scratch/junctions/gplot.py prof.json road index out.png [title] [reach]`: one place from the game: top view with
+  the decks and their node heights, the long section, and the change of slope. Use this one first.
