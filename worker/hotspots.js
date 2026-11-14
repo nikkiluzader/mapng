@@ -7,6 +7,11 @@ import { HOTSPOT_PLATFORMS, isHotspotCell } from '../services/exportHotspots.js'
 import { USAGE_FIELDS, validUsage } from '../services/usageStats.js';
 
 const LIMIT_PER_HOUR = 30;   // reports one address may make in an hour
+// New squares in a day, from everyone together. Far above real use (a few hundred squares in
+// the first fortnight); it stops a script, sending from many addresses, from drawing on the
+// public map or growing the table until it can no longer be read.
+export const NEW_CELLS_PER_DAY = 1500;
+const MAX_REPORT_BYTES = 4096;   // a report is a few dozen bytes, a settings report a few hundred
 
 // (asked over fetch, not RPC: no 'cloudflare:workers' import, so index.js
 // still loads in Node for tests/osmWorkerCache.test.mjs)
@@ -72,6 +77,11 @@ export class ExportHotspots {
       for (const [key, value] of this.recent) if (value.hour !== hour) this.recent.delete(key);
     }
     const day = new Date().toISOString().slice(0, 10);
+    const known = this.sql.exec('SELECT 1 FROM cells WHERE y = ? AND x = ?', y, x).toArray().length > 0;
+    if (!known) {
+      const today = this.sql.exec('SELECT COUNT(*) AS n FROM cells WHERE last_day = ? AND web + desktop = 1', day).toArray()[0]?.n || 0;
+      if (today >= NEW_CELLS_PER_DAY) return 'limited';
+    }
     // (platform is one of the two column names, checked above)
     this.sql.exec(
       `INSERT INTO cells (y, x, ${platform}, last_day) VALUES (?, ?, 1, ?)
@@ -114,6 +124,27 @@ export class ExportHotspots {
 
 const HOTSPOTS_CACHE_S = 600;
 
+/** A small JSON body, or null: read in pieces and given up on past MAX_REPORT_BYTES, whatever the sender says its length is. */
+async function smallJson(request) {
+  try {
+    if (Number(request.headers.get('Content-Length') || 0) > MAX_REPORT_BYTES) return null;
+    const reader = request.body?.getReader();
+    if (!reader) return null;
+    const parts = []; let size = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > MAX_REPORT_BYTES) { await reader.cancel(); return null; }
+      parts.push(value);
+    }
+    const all = new Uint8Array(size); let at = 0;
+    for (const p of parts) { all.set(p, at); at += p.byteLength; }
+    const body = JSON.parse(new TextDecoder().decode(all));
+    return body && typeof body === 'object' ? body : null;
+  } catch { return null; }
+}
+
 async function senderHash(request) {
   const address = request.headers.get('CF-Connecting-IP') || 'unknown';
   const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`mapng-hotspots:${address}`));
@@ -127,8 +158,8 @@ export async function handleHotspots(request, env, ctx, json) {
   const cache = caches.default;
   const key = new Request(new URL('/api/hotspots', request.url).toString(), { method: 'GET' });
   if (request.method === 'POST') {
-    let body;
-    try { body = await request.json(); } catch { return json({ error: 'Bad request' }, 400); }
+    const body = await smallJson(request);
+    if (!body) return json({ error: 'Bad request' }, 400);
     const { result } = await (await stub.fetch('https://hotspots/report', {
       method: 'POST',
       body: JSON.stringify({ y: body?.y, x: body?.x, platform: body?.platform, sender: await senderHash(request) }),
@@ -157,8 +188,8 @@ export async function handleUsage(request, env, ctx, json) {
   const cache = caches.default;
   const key = new Request(new URL('/api/usage', request.url).toString(), { method: 'GET' });
   if (request.method === 'POST') {
-    let body;
-    try { body = await request.json(); } catch { return json({ error: 'Bad request' }, 400); }
+    const body = await smallJson(request);
+    if (!body) return json({ error: 'Bad request' }, 400);
     const { result } = await (await stub.fetch('https://hotspots/usage-report', {
       method: 'POST',
       body: JSON.stringify({ settings: body?.settings, sender: await senderHash(request) }),

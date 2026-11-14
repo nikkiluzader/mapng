@@ -19,6 +19,20 @@ export const normalizeShareId = (text) => {
 };
 export const formatShareId = (id) => `${id.slice(0, 3)}-${id.slice(3)}`;
 
+const READS_PER_HOUR = 60;      // tries at opening a code, per address (the same in-memory note as for sending)
+const recentReads = new Map();
+async function limitedReads(request) {
+  const address = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`mapng-share-read:${address}`));
+  const key = [...new Uint8Array(digest).slice(0, 8)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  const hour = Math.floor(Date.now() / 3600000);
+  const seen = recentReads.get(key);
+  if (seen && seen.hour === hour && seen.count >= READS_PER_HOUR) return true;
+  recentReads.set(key, { hour, count: seen?.hour === hour ? seen.count + 1 : 1 });
+  if (recentReads.size > 5000) for (const [k, v] of recentReads) if (v.hour !== hour) recentReads.delete(k);
+  return false;
+}
+
 async function limited(request) {
   const address = request.headers.get('CF-Connecting-IP') || 'unknown';
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`mapng-share:${address}`));
@@ -53,7 +67,11 @@ export async function handleShareCodes(request, env, url, json) {
   }
 
   if (request.method !== 'GET') return json({ error: 'Method Not Allowed' }, 405);
-  const id = normalizeShareId(decodeURIComponent(sub.slice(1)));
+  // (codes are short so they can be read out loud; guessing them is slowed to a crawl instead)
+  if (await limitedReads(request)) return json({ error: 'Too many tries; try again later' }, 429, noStore);
+  let asked = '';
+  try { asked = decodeURIComponent(sub.slice(1)); } catch { return json({ error: 'Not a send code' }, 404, noStore); }
+  const id = normalizeShareId(asked);
   if (!id) return json({ error: 'Not a send code' }, 404, noStore);
   const object = await env.OSM_TILES.get(`${PREFIX}${id}`);
   const expiresAt = object?.customMetadata?.expiresAt;

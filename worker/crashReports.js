@@ -31,28 +31,38 @@ async function senderHash(request) {
 }
 
 const clip = (v, n) => String(v ?? '').slice(0, n);
+// (one line, for the headings of a report: no line breaks or control characters, which could
+// otherwise write lines of their own into the alert email)
+const oneLine = (v, n) => String(v ?? '').replace(/[\u0000-\u001f\u007f]+/g, ' ').slice(0, n);
+// The settings, area and memory figures of a report are small objects. One sent far bigger is
+// dropped: the list of reports reads them all at once, and a few of many megabytes would stop it.
+const MAX_OBJECT_CHARS = 64 * 1024;
+const smallObject = (v) => {
+  if (!v || typeof v !== 'object') return null;
+  try { return JSON.stringify(v).length <= MAX_OBJECT_CHARS ? v : { dropped: 'too large' }; } catch { return null; }
+};
 
 /** The report's fields kept as data (log and crash dump are stored as their own files). */
 export function reportSummary(body, id, receivedAt) {
   return {
     id,
     receivedAt,
-    kind: clip(body.kind, 40),                 // crash | export | generate | rebuild | manual | level
-    appVersion: clip(body.appVersion, 40),
-    build: clip(body.build, 80),
-    platform: clip(body.platform, 40),
-    os: clip(body.os, 120),
+    kind: oneLine(body.kind, 40),                 // crash | export | generate | rebuild | manual | level
+    appVersion: oneLine(body.appVersion, 40),
+    build: oneLine(body.build, 80),
+    platform: oneLine(body.platform, 40),
+    os: oneLine(body.os, 120),
     error: clip(body.error, 4000),
     description: clip(body.description, 4000),
-    options: body.options && typeof body.options === 'object' ? body.options : null,
-    area: body.area && typeof body.area === 'object' ? body.area : null,
+    options: smallObject(body.options),
+    area: smallObject(body.area),
     config: typeof body.config === 'string' && body.config.startsWith('mapng:') ? clip(body.config, MAX_CONFIG_CHARS) : '',
-    memory: body.memory && typeof body.memory === 'object' ? body.memory : null,
+    memory: smallObject(body.memory),
     gpu: clip(body.gpu, 1100),
     hasLog: typeof body.log === 'string' && body.log.length > 0,
     hasDump: typeof body.minidump === 'string' && body.minidump.length > 0,
     hasExportReport: typeof body.exportReport === 'string' && body.exportReport.length > 0,
-    level: clip(body.level, 120),              // the level's name, for a report sent from the levels list
+    level: oneLine(body.level, 120),              // the level's name, for a report sent from the levels list
   };
 }
 
@@ -96,15 +106,18 @@ async function notify(env, summary, viewerUrl) {
   counts.mails += 1; counts.hours[hour] = (Number(counts.hours[hour]) || 0) + 1;
   // (counted before sending: a failing mail service must not lift the cap)
   try { await writeCounts(env, day, counts); } catch { return; }
+  // (the link first, and what the sender wrote set in from the margin: a report's text cannot
+  // pass itself off as one of this email's own lines, such as a "View:" link to somewhere else)
+  const quoted = (text) => String(text).slice(0, 600).split(/\r?\n/).map((l) => `    | ${l}`).join('\n');
   const lines = [
     `MapNG ${summary.kind} report ${summary.id}`,
-    `App: ${summary.appVersion} (${summary.build}) on ${summary.os || summary.platform}`,
-    summary.error ? `Error: ${summary.error.slice(0, 600)}` : '',
-    summary.description ? `User wrote: ${summary.description.slice(0, 600)}` : '',
-    summary.level ? `Level: ${summary.level}` : '',
-    `Log: ${summary.hasLog ? 'yes' : 'no'}  Crash dump: ${summary.hasDump ? 'yes' : 'no'}  Export report: ${summary.hasExportReport ? 'yes' : 'no'}`,
     `View: ${viewerUrl}`,
     allowance.note,
+    `App: ${summary.appVersion} (${summary.build}) on ${summary.os || summary.platform}`,
+    summary.level ? `Level: ${summary.level}` : '',
+    `Log: ${summary.hasLog ? 'yes' : 'no'}  Crash dump: ${summary.hasDump ? 'yes' : 'no'}  Export report: ${summary.hasExportReport ? 'yes' : 'no'}`,
+    summary.error ? `Error:\n${quoted(summary.error)}` : '',
+    summary.description ? `User wrote:\n${quoted(summary.description)}` : '',
   ].filter(Boolean);
   try {
     await env.CRASH_MAIL.send({
@@ -154,7 +167,8 @@ export async function reportFile(env, key) {
   if (!REPORT_FILE_RE.test(key)) return null;
   const o = await env.OSM_TILES.get(key);
   if (!o) return null;
-  return new Response(o.body, { headers: { 'Content-Type': o.httpMetadata?.contentType || 'application/octet-stream', 'Cache-Control': 'no-store' } });
+  // (a file written by whoever sent the report: always a download or plain text, never a page)
+  return new Response(o.body, { headers: { 'Content-Type': o.httpMetadata?.contentType || 'application/octet-stream', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Content-Disposition': 'attachment' } });
 }
 
 /** POST /api/crash (a report), GET /api/crash/list and /api/crash/file (the developer, with the token). */

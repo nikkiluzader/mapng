@@ -44,6 +44,7 @@ export function causeOf(report) {
 const systemOf = (platform) => ({ win32: 'windows', linux: 'linux', web: 'web' }[String(platform || '')] || 'other');
 const versionOf = (v) => (v === 'web' ? 'web' : /^\d{1,3}\.\d{1,3}\.\d{1,3}(-dev\.\d{1,3})?$/.test(String(v || '')) ? String(v) : 'other');
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_VERSIONS = 60;
 
 export const emptyTally = () => ({ total: 0, byKind: {}, bySystem: {}, byCause: {}, byVersion: {}, byDay: {} });
 
@@ -58,7 +59,9 @@ export function addToTally(tally, report) {
   bump('byKind', kind);
   bump('bySystem', systemOf(report.platform));
   bump('byCause', causeOf(report));
-  bump('byVersion', versionOf(report.appVersion));
+  // (a version is the sender's word for it: a made-up one is counted as "other" once there are many)
+  const version = versionOf(report.appVersion);
+  bump('byVersion', version in t.byVersion || Object.keys(t.byVersion).length < MAX_VERSIONS ? version : 'other');
   if (DAY_RE.test(day)) bump('byDay', day);
   return t;
 }

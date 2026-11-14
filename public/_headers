@@ -3,6 +3,7 @@
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: geolocation=(self), microphone=(), camera=()
+  Strict-Transport-Security: max-age=15552000
 
 /crash-reports.html
   X-Robots-Tag: noindex, nofollow
@@ -14,3 +15,10 @@
 /admin
   X-Robots-Tag: noindex, nofollow
   Cache-Control: no-store
+
+# The public stats page draws numbers it fetches: it may load nothing from anywhere else.
+/stats.html
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://cloudflareinsights.com; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+
+/stats
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://cloudflareinsights.com; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'

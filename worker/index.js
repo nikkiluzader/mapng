@@ -243,7 +243,36 @@ const EXPOSED_HEADERS = [
 ].join(', ');
 
 
-export default {
+/**
+ * What every /api/ answer carries, whatever made it (this worker, a cache, or another server's
+ * answer passed through): never guessed to be another type, never run as a page of mapng.com
+ * (a passed-through server answering with HTML would otherwise run its script here, with this
+ * site's storage and sign-in), never setting a cookie for mapng.com, and https only from now on.
+ */
+export function hardenApiResponse(response) {
+  const headers = new Headers(response.headers);
+  headers.set('X-Content-Type-Options', 'nosniff');
+  headers.set('Content-Security-Policy', "sandbox; default-src 'none'; frame-ancestors 'none'");
+  headers.set('Strict-Transport-Security', 'max-age=15552000');
+  headers.delete('Set-Cookie');
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
+/** The address lookup's upstream query: only what the cache key is made of (so one cannot be cached as the other). */
+export function nominatimUpstreamSearch(url, upstreamPath) {
+  const p = url.searchParams;
+  const pick = (names) => { const out = new URLSearchParams(); for (const n of names) { const v = p.get(n); if (v != null && v !== '') out.set(n, String(v).slice(0, 300)); } return out.toString(); };
+  if (upstreamPath === '/reverse') return pick(['lat', 'lon', 'zoom', 'format', 'addressdetails']);
+  if (upstreamPath === '/search') return pick(['q', 'format', 'addressdetails', 'limit', 'dedupe']);
+  return null;
+}
+const NOMINATIM_FORMATS = ['json', 'jsonv2', 'geojson', 'geocodejson'];
+// What may be asked of each passed-through server (the paths the app uses; nothing else of the host is served from here).
+const KRON86_PATH_RE = /^\/wss\/service\/PZGIK\/[A-Za-z0-9_./-]{1,300}$/;
+const KRON86_OPENDATA_PATH_RE = /^\/[A-Za-z0-9_./-]{1,400}\.(asc|zip|xyz|txt|tif|tiff)$/i;
+const GPXZ_PATH_RE = /^\/v1\/elevation\/(point|points|hires-raster)$/;
+
+const app = {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
@@ -312,7 +341,7 @@ export default {
       return new Response(upstream.body, { status: upstream.status, headers });
     }
 
-    const proxySimple = async (origin, stripPrefix) => {
+    const proxySimple = async (origin, stripPrefix, pathOk = null) => {
       if (request.method === 'OPTIONS') {
         return new Response(null, {
           status: 204,
@@ -330,8 +359,15 @@ export default {
       }
 
       const upstreamPath = url.pathname.slice(stripPrefix.length);
-      const upstreamUrl = `${origin}${upstreamPath}${url.search}`;
       const isNominatimOrigin = origin.includes('nominatim');
+      if (upstreamPath.includes('..') || (pathOk && !pathOk.test(upstreamPath))) return jsonResponse({ error: 'Not found' }, 404);
+      let search = url.search;
+      if (isNominatimOrigin) {
+        const own = nominatimUpstreamSearch(url, upstreamPath);
+        if (own == null || !NOMINATIM_FORMATS.includes(url.searchParams.get('format') || '')) return jsonResponse({ error: 'Not found' }, 404);
+        search = `?${own}`;
+      }
+      const upstreamUrl = `${origin}${upstreamPath}${search}`;
       const requestOrigin = `${url.protocol}//${url.host}`;
 
       // An address lookup's answer is kept at the edge: OpenStreetMap's public
@@ -403,11 +439,11 @@ export default {
     }
 
     if (url.pathname.startsWith('/api/kron86/')) {
-      return proxySimple(KRON86_ORIGIN, '/api/kron86');
+      return proxySimple(KRON86_ORIGIN, '/api/kron86', KRON86_PATH_RE);
     }
 
     if (url.pathname.startsWith('/api/kron86-opendata/')) {
-      return proxySimple(KRON86_OPENDATA_ORIGIN, '/api/kron86-opendata');
+      return proxySimple(KRON86_OPENDATA_ORIGIN, '/api/kron86-opendata', KRON86_OPENDATA_PATH_RE);
     }
 
     // Only proxy /api/gpxz/* paths
@@ -430,6 +466,9 @@ export default {
 
     // Build upstream GPXZ URL: /api/gpxz/v1/foo?bar → https://api.gpxz.io/v1/foo?bar
     const gpxzPath = url.pathname.slice('/api/gpxz'.length); // keeps leading /
+    // (only the elevation calls the app makes, only read)
+    if (request.method !== 'GET') return jsonResponse({ error: 'Method Not Allowed' }, 405);
+    if (!GPXZ_PATH_RE.test(gpxzPath)) return jsonResponse({ error: 'Not found' }, 404);
     const gpxzUrl = `${GPXZ_ORIGIN}${gpxzPath}${url.search}`;
 
     // Forward request headers (especially x-api-key)
@@ -440,7 +479,7 @@ export default {
 
     try {
       const upstream = await fetch(gpxzUrl, {
-        method: request.method,
+        method: 'GET',
         headers: forwardHeaders,
       });
 
@@ -459,8 +498,15 @@ export default {
     } catch (e) {
       return new Response(JSON.stringify({ error: 'GPXZ proxy error', message: e.message }), {
         status: 502,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
       });
     }
+  },
+};
+
+export default {
+  async fetch(request, env, ctx) {
+    const response = await app.fetch(request, env, ctx);
+    return new URL(request.url).pathname.startsWith('/api/') ? hardenApiResponse(response) : response;
   },
 };

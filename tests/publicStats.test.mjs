@@ -103,3 +103,55 @@ test('the page has a name for every heading, and the data page explains the stat
   const data = readFileSync(new URL('../public/data.html', import.meta.url), 'utf8');
   assert.ok(data.includes('id="stats"') && data.includes('/api/stats') && data.includes(`at least ${COUNTRY_FLOOR} visits`));
 });
+
+// ---- the security pass of 2026-11-14 (worker/index.js) ----
+import worker, { hardenApiResponse, nominatimUpstreamSearch } from '../worker/index.js';
+
+test('every /api/ answer: no sniffing, never a page of mapng.com, no cookie from a passed-through server', () => {
+  const r = hardenApiResponse(new Response('<script>alert(1)</script>', { status: 200, headers: { 'Content-Type': 'text/html', 'Set-Cookie': 'a=b', 'X-Keep': 'yes' } }));
+  assert.equal(r.headers.get('X-Content-Type-Options'), 'nosniff');
+  assert.match(r.headers.get('Content-Security-Policy'), /^sandbox;/);
+  assert.match(r.headers.get('Strict-Transport-Security'), /max-age=\d+/);
+  assert.equal(r.headers.get('Set-Cookie'), null);
+  assert.equal(r.headers.get('X-Keep'), 'yes');
+  assert.equal(r.status, 200);
+});
+
+test('an address lookup sends on only what its cache key is made of', () => {
+  const u = (s) => new URL(`https://mapng.com/api/nominatim-osm${s}`);
+  assert.equal(nominatimUpstreamSearch(u('/search?q=paris&format=json&limit=5&countrycodes=us&json_callback=x&viewbox=1,2,3,4'), '/search'), 'q=paris&format=json&limit=5');
+  assert.equal(nominatimUpstreamSearch(u('/reverse?lat=40.7&lon=-74&lat=10&lon=10&format=json&zoom=16&accept-language=xx'), '/reverse'), 'lat=40.7&lon=-74&zoom=16&format=json');
+  assert.equal(nominatimUpstreamSearch(u('/status'), '/status'), null);
+});
+
+test('the pass-through routes serve only the paths the app uses', async () => {
+  const asked = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => { asked.push([String(url), init?.method]); return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json', 'Set-Cookie': 'x=1' } }); };
+  globalThis.caches = { default: { match: async () => null, put: async () => {}, delete: async () => {} } };
+  const env = { ASSETS: { fetch: async () => new Response('asset') } };
+  const ctx = { waitUntil: () => {} };
+  const get = (path, init) => worker.fetch(new Request(`https://mapng.com${path}`, init), env, ctx);
+  try {
+    for (const path of ['/api/nominatim-osm/status', '/api/nominatim-osm/details?osmtype=W&osmid=1', '/api/nominatim-osm/search?q=x&format=html', '/api/kron86/', '/api/kron86/index.html?x=<script>', '/api/kron86/wss/service/../../etc', '/api/kron86-opendata/somewhere/page.html', '/api/gpxz/v1/account', '/api/gpxz/v2/anything']) {
+      assert.equal((await get(path)).status, 404, path);
+    }
+    assert.equal((await get('/api/gpxz/v1/elevation/point?lat=0&lon=0', { method: 'DELETE' })).status, 405);
+    assert.deepEqual(asked, []);
+    const ok = await get('/api/gpxz/v1/elevation/point?lat=0&lon=0', { headers: { 'x-api-key': 'k' } });
+    assert.equal(ok.status, 200);
+    assert.equal(ok.headers.get('Set-Cookie'), null);
+    assert.equal(ok.headers.get('X-Content-Type-Options'), 'nosniff');
+    assert.equal((await get('/api/kron86/wss/service/PZGIK/NumerycznyModelTerenuEVRF2007/WFS/Skorowidze?SERVICE=WFS')).status, 200);
+    assert.equal((await get('/api/kron86-opendata/NumDaneWys/NMT/82047/82047_1474735_M-33-44-A-b-1-4.asc')).status, 200);
+    assert.equal((await get('/api/nominatim-osm/search?q=paris&format=json&countrycodes=us')).status, 200);
+    assert.deepEqual(asked.map(([u]) => u), [
+      'https://api.gpxz.io/v1/elevation/point?lat=0&lon=0',
+      'https://mapy.geoportal.gov.pl/wss/service/PZGIK/NumerycznyModelTerenuEVRF2007/WFS/Skorowidze?SERVICE=WFS',
+      'https://opendata.geoportal.gov.pl/NumDaneWys/NMT/82047/82047_1474735_M-33-44-A-b-1-4.asc',
+      'https://nominatim.openstreetmap.org/search?q=paris&format=json',
+    ]);
+    // (pages are not touched: the app's own headers file covers those)
+    assert.equal((await get('/stats.html')).headers.get('Content-Security-Policy'), null);
+  } finally { globalThis.fetch = realFetch; }
+});
