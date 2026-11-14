@@ -571,7 +571,7 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined, onSt
         if (b < total) list.push({ ...at(b), flag: 1, sink: true });
         for (const e of edges) {
           if (e <= a || e >= b || list.some((q) => Math.abs(q.s - e) < EDGE_NODE_MIN_M)) continue;
-          list.push({ ...at(e), flag: 1 });
+          list.push({ ...at(e), flag: 1, edge: true });
         }
         list.sort((u, v) => u.s - v.s);
         if (list.length >= 2 && list[list.length - 1].s - list[0].s > 0.5) lists.push(list);
@@ -583,6 +583,7 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined, onSt
       for (let j = lists.length - 1; j >= 1; j--) decks.splice(k + 1, 0, { name: `${stem}_x${j}_b`, ready: lists[j] });
     }
     d.sink = Uint8Array.from(out, (q) => (q.sink ? 1 : 0));
+    d.edge = Uint8Array.from(out, (q) => (q.edge ? 1 : 0));
     d.camber = Float64Array.from(out, (q) => q.camber || 0);
     const n = out.length;
     d.pts = out.map((q) => [q.x, q.y]);
@@ -613,6 +614,17 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined, onSt
         const lim = TILT_EDGE_M / Math.max(1, d.hw[i]);
         const slope = zl > -Infinity && zr > -Infinity ? (zl - zr) / (2 * d.hw[i]) : slopeAt[0] * nx + slopeAt[1] * ny;
         lean[i] = Math.max(-lim, Math.min(lim, slope));
+        // What of the road lies inside the other deck does not stand out of it: where its lean cannot follow
+        // that deck (the cap on a lean, a crest under it, a deck found under one edge only) it lies lower by
+        // what an edge would stand over it. A wide road ending in a steep lane, too wide to be left out of
+        // it, stood 15 cm out of the lane along one edge: a step across the lane, in a hill town at every such
+        // mouth. (Not the node on the other deck's edge: the road comes out from under it there.)
+        if (!d.edge[i]) {
+          let proud = 0;
+          if (zl > -Infinity) proud = Math.max(proud, other + lean[i] * d.hw[i] - zl);
+          if (zr > -Infinity) proud = Math.max(proud, other - lean[i] * d.hw[i] - zr);
+          if (proud > 0) r[i] -= proud + 0.01;
+        }
       } else if (d.flag[i] === 2) {
         // (no deck beyond this end: down to just over the road's own line, the deck easing down to it, so the
         // road goes on from it without a 10 to 25 cm step)

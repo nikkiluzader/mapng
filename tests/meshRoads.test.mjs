@@ -169,13 +169,14 @@ test('a road crossing another ends inside it on either side: no deck standing ov
     assert.ok(Math.abs(end[1]) < 3.6 && Math.abs(end[1]) > 0.5, `end at y ${end[1]}`);
     for (const sgn of [-1, 1]) assert.ok(Math.abs(end[1] + sgn * 3 * dx) < 4, 'a corner of the end is outside the crossed deck');
     // ... at the crossed deck's height there, leaning with it
-    assert.ok(Math.abs(end[2] - (crest(end[0]) + 0.03 - 0.02)) < 0.01, `end height ${end[2]} over ${crest(end[0])}`);
+    assert.ok(end[2] <= crest(end[0]) + 0.03 - 0.02 + 1e-6 && end[2] > crest(end[0]) + 0.03 - 0.15, `end height ${end[2]} over ${crest(end[0])}`);
   }
   // what is left of the crossing road inside the crossed deck lies in that deck's surface, edge to edge
   for (const m of cross) for (const nd of m.nodes) if (Math.abs(nd[1]) < 4) {
     for (const o of [-3, 3]) {
       const x = nd[0] - dy * o; const z = nd[2] - o * (nd[5] * -dy + nd[6] * dx) / nd[7];
-      assert.ok(Math.abs(z - (crest(x) + 0.03)) < 0.08, `edge of node ${nd.slice(0, 3)}: ${z} over a deck at ${crest(x) + 0.03}`);
+      // (never over it; under it by no more than the crest's misfit)
+      if (Math.abs(nd[1]) < 3.4) assert.ok(z <= crest(x) + 0.03 + 0.005 && z > crest(x) + 0.03 - 0.2, `edge of node ${nd.slice(0, 3)}: ${z} against a deck at ${crest(x) + 0.03}`);
     }
   }
 });
