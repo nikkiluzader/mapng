@@ -243,8 +243,10 @@ test('a road partly on a bridge gets a deck on each stretch that lies on the gro
   assert.equal(meshRoads.length, 2); assert.equal(stats.cut, 1);
   assert.equal(new Set(meshRoads.map((m) => m.name)).size, 2);
   const xs = meshRoads.map((m) => [Math.min(...m.nodes.map((nd) => nd[0])), Math.max(...m.nodes.map((nd) => nd[0]))]).sort((p, q) => p[0] - q[0]);
-  assert.ok(xs[0][0] === 0 && xs[0][1] > 48 && xs[0][1] <= 50, `first deck ${xs[0]}`);
-  assert.ok(xs[1][0] >= 70 && xs[1][0] < 72 && xs[1][1] === 120, `second deck ${xs[1]}`);
+  // (each runs a metre on under the bridge's deck, its end 5 cm under the road's line there)
+  assert.ok(xs[0][0] === 0 && xs[0][1] > 50 && xs[0][1] <= 51, `first deck ${xs[0]}`);
+  assert.ok(xs[1][0] >= 69 && xs[1][0] < 70 && xs[1][1] === 120, `second deck ${xs[1]}`);
+  for (const m of meshRoads) { const end = m.nodes.find((nd) => nd[0] > 50 && nd[0] < 70); assert.ok(end && Math.abs(end[2] - 9.95) < 0.005, `end under the bridge at ${end && end[2]}`); }
   // without the structures known, such a road is left alone as before
   assert.equal(buildMeshRoads([{ __items: [road('dr_a_s1_b', line(0, 0, 120, 0), { extra: { overObjects: true } })] }], ground).meshRoads.length, 0);
 });
@@ -299,6 +301,6 @@ test('a gap in the ground between a bridge\'s end and the bank is spanned by the
   const { meshRoads } = buildMeshRoads([{ __items: [road('dr_a_s1_b', line(0, 0, 120, 0), { extra: { overObjects: true } })] }], ground, { onStructure: (x) => x >= 50 && x <= 70 });
   const xs = meshRoads.map((m) => [Math.min(...m.nodes.map((nd) => nd[0])), Math.max(...m.nodes.map((nd) => nd[0]))]).sort((p, q) => p[0] - q[0]);
   assert.equal(xs.length, 2);
-  assert.ok(xs[0][1] > 48.9 && xs[0][1] <= 50, `the first deck reaches the bridge: ${xs[0]}`);
-  assert.ok(xs[1][0] >= 70 && xs[1][0] < 71.1, `the second starts at it: ${xs[1]}`);
+  assert.ok(xs[0][1] >= 50 && xs[0][1] <= 51, `the first deck reaches the bridge: ${xs[0]}`);
+  assert.ok(xs[1][0] >= 69 && xs[1][0] <= 70, `the second starts at it: ${xs[1]}`);
 });

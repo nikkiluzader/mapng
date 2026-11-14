@@ -35,6 +35,7 @@ const MIN_WIDTH_M = 3;
 const RUN_STEP_M = 1;            // how finely a road is looked along for the stretches that lie on the ground
 const RUN_MIN_M = 2;             // a shorter stretch on the ground gets no deck (a bridge road has 3.5 m of ground road at each end)
 const FLAW_MAX_M = 20;           // the ground off the road's line for no longer than this, with no structure there: bridged
+const UNDER_STRUCTURE_M = 0.05;     // a deck's end under a structure lies this far under the road's line
 const ON_GROUND_M = 0.35;          // the ground this near the road's line: the road is on the ground, whatever the graph calls it
 const ABUTMENT_GAP_M = 8;         // the ground off the road's line this far or less beyond a structure's end: the deck spans it
 const STRUCTURE_LEVEL_M = 2;     // a road within this of a structure's height there is on it (not the road under a bridge)
@@ -190,11 +191,19 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined, onSt
           if (byStructure && landed && along[j] - along[i] <= ABUTMENT_GAP_M) for (let q = i; q <= j; q++) bad[q] = false;
           i = j;
         }
+        // (a stretch that ends at a structure runs one step on under it, its end a little under the structure's
+        // surface: stopped at its last point on the ground it was up to a metre short of the bridge's deck, and
+        // the gap between them 0.5 to 2.5 m deep, measured in game at most bridge ends)
         runs = [];
         for (let i = 0; i < fine.length;) {
           if (bad[i]) { i++; continue; }
           let j = i; while (j + 1 < fine.length && !bad[j + 1]) j++;
-          if (along[j] - along[i] >= RUN_MIN_M) runs.push(fine.slice(i, j + 1));
+          if (along[j] - along[i] >= RUN_MIN_M) {
+            const a0 = i > 0 && st[i - 1] ? i - 1 : i; const b0 = j < fine.length - 1 && st[j + 1] ? j + 1 : j;
+            const run = fine.slice(a0, b0 + 1);
+            run.under0 = a0 < i; run.under1 = b0 > j;
+            runs.push(run);
+          }
           i = j + 1;
         }
         if (!runs.length) { stats.skipped++; continue; }
@@ -206,7 +215,11 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined, onSt
       const stem = String(decal.name).replace(/_b$/, '');
       runs.forEach((run, r) => {
         const pts = resample(run, NODE_GAP_M);
-        if (pts.length >= 2) pieces.push({ name: r ? `${stem}_g${r + 1}_b` : String(decal.name), nodes: pts.map((q) => ({ x: q[0], y: q[1], base: q[2], hw: width / 2 })) });
+        if (pts.length < 2) return;
+        const nodes = pts.map((q) => ({ x: q[0], y: q[1], base: q[2], hw: width / 2 }));
+        if (run.under0) nodes[0].under = true;
+        if (run.under1) nodes[nodes.length - 1].under = true;
+        pieces.push({ name: r ? `${stem}_g${r + 1}_b` : String(decal.name), nodes });
       });
     }
   }
@@ -341,7 +354,8 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined, onSt
     const s = new Float64Array(n); const low = new Float64Array(n); const need = new Float64Array(n); const hw = Float64Array.from(nd, (q) => q.hw);
     const base = Float64Array.from(nd, (q) => q.base);
     // 1: an end that meets another deck (and its run-on); 2: an end with no deck beyond it
-    const flag = Uint8Array.from(nd, (q) => (q.meet ? 1 : q.loose ? 2 : 0));
+    // 1: an end that meets another deck (and its run-on); 2: an end with no deck beyond it; 3: an end under a structure
+    const flag = Uint8Array.from(nd, (q) => (q.under ? 3 : q.meet ? 1 : q.loose ? 2 : 0));
     // The ground's own lean across the road at each node (a banked bend the elevation data shows, a road left
     // on a side slope where the terrain was not levelled for it): the deck leans with it. A native MeshRoad is
     // flat across and takes no shape from the ground; level on leaning ground, one edge stood out of it and
@@ -604,6 +618,9 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined, onSt
         // road goes on from it without a 10 to 25 cm step)
         r[i] = Math.min(d.need[i], END_NEED_M); fixed[i] = 1; leanFree[i] = 1;
         lean[i] = d.camber[i];
+      } else if (d.flag[i] === 3) {
+        // (under a bridge's deck or in a tunnel's mouth: just under the structure's surface, level across)
+        r[i] = -UNDER_STRUCTURE_M; fixed[i] = 1; leanFree[i] = 1;
       } else { r[i] = d.need[i]; leanFree[i] = 1; lean[i] = d.camber[i]; }
     }
     // The lean changes along the road by no more than LEAN_EASE a metre: from another deck's lean at a junction
