@@ -192,6 +192,7 @@
     "lockSelection": "Blocca l'area selezionata",
     "unlockSelection": "Sblocca l'area selezionata",
     "lockedByBackground": "Bloccata dalle aree della maschera",
+    "unlockOverMask": "Sblocca l'area selezionata (spostandola si rimuovono le aree di maschera)",
     "lockedField": "L'area è bloccata: sbloccala sulla mappa per modificarla",
     "recommendLabel": "Consigliata qui:",
     "recommendBestFree": "Miglior gratuito",

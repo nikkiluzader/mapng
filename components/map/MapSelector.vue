@@ -946,7 +946,7 @@ const addMapTools = (map) => {
       const paintLock = () => {
         const locked = store.boxLocked;
         const byBackground = store.boxLockedByBackground;
-        const label = byBackground ? t('map.lockedByBackground') : locked ? t('map.unlockSelection') : t('map.lockSelection');
+        const label = byBackground && store.backgroundDrawn ? t('map.unlockOverMask') : locked ? t('map.unlockSelection') : t('map.lockSelection');
         lock.title = label;
         lock.setAttribute('aria-label', label);
         lock.setAttribute('aria-pressed', String(locked));
@@ -956,14 +956,14 @@ const addMapTools = (map) => {
           : '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/></svg>';
       };
       paintLock();
-      stopLockWatch = watch(() => [store.boxLocked, store.boxLockedByBackground, locale.value], paintLock);
+      stopLockWatch = watch(() => [store.boxLocked, store.boxLockedByBackground, store.backgroundDrawn, locale.value], paintLock);
       L.DomEvent.disableClickPropagation(bar);
       L.DomEvent.on(a, 'click', (e) => { L.DomEvent.preventDefault(e); zoomToSelection(); });
       L.DomEvent.on(lock, 'click', (e) => {
         L.DomEvent.preventDefault(e);
-        if (store.boxLockedByBackground) return;       // (theirs to unlock: the Background areas card)
-        if (!store.boxPinnedByUser) flushMove();       // (the area exactly where it is shown now)
-        store.setBoxPinned(!store.boxPinnedByUser);
+        // (at any time, whatever holds the lock: by hand, a mask tool, or mask areas already drawn)
+        if (!store.boxLocked) flushMove();             // (the area exactly where it is shown now)
+        store.toggleBoxLock();
       });
       return bar;
     },

@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, computed, shallowRef } from 'vue';
+import { ref, computed, shallowRef, watch } from 'vue';
 import { loadBatchState } from '../services/batchJob';
 import { terrainMode, setTerrainMode } from '../composables/useTerrainMode.js';
 import { emptyMask, maskHasAreas } from '../services/backgroundMask.js';
@@ -125,10 +125,24 @@ export const useMainStore = defineStore('main', () => {
   // zoomed and panned, to place a spawn point say, without the area following
   // it. Asked for by Fizz_Mechanic. Not kept across a reload)
   const boxPinnedByUser = ref(false);
-  const boxLockedByBackground = computed(() => backgroundActive.value || (backgroundPinned.value && advancedMode.value && !batchMode.value));
+  // (and unlocked by hand over drawn mask areas: the lock button works at any time. The areas were drawn for
+  // the box where it is; they are removed, with a word why, once it moves. Locked again before that, they stay.)
+  const boxUnlockedOverMask = ref(false);
+  const boxLockedByBackground = computed(() => (backgroundActive.value && !boxUnlockedOverMask.value) || (backgroundPinned.value && advancedMode.value && !batchMode.value));
   const boxLocked = computed(() => boxLockedByBackground.value || (boxPinnedByUser.value && !batchMode.value));
   function setBackgroundPinned(v) { backgroundPinned.value = !!v; }
   function setBoxPinned(v) { boxPinnedByUser.value = !!v; }
+  function setBoxUnlockedOverMask(v) { boxUnlockedOverMask.value = !!v && backgroundDrawn.value; }
+  // The lock button, whatever holds the lock: on if nothing does; off otherwise, a mask tool put down with it.
+  function toggleBoxLock() {
+    if (boxLocked.value) {
+      boxPinnedByUser.value = false;
+      if (backgroundPinned.value) { backgroundPinned.value = false; backgroundTool.value = 'pan'; }
+      if (backgroundActive.value) boxUnlockedOverMask.value = true;
+    } else if (boxUnlockedOverMask.value) boxUnlockedOverMask.value = false;   // (the mask areas hold it again)
+    else boxPinnedByUser.value = true;
+  }
+  watch(backgroundDrawn, (drawn) => { if (!drawn) boxUnlockedOverMask.value = false; });
 
   // --- Spawn and quicktravel points (services/spawnPoints.js; Location step) ---
   // An export setting: geographic, independent of the box, never a reason to
@@ -297,6 +311,9 @@ export const useMainStore = defineStore('main', () => {
     boxLockedByBackground,
     boxPinnedByUser,
     setBoxPinned,
+    boxUnlockedOverMask,
+    setBoxUnlockedOverMask,
+    toggleBoxLock,
     backgroundPinned,
     setBackgroundPinned,
     setBackgroundMask,

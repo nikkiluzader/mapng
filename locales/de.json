@@ -192,6 +192,7 @@
     "lockSelection": "Ausgewählten Bereich fixieren",
     "unlockSelection": "Ausgewählten Bereich freigeben",
     "lockedByBackground": "Durch Maskenflächen gesperrt",
+    "unlockOverMask": "Auswahl entsperren (beim Verschieben werden die Maskenbereiche entfernt)",
     "lockedField": "Der Bereich ist fixiert: zum Ändern auf der Karte freigeben",
     "recommendLabel": "Empfohlen hier:",
     "recommendBestFree": "Bestes kostenloses",

@@ -192,6 +192,7 @@
     "lockSelection": "Verrouiller la zone sélectionnée",
     "unlockSelection": "Déverrouiller la zone sélectionnée",
     "lockedByBackground": "Verrouillée par les zones du masque",
+    "unlockOverMask": "Déverrouiller la zone sélectionnée (la déplacer supprime les zones de masque)",
     "lockedField": "La zone est verrouillée : déverrouillez-la sur la carte pour la modifier",
     "recommendLabel": "Conseillée ici :",
     "recommendBestFree": "Meilleur gratuit",

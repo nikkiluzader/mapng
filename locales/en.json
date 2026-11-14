@@ -197,6 +197,7 @@
     "lockSelection": "Lock the selected area in place",
     "unlockSelection": "Unlock the selected area",
     "lockedByBackground": "Locked by mask areas",
+    "unlockOverMask": "Unlock the selected area (moving it removes the mask areas)",
     "lockedField": "The area is locked: unlock it on the map to change it",
     "recommendLabel": "Suggested here:",
     "recommendBestFree": "Best free",

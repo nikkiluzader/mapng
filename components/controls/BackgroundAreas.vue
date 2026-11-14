@@ -240,6 +240,8 @@ function dropIfStale() {
 }
 onMounted(() => { window.addEventListener('keydown', onKey); dropIfStale(); });
 watch(() => store.backgroundActive, (on) => { if (on) dropIfStale(); });
+// (unlocked by hand over drawn areas, and the box has moved: they go, with the same word why)
+watch(() => `${props.center.lat},${props.center.lng},${sizeMeters.value}`, () => { if (store.boxUnlockedOverMask) dropIfStale(); });
 onBeforeUnmount(() => { window.removeEventListener('keydown', onKey); tool.value = 'pan'; if (!store.backgroundDrawn) store.setBackgroundPinned(false); });
 defineExpose({ edit });
 </script>

@@ -192,6 +192,7 @@
     "lockSelection": "Zablokuj wybrany obszar w miejscu",
     "unlockSelection": "Odblokuj wybrany obszar",
     "lockedByBackground": "Zablokowane przez obszary maski",
+    "unlockOverMask": "Odblokuj zaznaczony obszar (przesunięcie usuwa obszary maski)",
     "lockedField": "Obszar jest zablokowany: odblokuj go na mapie, aby go zmienić",
     "recommendLabel": "Zalecane tutaj:",
     "recommendBestFree": "Najlepsze darmowe",
