@@ -12013,16 +12013,21 @@ function buildGroundCoverObjects(terrainData, squareSize, includeTrees, biome) {
     seed: 31,
     ...varietyWind,
     Types: [
-      { billboardUVs: [0, 0.0078125, 1, 0.464843988], layer: 'DirtGrass',
-        clumpRadius: 2, maxClumpCount: 6, minClumpCount: 2, probability: 1,
-        sizeMax: 0.45, sizeMin: 0.22, windScale: 0.1 },
-      { billboardUVs: [0, 0.505124986, 1, 0.472656012], layer: 'DirtGrass',
-        clumpExponent: -0.5, maxClumpCount: 4, minClumpCount: 2, probability: 0.8,
-        sizeMax: 0.4, sizeMin: 0.2, windScale: 0.1 },
+      // (the texture holds four tufts, two in each row: a billboard takes one. Given a whole row, every
+      // billboard showed two tufts side by side, squeezed: a BeamNG artist, "you have some bug in groundcover
+      // that uses full uv scale but you get 4 grass inside texture")
+      ...[0, 0.5].flatMap((u) => [
+        { billboardUVs: [u, 0.0078125, 0.5, 0.464843988], layer: 'DirtGrass',
+          clumpRadius: 2, maxClumpCount: 6, minClumpCount: 2, probability: 1,
+          sizeMax: 0.45, sizeMin: 0.22, windScale: 0.1 },
+        { billboardUVs: [u, 0.505124986, 0.5, 0.472656012], layer: 'DirtGrass',
+          clumpExponent: -0.5, maxClumpCount: 4, minClumpCount: 2, probability: 0.8,
+          sizeMax: 0.4, sizeMin: 0.2, windScale: 0.1 },
+      ]),
       { billboardUVs: [0, 0.507812977, 0.5, 0.390625], layer: 'Dirt',
         clumpExponent: -0.5, maxClumpCount: 4, minClumpCount: 2, probability: 0.4,
         sizeMax: 0.4, sizeMin: 0.25, windScale: 0.2 },
-      {}, {}, {}, {}, {},
+      {}, {}, {},
     ],
   });
 
@@ -12045,13 +12050,16 @@ function buildGroundCoverObjects(terrainData, squareSize, includeTrees, biome) {
     seed: 41,
     ...varietyWind,
     Types: [
-      { billboardUVs: [0, 0.0078125, 1, 0.464843988], layer: 'Lawn',
-        clumpRadius: 1, maxClumpCount: 6, minClumpCount: 3, probability: 1,
-        sizeMax: 0.16, sizeMin: 0.08, windScale: 0.05 },
-      { billboardUVs: [0, 0.505124986, 1, 0.472656012], layer: 'Lawn',
-        clumpRadius: 1, maxClumpCount: 5, minClumpCount: 2, probability: 0.8,
-        sizeMax: 0.14, sizeMin: 0.07, windScale: 0.05 },
-      {}, {}, {}, {}, {}, {},
+      // (one tuft of the texture's four to a billboard, as the dry grass above)
+      ...[0, 0.5].flatMap((u) => [
+        { billboardUVs: [u, 0.0078125, 0.5, 0.464843988], layer: 'Lawn',
+          clumpRadius: 1, maxClumpCount: 6, minClumpCount: 3, probability: 1,
+          sizeMax: 0.16, sizeMin: 0.08, windScale: 0.05 },
+        { billboardUVs: [u, 0.505124986, 0.5, 0.472656012], layer: 'Lawn',
+          clumpRadius: 1, maxClumpCount: 5, minClumpCount: 2, probability: 0.8,
+          sizeMax: 0.14, sizeMin: 0.07, windScale: 0.05 },
+      ]),
+      {}, {}, {}, {},
     ],
   });
 
