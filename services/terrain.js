@@ -28,7 +28,7 @@ import { createLocalToWGS84 } from "./geoUtils.js";
 import { fetchKron86GridForBounds, isWithinKron86Coverage } from "./kron86.js";
 import { readUsgsWindows, readUsgsImageService } from "./usgsWindow.js";
 import { fillSmallSeaPits, hasSmallSeaPit } from "./terrariumPits.js";
-import { fetchMapterhornRaw } from "./mapterhorn.js";
+import { fetchMapterhornRaw, loadMapterhornTile } from "./mapterhorn.js";
 import { isGroundLevelRoad, smoothRoadsInHeightmap } from "./roadSmoother.js";
 import { snapRoadsToTerrain } from "./roadSnap.js";
 import { measureBenchWidths } from "./benchWidths.js";
@@ -1786,22 +1786,75 @@ async function pMap(items, mapper, concurrency, signal) {
 
 // (through the download cache in the browser: services/dataCache.js)
 const loadImage = (url, signal) => loadDataImage(url, signal);
-// A global elevation tile: from Amazon's public storage, and where that cannot be reached, through MapNG's own
-// address (worker/terrariumRelay.js). Some networks reach mapng.com and the satellite tiles but not Amazon: a
-// 1 km Generate failed with every elevation tile missing. Once the relay has answered where the direct
-// download did not, the rest of the session asks it first.
+// A global elevation tile. From Amazon's public storage; where that cannot be reached (some networks reach
+// mapng.com and the satellite tiles but not Amazon: a 1 km Generate failed with every elevation tile missing),
+// from Mapterhorn's tiles instead (its own 30 m base, or lidar where it has some: the same tiles the free lidar
+// source reads, through MapNG's cache), and last through MapNG's own address (worker/terrariumRelay.js), which
+// passes Amazon's tile on. Once a direct download has failed twice and another way has answered, the rest of
+// the session does not wait on Amazon first.
 export const TERRARIUM_RELAY_URL = '/api/terrarium';
-let terrariumRelayFirst = false;
+const MAPTERHORN_BASE_ZOOM = 12;     // Mapterhorn has every tile down to here; deeper only where there is lidar
+let amazonUnreachable = false;
+/** A Terrarium tile's place (z, x, y; 256 px) from its address. */
+const terrariumTileOf = (url) => { const m = /\/(\d+)\/(\d+)\/(\d+)\.png$/.exec(url); return m ? { z: Number(m[1]), x: Number(m[2]), y: Number(m[3]) } : null; };
+/**
+ * The same 256 px tile made from Mapterhorn's 512 px tiles (one zoom less covers the same ground at the same
+ * detail): the deepest tile there is over it, its heights read off and written out again in the same encoding,
+ * so the rest of Generate reads it like Amazon's. Null where Mapterhorn has nothing coarse enough (below z13).
+ */
+export async function terrariumTileFromMapterhorn({ z, x, y }, signal, loadTile = loadMapterhornTile) {
+  for (let up = 1; z - up >= MAPTERHORN_BASE_ZOOM; up++) {
+    const mz = z - up; const scale = 2 ** up; const tx = Math.floor(x / scale); const ty = Math.floor(y / scale);
+    let heights = null;
+    try { heights = await loadTile(mz, tx, ty, { signal }); } catch (e) { if (signal?.aborted) throw e; }
+    if (!heights) continue;
+    // (this tile's part of the 512 px tile: 256 px of it one zoom up, 128 px two zooms up...)
+    const part = 512 / scale; const x0 = (x - tx * scale) * part; const y0 = (y - ty * scale) * part;
+    const canvas = document.createElement('canvas'); canvas.width = TILE_SIZE; canvas.height = TILE_SIZE;
+    const ctx = canvas.getContext('2d'); const out = ctx.createImageData(TILE_SIZE, TILE_SIZE);
+    const at = (px, py) => heights[Math.min(511, Math.max(0, py)) * 512 + Math.min(511, Math.max(0, px))];
+    for (let r = 0; r < TILE_SIZE; r++) {
+      for (let c = 0; c < TILE_SIZE; c++) {
+        // (heights are stretched, never colours: a blended colour is a wrong height)
+        const fx = x0 + ((c + 0.5) * part) / TILE_SIZE - 0.5; const fy = y0 + ((r + 0.5) * part) / TILE_SIZE - 0.5;
+        const ix = Math.floor(fx); const iy = Math.floor(fy); const u = fx - ix; const v = fy - iy;
+        const a = at(ix, iy); const b = at(ix + 1, iy); const d = at(ix, iy + 1); const e = at(ix + 1, iy + 1);
+        const bad = a < -30000 || b < -30000 || d < -30000 || e < -30000;
+        const h = bad ? null : a * (1 - u) * (1 - v) + b * u * (1 - v) + d * (1 - u) * v + e * u * v;
+        const o = (r * TILE_SIZE + c) * 4;
+        if (h === null) { out.data[o] = 0; out.data[o + 1] = 0; out.data[o + 2] = 0; } else {
+          const value = Math.max(0, Math.min(65535.996, h + 32768));
+          out.data[o] = Math.floor(value / 256); out.data[o + 1] = Math.floor(value) % 256; out.data[o + 2] = Math.floor((value - Math.floor(value)) * 256);
+        }
+        out.data[o + 3] = 255;
+      }
+    }
+    ctx.putImageData(out, 0, 0);
+    return canvas;
+  }
+  return null;
+}
 async function loadTerrariumTile(url, signal) {
   const attempt = async (u) => { try { return await loadImage(u, signal); } catch (e) { if (signal?.aborted) throw e; return null; } };
-  const relay = url.replace(TILE_API_URL, TERRARIUM_RELAY_URL);
-  if (!terrariumRelayFirst) {
-    const direct = await attempt(url);
+  if (!amazonUnreachable) {
+    const direct = (await attempt(url)) || (await attempt(url));
     if (direct) return direct;
   }
-  const relayed = await attempt(relay);
-  if (relayed) { if (!terrariumRelayFirst) console.warn('[Elevation] Amazon\'s tile storage could not be reached: the global elevation tiles come through mapng.com.'); terrariumRelayFirst = true; return relayed; }
-  return terrariumRelayFirst ? attempt(url) : null;
+  const tile = terrariumTileOf(url);
+  const said = amazonUnreachable;
+  const fromMapterhorn = tile ? await terrariumTileFromMapterhorn(tile, signal) : null;
+  if (fromMapterhorn) {
+    if (!said) console.warn('[Elevation] Amazon\'s tile storage could not be reached: the global elevation comes from Mapterhorn\'s tiles (© Mapterhorn and its open-data sources, mapterhorn.com/attribution).');
+    amazonUnreachable = true;
+    return fromMapterhorn;
+  }
+  const relayed = await attempt(url.replace(TILE_API_URL, TERRARIUM_RELAY_URL));
+  if (relayed) {
+    if (!said) console.warn('[Elevation] Amazon\'s tile storage could not be reached: the global elevation tiles come through mapng.com.');
+    amazonUnreachable = true;
+    return relayed;
+  }
+  return amazonUnreachable ? attempt(url) : null;
 }
 
 const SAT_TEX_MAX_SIZE = 8192;

@@ -103,3 +103,32 @@ test('the elevation tile relay serves tile addresses only', async () => {
   const post = await handleTerrariumTiles(new Request('https://mapng.com/api/terrarium/3/1/1.png', { method: 'POST' }), new URL('https://mapng.com/api/terrarium/3/1/1.png'));
   assert.equal(post.status, 405);
 });
+
+test('a global elevation tile made from a Mapterhorn tile: the same heights, in the same encoding', async () => {
+  // a small stand-in for the canvas this runs on
+  const made = [];
+  const prev = globalThis.document;
+  globalThis.document = { createElement: () => { const c = { width: 0, height: 0, getContext: () => ({ createImageData: (w, h) => ({ data: new Uint8ClampedArray(w * h * 4), width: w, height: h }), putImageData: (img) => { c.image = img; } }) }; made.push(c); return c; } };
+  try {
+    const { terrariumTileFromMapterhorn } = await import('../services/terrain.js');
+    // Mapterhorn tile 13/10/20 (512 px): height = 100 + column, no data in its last row
+    const heights = new Float32Array(512 * 512);
+    for (let r = 0; r < 512; r++) for (let c = 0; c < 512; c++) heights[r * 512 + c] = r === 511 ? -99999 : 100 + c;
+    const asked = [];
+    const load = async (z, x, y) => { asked.push(`${z}/${x}/${y}`); return z === 13 && x === 10 && y === 20 ? heights : null; };
+    // the 256 px tile 14/21/40 is the top right quarter of it
+    const tile = await terrariumTileFromMapterhorn({ z: 14, x: 21, y: 40 }, null, load);
+    assert.deepEqual(asked, ['13/10/20']);
+    const d = tile.image.data; const heightAt = (c, r) => d[(r * 256 + c) * 4] * 256 + d[(r * 256 + c) * 4 + 1] + d[(r * 256 + c) * 4 + 2] / 256 - 32768;
+    assert.ok(Math.abs(heightAt(0, 0) - (100 + 256)) < 0.01, String(heightAt(0, 0)));
+    assert.ok(Math.abs(heightAt(255, 10) - (100 + 511)) < 0.01);
+    // a zoom deeper with no Mapterhorn tile at that depth: its ancestor's heights, stretched (a quarter pixel a step)
+    const deep = await terrariumTileFromMapterhorn({ z: 15, x: 42, y: 80 }, null, load);
+    const e = deep.image.data; const h2 = (c) => e[c * 4] * 256 + e[c * 4 + 1] + e[c * 4 + 2] / 256 - 32768;
+    assert.ok(Math.abs(h2(100) - h2(99) - 0.5) < 0.02, `step ${h2(100) - h2(99)}`);
+    // no data stays no data (the tile's last row), and a tile too coarse for Mapterhorn's cache is left to the next way
+    const low = await terrariumTileFromMapterhorn({ z: 14, x: 20, y: 41 }, null, load);
+    const l = low.image.data; assert.equal(l[(255 * 256 + 5) * 4] + l[(255 * 256 + 5) * 4 + 1] + l[(255 * 256 + 5) * 4 + 2], 0);
+    assert.equal(await terrariumTileFromMapterhorn({ z: 12, x: 5, y: 5 }, null, load), null);
+  } finally { globalThis.document = prev; }
+});
