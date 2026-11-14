@@ -79,3 +79,13 @@ test('a terrain\'s fingerprint never turns all its map features into one text', 
   assert.notEqual(featuresHash(feats.slice(0, 1699)), featuresHash(feats));
   assert.equal(featuresHash(null), featuresHash([]));
 });
+
+test('a building task whose features come in several strings reads back as one list', async () => {
+  const { taskItem } = await import('../services/buildingWorker.js');
+  const features = Array.from({ length: 7 }, (_, i) => ({ id: i, type: 'building' }));
+  const task = { head: JSON.stringify({ extras: 'water', maxBuildings: 5 }), featureChunks: [JSON.stringify(features.slice(0, 3)), JSON.stringify(features.slice(3))] };
+  const item = taskItem(task);
+  assert.equal(item.extras, 'water'); assert.equal(item.maxBuildings, 5);
+  assert.deepEqual(item.features, features);
+  assert.deepEqual(taskItem(JSON.stringify({ features: [1] })), { features: [1] }, 'one string, as before');
+});

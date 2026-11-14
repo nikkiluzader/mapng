@@ -31,10 +31,22 @@ function lookups(shared) {
  * shared { terrain, squareSize, tileM, roads, passages }. Returns the tiles' shapes
  * { key, origin, fullPx, data }, the count, the stats and the mesh tally.
  */
+/** A task as an object: one JSON string, or { head, featureChunks } (a JSON string and the features in several). */
+export function taskItem(task) {
+  if (typeof task === 'string') return JSON.parse(task);
+  if (task && typeof task.head === 'string' && Array.isArray(task.featureChunks)) {
+    const item = JSON.parse(task.head);
+    item.features = [];
+    for (const chunk of task.featureChunks) for (const f of JSON.parse(chunk)) item.features.push(f);
+    return item;
+  }
+  return task;
+}
+
 export function buildBuildingShare(task, shared) {
   // (a task comes as one JSON string: much cheaper to hand over than the
   // same features as objects)
-  const item = typeof task === 'string' ? JSON.parse(task) : task;
+  const item = taskItem(task);
   if (item.extras) return buildExtras(item, shared);
   const { project, groundAt, drape, streets } = lookups(shared);
   const levelsHints = new Map(); const businessTags = new Map(); const hotelMain = new Map();

@@ -1347,6 +1347,8 @@ function mergeBuildingStats(into, from) {
 
 // below this many buildings the threads cost more than they save
 const PARALLEL_BUILDINGS_FROM = 1500;
+// the extras' tasks carry every feature, this many to a JSON string
+const EXTRAS_FEATURES_PER_STRING = 20000;
 
 /**
  * The buildings built and written on worker threads (services/buildingWorker.js)
@@ -1390,11 +1392,18 @@ async function buildBuildingsOnWorkers(terrainData, features, project, options) 
   // the extras a task of their own, first: one thread, the longest task
   // (they ran half as fast here beside the busy workers)
   const slimRaceways = (options.raceways || []).map((cw) => ({ highway: cw.highway, nodes: cw.nodes, half: cw.half, tags: cw.tags, wayId: cw.wayId, oneWay: cw.oneWay }));
+  // (all the features go with them, a piece at a time: as one JSON string a 33 km city's 990,000 features
+  // were past the longest string the engine makes, "Invalid string length", and the export stopped here)
+  const featureChunks = [];
+  for (let i = 0; i < ctx.features.length; i += EXTRAS_FEATURES_PER_STRING) featureChunks.push(JSON.stringify(ctx.features.slice(i, i + EXTRAS_FEATURES_PER_STRING)));
   for (const part of ['water', 'fields']) {
-    items.unshift(JSON.stringify({
-      extras: part, features: ctx.features, raceways: slimRaceways, gateRoads: options.gateRoads || [], dams: options.dams || null,
-      maxBuildings: options.maxBuildings, buildingKeys: [...groups.keys()],
-    }));
+    items.unshift({
+      head: JSON.stringify({
+        extras: part, raceways: slimRaceways, gateRoads: options.gateRoads || [], dams: options.dams || null,
+        maxBuildings: options.maxBuildings, buildingKeys: [...groups.keys()],
+      }),
+      featureChunks,
+    });
   }
   // (the heightmap in shared memory: every worker reads the same one)
   const hm = terrainData.heightMap;
