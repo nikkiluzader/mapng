@@ -21,7 +21,7 @@ It is built for driving and modding, not survey-grade reconstruction. The result
 
 ## MapNG Desktop (Windows and Linux)
 
-The same MapNG, running on your own computer. Free, from [GitHub Releases](https://github.com/nikkiluzader/mapng/releases/latest): `MapNG-Setup-<version>.exe` for Windows, `MapNG-<version>-x86_64.AppImage` for Linux.
+The same MapNG, running on your own computer. Free, from [GitHub Releases](https://github.com/nikkiluzader/mapng/releases/latest): `MapNG-Setup-<version>.exe` for Windows (or `MapNG-<version>-windows-portable.zip`: unzip anywhere, nothing to install), `MapNG-<version>-x86_64.AppImage` for Linux.
 
 - **Big and dense maps.** No browser memory limit: generating and exporting run in their own processes and use every CPU core. A dense 8 km Manhattan level that took 34 minutes at the start of the desktop work exports in under 5 minutes.
 - **Full-detail free lidar.** The desktop app reads Mapterhorn's free lidar at full detail for much bigger areas than the browser can hold (about 2.5 GB of tiles against the browser's 290 MB): a 16 km area at 1 m gets about 0.8 m lidar instead of 3.3 m. The hint under the elevation source says the detail your area will actually get.
@@ -30,7 +30,7 @@ The same MapNG, running on your own computer. Free, from [GitHub Releases](https
 - **My Levels.** A sidebar on the right lists the MapNG levels in your mods folder, with their size, date and MapNG version. **Update** remakes a level with the current version from the data it was made from, with the same settings, so it gets every fix since. **Modify** loads it back in with its settings to change and export again. You can also show it on the map, show it in the mods folder, open its saved data, or **Delete** it (to the Recycle Bin or Trash). Levels from before the desktop app are updated by fetching their area again.
 - **Saved downloads.** Each level keeps what was downloaded for it (terrain, satellite, OpenStreetMap, bridge-height lidar) in the app's data folder (`%APPDATA%\MapNG\projects` on Windows), never in the level zip. Update and Modify read it instead of downloading again, so they work offline and use no GPXZ calls. **Show saved data** opens a level's folder; deleting a level removes it too.
 - **Problem reports, only if you say so.** When the app crashes or an export fails, it can offer to send a report. You see everything in it first, nothing is sent unless you choose Send, and you get a report ID to mention on Discord or GitHub ([details](https://mapng.com/data.html#reports)).
-- **Update checks.** The welcome screen has a box for automatic update checks (ticked; untick it to opt out), and MapNG asks before it downloads or installs an update.
+- **Update checks.** The welcome screen has a box for automatic update checks (ticked; untick it to opt out), and MapNG asks before it downloads or installs an update. **Help > Get Test Builds** offers the builds made between releases.
 - Cancel an export, see why one failed and open its log, taskbar progress, and a notification when a long export finishes.
 
 The Windows build isn't code-signed yet: on first run Windows SmartScreen may say it "protected your PC". Choose **More info**, then **Run anyway**.
@@ -44,6 +44,8 @@ The Windows build isn't code-signed yet: on first run Windows SmartScreen may sa
 - **Trees where trees grow:** ESA WorldCover keeps planted woods to real tree cover (no forests above the tree line), mountain trees become conifers; trees OSM maps one by one always stand
 - **Buildings** textured with BeamNG's own facades and roofs
 - **Roads:** DecalRoads with real surfaces, lane markings by country, crosswalks, stop bars, parking lanes and shoulders; roads on the 30 m source are smoothed and levelled automatically
+- **Road widths that fit the country:** a width mapped in OpenStreetMap comes first, then (if you switch it on) a width measured from the satellite picture, then the lane widths usual in the country (a library of ten countries' design rules, `services/roadWidthStandards.js`, with regional figures elsewhere)
+- **Road surfaces** (Fine-tuning, experimental): besides decal roads, BeamNG Mesh Roads under every paved road, or Hero Roads built and baked when the level first loads
 - **Street detail:** traffic signals per approach, road signs, street lamps that light up at night, sidewalks raised with curb returns and ramps (or flat as decals, with a curb height you choose), median islands on divided roads, hydrants, bins, benches, utility poles and power lines
 - **Bridges, tunnels and dams** solved as one network with the roads and terrain, from general rules that work with any terrain and OpenStreetMap data: smooth bridge ends, clearance over rivers and roads, styled bridges (trusses, arches, suspension, cable-stayed), drawbridges with their tower houses and lift spans, divided roads sharing one deck, lamps on lit bridges, lidar deck heights in the US, tunnel portals and lights (with the terrain Untouched, tunnels on lidar open only their entrances), concrete arch dams with the road and guardrails along the crest
 - **Venues:** racetracks with kerbs, walls and catch fences, sports grounds with surfaces, markings and seating, swimming pools and fountains, floodlights
@@ -51,15 +53,16 @@ The Windows build isn't code-signed yet: on first run Windows SmartScreen may sa
 - **OpenStreetMap data** from MapNG's own copy of the whole planet (read in a second or two anywhere, independent of the public servers; a snapshot, rebuilt regularly), or the live OpenStreetMap servers first if you prefer today's edits, with your own Overpass server if you have one; **Overture Maps** adds buildings and heights OpenStreetMap is missing, and is the last-resort source if neither MapNG's copy nor any server can be read
 - **How heavy is this level?** Before you export, a card rates the level from its size, how far its corners are from the centre (BeamNG starts to jitter past about 30 km) and its building count. It only warns; you can always export
 - **Share your setup:** a short code or link for your settings (works for 24 hours), a long code that never expires, or a file. Whoever opens it sees exactly what it changes first, and your own keys and servers never go with it
-- **A step-by-step control panel:** Location, Sources, Generate, Export (batch: Location, Sources, What you get, Run), with your setup always shown above the buttons
-- **Background areas** (Advanced): shade the parts of the map you won't drive; they keep their shape but get no buildings, trees, grass or props and download at lower detail. A No smoothing brush keeps chosen roads exactly as the elevation data has them
+- **A step-by-step control panel:** Location, Sources, Generate, Export (batch: Location, Sources, What you get, Run), with your setup always shown above the buttons. Generate asks what you are making (a BeamNG level, Assets, or both) and Export shows only that
+- **Which elevation source is best here?** Compare sources at any size up to the whole selection, and a quality report that scores each source for your square and marks its flaws
+- **Area Mask** (Advanced): shade the parts of the map you won't drive; they keep their shape but get no buildings, trees, grass or props and download at lower detail. A No smoothing brush keeps chosen roads exactly as the elevation data has them
 - **Exports that only redo what changed:** everything is downloaded at Generate and in a background data step (one download cache), Check level when nothing changed, and the slow steps reused when one setting did; export history in the desktop app
 - **2D preview:** the generated area flat, with everything that will be built drawn over it by group, terrain views (Relief, Slope, Height, contour lines), the backdrop's surrounding tiles, and a button straight into OpenStreetMap's editor
 - **3D preview** with Standard and Cinematic looks, sun shadows, and the same terrain views
 - **What to build:** switch any feature of the level on or off before you export. Basic has four presets (Everything, Clean driving, Roads only, Scenery only); Advanced has a switch for each of 32 features, single OpenStreetMap tags, and the 2D map coloured by group
 - **Spawn and quicktravel points:** pick where the car starts and add places to jump to from BeamNG's big map
 - **Railways** with their bridges, tunnels and level crossings (tracks only for now)
-- **Basic and Advanced modes:** Basic builds the BeamNG level from a preset. Advanced adds the Terrain choice (Ready to drive, Custom or Untouched), every feature switch and fine-tuning (forest density, measured bridge heights), heightmap, texture and 3D model downloads, and surrounding tiles
+- **Basic and Advanced modes:** Basic builds the BeamNG level from a preset. Advanced adds the Terrain choice (Ready to drive, Custom or Untouched), every feature switch and fine-tuning (forest density, measured bridge heights), heightmap and texture downloads, 3D models (of a picked area, in tiles, at a point spacing you choose), and surrounding tiles
 - **Your own OpenStreetMap data:** pull the area straight from openstreetmap.org (one request per click; its [API usage policy](https://operations.osmfoundation.org/policies/api/) is yours to follow), or drop in an `.osm` file, when the public servers are down or behind
 - **Batch mode** for tile grids up to 20×20, or a combined level stitched from a 2×2, 4×4 or 8×8 grid
 - Stage-by-stage progress like BeamNG's loading screen, with finished steps and timings, and a detailed `export_report.txt` in every level for troubleshooting
@@ -67,22 +70,23 @@ The Windows build isn't code-signed yet: on first run Windows SmartScreen may sa
 
 ## What's New
 
-**MapNG 0.3.0** ([update page](https://mapng.com/updates/0.3.0/)): the whole planet, ready to drive
+**MapNG 0.3.1** ([update page](https://mapng.com/updates/0.3.1/)): smoother roads, sounder bridge ends
 
-- **The planet:** MapNG's own copy of OpenStreetMap for the entire planet (145 GB in 63 archives). Map data for any area in a second or two, never rate limited, checked against the live servers at 23 places. A switch under Map data asks the live servers first instead
-- **Sidewalks:** as flat decals you can drive on, or raised with a curb height of your choice (15, 8 or 3 cm)
-- **What gets built:** choose and swap the trees picked for your area, switch road classes on and off, assumed street parking on or off
-- **The location map:** Height colours, Shaded relief and Slope layers; lock the selected area
-- **Elevation:** Poland's NMT now takes each sheet's 1 m lidar (it took a 5 m grid where an older year listed one); lidar half a cell off its place, fixed; GPXZ map sizes that lost their lidar, fixed; a suggested source with a warning when free lidar looks wrong; very wide maps
-- **Bridges and tunnels:** a road on an embankment is no flyover; an elevated roundabout is one slab; cleaner tunnel mouths; low tunnels without holes
-- **When things go wrong:** reports from the website (only if you choose Send), your settings offered back after an unexpected close (kept in your browser, nothing sent), the app says so when started from inside its zip
-- **In the game:** the view distance follows the map's size
+- **Road surfaces:** two experimental choices beside decal roads: Mesh Roads, and Hero Roads that are built once and baked
+- **Bridge ends:** no wall across a road where a ramp joins on a bridge, no gap between a bridge and the road after it, a lip where the road steps onto a deck
+- **Road widths:** narrower roads outside the Americas, single-track roads one lane wide, and a satellite measurement that no longer widens a road
+- **Generate asks what you are making**, and paints only the ground texture you chose
+- **3D models** of a picked area, in tiles, at a chosen point spacing
+- **Elevation:** Compare sources at any size, with USGS and Poland's survey; a quality report per source; survey sheets joined; coasts on the 30 m data
+- **Faster desktop app:** an 8 km Generate 78 s to 54 s, export 112 s to 88 s
+- **When things go wrong:** a huge city's "Invalid string length", "out of memory" on a page older than the site, a full disk said plainly, graphics details in reports
 
-**Earlier updates**, each with pictures: [0.2.17](https://mapng.com/updates/0.2.17/), [0.2.16](https://mapng.com/updates/0.2.16/), [0.2.15](https://mapng.com/updates/0.2.15/), [0.2.14](https://mapng.com/updates/0.2.14/), [0.2.13](https://mapng.com/updates/0.2.13/), [0.2.12](https://mapng.com/updates/0.2.12/), [0.2.11](https://mapng.com/updates/0.2.11/), [0.2.9](https://mapng.com/updates/0.2.9/), [0.2.8](https://mapng.com/updates/0.2.8/), [0.2.7](https://mapng.com/updates/0.2.7/), [0.2.6](https://mapng.com/updates/0.2.6/), [0.2.5](https://mapng.com/updates/0.2.5/). Every release with its notes is on the [releases page](https://github.com/nikkiluzader/mapng/releases).
+**Earlier updates**, each with pictures: [0.3.0](https://mapng.com/updates/0.3.0/), [0.2.17](https://mapng.com/updates/0.2.17/), [0.2.16](https://mapng.com/updates/0.2.16/), [0.2.15](https://mapng.com/updates/0.2.15/), [0.2.14](https://mapng.com/updates/0.2.14/), [0.2.13](https://mapng.com/updates/0.2.13/), [0.2.12](https://mapng.com/updates/0.2.12/), [0.2.11](https://mapng.com/updates/0.2.11/), [0.2.9](https://mapng.com/updates/0.2.9/), [0.2.8](https://mapng.com/updates/0.2.8/), [0.2.7](https://mapng.com/updates/0.2.7/), [0.2.6](https://mapng.com/updates/0.2.6/), [0.2.5](https://mapng.com/updates/0.2.5/). Every release with its notes is on the [releases page](https://github.com/nikkiluzader/mapng/releases).
 
 ## Important Notes
 
 - Large and dense exports (`4096` and up, or any big city) are heavy on browser memory: use [MapNG Desktop](https://github.com/nikkiluzader/mapng/releases/latest), which has no browser limit and uses every core.
+- Building a map is heavy work: a large or detailed one can use all of your computer's memory or fill its disk, and the browser, the app, the game or the whole computer can freeze or crash. MapNG warns about very heavy maps but cannot know what your computer can take. It is provided as it is, with no warranty (see the [license](LICENSE)): you use it at your own risk.
 - OSM coverage varies by area: missing or mistagged OSM data shows up as missing or odd roads, buildings and features.
 - At very small processing scales (for example `0.25 m/px`), small geospatial alignment differences can become visible near tile edges.
 - MapNG outputs are a strong starting point. If you plan to publish to community mod sites, please do additional editing, world-building, optimization and QA first.
@@ -192,7 +196,7 @@ Releases are built by `.github/workflows/desktop-release.yml` when a `vX.Y.Z` ta
 1. Pick a location on the map or search by name.
 2. Choose an output size, a processing scale (m/px) and an elevation source.
 3. Keep Include OSM features on for roads, buildings, vegetation and everything built from them (they come from MapNG's own copy of the whole planet; the note above the map says which source is in use).
-4. Generate. The 2D preview opens: check what will be built, the slope and the relief; open the 3D preview for a look round.
+4. On the Generate step, say what you are making (a BeamNG level, Assets, or both), then Generate. The 2D preview opens: check what will be built, the slope and the relief; open the 3D preview for a look round.
 5. Export the BeamNG level and put the ZIP in your BeamNG.drive `mods` folder (the desktop app saves it there for you).
 6. For larger areas, switch to Batch job mode and process a tile grid, or stitch one into a combined level.
 

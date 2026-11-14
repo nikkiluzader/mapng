@@ -150,7 +150,7 @@
   <section id="testing">
     <h2>How a change is tested</h2>
     <ol class="flow">
-      <li><b>Automated tests.</b> About 1,100 tests in 167 files cover the pieces: road widths, bridges and tunnels, water, terrain repair, map data reading, the texts in all seven languages, and more. A change is kept only when all of them pass.</li>
+      <li><b>Automated tests.</b> About 1,170 tests in 184 files cover the pieces: road widths, bridges and tunnels, water, terrain repair, map data reading, the texts in all seven languages, and more. A change is kept only when all of them pass.</li>
       <li><b>A plot first.</b> For anything that shapes terrain or structures, the expected result is drawn from above before a level is exported, so a wrong idea is caught before it is built.</li>
       <li><b>The export sweep.</b> Before a change reaches the public site, MapNG exports 99 complete levels: a set of real test places, each on three elevation sources (1 m lidar, free lidar, global 30 m) and three terrain settings. Each export is measured (road steps, steep spots, sidewalks floating or buried, bridge decks, tunnels) and compared with recorded results. A number that got worse stops the change.</li>
       <li><b>In the game.</b> Levels are loaded in BeamNG.drive and checked from several angles and from the driver's seat. Where it can be measured, it is: rays cast onto the road surface, heights read every half metre through a tunnel.</li>
