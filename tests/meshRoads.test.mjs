@@ -190,3 +190,21 @@ test('a lane running along inside a wider deck is left out where that deck cover
   assert.equal(b.stats.crossings || 0, 0);
   assert.equal(b.meshRoads.length, 2);
 });
+
+test('a lean taken from another deck eases out along the road, and a leaning deck has a middle line of vertices', () => {
+  const climb = (x) => 10 + 0.06 * x;
+  const groups = [{ __items: [
+    road('dr_main_s1_b', line(-40, 0, 0, 0), { width: 8, z: climb }), road('dr_main_s2_b', line(0, 0, 40, 0), { width: 8, z: climb }),
+    road('dr_side_s1_b', line(0, 0, 0, 40), { z: () => 10 }),
+  ] }];
+  const { meshRoads } = buildMeshRoads(groups, (x, y) => (Math.abs(y) < 4 ? climb(x) : 10));
+  const side = meshRoads.find((m) => m.name === 'mr_side_s1'); const main = meshRoads.find((m) => m.name === 'mr_main_s1');
+  assert.equal(side.widthSubdivisions, 1); assert.equal(main.widthSubdivisions, 0);
+  // between two nodes the lean changes by no more than 0.75 % a metre: no quad twisted enough to fold into a ridge
+  const leanOf = (nd) => Math.hypot(nd[5], nd[6]) / nd[7];
+  for (let i = 1; i < side.nodes.length; i++) {
+    const a = side.nodes[i - 1]; const b = side.nodes[i]; const gap = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    assert.ok(Math.abs(leanOf(a) - leanOf(b)) <= 0.0075 * gap + 1e-4, `lean ${leanOf(a)} to ${leanOf(b)} in ${gap} m`);
+  }
+  assert.ok(leanOf(side.nodes.find((nd) => nd[1] > 4.5 && nd[1] < 6)) > 0.03, 'still leaning just outside the through road');
+});

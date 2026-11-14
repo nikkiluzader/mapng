@@ -52,6 +52,7 @@ const CROSS_TUCK_M = 0.5;      // a road crossing a deck ends at least this far 
 const CROSS_SINK_M = 0.02;     // ... and this far under its surface there (two tops at one height flicker)
 const END_ZONE_M = 6;          // near an end that meets another deck the road is at that deck's level
 const SCAN_M = 0.25;          // how finely a road's line is looked along for the decks it lies in
+const LEAN_EASE = 0.0075;       // how fast a deck's lean eases out beyond the deck it took it from, per metre
 const TILT_EDGE_M = 0.25;       // a deck is tilted to another's slope by no more than lifts its edge this much
 const END_NEED_M = 0.05;        // a deck's end with no deck beyond it: this far over the road's own line
 const DECAL_OVER_DECK_M = 0.02;
@@ -432,11 +433,12 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined } = {
     // the road counts (leaning a deck forward along its own line does nothing but turn its end face), and no
     // more than lifts its edge TILT_EDGE_M: a 21 m carriageway given a crossing ramp's 11 % stood 2.3 m out of
     // the ground along one side.
-    d.nrm = [];
+    d.nrm = []; const lean = new Float64Array(n); const across = [];
     for (let i = 0; i < n; i++) {
       const a = d.pts[Math.max(0, i - 1)]; const b = d.pts[Math.min(n - 1, i + 1)];
       const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
       const nx = -(b[1] - a[1]) / L; const ny = (b[0] - a[0]) / L;
+      across.push([nx, ny]);
       // (the other deck's height under this road's two edges, where it lies under both: its true lean across
       // this road, also where that deck's slope changes under it)
       const zl = under(d.pts[i][0] + nx * d.hw[i], d.pts[i][1] + ny * d.hw[i], d.base[i], d.flag[i]);
@@ -445,16 +447,22 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined } = {
       if (other > -Infinity) {
         r[i] = other - d.base[i] - (d.sink[i] ? CROSS_SINK_M : 0); fixed[i] = 1;
         const lim = TILT_EDGE_M / Math.max(1, d.hw[i]);
-        const lean = zl > -Infinity && zr > -Infinity ? (zl - zr) / (2 * d.hw[i]) : slopeAt[0] * nx + slopeAt[1] * ny;
-        const g = Math.max(-lim, Math.min(lim, lean));
-        const len = Math.hypot(g, 1);
-        d.nrm[i] = [(-g * nx) / len, (-g * ny) / len, 1 / len];
+        const slope = zl > -Infinity && zr > -Infinity ? (zl - zr) / (2 * d.hw[i]) : slopeAt[0] * nx + slopeAt[1] * ny;
+        lean[i] = Math.max(-lim, Math.min(lim, slope));
       } else if (d.flag[i] === 2) {
         // (no deck beyond this end: down to just over the road's own line, the deck easing down to it, so the
         // road goes on from it without a 10 to 25 cm step)
-        r[i] = Math.min(d.need[i], END_NEED_M); fixed[i] = 1; d.nrm[i] = [0, 0, 1];
-      } else { r[i] = d.need[i]; d.nrm[i] = [0, 0, 1]; }
+        r[i] = Math.min(d.need[i], END_NEED_M); fixed[i] = 1;
+      } else r[i] = d.need[i];
     }
+    // The lean eases out along the road beyond the other deck, LEAN_EASE a metre. Leaning at the other deck's
+    // edge and level again at the next node 2 m on, the surface between was one twisted quad, which the game
+    // folds along a diagonal: a ridge 10 to 13 cm high across the lane just outside the junction (measured in
+    // game: 19.06 and 19.12 at the two nodes, 19.19 between them).
+    for (let i = 1; i < n; i++) if (!fixed[i] || !lean[i]) { const c = Math.sign(lean[i - 1]) * Math.max(0, Math.abs(lean[i - 1]) - LEAN_EASE * (d.s[i] - d.s[i - 1])); if (Math.abs(c) > Math.abs(lean[i])) lean[i] = c; }
+    for (let i = n - 2; i >= 0; i--) if (!fixed[i] || !lean[i]) { const c = Math.sign(lean[i + 1]) * Math.max(0, Math.abs(lean[i + 1]) - LEAN_EASE * (d.s[i + 1] - d.s[i])); if (Math.abs(c) > Math.abs(lean[i])) lean[i] = c; }
+    for (let i = 0; i < n; i++) { const g = lean[i]; const len = Math.hypot(g, 1); d.nrm[i] = g ? [(-g * across[i][0]) / len, (-g * across[i][1]) / len, 1 / len] : [0, 0, 1]; }
+    d.leans = lean.some((g) => g !== 0);
     for (let i = 1; i < n; i++) if (!fixed[i]) r[i] = Math.max(r[i], r[i - 1] - RAMP_SLOPE * (d.s[i] - d.s[i - 1]));
     for (let i = n - 2; i >= 0; i--) if (!fixed[i]) r[i] = Math.max(r[i], r[i + 1] - RAMP_SLOPE * (d.s[i + 1] - d.s[i]));
     // (and down to a deck that lies lower than the road's own need: eased the same way, or the road's deck
@@ -475,7 +483,9 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined } = {
       name, class: 'MeshRoad', persistentId: makeId(), __parent: 'mesh_roads',
       position: [r3(d.pts[0][0]), r3(d.pts[0][1]), r3(d.z[0])],
       topMaterial: MESH_ROAD_MATERIAL, bottomMaterial: MESH_ROAD_MATERIAL, sideMaterial: MESH_ROAD_MATERIAL,
-      textureLength: 8, breakAngle: 3, widthSubdivisions: 0,
+      // (a deck that leans anywhere has a line of vertices along its middle: what twist is left between two of
+      // its nodes then folds within each half, and the road's own line stays true)
+      textureLength: 8, breakAngle: 3, widthSubdivisions: d.leans ? 1 : 0,
       // [x, y, z, width, depth, normal x, y, z]
       nodes: d.pts.map((p, i) => [r3(p[0]), r3(p[1]), r3(d.z[i]), r3(d.hw[i] * 2),
         r3(Math.max(MIN_DEPTH_M, Math.min(MAX_DEPTH_M, d.z[i] - d.low[i] + 0.15))), ...d.nrm[i].map((v) => Math.round(v * 1e5) / 1e5)]),
