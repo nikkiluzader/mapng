@@ -65,6 +65,12 @@ out of the through road; the ground's own camber; the bank at a bridge's end no 
 every road mode). Frame rate on a city grid (221 decks): no measurable difference from decal roads; both sat at
 the frame limiter with about 1.8 ms of render time.
 
+After the last two fixes of the night (what lies inside another deck does not stand out of it; a hump of ground
+on the road's own line is covered) the recorded baselines stand at 296 stepped places on 26 areas: 168 at
+bridges and tunnels, 62 ground through the deck, 46 deck to deck, 20 within one deck; 2,474 of 711,526 road
+samples have no deck. (The commit that recorded them, 8359bbb, says 1.07 million samples: wrong, it is 711,526.)
+Tried and taken out: a higher cap on a deck's lean (no net gain), bridge decks as surfaces (worse).
+
 Open, by how often it was measured:
 1. **Bridge parapets across side streets** that join a bridge at its end (a canal city: a 1.1 m rail across the
    mouth of each quay street). The bridge builder leaves parapets open for ground roads it finds on the deck
