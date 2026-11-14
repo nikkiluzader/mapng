@@ -329,7 +329,9 @@ export function composeTerrain(graph, grid) {
           // (past this piece's end where a deck begins: the road's line carried on at its grade and a little
           // under it, not this end's own height laid flat. See deckBefore above.)
           const overDeck = (deckBefore && uRaw < 0) || (deckAfter && uRaw > 1);
-          const ue = overDeck ? uRaw : u;
+          // (never over this end's own height: off a humped bridge the road falls away from the deck, and its
+          // grade carried back rose over the deck's flattening crest, on every arched canal bridge of one city)
+          const ue = overDeck && (zk[i + 1] - zk[i]) * (uRaw - u) < 0 ? uRaw : u;
           let zc = zk[i] + (zk[i + 1] - zk[i]) * ue - (overDeck ? END_UNDER_DECK_M : 0) - (abutment ? DECK_UNDER_M + DECK_ABUT_CLEAR_M : 0) - (dropAt(i) + (dropAt(i + 1) - dropAt(i)) * u);
           // (banked: the left of the line higher by bank per metre, out to the core's edge)
           if (bank) zc += bank * Math.max(-core, Math.min(core, (-(x - ax) * vy + (y - ay) * vx) / Math.sqrt(L2)));
