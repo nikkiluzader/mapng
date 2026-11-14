@@ -36,6 +36,11 @@ The steps were not, as first thought, crests in the solved road heights: the sol
 Eight maps, the older measure: steps over 8 cm 85 to 34 before the terrain fix.
 
 Open, most visible first:
+0. **An underpass with no room.** Where a tunnel road passes less than 3.5 m under another road, the higher class
+   keeps its surface and the other is blocked (dam-road area on the free lidar: a secondary road's 23 m underpass
+   1.6 m under a primary road is buried; before, it trenched the primary). The better answer is one crossing at
+   grade at the major road's height (pins in the road solve); not built. With 3.5 m or more the road above now
+   gets a bridge.
 1. **Sidewalk slabs across a carriageway** (three in the roundabout town, 18 to 36 cm): the sidewalk builder.
 2. **Deck meets structure.** Steps where a deck meets a bridge deck or a tunnel floor (24 to 33 cm in the hilly
    city, more at an interchange), and one 60 cm terrain step on a boulevard there.
@@ -145,6 +150,16 @@ road, a dense hilly city.
 24. World Editor: decks listed, selectable and editable; nothing extra drawn.
 25. The website's export and the desktop app's export of the same map give the same decks.
 26. A drive test: a car at speed over the ten worst junctions of each map, with and without junction mouths.
+
+## Borrowed rules to try (research notes in scratch/research/road-techniques.md, unverified numbers)
+
+- A landing on the minor road at a junction: approach grade 3 % or less (6 % limit), grade break up to 3 %; the
+  major road's grade and cross-slope carried through; both flattened to one plane where neither dominates.
+- Profiles as straight grades joined by parabolas, length = K x grade change, K by speed.
+- Cross-slope change spread over slope change x half-width / relative gradient (0.5 to 0.9 %): far longer than
+  the 0.75 % a metre Mesh Roads uses now.
+- Junction as its own surface with each arm blended in over a transition length (OpenDRIVE).
+- Named reference junction cases with invariant checks (osm2streets' test pattern).
 
 ## Diagram tools (in scratch/, not in the repo)
 
