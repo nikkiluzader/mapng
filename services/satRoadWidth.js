@@ -28,6 +28,8 @@ const CONCURRENCY = 12;
 // (in order of who is measured first when the tile budget runs out)
 const CLASSES = ['trunk', 'primary', 'secondary', 'tertiary', 'unclassified', 'residential'];
 
+// (the desktop app generates in its own Node process, where there is no window to ask: services/mapterhorn.js tells it the same way)
+const inDesktopRunner = () => typeof process !== 'undefined' && !!process.versions?.node && !process.versions.electron;
 export const measureWidthsEnabled = () => {
   try { return globalThis.localStorage?.getItem(MEASURE_WIDTHS_STORAGE_KEY) === 'true'; } catch { return false; }
 };
@@ -221,7 +223,7 @@ export async function withMeasuredWidths(features, { onProgress, signal } = {}) 
   if (!measureWidthsEnabled() || !Array.isArray(features) || !features.length) return features;
   // (the tile budget is for the website: a browser tab's memory and its user's connection. The desktop app
   // measures every road, however many tiles that is)
-  try { await measureRoadWidths(features, { onProgress, signal, maxTiles: desktopApp ? Infinity : MAX_TILES }); } catch (e) {
+  try { await measureRoadWidths(features, { onProgress, signal, maxTiles: desktopApp || inDesktopRunner() ? Infinity : MAX_TILES }); } catch (e) {
     if (signal?.aborted) throw e;
     console.warn('[Road widths] measuring failed; roads keep their usual widths:', e?.message || e);
   }
