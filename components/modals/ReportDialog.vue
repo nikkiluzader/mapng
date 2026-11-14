@@ -44,7 +44,7 @@
                 <li v-if="preview.gpu" data-testid="report-gpu">{{ t('report.incGpu', { gpu: preview.gpu }) }}</li>
                 <li v-if="preview.error">{{ t('report.incError') }}</li>
                 <li v-if="preview.exportReportChars">{{ t('report.incExportReport', { kb: Math.max(1, Math.round(preview.exportReportChars / 1024)) }) }}</li>
-                <li v-if="preview.logChars">{{ t('report.incLog', { kb: Math.max(1, Math.round(preview.logChars / 1024)) }) }}</li>
+                <li v-if="preview.logChars && (includeArea || !preview.area)">{{ t('report.incLog', { kb: Math.max(1, Math.round(preview.logChars / 1024)) }) }}</li>
                 <li v-if="preview.hasOptions">{{ t('report.incOptions') }}</li>
                 <li v-if="preview.dumpBytes">{{ t('report.incDump', { kb: Math.max(1, Math.round(preview.dumpBytes / 1024)) }) }}</li>
                 <li v-if="preview.area && includeArea">{{ t('report.incArea') }}</li>
@@ -52,7 +52,7 @@
                 <li v-if="description.trim()">{{ t('report.incDescription') }}</li>
                 <li class="text-gray-500 dark:text-gray-400">{{ t('report.incNever') }}</li>
               </ul>
-              <pre v-if="preview.logTail" class="mt-2 max-h-40 overflow-auto rounded bg-gray-100 dark:bg-gray-800 p-2 text-micro leading-snug whitespace-pre-wrap">{{ preview.logTail }}</pre>
+              <pre v-if="preview.logTail && (includeArea || !preview.area)" class="mt-2 max-h-40 overflow-auto rounded bg-gray-100 dark:bg-gray-800 p-2 text-micro leading-snug whitespace-pre-wrap">{{ preview.logTail }}</pre>
               <a href="https://mapng.com/data.html#reports" target="_blank" rel="noopener" class="mt-2 inline-block text-caption text-brand hover:underline">{{ t('report.privacy') }}</a>
             </details>
             <p v-if="failed" class="text-caption text-red-600 dark:text-red-400">{{ failed }}</p>

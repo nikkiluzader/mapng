@@ -186,6 +186,24 @@ async function pipe(bytes, stream) {
   return new Uint8Array(out);
 }
 
+const MAX_CODE_TEXT_CHARS = 4 * 1024 * 1024;
+const MAX_CONFIG_BYTES = 16 * 1024 * 1024;
+/** The bytes a deflated code unpacks to; throws once they pass `max`. */
+async function inflateCapped(bytes, max) {
+  const reader = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader();
+  const parts = []; let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > max) { await reader.cancel().catch(() => {}); throw new Error('too large'); }
+    parts.push(value);
+  }
+  const out = new Uint8Array(size); let at = 0;
+  for (const p of parts) { out.set(p, at); at += p.byteLength; }
+  return out;
+}
+
 /** "mapng:1:…" for a config. */
 export async function encodeSessionCode(config) {
   const json = new TextEncoder().encode(JSON.stringify(withoutSecrets(config)));
@@ -199,8 +217,10 @@ export async function parseSessionText(text) {
   const t = String(text || '').trim();
   if (!t) throw new Error('empty');
   let value;
+  // (a code from someone else is only so big: one that unpacks into gigabytes would take the page down)
+  if (t.length > MAX_CODE_TEXT_CHARS) throw new Error('too large');
   if (t.startsWith(CODE_PREFIX)) {
-    const bytes = await pipe(fromBase64Url(t.slice(CODE_PREFIX.length).replace(/\s+/g, '')), new DecompressionStream('deflate-raw'));
+    const bytes = await inflateCapped(fromBase64Url(t.slice(CODE_PREFIX.length).replace(/\s+/g, '')), MAX_CONFIG_BYTES);
     value = JSON.parse(new TextDecoder().decode(bytes));
   } else {
     value = JSON.parse(t);

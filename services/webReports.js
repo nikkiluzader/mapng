@@ -11,6 +11,8 @@
 // It is posted to /api/crash (worker/crashReports.js), which keeps it in
 // private storage only the developer reads.
 
+import { withoutPersonal } from './personalKeys.js';
+
 const TAIL_LINES = 400;
 const LINE_CHARS = 400;
 const tail = [];
@@ -59,7 +61,7 @@ export async function prepareReport(kind, ctx = {}) {
     os: browserSummary(),
     error: String(ctx.error || '').slice(0, 4000),
     description: String(ctx.description || '').slice(0, 4000),
-    options: ctx.options && typeof ctx.options === 'object' ? JSON.parse(JSON.stringify(ctx.options, (k, v) => (typeof v === 'function' || k === 'gpxzApiKey' ? undefined : v))) : null,
+    options: ctx.options && typeof ctx.options === 'object' ? withoutPersonal(JSON.parse(JSON.stringify(ctx.options, (k, v) => (typeof v === 'function' || /key|token|secret|password/i.test(k) ? undefined : v)))) : null,
     area: ctx.area && typeof ctx.area === 'object' ? ctx.area : null,
     config: typeof ctx.config === 'string' ? ctx.config : '',
     memory: { totalGB: Number(nav.deviceMemory) || null, cpus: Number(nav.hardwareConcurrency) || null },
@@ -83,8 +85,9 @@ export async function sendReport(token, { includeArea = true, description = '' }
   const report = prepared.get(token);
   if (!report) throw new Error('This report is no longer available. Try again.');
   const body = { ...report, description: String(description || report.description || '').slice(0, 4000) };
-  // (without the location: no place, no settings code (it holds the place), no options)
-  if (!includeArea) { body.area = null; body.config = ''; body.options = null; }
+  // (without the location: no place, no settings code (it holds the place), no options, and no
+  // log: its lines name the area's bounds, its country and its lakes)
+  if (!includeArea) { body.area = null; body.config = ''; body.options = null; body.log = ''; }
   const r = await fetchImpl('/api/crash', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const d = await r.json().catch(() => ({}));
   if (!r.ok || !d.id) throw new Error(d.error || `The report could not be sent (HTTP ${r.status}).`);

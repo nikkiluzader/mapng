@@ -251,6 +251,8 @@
   'use strict';
   const REPO = 'nikkiluzader/mapng';
   const $ = (id) => document.getElementById(id);
+  // (a report's kind is the sender's word: only the known ones pick a colour)
+  const kindClass = (k) => (['crash', 'export', 'generate', 'rebuild', 'level', 'manual'].includes(k) ? k : '');
   const el = (tag, props = {}, ...kids) => {
     const n = document.createElement(tag);
     for (const [k, v] of Object.entries(props)) {
@@ -452,7 +454,7 @@
     if (!list.length) { body.append(el('tr', {}, el('td', { colspan: '5', class: 'muted', text: state.reports.length ? 'No report matches the filters.' : 'No reports yet.' }))); return; }
     const rowOf = (r, count = 0) => el('tr', { class: `row${r.admin?.handled ? ' handled' : ''}${state.selected === r.key ? ' sel' : ''}`, tabindex: '0', onclick: () => select(r.key), onkeydown: (e) => { if (e.key === 'Enter') select(r.key); } },
       el('td', {}, el('div', { text: when(r.receivedAt) }), el('div', { class: 'muted mono', text: r.id })),
-      el('td', {}, el('span', { class: `pill ${r.kind}`, text: r.kind }), r.admin?.handled ? el('div', {}, el('span', { class: 'pill ok', text: 'handled' })) : null),
+      el('td', {}, el('span', { class: `pill ${kindClass(r.kind)}`, text: r.kind }), r.admin?.handled ? el('div', {}, el('span', { class: 'pill ok', text: 'handled' })) : null),
       el('td', { text: r.appVersion || '' }),
       el('td', {}, el('div', { text: whatOf(r).slice(0, 180) }), count > 1 ? el('div', { class: 'muted', text: `${count} reports with this error` }) : null, r.admin?.note ? el('div', { class: 'muted', text: `Note: ${r.admin.note.slice(0, 120)}` }) : null),
       el('td', { class: 'mono', text: placeOf(r) }));
@@ -490,7 +492,7 @@
     const settings = Object.entries(o).filter(([k, v]) => !['sessionCode', 'points'].includes(k) && typeof v !== 'object').map(([k, v]) => `${k}: ${v}`).join('  ·  ');
     const mapLink = r.area && Number.isFinite(Number(r.area.lat)) ? el('a', { href: `https://www.openstreetmap.org/?mlat=${encodeURIComponent(r.area.lat)}&mlon=${encodeURIComponent(r.area.lng)}#map=13/${encodeURIComponent(r.area.lat)}/${encodeURIComponent(r.area.lng)}`, target: '_blank', rel: 'noopener noreferrer', text: 'open the place on a map' }) : null;
     host.append(...[
-      el('h2', {}, document.createTextNode(`${r.id} `), el('span', { class: `pill ${r.kind}`, text: r.kind })),
+      el('h2', {}, document.createTextNode(`${r.id} `), el('span', { class: `pill ${kindClass(r.kind)}`, text: r.kind })),
       el('p', { class: 'sub', text: `${when(r.receivedAt)} (${ago(r.receivedAt)})` }),
       r.error ? el('div', { class: 'err mono', text: r.error }) : null,
       r.description ? el('p', {}, el('b', { text: 'They wrote: ' }), document.createTextNode(r.description)) : null,
@@ -522,7 +524,7 @@
     need('reports', open ? { mark: String(open), title: `Open problem report${open === 1 ? '' : 's'}`, text: newest ? `Newest: ${whatOf(newest).slice(0, 140)} (${newest.kind}, ${newest.appVersion || '?'}, ${ago(newest.receivedAt)}).` : '', action: 'Open reports', tab: 'reports' } : null);
     const top = state.reports.slice(0, 4);
     put('ov-reports', top.length ? el('div', {}, top.map((r) => el('div', { style: 'display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)' },
-      el('span', { class: `pill ${r.admin?.handled ? 'ok' : r.kind}`, style: 'align-self:flex-start', text: r.admin?.handled ? 'handled' : r.kind }),
+      el('span', { class: `pill ${r.admin?.handled ? 'ok' : kindClass(r.kind)}`, style: 'align-self:flex-start', text: r.admin?.handled ? 'handled' : r.kind }),
       el('div', { style: 'min-width:0' }, el('div', { style: r.admin?.handled ? 'color:var(--muted)' : 'font-weight:600', text: whatOf(r).slice(0, 120) }), el('div', { class: 'muted', style: 'font-size:13px', text: `${r.appVersion || '?'} · ${ago(r.receivedAt)}` }))))) : el('p', { class: 'muted', text: 'No reports yet.' }));
   }
   async function loadReports() {

@@ -513,8 +513,8 @@
     bars($('top-keen'), codes.map((code) => [code, keenOf(code)]).filter(([, k]) => k > 0).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([code, k]) => ({ ...named(code), value: k, note: k.toFixed(1), title: `${nameOf(code, byCode)}: ${fmt(exportsOf(code))} shared exports, ${fmt(visits.get(code))} visits` })), { rank: true, empty: 'Not enough of both numbers yet.' });
 
     // ---- settings ----
-    const by = {};
-    for (const [name, value, count] of usage?.rows || []) (by[name] ||= {})[value] = count;
+    const by = Object.create(null);
+    for (const [name, value, count] of usage?.rows || []) if (Number.isFinite(count)) (by[name] ||= Object.create(null))[value] = count;
     const allValues = stats?.settingValues || {};
     const names = (usage?.settings || Object.keys(by)).filter((n) => by[n]);
     const totalOf = (n) => Object.values(by[n] || {}).reduce((a, b) => a + b, 0);
@@ -658,7 +658,7 @@
       bars($('causes'), tally(rep.byCause, CAUSE)); bars($('kinds'), tally(rep.byKind, KIND)); bars($('systems'), tally(rep.bySystem, SYSTEM));
       const span = []; for (let i = 20; i >= 0; i--) { const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10); span.push([d, rep.byDay[d] || 0]); }
       const mx = Math.max(...span.map(([, n]) => n), 1); const cw = 100 / span.length;
-      $('report-days').innerHTML = `<svg class="chart" viewBox="0 0 100 34" preserveAspectRatio="none" style="height:70px" role="img" aria-label="Problem reports per day, last 21 days">${span.map(([d, n], i) => `<rect class="col" x="${(i * cw + 0.4).toFixed(2)}" y="${(30 - 28 * n / mx).toFixed(2)}" width="${(cw - 0.8).toFixed(2)}" height="${(28 * n / mx).toFixed(2)}" rx="0.6"><title>${esc(new Date(d + 'T12:00:00Z').toLocaleDateString('en', { month: 'short', day: 'numeric' }))}: ${n} report${n === 1 ? '' : 's'}</title></rect>`).join('')}<line class="grid" x1="0" x2="100" y1="30" y2="30"/></svg><p class="src">The last 21 days; most in a day: ${fmt(mx)}.</p>`;
+      $('report-days').innerHTML = `<svg class="chart" viewBox="0 0 100 34" preserveAspectRatio="none" style="height:70px" role="img" aria-label="Problem reports per day, last 21 days">${span.map(([d, n], i) => `<rect class="col" x="${(i * cw + 0.4).toFixed(2)}" y="${(30 - 28 * n / mx).toFixed(2)}" width="${(cw - 0.8).toFixed(2)}" height="${(28 * n / mx).toFixed(2)}" rx="0.6"><title>${esc(new Date(d + 'T12:00:00Z').toLocaleDateString('en', { month: 'short', day: 'numeric' }))}: ${esc(fmt(n))} report${n === 1 ? '' : 's'}</title></rect>`).join('')}<line class="grid" x1="0" x2="100" y1="30" y2="30"/></svg><p class="src">The last 21 days; most in a day: ${fmt(mx)}.</p>`;
     } else {
       $('problem-tiles').innerHTML = `<div class="empty">${stats ? 'No reports counted yet.' : "The counts couldn't be loaded."}</div>`;
       ['causes', 'kinds', 'systems'].forEach((id) => bars($(id), [], { empty: '–' }));

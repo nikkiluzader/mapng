@@ -51,11 +51,11 @@
 <script>
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  try { $('token').value = localStorage.getItem('mapng_crash_token') || ''; } catch {}
+  try { $('token').value = sessionStorage.getItem('mapng_crash_token') || ''; } catch {}
   const auth = () => ({ Authorization: `Bearer ${$('token').value.trim()}` });
   let reports = [];
   async function load() {
-    try { localStorage.setItem('mapng_crash_token', $('token').value.trim()); } catch {}
+    try { sessionStorage.setItem('mapng_crash_token', $('token').value.trim()); localStorage.removeItem('mapng_crash_token'); } catch {}
     $('status').textContent = 'Loading…';
     const r = await fetch('/api/crash/list?limit=200', { headers: auth() });
     const d = await r.json().catch(() => ({}));
