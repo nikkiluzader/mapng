@@ -238,6 +238,7 @@ import { Loader2, AlertTriangle } from 'lucide-vue-next';
 import MobileRestrictionOverlay from './components/modals/MobileRestrictionOverlay.vue';
 import MemoryWidget from './components/ui/MemoryWidget.vue';
 import { appUpdated, codeFailed } from './services/appUpdate.js';
+import { isDiskFull } from './services/errorText.js';
 import AboutModal from './components/modals/AboutModal.vue';
 import DisclaimerModal from './components/modals/DisclaimerModal.vue';
 import TechStackModal from './components/modals/TechStackModal.vue';
@@ -1012,7 +1013,9 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
     const byodMessage = String(error?.message || '');
     if (!uploadedElevationFile.value) {
       // (the reason, and the offer to send a report: with the job's log in the desktop app, the page's last lines on the website)
-      const message = byodMessage.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') || t('app.error.fetchTerrain');
+      // (a desktop report read only "ENOSPC: no space left on device, write": the disk was full)
+      const message = isDiskFull(byodMessage) ? t('app.error.diskFull')
+        : byodMessage.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') || t('app.error.fetchTerrain');
       markJobEnd();
       openReportDialog('generate', {
         error: message,

@@ -1191,6 +1191,7 @@
     "error": {
       "fetchOsm": "Nie udało się pobrać danych OSM.",
       "osmUnavailable": "Serwery OpenStreetMap obecnie nie odpowiadają, więc teren wygenerowano bez dróg, budynków i innych obiektów mapy. Spróbuj ponownie za kilka minut.",
+      "diskFull": "Dysk jest pełny: MapNG nie mógł zapisać plików roboczych. Zwolnij miejsce (duże mapy wymagają kilku gigabajtów) i spróbuj ponownie.",
       "fetchTerrain": "Nie udało się pobrać danych terenu. Żądany obszar może być zbyt duży lub usługa jest niedostępna.",
       "usgsFallback": "Dla tego obszaru brakowało danych USGS 1m lub były uszkodzone. Używany jest globalny zestaw danych 30 m.\n\nWyjście pozostaje na obecnej siatce przetwarzania aplikacji.",
       "kron86Fallback": "Dane NMT EVRF2007 są dostępne tylko dla obsługiwanych kafli w Polsce. Powrót do globalnego zestawu danych 30 m."

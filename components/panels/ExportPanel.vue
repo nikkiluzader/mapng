@@ -633,6 +633,7 @@
 
 <script setup>
 import { backdropSourceCovers, effectiveBackdropSource } from '../../services/backdropSources.js';
+import { isDiskFull } from '../../services/errorText.js';
 import { ref, shallowRef, computed, watch, nextTick, onUnmounted, toRaw } from 'vue';
 import { useMainStore } from '../../stores/mainStore';
 import { useI18n } from 'vue-i18n';
@@ -2419,7 +2420,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
     });
     // (the desktop app says why and keeps the export's log)
     // (why it failed, kept on screen with the offer to send a report: the desktop app's log, or the page's last lines)
-    beamNGDesktopFailed.value = { message: error?.message || String(error) || t('export.errorBeamngLevel'), logPath: error?.logPath || null }; showExportOutcome('mapng-export-outcome-failed');
+    beamNGDesktopFailed.value = { message: isDiskFull(error?.message || error) ? t('app.error.diskFull') : (error?.message || String(error) || t('export.errorBeamngLevel')), logPath: error?.logPath || null }; showExportOutcome('mapng-export-outcome-failed');
   } finally {
     markJobEnd();
     heavyJobRunning.value = false;
