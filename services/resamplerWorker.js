@@ -282,7 +282,94 @@ const samplePreparedTile = (tile, projectedX, projectedY) => {
  * tile is stored on its group so the next nearby pixel skips the linear scan.
  * This gives a large speedup on spatially coherent access patterns (raster scan).
  */
-const sampleHeightAt = (lng, lat, preparedGroups, fallback, noData) => {
+// Between two sheets of a survey. A sheet's data stops at its edge: its rectangle's, or, inside the rectangle,
+// where its padding of no-data begins (Poland's 1 m sheets are slanted quadrilaterals padded square). There a
+// point between one sheet's last sample and the next sheet's first, a metre apart, was given one sheet's edge
+// value or the other's, whichever sheet had been read last: along every sheet join a line one cell wide jumping
+// between the two, up to a metre where the sheets disagree. In game: rows of raised pills across the terrain.
+// The four samples round such a point are now taken from whichever sheet has each, and the height is the one
+// slope through them.
+const sampleAt = (tile, X, Y) => {
+    const c = Math.round((X - tile.originX) / tile.resX); const r = Math.round((Y - tile.originY) / tile.resY);
+    if (c < 0 || r < 0 || c >= tile.width || r >= tile.height) return NaN;
+    const v = tile.raster[r * tile.width + c];
+    return Number.isFinite(v) && v !== tile.noData ? v : NaN;
+};
+// (true where the point's four samples in this tile are all there: the usual case, nothing to join)
+const wholeCell = (tile, X, Y) => {
+    const fx = (X - tile.originX) / tile.resX; const fy = (Y - tile.originY) / tile.resY;
+    if (!(fx >= 0 && fy >= 0 && fx <= tile.width - 1 && fy <= tile.height - 1)) return false;
+    const x0 = Math.min(tile.width - 2, Math.floor(fx)); const y0 = Math.min(tile.height - 2, Math.floor(fy));
+    if (x0 < 0 || y0 < 0) return false;
+    const i = y0 * tile.width + x0; const nd = tile.noData; const ras = tile.raster;
+    return ras[i] !== nd && ras[i + 1] !== nd && ras[i + tile.width] !== nd && ras[i + tile.width + 1] !== nd;
+};
+const joinAtEdge = (group, tile, value, X, Y) => {
+    if (group.tiles.length < 2 || wholeCell(tile, X, Y)) return value;
+    const fx = (X - tile.originX) / tile.resX; const fy = (Y - tile.originY) / tile.resY;
+    const x0 = Math.floor(fx); const y0 = Math.floor(fy); const dx = fx - x0; const dy = fy - y0;
+    let sum = 0; let wsum = 0; let fromOthers = 0;
+    for (let k = 0; k < 4; k++) {
+        const cx = tile.originX + (x0 + (k & 1)) * tile.resX; const cy = tile.originY + (y0 + (k >> 1)) * tile.resY;
+        let v = sampleAt(tile, cx, cy);
+        if (!Number.isFinite(v)) for (const other of group.tiles) { if (other === tile) continue; v = sampleAt(other, cx, cy); if (Number.isFinite(v)) { fromOthers++; break; } }
+        if (!Number.isFinite(v)) continue;
+        const w = ((k & 1) ? dx : 1 - dx) * ((k >> 1) ? dy : 1 - dy);
+        sum += v * w; wsum += w;
+    }
+    // (no other sheet there: this sheet's own edge value, as before)
+    if (!(fromOthers && wsum > 1e-6)) return value;
+    joinedHere = true;
+    return sum / wsum;
+};
+// (set where the last height sampled lay on a join of two sheets: the callers note the cell, featherSheetJoins)
+let joinedHere = false;
+
+// Two sheets of one survey can disagree where they meet: flown in different years, or a lake standing at two
+// levels (a reservoir's water was 1.9 m higher in one of two Polish sheets than in the next). Joined cleanly that
+// is still a step along the join. Round the cells noted as joins the ground is eased: each cell within
+// JOIN_FEATHER_CELLS takes a share of the mean of the ground round it, the more the nearer the join, so a 0.3 m
+// step becomes a slope some metres wide. Nothing else is touched.
+const JOIN_FEATHER_CELLS = 8;
+const JOIN_BLUR_CELLS = 4;
+export function featherSheetJoins(heightMap, seam, width, height, noData) {
+    if (!seam) return 0;
+    const near = new Map();   // cell -> distance to the nearest join cell
+    const D = JOIN_FEATHER_CELLS;
+    for (let i = 0; i < seam.length; i++) {
+        if (!seam[i]) continue;
+        const x = i % width; const y = (i - x) / width;
+        for (let dy = -D; dy <= D; dy++) {
+            const yy = y + dy; if (yy < 0 || yy >= height) continue;
+            for (let dx = -D; dx <= D; dx++) {
+                const xx = x + dx; if (xx < 0 || xx >= width) continue;
+                const d = Math.hypot(dx, dy); if (d > D) continue;
+                const k = yy * width + xx; const was = near.get(k);
+                if (was === undefined || d < was) near.set(k, d);
+            }
+        }
+    }
+    if (!near.size) return 0;
+    const R = JOIN_BLUR_CELLS; const out = new Map();
+    for (const [k, d] of near) {
+        const h = heightMap[k]; if (h === noData) continue;
+        const x = k % width; const y = (k - x) / width;
+        let sum = 0; let n = 0;
+        for (let dy = -R; dy <= R; dy++) {
+            const yy = y + dy; if (yy < 0 || yy >= height) continue;
+            for (let dx = -R; dx <= R; dx++) {
+                const xx = x + dx; if (xx < 0 || xx >= width) continue;
+                const v = heightMap[yy * width + xx]; if (v !== noData) { sum += v; n++; }
+            }
+        }
+        const w = 1 - d / D;
+        out.set(k, h * (1 - w) + (sum / n) * w);
+    }
+    for (const [k, v] of out) heightMap[k] = v;
+    return out.size;
+}
+
+export const sampleHeightAt = (lng, lat, preparedGroups, fallback, noData) => {
     for (const group of preparedGroups) {
         let projectedX;
         let projectedY;
@@ -297,7 +384,7 @@ const sampleHeightAt = (lng, lat, preparedGroups, fallback, noData) => {
 
         if (group.lastTile) {
             const cachedVal = samplePreparedTile(group.lastTile, projectedX, projectedY);
-            if (cachedVal !== group.lastTile.noData) return cachedVal;
+            if (cachedVal !== group.lastTile.noData) return joinAtEdge(group, group.lastTile, cachedVal, projectedX, projectedY);
         }
 
         for (const tile of group.tiles) {
@@ -305,7 +392,7 @@ const sampleHeightAt = (lng, lat, preparedGroups, fallback, noData) => {
             const value = samplePreparedTile(tile, projectedX, projectedY);
             if (value !== tile.noData) {
                 group.lastTile = tile;
-                return value;
+                return joinAtEdge(group, tile, value, projectedX, projectedY);
             }
         }
     }
@@ -1161,9 +1248,10 @@ export const sampleHeightBand = async ({ y0, y1 }, shared) => {
             groups: layerStack[0] || [],
             toWGS84: createLocalToWGS84(shared.center.lat, shared.center.lng),
             heightMap: new Float32Array(shared.heightBuffer),
+            seam: shared.seamBuffer ? new Uint8Array(shared.seamBuffer) : null,
         };
     }
-    const { groups, toWGS84, heightMap } = bandContext;
+    const { groups, toWGS84, heightMap, seam } = bandContext;
     const { width, height, targetBounds, noData } = shared;
     // (the last-tile cache starts empty in every band: it only saves time)
     for (const group of groups) group.lastTile = null;
@@ -1171,9 +1259,11 @@ export const sampleHeightBand = async ({ y0, y1 }, shared) => {
         const rowOffset = y * width;
         for (let x = 0; x < width; x++) {
             const [lng, lat] = getPixelLatLng(x, y, width, height, toWGS84, targetBounds);
+            joinedHere = false;
             let h = sampleHeightAt(lng, lat, groups, null, noData);
             if (!Number.isFinite(h) || h <= -200 || h === noData) h = noData;
             heightMap[rowOffset + x] = h;
+            if (joinedHere && seam) seam[rowOffset + x] = 1;
         }
     }
     return y1 - y0;
@@ -1196,9 +1286,11 @@ const sampleHeightParallel = async ({ width, height, center, targetBounds, tiles
     const threads = await parallelThreads();
     if (threads <= 1) return null;
     const heightBuffer = new SharedArrayBuffer(width * height * 4);
+    // (where two sheets were joined, a flag a cell: only where there is more than one sheet)
+    const seamBuffer = (tiles || []).length > 1 ? new SharedArrayBuffer(width * height) : null;
     const shared = {
         jobKey: `${Date.now()}-${Math.random()}`,
-        width, height, center, targetBounds, epsgDefs, noData, heightBuffer,
+        width, height, center, targetBounds, epsgDefs, noData, heightBuffer, seamBuffer,
         tiles: (tiles || []).map((t) => ({ ...t, raster: toShared(t.raster) })),
     };
     const bands = [];
@@ -1215,7 +1307,9 @@ const sampleHeightParallel = async ({ width, height, center, targetBounds, tiles
             reportProgress?.({ stage: 'sample-height-image', message: 'Mapping elevation to the output grid...', current: rowsDone, total: height });
         },
     });
-    return new Float32Array(heightBuffer);
+    const out = new Float32Array(heightBuffer);
+    if (seamBuffer) featherSheetJoins(out, new Uint8Array(seamBuffer), width, height, noData);
+    return out;
 };
 
 // The satellite texture the same way: lattice row bands on every core, the
@@ -1376,6 +1470,7 @@ const resampleHeightAndImage = async ({ id, center, width, height, imageWidth, i
     }
     const sampledInParallel = !!heightMap;
     if (!heightMap) heightMap = new Float32Array(width * height);
+    let serialSeam = null;
     if (!flat && !sampledInParallel) {
         for (let y = 0; y < height; y++) {
             const rowOffset = y * width;
@@ -1383,9 +1478,11 @@ const resampleHeightAndImage = async ({ id, center, width, height, imageWidth, i
                 const [lng, lat] = getPixelLatLng(x, y, width, height, toWGS84, targetBounds);
                 // Gap-fill is sampled and blended in afterwards, not inline, so
                 // the seam between the two sources can be joined smoothly.
+                joinedHere = false;
                 let h = sampleHeightAt(lng, lat, preparedGroups, null, NO_DATA);
                 if (!Number.isFinite(h) || h <= -200 || h === NO_DATA) h = NO_DATA;
                 heightMap[rowOffset + x] = h;
+                if (joinedHere) (serialSeam ||= new Uint8Array(width * height))[rowOffset + x] = 1;
             }
             if ((y & 31) === 31 || y === height - 1) {
                 reportProgress({
@@ -1398,6 +1495,7 @@ const resampleHeightAndImage = async ({ id, center, width, height, imageWidth, i
         }
     }
 
+    if (serialSeam) featherSheetJoins(heightMap, serialSeam, width, height, NO_DATA);
     reportProgress({ stage: 'sample-image', message: 'Mapping satellite imagery to the output grid...', current: 0, total: 1, force: true });
     const image = (await resampleSatelliteParallel({ width, height, imageWidth, imageHeight, center, targetBounds, imageSource }))
         || resampleSatelliteImage({ width, height, imageWidth, imageHeight, toWGS84, targetBounds, imageSource });
