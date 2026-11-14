@@ -4,6 +4,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, net, Notification, protocol,
 import { missingParts, incompleteMessage } from './installCheck.js';
 import { menuText, updaterText } from './menuText.js';
 import { fork } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -81,6 +82,31 @@ function servePage() {
       const folder = modsFolder();
       const bytes = folder ? (() => { try { return readZipFile(path.join(folder, zipName), `levels/${preview[2]}/preview.png`); } catch { return null; } })() : null;
       return bytes ? new Response(bytes, { headers: { 'content-type': 'image/png', 'cache-control': 'no-store' } }) : new Response(null, { status: 404 });
+    }
+    // GPXZ elevation asked for by the window (the source comparison): kept in the download cache under the
+    // name the generate job looks for (runner/browserShims.mjs sourceKey), so a map generated from GPXZ
+    // afterwards reads these tiles instead of spending calls on them again.
+    if (request.method === 'GET' && /^\/api\/gpxz\/v1\/elevation\/(hires-raster|points)$/.test(url.pathname)) {
+      const rel = `${url.pathname}${url.search}`;
+      const key = crypto.createHash('sha1').update(`GET ${rel}  `).digest('hex');
+      const metaFile = path.join(SOURCE_CACHE(), `${key}.json`); const bodyFile = path.join(SOURCE_CACHE(), `${key}.bin`);
+      try {
+        if (fs.existsSync(metaFile) && fs.existsSync(bodyFile)) {
+          const meta = JSON.parse(fs.readFileSync(metaFile, 'utf8'));
+          const now = new Date(); try { fs.utimesSync(metaFile, now, now); } catch { /* read-only */ }
+          return new Response(fs.readFileSync(bodyFile), { status: meta.status, statusText: meta.statusText, headers: meta.headers });
+        }
+      } catch { /* unreadable entry: asked again */ }
+      const live = await net.fetch(`${API_ORIGIN}${rel}`, { method: 'GET', headers: request.headers });
+      if (live.status !== 200) return live;
+      const bytes = Buffer.from(await live.arrayBuffer());
+      const headers = Object.fromEntries([...live.headers.entries()].filter(([k]) => !/^(content-encoding|content-length|transfer-encoding|set-cookie)$/i.test(k)));
+      try {
+        fs.mkdirSync(SOURCE_CACHE(), { recursive: true });
+        fs.writeFileSync(bodyFile, bytes);
+        fs.writeFileSync(metaFile, JSON.stringify({ url: rel, method: 'GET', status: 200, statusText: live.statusText, headers, savedAt: Date.now() }));
+      } catch { /* not kept: the answer is still used */ }
+      return new Response(bytes, { status: 200, statusText: live.statusText, headers });
     }
     if (url.pathname.startsWith('/api/')) {
       // (as on mapng.com: its worker answers /api/*; MAPNG_TEST_API_ORIGIN sends

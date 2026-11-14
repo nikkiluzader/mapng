@@ -75,16 +75,38 @@ function blur(h, px, sigma) {
 /** Standard 30 m as MapNG builds levels from it: the z15 tiles hold 30 m data in blocky steps, which the app
  *  smooths (terrariumSampling.js: B-spline and a ~5 m blur); shown the same way so the comparison is fair. */
 export async function standardPatch(center, { sideM = 512, px = 192, signal } = {}) {
-  const h = await mercatorPatch({ center, sideM, px, z: 15, tileSize: 256, url: (z, x, y) => tileHeights(`${AWS}/${z}/${x}/${y}.png`, 256, signal), signal });
+  const h = await mercatorPatch({ center, sideM, px, z: Math.min(15, zoomForSide(center.lat, sideM)), tileSize: 256, url: (z, x, y) => tileHeights(`${AWS}/${z}/${x}/${y}.png`, 256, signal), signal });
   return blur(h, px, Math.max(1, 6 / (sideM / px)));
 }
 
 export const MAPTERHORN_BASE_ZOOM = 12;
+// The deepest zoom at which a square this wide is still only about six tiles across: a comparison of a whole
+// 16 km selection read at a lidar zoom would be thousands of tiles for a picture 512 pixels wide.
+export const zoomForSide = (lat, sideM, tilesAcross = 6) => Math.max(8, Math.floor(Math.log2((tilesAcross * 40075016.686 * Math.cos((lat * Math.PI) / 180)) / sideM)));
+
+/**
+ * GPXZ over a whole square, read the way a map is: the same requests Generate makes for `bounds` (terrain.js
+ * fetchGPXZRaw: its tiles, kept for a day), so a map generated from GPXZ afterwards spends no calls on them again.
+ * The picture is the square of sideM round center. null where GPXZ answered nothing.
+ */
+export async function gpxzAreaPatch(center, apiKey, bounds, { sideM = 512, px = 192, signal, onProgress } = {}) {
+  const [{ fetchGPXZRaw }, { resampleHeightMapOffThread }] = await Promise.all([import('./terrain.js'), import('./resamplerClient.js')]);
+  const got = await fetchGPXZRaw(bounds, apiKey, onProgress, signal);
+  if (!got?.data?.length) return null;
+  const dLat = sideM / 2 / 111320, dLng = dLat / Math.cos((center.lat * Math.PI) / 180);
+  const square = { north: center.lat + dLat, south: center.lat - dLat, west: center.lng - dLng, east: center.lng + dLng };
+  // (the rasters stay here, not handed over to the worker for good: nothing else holds them)
+  const res = await resampleHeightMapOffThread({ type: 'geotiff', data: got.data, transferRasters: false }, center, px, px, 'bilinear', false, null, false, square, null, false);
+  const out = new Float32Array(px * px);
+  for (let i = 0; i < out.length; i++) { const h = res.heightMap[i]; out[i] = Number.isFinite(h) && h > -9000 ? h : NaN; }
+  return out;
+}
+
 export async function mapterhornPatch(center, zoom, { sideM = 512, px = 192, signal } = {}) {
   const url = async (z, x, y) => (await tileHeights(`${MAPTERHORN_CACHE_URL}/${z}/${x}/${y}.webp`, 512, signal))
     || tileHeights(`${MAPTERHORN_TILE_URL}/${z}/${x}/${y}.webp`, 512, signal);
   // (zoom 12: Mapterhorn's worldwide base, about 30 m, where it has no lidar)
-  return mercatorPatch({ center, sideM, px, z: Math.max(MAPTERHORN_BASE_ZOOM, Math.min(17, zoom)), tileSize: 512, url, signal });
+  return mercatorPatch({ center, sideM, px, z: Math.max(MAPTERHORN_BASE_ZOOM, Math.min(17, zoom, zoomForSide(center.lat, sideM))), tileSize: 512, url, signal });
 }
 
 export async function gpxzPatch(center, apiKey, { sideM = 512, px = 192, signal } = {}) {

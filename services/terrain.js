@@ -1385,6 +1385,44 @@ const fetchGapFillSource = async ({
  *
  * @returns {{ data, smooth, rawArrayBuffers, hadChunkFailures } | null}
  */
+// GPXZ answers kept for a day, on the website (the browser's Cache storage; the desktop app keeps them in its
+// download cache, desktop/main.js and the runner's recorder). Every GPXZ tile is a counted call: a map generated
+// again, or generated after the source comparison had fetched the same tiles, asks for nothing twice.
+const GPXZ_CACHE = 'mapng-gpxz-v1';
+const GPXZ_CACHE_MS = 24 * 3600 * 1000;
+const gpxzCacheUsable = () => typeof caches !== 'undefined' && typeof location !== 'undefined' && /^https?:$/.test(location.protocol);
+async function gpxzFetch(url, init) {
+  if (!gpxzCacheUsable()) return fetch(url, init);
+  let store = null;
+  try {
+    store = await caches.open(GPXZ_CACHE);
+    const hit = await store.match(url);
+    if (hit && Date.now() - Number(hit.headers.get('x-mapng-saved') || 0) < GPXZ_CACHE_MS) return hit;
+  } catch { store = null; }
+  const live = await fetch(url, init);
+  if (store && live.status === 200) {
+    try {
+      const headers = new Headers(live.headers); headers.set('x-mapng-saved', String(Date.now()));
+      await store.put(url, new Response(await live.clone().arrayBuffer(), { status: 200, headers }));
+      // (older answers dropped as new ones come in)
+      for (const req of await store.keys()) { const r = await store.match(req); if (r && Date.now() - Number(r.headers.get('x-mapng-saved') || 0) >= GPXZ_CACHE_MS) await store.delete(req); }
+    } catch { /* no room: the answer is still used */ }
+  }
+  return live;
+}
+
+/** The area Generate asks elevation for, for a map this wide (m) centred here: the comparison asks for the same. */
+export const gpxzMapBounds = (center, widthM) => computeMetricFetchBounds({ lat: Number(center.lat), lng: normalizeLng(Number(center.lng)) }, widthM, widthM);
+
+/** How many GPXZ calls fetchGPXZRaw makes for these bounds: its raster tiles and one check of the data's resolution. */
+export function gpxzCallsFor(bounds) {
+  const BUFFER_DEG = 0.002;
+  const latSpan = bounds.north - bounds.south; const lngSpan = bounds.east - bounds.west;
+  const perLat = 111320; const perLng = 111320 * Math.cos((((bounds.north + bounds.south) / 2) * Math.PI) / 180);
+  const { rows, cols } = gpxzChunkGrid((latSpan * perLat) / 1000, (lngSpan * perLng) / 1000, (2 * BUFFER_DEG * perLat) / 1000, (2 * BUFFER_DEG * perLng) / 1000);
+  return rows * cols + 1;
+}
+
 export const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal, { skipBox = null } = {}) => {
   try {
     signal?.throwIfAborted();
@@ -1419,7 +1457,7 @@ export const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal, { skipBox
       await acquireGpxzSlot(signal);
       const latlons = sampledLatLons.map(([lat, lng]) => `${lat},${lng}`).join('|');
       const pointsUrl = `/api/gpxz/v1/elevation/points?latlons=${encodeURIComponent(latlons)}`;
-      const pointsResp = await fetch(pointsUrl, {
+      const pointsResp = await gpxzFetch(pointsUrl, {
         headers: { "x-api-key": apiKey },
         signal,
       });
@@ -1553,7 +1591,7 @@ export const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal, { skipBox
           await acquireGpxzSlot(signal);
           let response = null;
           try {
-            response = await fetch(url, { headers: { "x-api-key": apiKey }, signal });
+            response = await gpxzFetch(url, { headers: { "x-api-key": apiKey }, signal });
           } catch (fetchErr) {
             // Network error (ERR_QUIC_PROTOCOL_ERROR, Failed to fetch, etc.)
             const waitTime = 2000 * Math.pow(2, retries);

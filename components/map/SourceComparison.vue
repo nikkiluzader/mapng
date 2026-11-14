@@ -8,6 +8,16 @@
         <button v-if="store.compareSpot" type="button" data-testid="compare-middle" class="text-brand hover:underline" @click="store.compareSpot = null">{{ t('map.compareBackToMiddle') }}</button>
         <span v-else>{{ t('map.compareSpotHint') }}</span>
       </p>
+      <!-- how wide a square: 512 m, wider, or the whole selection -->
+      <label class="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+        <span>{{ t('map.compareSize') }}</span>
+        <select v-model="sizeChoice" data-testid="compare-size" class="rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-micro py-0.5 pl-1 pr-5">
+          <option value="512">500 m</option>
+          <option value="1024">1 km</option>
+          <option value="2048">2 km</option>
+          <option v-if="Number(selectionMeters) >= 512" value="selection">{{ t('map.compareSizeSelection', { size: sizeLabel(Number(selectionMeters)) }) }}</option>
+        </select>
+      </label>
       <div v-if="stale" class="flex items-center gap-2">
         <button type="button" data-testid="compare-toggle" class="font-bold text-brand hover:underline" @click="loadCompare">{{ t('map.compareStart') }}</button>
         <span v-if="moved" class="text-gray-500 dark:text-gray-400">{{ t('map.compareMoved') }}</span>
@@ -17,7 +27,7 @@
           <figure v-for="cell in compareCells" :key="cell.key" :data-testid="`compare-cell-${cell.key}`" class="flex flex-col gap-0.5 min-w-0">
             <div class="aspect-square rounded border border-gray-200 dark:border-gray-600 bg-gray-100 dark:bg-gray-900 overflow-hidden flex items-center justify-center">
               <img v-if="cell.url" :src="cell.url" :alt="cell.label" class="w-full h-full object-cover" style="image-rendering: auto" />
-              <button v-else-if="cell.key === 'gpxz' && cell.state === 'ask'" type="button" class="px-1 text-center text-brand hover:underline" @click="loadGpxzCompare">{{ t('map.compareAddGpxz') }}</button>
+              <button v-else-if="cell.key === 'gpxz' && cell.state === 'ask'" type="button" class="px-1 text-center text-brand hover:underline" @click="loadGpxzCompare">{{ t('map.compareAddGpxzCalls', { n: gpxzCalls }) }}</button>
               <button v-else-if="cell.regional && cell.state === 'ask'" type="button" class="px-1 text-center text-brand hover:underline" :title="cell.key === 'kron86' ? t('map.compareAddSurveyHint') : ''" @click="loadRegional(cell.key)">{{ t('map.compareAddSurvey') }}</button>
               <span v-else class="px-1 text-center text-gray-400">{{ cell.state === 'loading' ? (cell.progress || '…') : cell.note }}</span>
             </div>
@@ -50,7 +60,8 @@ import { Layers } from 'lucide-vue-next';
 import { boxAround, probeMapterhorn } from '../../services/sourceAdvisor.js';
 import { useMainStore } from '../../stores/mainStore';
 import { recommendSource } from '../../services/sourceRecommend.js';
-import { standardPatch, mapterhornPatch, gpxzPatch, regionalPatch, regionalSourcesAt, hillshadeDataUrl, MAPTERHORN_BASE_ZOOM } from '../../services/sourceCompare.js';
+import { standardPatch, mapterhornPatch, gpxzPatch, regionalPatch, regionalSourcesAt, hillshadeDataUrl, MAPTERHORN_BASE_ZOOM, gpxzAreaPatch } from '../../services/sourceCompare.js';
+import { gpxzMapBounds, gpxzCallsFor } from '../../services/terrain.js';
 
 const { t } = useI18n({ useScope: 'global' });
 const props = defineProps({
@@ -58,6 +69,8 @@ const props = defineProps({
   gpxzApiKey: { type: String, default: '' },
   // the elevation source chosen now (the recommendation offers "Use it" only for another one)
   elevationSource: { type: String, default: '' },
+  // the selection's width in metres (resolution x metres a pixel); 0 where there is no single selection
+  selectionMeters: { type: Number, default: 0 },
 });
 const emit = defineEmits(['pick']);
 const store = useMainStore();
@@ -68,7 +81,13 @@ const hasCenter = computed(() => Number.isFinite(Number(props.center?.lat)) && N
 const fmtRes = (m) => (m < 1.5 ? m.toFixed(1) : String(Math.round(m)));
 
 // (1 m cells: the quality report measures road benches on the same heights the pictures show)
-const COMPARE_SIDE_M = 512, COMPARE_PX = 512;
+const COMPARE_PX = 512;
+// How wide a square is compared: 512 m (a metre a pixel: the quality report's size), wider, or the whole selection.
+const SIZE_CHOICES = ['512', '1024', '2048', 'selection'];
+const sizeChoice = ref((() => { try { const v = localStorage.getItem('mapng_compareSize'); return SIZE_CHOICES.includes(v) ? v : '512'; } catch { return '512'; } })());
+const wholeSelection = computed(() => sizeChoice.value === 'selection' && Number(props.selectionMeters) >= 512);
+const sideM = computed(() => (wholeSelection.value ? Number(props.selectionMeters) : Number(sizeChoice.value) || 512));
+const sizeLabel = (m) => (m >= 1000 ? `${(m / 1000).toFixed(m % 1000 < 50 ? 0 : 1)} km` : `${Math.round(m / 100) * 100} m`);
 // heights behind each picture, for the report (not reactive: 1 MB arrays)
 const compareHeights = {};
 const compare = ref({});           // key -> { url, state, note, detail, progress }
@@ -76,7 +95,8 @@ const stale = ref(true);           // nothing loaded for where the selection is 
 const moved = ref(false);
 let compareAbort = null;
 // (a spot chosen on the map with a right-click, else the middle of the selection)
-const centerPoint = () => (store.compareSpot ? { lat: Number(store.compareSpot.lat), lng: Number(store.compareSpot.lng) } : { lat: Number(props.center?.lat), lng: Number(props.center?.lng) });
+// (the whole selection is compared round its own middle, whatever spot was picked)
+const centerPoint = () => (store.compareSpot && !wholeSelection.value ? { lat: Number(store.compareSpot.lat), lng: Number(store.compareSpot.lng) } : { lat: Number(props.center?.lat), lng: Number(props.center?.lng) });
 // the region's own surveys at this place (USGS in the United States, NMT in Poland): each its own cell
 const regional = computed(() => (hasCenter.value ? regionalSourcesAt(centerPoint()) : []));
 const REGIONAL_LABEL = { usgs: 'USGS 1 m', kron86: 'NMT (Polska)' };
@@ -89,7 +109,7 @@ const compareCells = computed(() => [
 const recommend = ref(null);       // { pick, why, share, apartM } once every picture asked for has loaded
 const updateRecommend = () => {
   const loading = Object.values(compare.value).some((c) => c?.state === 'loading');
-  try { recommend.value = loading ? null : recommendSource(compareHeights, COMPARE_PX, COMPARE_SIDE_M / COMPARE_PX); } catch { recommend.value = null; }
+  try { recommend.value = loading ? null : recommendSource(compareHeights, COMPARE_PX, sideM.value / COMPARE_PX); } catch { recommend.value = null; }
 };
 const recommendText = computed(() => {
   const r = recommend.value; if (!r) return '';
@@ -106,9 +126,9 @@ const loadCompare = async () => {
   compareAbort?.abort(); compareAbort = new AbortController(); const signal = compareAbort.signal;
   const c = centerPoint(); compare.value = {}; recommend.value = null; for (const k of Object.keys(compareHeights)) delete compareHeights[k]; reportNote.value = '';
   stale.value = false; moved.value = false;
-  const cell = COMPARE_SIDE_M / COMPARE_PX;
+  const cell = sideM.value / COMPARE_PX;
   setCell('standard', { state: 'loading' }); setCell('mapterhorn', { state: 'loading' });
-  standardPatch(c, { sideM: COMPARE_SIDE_M, px: COMPARE_PX, signal })
+  standardPatch(c, { sideM: sideM.value, px: COMPARE_PX, signal })
     .then((h) => { compareHeights.standard = { h, res: 30 }; setCell('standard', { url: hillshadeDataUrl(h, COMPARE_PX, cell), detail: '~30 m' }); })
     .catch(() => { if (!signal.aborted) setCell('standard', { note: t('map.compareFailed') }); });
   try {
@@ -116,11 +136,11 @@ const loadCompare = async () => {
     if (!p.zoom) {
       // No lidar here: what Mapterhorn does have, its worldwide base at about 30 m, is shown all the same
       // (a blank tile saying "no lidar here" told nothing about what choosing it would give).
-      const h = await mapterhornPatch(c, MAPTERHORN_BASE_ZOOM, { sideM: COMPARE_SIDE_M, px: COMPARE_PX, signal });
+      const h = await mapterhornPatch(c, MAPTERHORN_BASE_ZOOM, { sideM: sideM.value, px: COMPARE_PX, signal });
       compareHeights.mapterhorn = { h, res: 30, base: true };
       setCell('mapterhorn', { url: hillshadeDataUrl(h, COMPARE_PX, cell), detail: `~30 m · ${t('map.compareNoLidar')}` });
     } else {
-      const h = await mapterhornPatch(c, p.zoom, { sideM: COMPARE_SIDE_M, px: COMPARE_PX, signal });
+      const h = await mapterhornPatch(c, p.zoom, { sideM: sideM.value, px: COMPARE_PX, signal });
       compareHeights.mapterhorn = { h, res: p.metersPerPixel };
       setCell('mapterhorn', { url: hillshadeDataUrl(h, COMPARE_PX, cell), detail: `~${fmtRes(p.metersPerPixel)} m · ${t('map.compareFree')}` });
     }
@@ -129,20 +149,22 @@ const loadCompare = async () => {
 const loadGpxzCompare = async () => {
   const c = centerPoint(); const signal = compareAbort?.signal; setCell('gpxz', { state: 'loading' });
   try {
-    const h = await gpxzPatch(c, props.gpxzApiKey, { sideM: COMPARE_SIDE_M, px: COMPARE_PX, signal });
+    // (the requests Generate would make for a map this size here: kept, so it does not make them again)
+    const h = await gpxzAreaPatch(c, props.gpxzApiKey, gpxzMapBounds(c, sideM.value), { sideM: sideM.value, px: COMPARE_PX, signal, onProgress: (msg) => { if (typeof msg === 'string') setCell('gpxz', { state: 'loading', progress: msg.slice(0, 60) }); } });
+    if (!h) throw new Error('no GPXZ data');
     compareHeights.gpxz = { h, res: 1 };
-    setCell('gpxz', { url: hillshadeDataUrl(h, COMPARE_PX, COMPARE_SIDE_M / COMPARE_PX), detail: '~1 m' });
+    setCell('gpxz', { url: hillshadeDataUrl(h, COMPARE_PX, sideM.value / COMPARE_PX), detail: '~1 m' });
   } catch { if (!signal?.aborted) setCell('gpxz', { note: t('map.compareFailed') }); }
 };
 // A region's own survey (asked for: it downloads whole survey sheets, which can be large)
 const loadRegional = async (key) => {
   const c = centerPoint(); const signal = compareAbort?.signal; setCell(key, { state: 'loading' });
   try {
-    const h = await regionalPatch(c, key, { sideM: COMPARE_SIDE_M, px: COMPARE_PX, signal, onProgress: (text) => { if (compare.value[key]?.state === 'loading') compare.value = { ...compare.value, [key]: { state: 'loading', progress: String(text || '').slice(0, 60) } }; } });
+    const h = await regionalPatch(c, key, { sideM: sideM.value, px: COMPARE_PX, signal, onProgress: (text) => { if (compare.value[key]?.state === 'loading') compare.value = { ...compare.value, [key]: { state: 'loading', progress: String(text || '').slice(0, 60) } }; } });
     if (signal?.aborted) return;
     if (!h) { setCell(key, { note: t('map.compareNoSurvey') }); return; }
     compareHeights[key] = { h, res: 1 };
-    setCell(key, { url: hillshadeDataUrl(h, COMPARE_PX, COMPARE_SIDE_M / COMPARE_PX), detail: `~1 m · ${t('map.compareFree')}` });
+    setCell(key, { url: hillshadeDataUrl(h, COMPARE_PX, sideM.value / COMPARE_PX), detail: `~1 m · ${t('map.compareFree')}` });
   } catch (e) { console.warn('[Compare]', key, e); if (!signal?.aborted) setCell(key, { note: t('map.compareFailed') }); }
 };
 
@@ -150,7 +172,11 @@ const loadRegional = async (key) => {
 // has loaded; opened as one HTML page. GPXZ and the regional surveys are in it only when they were added.
 const reportBusy = ref(false);
 const reportNote = ref('');
-const canReport = computed(() => compareCells.value.some((c) => c.url));
+// (the quality report measures roads on metre cells: only at the two smallest sizes)
+const canReport = computed(() => sideM.value <= 1024 && compareCells.value.some((c) => c.url));
+const gpxzCalls = computed(() => (hasCenter.value ? gpxzCallsFor(gpxzMapBounds(centerPoint(), sideM.value)) : 1));
+watch(sizeChoice, (v) => { try { localStorage.setItem('mapng_compareSize', v); } catch { /* private window */ } compareAbort?.abort(); if (open.value) loadCompare(); else stale.value = true; });
+watch(() => props.selectionMeters, () => { if (wholeSelection.value) { compareAbort?.abort(); stale.value = true; moved.value = true; } });
 /** A new tab with a waiting line in it, or null when the browser refuses one. */
 const openReportTab = (waiting) => {
   try {
@@ -174,7 +200,7 @@ const saveQualityReport = async () => {
   try {
     const c = centerPoint();
     const [{ fetchOSMData, getLastOSMRequestInfo, restoreLastOSMRequestInfo }, { roadsInPatch, compareSources, qualityReportHtml }] = await Promise.all([import('../../services/osm.js'), import('../../services/sourceQuality.js')]);
-    const dLat = COMPARE_SIDE_M / 2 / 111320, dLng = dLat / Math.cos((c.lat * Math.PI) / 180);
+    const dLat = sideM.value / 2 / 111320, dLng = dLat / Math.cos((c.lat * Math.PI) / 180);
     // (this small pull is not the map's: what the last real one recorded is put back after it)
     const lastInfo = getLastOSMRequestInfo();
     let features; let osmSource = '';
@@ -182,16 +208,16 @@ const saveQualityReport = async () => {
       features = await fetchOSMData({ north: c.lat + dLat, south: c.lat - dLat, east: c.lng + dLng, west: c.lng - dLng }, { signal: compareAbort?.signal });
       osmSource = getLastOSMRequestInfo()?.endpointUsed || '';
     } finally { restoreLastOSMRequestInfo(lastInfo); }
-    const roads = roadsInPatch(features, c, COMPARE_SIDE_M);
+    const roads = roadsInPatch(features, c, sideM.value);
     const sources = compareCells.value.map((cell) => {
       const got = compareHeights[cell.key];
       // (a regional survey nobody added is left out of the page; GPXZ keeps its "needs a key" card)
       if (cell.regional && !got) return null;
-      return { key: cell.key, label: cell.label, detail: cell.detail || '', note: cell.note || (cell.key === 'gpxz' ? t('map.compareNeedsKey') : ''), nativeResM: got?.res ?? NaN, heights: cell.url && got ? got.h : null, px: COMPARE_PX, cellM: COMPARE_SIDE_M / COMPARE_PX, image: cell.url || null };
+      return { key: cell.key, label: cell.label, detail: cell.detail || '', note: cell.note || (cell.key === 'gpxz' ? t('map.compareNeedsKey') : ''), nativeResM: got?.res ?? NaN, heights: cell.url && got ? got.h : null, px: COMPARE_PX, cellM: sideM.value / COMPARE_PX, image: cell.url || null };
     }).filter(Boolean);
-    const result = compareSources(sources, roads, COMPARE_SIDE_M);
+    const result = compareSources(sources, roads, sideM.value);
     const html = qualityReportHtml(result, {
-      center: c, sideM: COMPARE_SIDE_M, roadCount: roads.length, generatedAt: new Date().toISOString().slice(0, 10),
+      center: c, sideM: sideM.value, roadCount: roads.length, generatedAt: new Date().toISOString().slice(0, 10),
       appVersion: typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : '', osmSource,
     });
     const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
