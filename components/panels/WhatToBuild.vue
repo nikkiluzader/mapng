@@ -285,8 +285,18 @@ const measuredRoads = computed(() => {
   for (const f of features) if (f?.tags?.[WIDTH_SOURCE_TAG] === 'satellite') n++;
   return n;
 });
+const roadPieces = computed(() => {
+  const features = toRaw(useMainStore().terrainData)?.osmFeatures;
+  if (!Array.isArray(features)) return 0;
+  let n = 0;
+  for (const f of features) if (f?.type === 'road') n++;
+  return n;
+});
+// (how many of how many, so a few measured roads do not read as all of them; and what a change of the switch
+// needs, which a tester found missing: "it doesnt say anything when i change setting")
 const measuredWidthsNote = computed(() => (measuredRoads.value > 0
-  ? t('exportPanel.ui.measuredWidthsUsed', { n: measuredRoads.value })
+  ? t('exportPanel.ui.measuredWidthsUsedOf', { n: measuredRoads.value, total: roadPieces.value })
+    + (measureWidthsOn.value ? '' : ` ${t('exportPanel.ui.measuredWidthsNowOff')}`)
   : measureWidthsOn.value ? t('exportPanel.ui.measuredWidthsOnNone') : t('exportPanel.ui.measuredWidthsOff')));
 const { t, te } = useI18n();
 const store = useMainStore();

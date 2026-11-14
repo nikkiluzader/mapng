@@ -636,6 +636,8 @@
       "measuredWidthsOff": "Désactivé : les routes sans largeur dans OpenStreetMap prennent la largeur habituelle de leur classe. Se règle avant la génération.",
       "measuredWidthsOnNone": "Activé, mais aucune route de cette carte n'a été mesurée. Générez à nouveau si vous l'avez activé après la création de cette carte.",
       "measuredWidthsUsed": "{n} tronçons de route de cette carte utilisent une largeur mesurée sur l'image satellite.",
+      "measuredWidthsUsedOf": "{n} des {total} tronçons de route de cette carte utilisent une largeur mesurée sur l'image satellite. Les autres ont une largeur dans OpenStreetMap, ou n'étaient pas assez visibles et gardent la largeur habituelle de leur classe.",
+      "measuredWidthsNowOff": "C'est désactivé maintenant : générez à nouveau pour construire la carte sans les largeurs mesurées.",
       "measuredWidthsChange": "Le modifier dans Données cartographiques",
       "curbHeight": "Hauteur des bordures",
       "curbHeight_standard": "Standard (15 cm)",

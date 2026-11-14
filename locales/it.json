@@ -636,6 +636,8 @@
       "measuredWidthsOff": "Disattivato: le strade senza larghezza in OpenStreetMap prendono la larghezza abituale della loro classe. Si imposta prima di generare.",
       "measuredWidthsOnNone": "Attivo, ma nessuna strada di questa mappa è stata misurata. Genera di nuovo se l'hai attivato dopo aver creato questa mappa.",
       "measuredWidthsUsed": "{n} tratti stradali di questa mappa usano una larghezza misurata dall'immagine satellitare.",
+      "measuredWidthsUsedOf": "{n} dei {total} tratti di strada di questa mappa usano una larghezza misurata dall'immagine satellitare. Gli altri hanno una larghezza in OpenStreetMap, oppure non erano abbastanza visibili e mantengono la larghezza abituale della loro classe.",
+      "measuredWidthsNowOff": "Ora è disattivato: genera di nuovo per costruire la mappa senza le larghezze misurate.",
       "measuredWidthsChange": "Modificalo in Dati della mappa",
       "curbHeight": "Altezza del cordolo",
       "curbHeight_standard": "Standard (15 cm)",

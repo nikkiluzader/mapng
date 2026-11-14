@@ -641,6 +641,8 @@
       "measuredWidthsOff": "Off: roads with no width in OpenStreetMap get their class's usual width. It is set before Generate.",
       "measuredWidthsOnNone": "On, but none of this map's roads was measured. Generate again if you turned it on after this map was made.",
       "measuredWidthsUsed": "{n} of this map's road pieces use a width measured from the satellite picture.",
+      "measuredWidthsUsedOf": "{n} of this map's {total} road pieces use a width measured from the satellite picture. The others have a width in OpenStreetMap, or could not be seen clearly enough and keep their class's usual width.",
+      "measuredWidthsNowOff": "It is switched off now: Generate again to build this map without the measured widths.",
       "measuredWidthsChange": "Change it in Map data",
       "curbHeight": "Curb height",
       "curbHeight_standard": "Standard (15 cm)",

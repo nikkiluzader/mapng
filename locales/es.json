@@ -636,6 +636,8 @@
       "measuredWidthsOff": "Desactivado: las carreteras sin ancho en OpenStreetMap usan el ancho habitual de su clase. Se ajusta antes de generar.",
       "measuredWidthsOnNone": "Activado, pero no se midió ninguna carretera de este mapa. Vuelve a generar si lo activaste después de crear este mapa.",
       "measuredWidthsUsed": "{n} tramos de carretera de este mapa usan un ancho medido en la imagen de satélite.",
+      "measuredWidthsUsedOf": "{n} de los {total} tramos de carretera de este mapa usan un ancho medido en la imagen de satélite. Los demás tienen un ancho en OpenStreetMap o no se veían con suficiente claridad y conservan el ancho habitual de su clase.",
+      "measuredWidthsNowOff": "Ahora está desactivado: genera de nuevo para construir el mapa sin los anchos medidos.",
       "measuredWidthsChange": "Cambiarlo en Datos del mapa",
       "curbHeight": "Altura del bordillo",
       "curbHeight_standard": "Estándar (15 cm)",

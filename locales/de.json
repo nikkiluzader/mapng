@@ -636,6 +636,8 @@
       "measuredWidthsOff": "Aus: Straßen ohne Breite in OpenStreetMap bekommen die übliche Breite ihrer Klasse. Wird vor dem Erzeugen eingestellt.",
       "measuredWidthsOnNone": "Ein, aber keine Straße dieser Karte wurde gemessen. Erzeuge neu, wenn du es erst nach dem Erstellen dieser Karte eingeschaltet hast.",
       "measuredWidthsUsed": "{n} Straßenabschnitte dieser Karte nutzen eine im Satellitenbild gemessene Breite.",
+      "measuredWidthsUsedOf": "{n} von {total} Straßenstücken dieser Karte nutzen eine aus dem Satellitenbild gemessene Breite. Die anderen haben eine Breite in OpenStreetMap oder waren nicht klar genug zu sehen und behalten die übliche Breite ihrer Klasse.",
+      "measuredWidthsNowOff": "Es ist jetzt ausgeschaltet: Erneut generieren, um die Karte ohne die gemessenen Breiten zu bauen.",
       "measuredWidthsChange": "In Kartendaten ändern",
       "curbHeight": "Bordsteinhöhe",
       "curbHeight_standard": "Standard (15 cm)",

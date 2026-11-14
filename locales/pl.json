@@ -636,6 +636,8 @@
       "measuredWidthsOff": "Wyłączone: drogi bez szerokości w OpenStreetMap dostają typową szerokość swojej klasy. Ustawia się to przed generowaniem.",
       "measuredWidthsOnNone": "Włączone, ale nie zmierzono żadnej drogi tej mapy. Wygeneruj ponownie, jeśli włączono to po utworzeniu tej mapy.",
       "measuredWidthsUsed": "{n} odcinków dróg tej mapy używa szerokości zmierzonej na zdjęciu satelitarnym.",
+      "measuredWidthsUsedOf": "{n} z {total} odcinków dróg tej mapy używa szerokości zmierzonej na zdjęciu satelitarnym. Pozostałe mają szerokość w OpenStreetMap albo nie były dość wyraźnie widoczne i zachowują zwykłą szerokość swojej klasy.",
+      "measuredWidthsNowOff": "Teraz jest wyłączone: wygeneruj ponownie, aby zbudować mapę bez zmierzonych szerokości.",
       "measuredWidthsChange": "Zmień w Danych mapy",
       "curbHeight": "Wysokość krawężnika",
       "curbHeight_standard": "Standardowa (15 cm)",
