@@ -160,7 +160,7 @@ stopped). A 16 km city at 1 m failed after 46 minutes on a Set past 16.7 million
 Not pursued further: "Extremely heavy" warns, nothing blocks.
 
 A reported 33 km city (16384 px at 2 m, 990,000 features) was run here on the code of the report: about five and
-a half hours to reach the buildings step, where it stopped with "Invalid string length" as reported. The cause
+to reach the buildings step, where it stopped with "Invalid string length" as reported. The cause
 was the buildings step's extras tasks (every feature as one JSON string), now sent in pieces. The same export on
 the fixed code was started 2026-11-14 and had not finished when this was written.
 
