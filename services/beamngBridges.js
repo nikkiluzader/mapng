@@ -23,6 +23,8 @@ const SIGMA_M = 12;                    // smoothing: at least ...
 const SIGMA_SHARE = 25;                // ... a 25th of the chain ...
 const SIGMA_MAX_M = 40;                // ... at most
 const JOIN_M = 0.5;                    // part ends this close are one joint
+const END_LIP_M = 1.6;                 // a deck's slab reaches this far past its own end
+const END_LIP_UNDER_M = 0.03;          // ... its top this far under the road's line
 const RUN_ON_COS = 0.3;                // two parts at a joint run on into each other within about 70 degrees
 const VERTICAL_CURVE_M = 40;           // grade changes ease in over this far (a vertical curve)
 
@@ -1247,6 +1249,24 @@ export function buildDeckGeometry(deck, { groundAt, roadLines = [], groundRoads:
       const g = groundAt ? groundAt(xy[k][0], xy[k][1]) : -Infinity;
       const bottom = z[k] - depth - g < WALL_GAP_M && z[k] - slab > g ? g - FOOTING_M / 2 - z[k] : -slab;
       b.quad(at(k, outL, 0), at(k, outR, 0), at(k, outR, bottom), at(k, outL, bottom), want);
+      // A lip past the end, on along the deck's own grade and just under the road's line: the terrain is a
+      // grid, and its last square before the deck falls away from road height to the ground under the bridge
+      // (a notch up to a square long and 0.75 m deep where the road steps onto the deck, measured in game).
+      // Where the ground is at road height the lip lies hidden just under it.
+      {
+        const run = Math.hypot(xy[k][0] - xy[j][0], xy[k][1] - xy[j][1]) || 1;
+        const rise = ((z[k] - z[j]) / run) * END_LIP_M;
+        const out = (p, dz) => [p[0] + want[0] * END_LIP_M, p[1] + want[1] * END_LIP_M, p[2] + rise + dz];
+        const l0 = at(k, outL, -END_LIP_UNDER_M); const r0 = at(k, outR, -END_LIP_UNDER_M);
+        const l1 = out(l0, 0); const r1 = out(r0, 0);
+        const ld = [l1[0], l1[1], l1[2] - slab]; const rd = [r1[0], r1[1], r1[2] - slab];
+        const l0d = [l0[0], l0[1], l0[2] - slab]; const r0d = [r0[0], r0[1], r0[2] - slab];
+        b.quad(l0, r0, r1, l1, [0, 0, 1]);
+        b.quad(l1, r1, rd, ld, want);
+        b.quad(l0, l1, ld, l0d, [-want[1], want[0], 0]);
+        b.quad(r1, r0, r0d, rd, [want[1], -want[0], 0]);
+        b.quad(l0d, ld, rd, r0d, [0, 0, -1]);
+      }
       sides.forEach((side) => {
         // (a parapet shown up to this end)
         if (!side.shown.some(([i, t0, t1]) => (k === 0 ? i === 0 && t0 < 1e-6 : i === xy.length - 2 && t1 > 1 - 1e-6))) return;

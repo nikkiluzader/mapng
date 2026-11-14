@@ -249,7 +249,12 @@ export function composeTerrain(graph, grid) {
   graph.edges.forEach((e, k) => {
     const zk = z[k];
     for (let i = 0; i + 1 < e.s.length; i++) {
-      const kind = kindOf[k][i];
+      // A piece is its first station's kind, but not where a deck's last station hands over to the ground:
+      // the deck's mesh ends at that station, and the piece after it is road on the ground. Taken for deck
+      // (as it was at a deck's far end only, never at its start), it was left unfilled wherever the ground
+      // lay more than ABUT_FILL_MAX_M down: a slot one station long between the deck's end and the road, 3.6 m
+      // long and 2.5 m deep at an avenue bridge over a freeway (measured in game).
+      const kind = kindOf[k][i] === 'deck' && kindOf[k][i + 1] === 'ground' ? 'ground' : kindOf[k][i];
       if (TUBE.has(kind)) continue;
       // terrain shaping switched off for this piece (structures/shaping.js)
       if (skip && skip(k, i)) { stats.skipped = (stats.skipped || 0) + 1; continue; }
