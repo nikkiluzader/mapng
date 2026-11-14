@@ -46,6 +46,7 @@ const CLEAR_M = 0.03;          // the deck over the highest ground under it
 // to 75 % at 90 % of nodes, 8 cm higher at the edge at half of them): a deck lifted over that stood 15 cm to 2 m
 // over the road it replaced.
 const INNER = 0.75;
+const MID_NEED_M = 0.6;       // ... and ground on the road's own line up to this much over it is covered by the deck
 const MAX_NEED_M = 0.3;       // ground higher than this over the road's line is left to stand through the deck's edge
 const RAMP_SLOPE = 0.03;       // a height taken from the ground or another deck is eased along the road at this slope
 const MIN_DEPTH_M = 0.3;
@@ -405,12 +406,16 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined, onSt
           const h = drapeAt(cx + nx * hw[i] * o, cy + ny * hw[i] * o);
           // (against the deck as it leans there)
           const top = baseHere + camber[i] * hw[i] * o;
-          if (h - top > over) over = h - top;
+          // (the ground in the middle of the road counts for more than the ground at its edges: a hump on the
+          // road's own line is covered up to MID_NEED_M, a bank at its edge only to MAX_NEED_M. Capped alike,
+          // ground 20 to 50 cm over the line stood through the deck across the lane for metres at a time)
+          const lift = Math.abs(o) <= INNER / 2 ? Math.min(MID_NEED_M, h - top) : Math.min(MAX_NEED_M, h - top);
+          if (lift > over) over = lift;
           if (h < lo) lo = h;
         }
       }
       low[i] = lo;
-      need[i] = Math.max(CLEAR_M, Math.min(MAX_NEED_M, over + CLEAR_M));
+      need[i] = Math.max(CLEAR_M, over + CLEAR_M);
     }
     return { name: pc.name, pts, s, hw, base, need, low, flag, camber, z: new Float64Array(n) };
   });
@@ -685,7 +690,7 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined, onSt
       let any = false;
       for (const node of decal.nodes) {
         // (a deck well over or under the decal's own height is another level: the road above at a hillside fork)
-        const z = deckAt(node[0], node[1], node[2], SAME_LEVEL_M + MAX_NEED_M);
+        const z = deckAt(node[0], node[1], node[2], SAME_LEVEL_M + MID_NEED_M);
         // (where decks overlap at a junction this is the one nearest the decal's own height; they are level there)
         if (z === -Infinity) continue;
         node[2] = r3(z + DECAL_OVER_DECK_M);
