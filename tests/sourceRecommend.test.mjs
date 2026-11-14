@@ -44,3 +44,9 @@ test('a region\'s own survey: picked where the free lidar is missing or coarse, 
   assert.equal(recommendSource({ standard: { h, res: 30 }, mapterhorn: { h, res: 10 }, kron86: { h, res: 1 } }, 64, 8).pick, 'kron86');
   assert.equal(recommendSource({ standard: { h, res: 30 }, mapterhorn: { h, res: 1 }, usgs: { h, res: 1 } }, 64, 8).pick, 'mapterhorn');
 });
+
+test('Mapterhorn\'s 30 m base (no lidar here) is shown but never the suggestion', () => {
+  const flat = new Float32Array(16 * 16).fill(5);
+  assert.deepEqual(recommendSource({ standard: { h: flat, res: 30 }, mapterhorn: { h: flat, res: 30, base: true } }, 16, 30), { pick: 'standard', why: 'noLidar' });
+  assert.equal(recommendSource({ standard: { h: flat, res: 30 }, mapterhorn: { h: flat, res: 30, base: true }, gpxz: { h: flat, res: 1 } }, 16, 30).pick, 'gpxz');
+});

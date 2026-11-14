@@ -50,7 +50,7 @@ import { Layers } from 'lucide-vue-next';
 import { boxAround, probeMapterhorn } from '../../services/sourceAdvisor.js';
 import { useMainStore } from '../../stores/mainStore';
 import { recommendSource } from '../../services/sourceRecommend.js';
-import { standardPatch, mapterhornPatch, gpxzPatch, regionalPatch, regionalSourcesAt, hillshadeDataUrl } from '../../services/sourceCompare.js';
+import { standardPatch, mapterhornPatch, gpxzPatch, regionalPatch, regionalSourcesAt, hillshadeDataUrl, MAPTERHORN_BASE_ZOOM } from '../../services/sourceCompare.js';
 
 const { t } = useI18n({ useScope: 'global' });
 const props = defineProps({
@@ -113,8 +113,13 @@ const loadCompare = async () => {
     .catch(() => { if (!signal.aborted) setCell('standard', { note: t('map.compareFailed') }); });
   try {
     const p = await probeMapterhorn(boxAround(c, 0.6), { signal });
-    if (!p.zoom) setCell('mapterhorn', { note: t('map.compareNoLidar') });
-    else {
+    if (!p.zoom) {
+      // No lidar here: what Mapterhorn does have, its worldwide base at about 30 m, is shown all the same
+      // (a blank tile saying "no lidar here" told nothing about what choosing it would give).
+      const h = await mapterhornPatch(c, MAPTERHORN_BASE_ZOOM, { sideM: COMPARE_SIDE_M, px: COMPARE_PX, signal });
+      compareHeights.mapterhorn = { h, res: 30, base: true };
+      setCell('mapterhorn', { url: hillshadeDataUrl(h, COMPARE_PX, cell), detail: `~30 m · ${t('map.compareNoLidar')}` });
+    } else {
       const h = await mapterhornPatch(c, p.zoom, { sideM: COMPARE_SIDE_M, px: COMPARE_PX, signal });
       compareHeights.mapterhorn = { h, res: p.metersPerPixel };
       setCell('mapterhorn', { url: hillshadeDataUrl(h, COMPARE_PX, cell), detail: `~${fmtRes(p.metersPerPixel)} m · ${t('map.compareFree')}` });

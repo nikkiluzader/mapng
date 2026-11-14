@@ -72,7 +72,9 @@ export function levelWhereItSlopes(lidar, coarse, px, cellM) {
  * or null when nothing is loaded.
  */
 export function recommendSource(sources, px, cellM) {
-  const { standard, mapterhorn, gpxz, usgs, kron86 } = sources || {};
+  const { standard, gpxz, usgs, kron86 } = sources || {};
+  // (base: Mapterhorn's worldwide 30 m base, shown where it has no lidar: no lidar to recommend or to doubt)
+  const mapterhorn = sources?.mapterhorn?.base ? null : sources?.mapterhorn;
   // (the region's own survey, when it was added to the comparison: USGS 1 m, Poland's NMT)
   const regional = usgs?.h ? 'usgs' : kron86?.h ? 'kron86' : null;
   if (!standard?.h && !mapterhorn?.h && !gpxz?.h && !regional) return null;

@@ -79,10 +79,12 @@ export async function standardPatch(center, { sideM = 512, px = 192, signal } = 
   return blur(h, px, Math.max(1, 6 / (sideM / px)));
 }
 
+export const MAPTERHORN_BASE_ZOOM = 12;
 export async function mapterhornPatch(center, zoom, { sideM = 512, px = 192, signal } = {}) {
   const url = async (z, x, y) => (await tileHeights(`${MAPTERHORN_CACHE_URL}/${z}/${x}/${y}.webp`, 512, signal))
     || tileHeights(`${MAPTERHORN_TILE_URL}/${z}/${x}/${y}.webp`, 512, signal);
-  return mercatorPatch({ center, sideM, px, z: Math.max(13, Math.min(17, zoom)), tileSize: 512, url, signal });
+  // (zoom 12: Mapterhorn's worldwide base, about 30 m, where it has no lidar)
+  return mercatorPatch({ center, sideM, px, z: Math.max(MAPTERHORN_BASE_ZOOM, Math.min(17, zoom)), tileSize: 512, url, signal });
 }
 
 export async function gpxzPatch(center, apiKey, { sideM = 512, px = 192, signal } = {}) {
