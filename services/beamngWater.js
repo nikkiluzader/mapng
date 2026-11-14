@@ -147,6 +147,30 @@ const isLakeWater = (t = {}) => {
   return norm(t.natural) === 'water' ? (!t.water || LAKE_WATER.has(norm(t.water))) : ['reservoir', 'basin'].includes(norm(t.landuse));
 };
 const isStandingWater = (t = {}) => isLakeWater(t) && !isDry(t);
+// A reservoir mapped as sometimes dry (intermittent or seasonal) that the elevation data shows full: behind a dam,
+// and level inside its outline. Built as the lake the data holds. (A reservoir drained for dam works was tagged
+// intermittent=yes: the survey has its water, the map painted it blue, and the level got no lake at all, only the
+// river's thin ribbon across a flat blue plain. A dry lake bed in a desert has no dam and stays dry.)
+const STILL_WATER_M = 2.5;      // the middle 80 % of the ground inside within this: water in the data (two survey sheets can hold it at two levels)
+const sometimesDry = (t = {}) => (['yes', 'true'].includes(norm(t.intermittent)) || ['yes', 'true'].includes(norm(t.seasonal))) && norm(t.water) !== 'dry';
+function fullBehindDam(t, poly, heightAt, damPoints) {
+  if (!sometimesDry(t) || !damPoints?.length) return false;
+  const near = damPoints.some(([x, y]) => {
+    if (poly.contains(x, y)) return true;
+    for (let i = 0; i < poly.outer.length; i++) {
+      const a = poly.outer[i]; const b = poly.outer[(i + 1) % poly.outer.length];
+      const dx = b[0] - a[0]; const dy = b[1] - a[1];
+      const u = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy || 1)));
+      if (Math.hypot(x - (a[0] + dx * u), y - (a[1] + dy * u)) <= DAM_NEAR_M) return true;
+    }
+    return false;
+  });
+  if (!near) return false;
+  const g = groundInside(poly, heightAt);
+  return g.length >= 8 && g[Math.floor(g.length * 0.9)] - g[Math.floor(g.length * 0.1)] <= STILL_WATER_M;
+}
+const DAM_NEAR_M = 40;
+const damPointsOf = (features, toWorld) => features.filter((f) => norm(f?.tags?.waterway) === 'dam' && f.geometry?.length).flatMap((f) => f.geometry.map((p) => toWorld(p.lat, p.lng)));
 // Some point inside at least r from every shore (holes included).
 function hasRoom(poly, r) {
   const [x0, y0, x1, y1] = poly.box;
@@ -247,6 +271,7 @@ export function planRivers({ features = [], toWorld, heightAt, roads = [] }) {
   // (and the wide or tidal ones, area water: no ribbon in them)
   const outlines = [];
   const areas = [];
+  let riverDams = null;
   for (const f of features) {
     if (f.type !== 'water' || !(f.geometry?.length > 3) || !isClosed(f.geometry)) continue;
     const t = f.tags || {};
@@ -254,7 +279,11 @@ export function planRivers({ features = [], toWorld, heightAt, roads = [] }) {
     // centreline lay its length over the Emsworth Pool's outline, a second
     // surface 0.2 m over the pool's in a band down the river)
     if (!isRiverbank(t)) {
-      if (isStandingWater(t)) areas.push(makePolygon(f.geometry.map((p) => toWorld(p.lat, p.lng)), (f.holes || []).map((h) => h.map((p) => toWorld(p.lat, p.lng)))));
+      if (isLakeWater(t)) {
+        const lake = makePolygon(f.geometry.map((p) => toWorld(p.lat, p.lng)), (f.holes || []).map((h) => h.map((p) => toWorld(p.lat, p.lng))));
+        // (as planLakes: a reservoir mapped sometimes dry but full in the data is a lake, and no ribbon runs through it)
+        if (!isDry(t) || fullBehindDam(t, lake, heightAt, (riverDams ||= damPointsOf(features, toWorld)))) areas.push(lake);
+      }
       continue;
     }
     const poly = makePolygon(f.geometry.map((p) => toWorld(p.lat, p.lng)), (f.holes || []).map((h) => h.map((p) => toWorld(p.lat, p.lng))));
@@ -545,14 +574,18 @@ export function planLakes({ features = [], toWorld, heightAt, seaZ = null, minCe
   const tiles = [];
   const lakes = [];   // { poly, level } for carveLakeBeds
   const stats = { lakes: 0, dry: 0, tiles: 0, riverAreas: 0 };
+  let dams = null;
   for (const f of features) {
     if (f.type !== 'water' || !(f.geometry?.length > 3) || !isClosed(f.geometry)) continue;
     const t = f.tags || {};
     const river = isRiverbank(t);
     if (!river && !isLakeWater(t)) continue;
     if (river && isDry(t)) continue;
-    if (isDry(t)) { stats.dry++; continue; }
     const poly = makePolygon(f.geometry.map((p) => toWorld(p.lat, p.lng)), (f.holes || []).map((h) => h.map((p) => toWorld(p.lat, p.lng))));
+    if (isDry(t)) {
+      if (!fullBehindDam(t, poly, heightAt, (dams ||= damPointsOf(features, toWorld)))) { stats.dry++; continue; }
+      stats.fullBehindDam = (stats.fullBehindDam || 0) + 1;
+    }
     // (a river's outline only where it is area water; the rest are Rivers)
     if (river && !isRiverArea(t, poly, heightAt)) continue;
     if (river) stats.riverAreas++;
