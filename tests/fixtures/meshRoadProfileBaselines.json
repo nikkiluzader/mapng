@@ -1,7 +1,7 @@
 {
  "_note": "Mesh Roads in-game baselines (scripts/ingame/meshRoadProfile.mjs --save): places with a step over 8 cm and 3 cm, and road samples with no deck.",
  "recorded": "2026-11-14",
- "commit": "41de737",
+ "commit": "3e1c131",
  "areas": {
   "lcc": {
    "terrain": "gpxz",
@@ -347,6 +347,155 @@
     "structure": 9,
     "deckTerrain": 4
    }
+  },
+  "w_bergen": {
+   "terrain": "gpxz",
+   "steps8": 5,
+   "steps3": 54,
+   "bareRoad": 60,
+   "kinds": {
+    "structure": 1,
+    "deckToDeck": 3,
+    "deckTerrain": 1
+   }
+  },
+  "w_capetown": {
+   "terrain": "gpxz",
+   "steps8": 118,
+   "steps3": 294,
+   "bareRoad": 1859,
+   "kinds": {
+    "deckTerrain": 30,
+    "structure": 28,
+    "deckToDeck": 50,
+    "oneDeck": 10
+   }
+  },
+  "w_singapore": {
+   "terrain": "gpxz",
+   "steps8": 23,
+   "steps3": 68,
+   "bareRoad": 476,
+   "kinds": {
+    "deckTerrain": 9,
+    "deckToDeck": 7,
+    "structure": 4,
+    "oneDeck": 3
+   }
+  },
+  "w_paris_maillot": {
+   "terrain": "gpxz",
+   "steps8": 67,
+   "steps3": 123,
+   "bareRoad": 322,
+   "kinds": {
+    "structure": 48,
+    "deckToDeck": 10,
+    "deckTerrain": 9
+   }
+  },
+  "w_pittsburgh": {
+   "terrain": "gpxz",
+   "steps8": 14,
+   "steps3": 49,
+   "bareRoad": 53,
+   "kinds": {
+    "structure": 11,
+    "deckTerrain": 2,
+    "deckToDeck": 1
+   }
+  },
+  "w_la_fourlevel": {
+   "terrain": "gpxz",
+   "steps8": 26,
+   "steps3": 80,
+   "bareRoad": 173,
+   "kinds": {
+    "structure": 22,
+    "deckToDeck": 3,
+    "deckTerrain": 1
+   }
+  },
+  "bt_lisbon": {
+   "terrain": "gpxz",
+   "steps8": 4,
+   "steps3": 20,
+   "bareRoad": 17,
+   "kinds": {
+    "deckToDeck": 1,
+    "deckTerrain": 1,
+    "structure": 2
+   }
+  },
+  "zion": {
+   "terrain": "gpxz",
+   "steps8": 3,
+   "steps3": 6,
+   "bareRoad": 17,
+   "kinds": {
+    "structure": 3
+   }
+  },
+  "staug_dt": {
+   "terrain": "gpxz",
+   "steps8": 4,
+   "steps3": 22,
+   "bareRoad": 43,
+   "kinds": {
+    "structure": 2,
+    "deckTerrain": 1,
+    "deckToDeck": 1
+   }
+  },
+  "oslo": {
+   "terrain": "gpxz",
+   "steps8": 85,
+   "steps3": 247,
+   "bareRoad": 1026,
+   "kinds": {
+    "structure": 48,
+    "deckToDeck": 15,
+    "deckTerrain": 18,
+    "oneDeck": 4
+   }
+  },
+  "verona": {
+   "terrain": "gpxz",
+   "steps8": 2,
+   "steps3": 15,
+   "bareRoad": 11,
+   "kinds": {
+    "deckToDeck": 2
+   }
+  },
+  "bologna": {
+   "terrain": "gpxz",
+   "steps8": 16,
+   "steps3": 70,
+   "bareRoad": 250,
+   "kinds": {
+    "structure": 9,
+    "deckTerrain": 4,
+    "deckToDeck": 2,
+    "oneDeck": 1
+   }
+  },
+  "leeds": {
+   "terrain": "gpxz",
+   "steps8": 4,
+   "steps3": 57,
+   "bareRoad": 75,
+   "kinds": {
+    "deckToDeck": 2,
+    "structure": 2
+   }
+  },
+  "plano": {
+   "terrain": "gpxz",
+   "steps8": 0,
+   "steps3": 15,
+   "bareRoad": 42,
+   "kinds": {}
   }
  }
 }
