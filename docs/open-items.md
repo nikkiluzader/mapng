@@ -9,13 +9,38 @@ alone have misled this work more than once. Tools are listed at the end.
 
 ## State of the branches
 
-- `main` and desktop test build 0.3.1-dev.7: the water and backdrop fixes, Mapterhorn and Poland's 1 m model as
-  backdrop sources, street parking off by default, Mesh Roads as an experimental choice.
-- `dev` since then, not on main and not in a test build: map data saved in pieces (very large maps), "Extremely
-  heavy" rating, Mapterhorn's 30 m base in the source comparison, comparison sizes up to the whole selection with
-  GPXZ calls counted and kept for Generate, quality report up to 4 km, flaw check (knots and stripes), survey sheet
-  joins (Poland's dashed lines), reservoirs mapped as sometimes dry, Mesh Roads end fixes, junction mouths (behind
-  a switch, off).
+As of 2026-11-14, late:
+
+- `main` and desktop test build 0.3.1-dev.11: everything up to the Hero Roads work below (lane widths, pieces
+  joined, fewer nodes, baked on the first load), the Mesh Roads night, the lock button, the update notice on a
+  page older than the site, proposed roads and tunnels kept out of the painted texture.
+- `dev` since then, not on main and not in a test build: the buildings step of a very large map hands its
+  features to the workers in pieces (the real cause of a reported "Invalid string length"), and a full disk
+  during Generate or Export is said plainly.
+
+### Hero Roads (experimental), 2026-11-14
+
+Done: lanes as wide as the driving lanes with the rest as shoulder; road pieces that run on into each other built
+as one Hero Road; nodes only where the shape needs them; the roads baked with the editor's own Bake on the first
+load (it runs with the editor closed) and placed from the baked files on later loads.
+`mainLevel.heroRoads().edit()` gives live roads for the editor.
+
+Open:
+1. Junctions are not joined: each Hero Road ends square at a junction.
+2. A one-way road with one lane gets that lane as wide as all of MapNG's driving width (7 m seen).
+3. The first load of a town took 42 s to build and bake 88 roads; a large city is not measured.
+4. The baked files are in the game's user folder, not in the level's zip: a shared level bakes again on the
+   other PC. Putting the bake into the zip at export would need the meshes made outside the game.
+5. Frame rate: baked Hero Roads against decal roads and Mesh Roads, not measured.
+6. Only tried on one game version.
+
+### Sidewalk mesh standing in a road: looked for, not found (2026-11-14)
+
+A detector over the built sidewalk meshes (scratch, `detect_pre.mjs`: every vertex well inside another road's
+driving width and more than 8 cm over it) finds nothing real on the roundabout town: what it reports are curbs on
+the far side of a T junction, where the side road's drawn end reaches past the through road's far edge. The
+"sidewalk slabs across a carriageway" in the lists below were measured in game before the later fixes and need
+their places measured again before any work on them.
 
 ## 1. Mesh Roads and junction heights (in progress)
 
@@ -109,8 +134,8 @@ Open, by how often it was measured:
 
 ## 3. Release steps waiting on a go-ahead
 
-1. Push `dev` to `main`.
-2. Cut desktop test build 0.3.1-dev.8 (the very-large-map fix is not in dev.7).
+1. Push `dev` to `main` (the two fixes above).
+2. The next desktop test build, and a desktop release: people on 0.3.0 only get the very-large-map fix with one.
 
 ## 4. Optimization pass (asked for, one item done)
 
@@ -133,6 +158,11 @@ Open, by how often it was measured:
 A 66 km map of a dense city generates now but does not export (first step still running after 30 minutes when
 stopped). A 16 km city at 1 m failed after 46 minutes on a Set past 16.7 million entries; fixed, not run again.
 Not pursued further: "Extremely heavy" warns, nothing blocks.
+
+A reported 33 km city (16384 px at 2 m, 990,000 features) was run here on the code of the report: about five and
+a half hours to reach the buildings step, where it stopped with "Invalid string length" as reported. The cause
+was the buildings step's extras tasks (every feature as one JSON string), now sent in pieces. The same export on
+the fixed code was started 2026-11-14 and had not finished when this was written.
 
 ## 7. Waiting on other people
 
