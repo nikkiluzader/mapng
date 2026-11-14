@@ -298,7 +298,7 @@ export const repairTerrariumNoDataTiles = async ({
     if (!ancestorCache.has(key)) {
       const numTiles = 2 ** z;
       const wrappedX = ((x % numTiles) + numTiles) % numTiles;
-      ancestorCache.set(key, loadImage(`${TILE_API_URL}/${z}/${wrappedX}/${y}.png`, signal).catch(() => null));
+      ancestorCache.set(key, loadTerrariumTile(`${TILE_API_URL}/${z}/${wrappedX}/${y}.png`, signal).catch(() => null));
     }
     return ancestorCache.get(key);
   };
@@ -573,7 +573,7 @@ export const repairTerrariumBlendedTiles = async ({
     if (!ancestorCache.has(key)) {
       const numTiles = 2 ** z;
       const wrappedX = ((x % numTiles) + numTiles) % numTiles;
-      ancestorCache.set(key, loadImage(`${TILE_API_URL}/${z}/${wrappedX}/${y}.png`, signal)
+      ancestorCache.set(key, loadTerrariumTile(`${TILE_API_URL}/${z}/${wrappedX}/${y}.png`, signal)
         .then((img) => {
           const c = document.createElement('canvas');
           c.width = TILE_SIZE; c.height = TILE_SIZE;
@@ -935,7 +935,7 @@ export const fetchTerrariumMosaic = async (
       const wrappedTx = ((tx % numTiles) + numTiles) % numTiles;
       const terrainUrl = `${TILE_API_URL}/${terrainZoom}/${wrappedTx}/${ty}.png`;
 
-      const img = await loadImage(terrainUrl, signal);
+      const img = await loadTerrariumTile(terrainUrl, signal);
       if (img) {
         tCtx.drawImage(img, drawX, drawY);
       } else {
@@ -1786,6 +1786,23 @@ async function pMap(items, mapper, concurrency, signal) {
 
 // (through the download cache in the browser: services/dataCache.js)
 const loadImage = (url, signal) => loadDataImage(url, signal);
+// A global elevation tile: from Amazon's public storage, and where that cannot be reached, through MapNG's own
+// address (worker/terrariumRelay.js). Some networks reach mapng.com and the satellite tiles but not Amazon: a
+// 1 km Generate failed with every elevation tile missing. Once the relay has answered where the direct
+// download did not, the rest of the session asks it first.
+export const TERRARIUM_RELAY_URL = '/api/terrarium';
+let terrariumRelayFirst = false;
+async function loadTerrariumTile(url, signal) {
+  const attempt = async (u) => { try { return await loadImage(u, signal); } catch (e) { if (signal?.aborted) throw e; return null; } };
+  const relay = url.replace(TILE_API_URL, TERRARIUM_RELAY_URL);
+  if (!terrariumRelayFirst) {
+    const direct = await attempt(url);
+    if (direct) return direct;
+  }
+  const relayed = await attempt(relay);
+  if (relayed) { if (!terrariumRelayFirst) console.warn('[Elevation] Amazon\'s tile storage could not be reached: the global elevation tiles come through mapng.com.'); terrariumRelayFirst = true; return relayed; }
+  return terrariumRelayFirst ? attempt(url) : null;
+}
 
 const SAT_TEX_MAX_SIZE = 8192;
 
@@ -2205,7 +2222,7 @@ export const fetchTerrainData = async (
         const wrappedTx = ((tx % numTiles) + numTiles) % numTiles;
 
         const terrainUrl = `${TILE_API_URL}/${terrainZoom}/${wrappedTx}/${ty}.png`;
-        const tImg = await loadImage(terrainUrl, signal);
+        const tImg = await loadTerrariumTile(terrainUrl, signal);
         if (tImg) {
           terrainTilesSucceeded++;
           tCtx.drawImage(tImg, drawX, drawY);

@@ -104,6 +104,7 @@ export const clearBatchCache = async () => {
 const isCacheableUrl = (url) => {
   return (
     url.includes('elevation-tiles-prod') ||
+    url.includes('/api/terrarium/') ||
     url.includes('ArcGIS/rest/services/World_Imagery') ||
     url.includes('/api/gpxz/') ||
     url.includes('tnmaccess.nationalmap.gov') ||

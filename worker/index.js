@@ -35,6 +35,7 @@ import { handleCrashReports } from './crashReports.js';
 import { handleAdmin } from './admin.js';
 import { handleShareCodes } from './shareCodes.js';
 import { handleMapterhornTiles } from './mapterhornCache.js';
+import { handleTerrariumTiles } from './terrariumRelay.js';
 import { LATEST_UPDATE } from './updates.js';
 import { readWithRetry } from './retry.js';
 
@@ -275,6 +276,10 @@ export default {
 
     if (url.pathname.startsWith(OSM_TILES_PREFIX)) {
       return handleOsmTiles(request, url, env, ctx);
+    }
+
+    if (url.pathname.startsWith('/api/terrarium/')) {
+      return handleTerrariumTiles(request, url);
     }
 
     if (url.pathname.startsWith('/api/mapterhorn/')) {

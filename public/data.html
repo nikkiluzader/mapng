@@ -289,7 +289,7 @@ Content-Type: application/json
     <div class="table-wrap"><table>
       <thead><tr><th>Service</th><th>Why</th><th>What it receives</th></tr></thead>
       <tbody>
-        <tr><td>AWS Terrarium, Mapterhorn, OpenGeoHub (GEDTM30), USGS, GUGiK (Poland)</td><td>Elevation data, and USGS 3DEP lidar for measured bridge heights</td><td>The map tiles for the area you select</td></tr>
+        <tr><td>AWS Terrarium, Mapterhorn, OpenGeoHub (GEDTM30), USGS, GUGiK (Poland)</td><td>Elevation data, and USGS 3DEP lidar for measured bridge heights</td><td>The map tiles for the area you select. If your network cannot reach Amazon's storage, the global elevation tiles are fetched through mapng.com instead, which then sees which tiles were asked for (nothing is stored)</td></tr>
         <tr><td>GPXZ</td><td>Optional premium elevation</td><td>The area, and your own GPXZ key (only if you enter one)</td></tr>
         <tr><td>Esri</td><td>Satellite imagery and map backgrounds</td><td>The map tiles you view or export, and the tiles along the roads when you switch on measuring road widths from the satellite picture</td></tr>
         <tr><td>MapNG's own OSM tiles, OpenStreetMap Overpass servers, Overture Maps</td><td>Roads, buildings, land use</td><td>The area you select</td></tr>

@@ -89,3 +89,17 @@ test('a building task whose features come in several strings reads back as one l
   assert.deepEqual(item.features, features);
   assert.deepEqual(taskItem(JSON.stringify({ features: [1] })), { features: [1] }, 'one string, as before');
 });
+
+test('the elevation tile relay serves tile addresses only', async () => {
+  const { parseTerrariumPath, handleTerrariumTiles } = await import('../worker/terrariumRelay.js');
+  assert.deepEqual(parseTerrariumPath('/api/terrarium/14/9857/5304.png'), { z: 14, x: 9857, y: 5304 });
+  for (const bad of ['/api/terrarium/16/1/1.png', '/api/terrarium/3/9/1.png', '/api/terrarium/3/1/1.jpg', '/api/terrarium/../secret', '/api/terrarium/3/1/1.png/extra']) assert.equal(parseTerrariumPath(bad), null, bad);
+  const asked = [];
+  const ok = await handleTerrariumTiles(new Request('https://mapng.com/api/terrarium/14/9857/5304.png'), new URL('https://mapng.com/api/terrarium/14/9857/5304.png'), { fetchImpl: async (u) => { asked.push(u); return new Response('png', { status: 200 }); } });
+  assert.equal(ok.status, 200); assert.equal(ok.headers.get('content-type'), 'image/png');
+  assert.deepEqual(asked, ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/14/9857/5304.png']);
+  const no = await handleTerrariumTiles(new Request('https://mapng.com/api/terrarium/20/1/1.png'), new URL('https://mapng.com/api/terrarium/20/1/1.png'), { fetchImpl: async () => { throw new Error('not asked'); } });
+  assert.equal(no.status, 404);
+  const post = await handleTerrariumTiles(new Request('https://mapng.com/api/terrarium/3/1/1.png', { method: 'POST' }), new URL('https://mapng.com/api/terrarium/3/1/1.png'));
+  assert.equal(post.status, 405);
+});
