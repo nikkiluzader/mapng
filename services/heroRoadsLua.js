@@ -58,8 +58,11 @@ local function lanesOf(road, width)
   if (not ok or not note or note == '') then ok, note = pcall(function() return road.mapngLanes end) end
   local f, b, lht = tostring(ok and note or ''):match('^(%d+) (%d+) (%d)')
   f, b = tonumber(f), tonumber(b)
-  if not f or f + b < 1 then local n = width >= 13 and 2 or 1; return n, n, false end
-  return f, b, lht == '1'
+  if not f or f + b < 1 then local n = width >= 13 and 2 or 1; return n, n, false, nil end
+  -- (the fifth number: the width of the driving lanes together; levels from before 0.3.1-dev.10 have none)
+  local driving = tonumber(tostring(note):match('^%d+ %d+ %d %d ([%d%.]+)'))
+  if driving and (driving < 2 or driving > width + 0.01) then driving = nil end
+  return f, b, lht == '1', driving
 end
 
 local layersOf = {}            -- 'dr_<road>_s<n>_' -> the names of that road's DecalRoad layers
@@ -162,19 +165,26 @@ local function buildOne(name)
   local g = groups[#groups]
   -- The lanes each way are OpenStreetMap's (MapNG writes them on the road surface as "forward backward
   -- left-hand tagged"); the width is MapNG's, which is the mapped or measured one where there is one.
-  local forward, backward, leftHand = lanesOf(road, width)
+  local forward, backward, leftHand, driving = lanesOf(road, width)
   local lanesLeft, lanesRight = backward, forward
   if leftHand then lanesLeft, lanesRight = forward, backward end
   local total = lanesLeft + lanesRight
   gm.applyProfilePreset(g, total >= 4 and 'highway' or 'city')
-  g.shoulderWidthM = SHOULDER_M
+  -- The lanes are as wide as MapNG's driving lanes, and what is left of the road surface each side (a paved
+  -- shoulder, a parking lane) is the Hero Road's shoulder. With the whole surface shared out among the lanes,
+  -- a 7 m road with 0.9 m shoulders got lanes of 4.1 m (a BeamNG developer, 2026-11-14: "all roads use width
+  -- 4.1 vs 2.75 for lane width").
+  local shoulder = SHOULDER_M
+  if driving then shoulder = math.max(0.05, (width - driving) / 2) end
+  local laneWidth = math.max(1.5, ((driving or (width - 2 * SHOULDER_M))) / total)
+  g.shoulderWidthM = shoulder
 
   -- The deck's height. A Hero Road is a mesh over the ground, highest along its crown and falling to its edges:
   -- set at the centre line's ground height it lay under the terrain wherever the ground is not dead level
   -- across the road (a BeamNG developer's hill road, 2026-11-13: "most of them are under terrain"). Each node
   -- takes the highest ground across the road's width there, plus what the crown and shoulders fall by, so the
   -- deck's lowest edge clears the ground.
-  local fall = half * math.abs(tonumber(g.crossfallPct) or 2.5) / 100 + SHOULDER_M * math.abs(tonumber(g.shoulderFallPct) or 6) / 100
+  local fall = half * math.abs(tonumber(g.crossfallPct) or 2.5) / 100 + shoulder * math.abs(tonumber(g.shoulderFallPct) or 6) / 100
   local nodes = {}
   for i = 1, #line do
     local a, b = line[math.max(1, i - 1)], line[math.min(#line, i + 1)]
@@ -193,7 +203,7 @@ local function buildOne(name)
   g.nodes, g.widths, g.nmls = nodes, {}, {}
   for i = 1, #nodes do g.widths[i] = width; g.nmls[i] = vec3(0, 0, 1) end
   -- (the lanes carry the width: the editor's code works the deck out from lanes and shoulders)
-  gm.setLaneProfile(g, lanesLeft, lanesRight, math.max(1.5, (width - 2 * SHOULDER_M) / total))
+  gm.setLaneProfile(g, lanesLeft, lanesRight, laneWidth)
   -- (no lines of the Hero Road's own: MapNG's are lifted onto it, liftLines)
   g.isRoadCenterLine, g.isRoadEdgeLines, g.isRoadLaneLines = false, false, false
   g.geometryMode = 'spline'    -- MapNG's line is already the shape wanted; no re-engineered curves

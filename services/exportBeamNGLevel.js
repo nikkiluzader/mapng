@@ -6497,10 +6497,13 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
           if (edgeBlend && onStructure) continue;
           decal.name = sanitizeBeamNGObjectName(`${roadNamePrefix}_${nameSuffix}_${layerCode}`);
           // (the road's lanes each way as OpenStreetMap has them, and the side traffic keeps: "forward backward
-          // left-hand tagged". Read by the Hero Roads script, heroRoadsLua.js; the game keeps it as a dynamic field)
+          // left-hand tagged driving-width". Read by the Hero Roads script, heroRoadsLua.js; the game keeps it as
+          // a dynamic field)
           if (layerCode === 'b') {
             const lanes = laneSplit(renderTags, highway, isOneWay);
-            decal.mapngLanes = `${lanes.forward} ${lanes.backward} ${leftHandTraffic ? 1 : 0} ${lanes.tagged ? 1 : 0}`;
+            // (... and the width of the driving lanes together, in metres: the road surface is the whole
+            // carriageway, paved shoulders and parking lanes included)
+            decal.mapngLanes = `${lanes.forward} ${lanes.backward} ${leftHandTraffic ? 1 : 0} ${lanes.tagged ? 1 : 0} ${(2 * drivingHalfWidth).toFixed(2)}`;
           }
           // On a bridge the road clips onto the deck, in a tunnel onto its
           // floor: without overObjects a DecalRoad is projected onto the
