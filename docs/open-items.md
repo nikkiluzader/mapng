@@ -52,6 +52,23 @@ Open, most visible first:
 5. **Frame rate.** Decal roads against Mesh Roads against Hero Roads on the same level. Not measured yet.
 6. **Decide whether Mesh Roads stays experimental** once 1 to 3 are done.
 
+### Mesh Roads work list (night of 2026-11-14)
+
+Measured with `scratch/night/run.mjs` (export, load in game, walk every paved road at 0.5 m) on 20 areas, then
+on new ones. Baseline: 339 places with a step over 8 cm on 20 areas; most are joins with bridges and tunnels, and
+one hill grid's crossings.
+
+1. Decks for the on-ground stretches of roads that are partly on a bridge or in a tunnel (they had none).
+2. A crossing found out to the crossed deck's edge whatever the height difference (steep streets across wide ones).
+3. A side road's end inside a through road left out even where its run-on reaches the far edge.
+4. Decks spanning the gap between a bridge's end and its bank.
+5. Deck ends at structures: the height they meet the bridge deck or tunnel floor at.
+6. Terrain standing through decks on their centre line (deck/terrain steps).
+7. New locations: a roundabout new town, an alpine valley, mountain hairpins, a cul-de-sac suburb, a hill town.
+8. Raw-terrain (not levelled) runs on hills: camber and floating decks.
+9. Frame rate against decal roads on the same level.
+10. Screenshots of each fixed class; before/after diagrams kept in scratch/night/.
+
 ## 2. Checks owed on work already on dev
 
 1. Poland's sheet joins and the reservoir rule: measured in the data only. Export that level and look in game.
