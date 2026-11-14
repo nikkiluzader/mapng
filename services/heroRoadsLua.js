@@ -26,7 +26,20 @@ local M = {}
 
 local PER_FRAME = 12           -- roads built a frame
 local RELOAD_EVERY = 120       -- the level's collision taken up again after this many roads (and at the end)
-local NODE_GAP_M = 4           -- a Hero Road node about this often along MapNG's line
+local NODE_GAP_M = 4           -- MapNG's line is read about this often
+-- A Hero Road is a spline through its nodes, so it needs a node only where the road's shape changes (a BeamNG
+-- developer, 2026-11-14: "way too many points... you get smooth roads with less nodes"). Of the points read,
+-- a node is kept where leaving it out would move the line this far sideways or in height, and at least this often.
+local THIN_SIDE_M = 0.05
+local THIN_HEIGHT_M = 0.02
+local THIN_GAP_M = 24
+-- MapNG cuts a road at every junction; the same tester's map was "over 400 roads" in the editor's list. Pieces
+-- that run on into each other (end on start, the same width and lanes, no more than this much of a turn) are
+-- built as one Hero Road, up to about this length.
+local JOIN_TURN_COS = 0.906    -- 25 degrees
+local JOIN_END_M = 0.5
+local JOIN_WIDTH_M = 0.15
+local JOIN_LENGTH_M = 1500
 local SHOULDER_M = 0.3
 local OVER_GROUND_M = 1.0      -- a line this far over or under the terrain is a bridge deck, ramp or tunnel: left as it is
 local MIN_WIDTH_M = 3.0
@@ -37,6 +50,7 @@ local CLEAR_M = 0.03           -- the deck's lowest edge over the highest ground
 local gm = nil
 local queue, at = nil, 0
 local built, skipped, failed = 0, 0, 0
+local surfaces, nodesRead, nodesKept = 0, 0, 0
 local lanesSeen = {}           -- 'forward+backward' -> roads, for status()
 local firstError = nil
 local started, done = false, false
@@ -53,9 +67,13 @@ end
 
 -- A road surface's lanes: forward, backward, left-hand traffic. Without MapNG's note (a level from an older
 -- MapNG): one lane each way, two on a road 13 m wide or more.
-local function lanesOf(road, width)
+local function lanesNote(road)
   local ok, note = pcall(function() return road:getField('mapngLanes', 0) end)
   if (not ok or not note or note == '') then ok, note = pcall(function() return road.mapngLanes end) end
+  return ok, note
+end
+local function lanesOf(road, width)
+  local ok, note = lanesNote(road)
   local f, b, lht = tostring(ok and note or ''):match('^(%d+) (%d+) (%d)')
   f, b = tonumber(f), tonumber(b)
   if not f or f + b < 1 then local n = width >= 13 and 2 or 1; return n, n, false, nil end
@@ -122,6 +140,104 @@ local function collect()
   return list
 end
 
+-- The road surfaces in the runs they are built in: pieces that run on into each other, one after the other.
+-- Two pieces are joined only when each is the other's straightest way on, so at a fork neither branch is taken.
+local function joinRuns(list)
+  local info, cells = {}, {}
+  local function cellOf(p) return math.floor(p.x / 2) .. ':' .. math.floor(p.y / 2) end
+  for _, name in ipairs(list) do
+    local r = scenetree.findObject(name)
+    local n = r and r:getNodeCount() or 0
+    if n >= 2 then
+      local a, a2, z2, z = r:getNodePosition(0), r:getNodePosition(1), r:getNodePosition(n - 2), r:getNodePosition(n - 1)
+      local da, dz = a2 - a, z - z2
+      da.z, dz.z = 0, 0
+      local la, lz = da:length(), dz:length()
+      if la > 0.01 and lz > 0.01 then
+        local ok, note = lanesNote(r)
+        local it = { name = name, a = a, z = z, da = da / la, dz = dz / lz, width = r:getNodeWidth(math.floor(n / 2)),
+          note = tostring(ok and note or ''), len = (z - a):length() }
+        info[name] = it
+        local c = cellOf(a)
+        cells[c] = cells[c] or {}
+        table.insert(cells[c], it)
+      end
+    end
+  end
+  -- each piece's straightest way on, and each piece's straightest way in
+  local bestOn, bestIn = {}, {}
+  for _, name in ipairs(list) do
+    local A = info[name]
+    if A then
+      local cx, cy = math.floor(A.z.x / 2), math.floor(A.z.y / 2)
+      for ix = cx - 1, cx + 1 do
+        for iy = cy - 1, cy + 1 do
+          for _, B in ipairs(cells[ix .. ':' .. iy] or {}) do
+            if B ~= A and (B.a - A.z):length() <= JOIN_END_M and math.abs(B.width - A.width) <= JOIN_WIDTH_M and B.note == A.note then
+              local turn = A.dz.x * B.da.x + A.dz.y * B.da.y
+              if turn >= JOIN_TURN_COS then
+                if not bestOn[A.name] or turn > bestOn[A.name].turn then bestOn[A.name] = { to = B.name, turn = turn } end
+                if not bestIn[B.name] or turn > bestIn[B.name].turn then bestIn[B.name] = { from = A.name, turn = turn } end
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+  local nextOf, hasPrev = {}, {}
+  for name, on in pairs(bestOn) do
+    if bestIn[on.to] and bestIn[on.to].from == name then nextOf[name] = on.to; hasPrev[on.to] = true end
+  end
+  local runs, used = {}, {}
+  local function walk(first)
+    local run, len, name = {}, 0, first
+    while name and not used[name] do
+      used[name] = true
+      local l = info[name] and info[name].len or 0
+      if #run > 0 and len + l > JOIN_LENGTH_M then runs[#runs + 1] = run; run, len = {}, 0 end
+      run[#run + 1] = name
+      len = len + l
+      name = nextOf[name]
+    end
+    if #run > 0 then runs[#runs + 1] = run end
+  end
+  for _, name in ipairs(list) do if not hasPrev[name] then walk(name) end end
+  for _, name in ipairs(list) do if not used[name] then walk(name) end end   -- (a ring of pieces has no first one)
+  return runs
+end
+
+-- Of a road's points, the ones its shape needs: the ends, and any point the line between its neighbours would
+-- miss by more than THIN_SIDE_M sideways or THIN_HEIGHT_M in height, and one at least every THIN_GAP_M.
+local function thinned(pts)
+  local n = #pts
+  if n <= 2 then return pts end
+  local keep = { [1] = true, [n] = true }
+  local stack = { { 1, n } }
+  while #stack > 0 do
+    local i, j = stack[#stack][1], stack[#stack][2]
+    stack[#stack] = nil
+    if j - i >= 2 then
+      local a, b = pts[i], pts[j]
+      local ax, ay, az = b.x - a.x, b.y - a.y, b.z - a.z
+      local l2 = ax * ax + ay * ay + az * az
+      local worst, at = 0, nil
+      for k = i + 1, j - 1 do
+        local p = pts[k]
+        local t = l2 > 0 and ((p.x - a.x) * ax + (p.y - a.y) * ay + (p.z - a.z) * az) / l2 or 0
+        local dx, dy, dz = p.x - (a.x + ax * t), p.y - (a.y + ay * t), p.z - (a.z + az * t)
+        local s = math.max(math.sqrt(dx * dx + dy * dy) / THIN_SIDE_M, math.abs(dz) / THIN_HEIGHT_M)
+        if s > worst then worst, at = s, k end
+      end
+      if worst <= 1 and l2 > THIN_GAP_M * THIN_GAP_M then at = math.floor((i + j) / 2) elseif worst <= 1 then at = nil end
+      if at then keep[at] = true; stack[#stack + 1] = { i, at }; stack[#stack + 1] = { at, j } end
+    end
+  end
+  local out = {}
+  for i = 1, n do if keep[i] then out[#out + 1] = pts[i] end end
+  return out
+end
+
 -- MapNG's own surface and paint for a road that now has a Hero Road: hidden, kept for traffic.
 local function hideLayers(baseName)
   local prefix = baseName and baseName:match('^(dr_.*_s%d+_)b$')
@@ -133,8 +249,8 @@ end
 
 local function groundAt(x, y) return core_terrain.getTerrainHeight(vec3(x, y, 0)) end
 
--- One MapNG road surface -> one Hero Road as wide as it, or nil and why.
-local function buildOne(name)
+-- One MapNG road surface's line on the ground, with its width and lanes, or nil and why.
+local function readSurface(name)
   local road = scenetree.findObject(name)
   if not road or road:getNodeCount() < 2 then return nil, 'too short' end
   if not paved(road) then return nil, 'not paved' end
@@ -159,8 +275,20 @@ local function buildOne(name)
     end
   end
   if #line < 2 then return nil, 'too short' end
+  return { name = name, road = road, line = line, width = width }
+end
 
-  gm.addNewGroup('MapNG ' .. name:sub(4))
+-- A run of MapNG road surfaces that run on into each other -> one Hero Road as wide as they are.
+local function buildRun(parts)
+  local name, road, width = parts[1].name, parts[1].road, parts[1].width
+  local half = width / 2
+  local line = {}
+  for k, part in ipairs(parts) do
+    -- (the point two pieces share is taken once)
+    for i = (k > 1 and 2 or 1), #part.line do line[#line + 1] = part.line[i] end
+  end
+
+  gm.addNewGroup('MapNG ' .. name:sub(4) .. (#parts > 1 and (' +' .. (#parts - 1)) or ''))
   local groups = gm.getGroups()
   local g = groups[#groups]
   -- The lanes each way are OpenStreetMap's (MapNG writes them on the road surface as "forward backward
@@ -197,8 +325,12 @@ local function buildOne(name)
       local h = groundAt(line[i].x + nx * half * o, line[i].y + ny * half * o)
       if h and h > top and h - line[i].z < OVER_GROUND_M * 2 then top = h end
     end
-    nodes[i] = vec3(line[i].x, line[i].y, top + fall + CLEAR_M)
+    -- (thinning lets the line pass up to THIN_HEIGHT_M under a point left out: that much is added)
+    nodes[i] = vec3(line[i].x, line[i].y, top + fall + CLEAR_M + THIN_HEIGHT_M)
   end
+  nodesRead = nodesRead + #nodes
+  nodes = thinned(nodes)
+  nodesKept = nodesKept + #nodes
 
   g.nodes, g.widths, g.nmls = nodes, {}, {}
   for i = 1, #nodes do g.widths[i] = width; g.nmls[i] = vec3(0, 0, 1) end
@@ -213,12 +345,28 @@ local function buildOne(name)
   -- that stopped responding. A piece a metre along, and a metre or so across.
   g.lonRes = LON_PIECES
   g.latRes = math.max(2, math.min(8, math.ceil(width / 2 / 1.2)))
-  g.mapngSource = name         -- (which MapNG road it stands for)
+  g.mapngSources = {}          -- (which MapNG road surfaces it stands for)
+  for k, part in ipairs(parts) do g.mapngSources[k] = part.name end
   gm.ensureCornerArray(g)
   g.isDirty = true
   local key = forward .. '+' .. backward
   lanesSeen[key] = (lanesSeen[key] or 0) + 1
   return g
+end
+
+-- A run from joinRuns -> its Hero Roads: one, or more where a piece in it is left as it is (a bridge, a tunnel).
+local function buildOne(run)
+  local made, parts = {}, {}
+  local function flush()
+    if #parts > 0 then made[#made + 1] = buildRun(parts) end
+    parts = {}
+  end
+  for _, name in ipairs(run) do
+    local part = readSurface(name)
+    if part then parts[#parts + 1] = part else skipped = skipped + 1; flush() end
+  end
+  flush()
+  return made
 end
 
 -- Build the roads marked dirty. The editor's code has the engine take up the whole level's collision again after
@@ -272,10 +420,13 @@ local function start()
       return t
     end
   end
-  queue = collect()
+  local list = collect()
+  surfaces = #list
+  queue = joinRuns(list)
   at, built, skipped, failed, firstError, lanesSeen = 0, 0, 0, 0, nil, {}
+  nodesRead, nodesKept = 0, 0
   t0 = os.clock()
-  log('I', 'mapngHeroRoads', string.format('Building Hero Roads from %d MapNG road surfaces', #queue))
+  log('I', 'mapngHeroRoads', string.format('Building Hero Roads from %d MapNG road surfaces in %d runs', surfaces, #queue))
   say(string.format('MapNG: building Hero Roads (0/%d)...', #queue), 6)
 end
 
@@ -283,10 +434,9 @@ local function step()
   local made = {}
   while at < #queue and #made < PER_FRAME do
     at = at + 1
-    local ok, g, why = pcall(buildOne, queue[at])
-    if not ok then failed = failed + 1; firstError = firstError or tostring(g)
-    elseif g then made[#made + 1] = g
-    else skipped = skipped + 1 end
+    local ok, gs = pcall(buildOne, queue[at])
+    if not ok then failed = failed + 1; firstError = firstError or tostring(gs)
+    else for _, g in ipairs(gs) do made[#made + 1] = g end end
   end
   if #made > 0 then
     local ok, err = buildDirty()
@@ -294,7 +444,7 @@ local function step()
       built = built + #made
       sinceReload = sinceReload + #made
       if sinceReload >= RELOAD_EVERY then reloadCollision() end
-      for _, g in ipairs(made) do hideLayers(g.mapngSource) end
+      for _, g in ipairs(made) do for _, source in ipairs(g.mapngSources) do hideLayers(source) end end
     else failed = failed + #made; firstError = firstError or tostring(err) end
   end
   if at % 30 < PER_FRAME then say(string.format('MapNG: building Hero Roads (%d/%d)...', at, #queue), 6) end
@@ -305,7 +455,7 @@ local function step()
     local okLift, nLines = pcall(liftLines)
     if not okLift then firstError = firstError or tostring(nLines); nLines = 0 end
     linesLifted = nLines
-    local msg = string.format('MapNG: %d Hero Roads built in %.0f s (%d left as they were, %d failed)', built, os.clock() - t0, skipped, failed)
+    local msg = string.format('MapNG: %d Hero Roads built from %d road pieces in %.0f s (%d left as they were, %d failed)', built, surfaces, os.clock() - t0, skipped, failed)
     log(failed > 0 and 'W' or 'I', 'mapngHeroRoads', msg .. (firstError and (' | first error: ' .. firstError) or ''))
     say(msg, 10)
   end
@@ -337,7 +487,7 @@ M.onUpdate = function()
   if queue then step() end
 end
 
-M.status = function() return { started = started, done = done, total = queue and #queue or 0, at = at, built = built, skipped = skipped, failed = failed, firstError = firstError, lanes = lanesSeen, hiddenLayers = #hiddenByUs, linesLifted = linesLifted } end
+M.status = function() return { started = started, done = done, total = queue and #queue or 0, at = at, built = built, surfaces = surfaces, nodesRead = nodesRead, nodesKept = nodesKept, skipped = skipped, failed = failed, firstError = firstError, lanes = lanesSeen, hiddenLayers = #hiddenByUs, linesLifted = linesLifted } end
 M.remove = remove
 M.rebuild = function() remove(); started, done = false, false end
 
