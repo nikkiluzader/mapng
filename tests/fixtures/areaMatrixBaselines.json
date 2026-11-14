@@ -1,7 +1,7 @@
 {
  "_note": "Area baselines for scripts/sweep/runSweep.mjs: re-record with --save after a change that improves an area (commit the file with it).",
  "recorded": "2026-11-14",
- "commit": "0da37c5",
+ "commit": "71c1b5f",
  "areas": {
   "normandy_flat@gpxz/untouched": {
    "steps": 0,
@@ -25,7 +25,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 3
+   "seconds": 2
   },
   "normandy_flat@gpxz/noshape": {
    "steps": 0,
@@ -149,7 +149,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 5
+   "seconds": 3
   },
   "naldo@gpxz/untouched": {
    "steps": 0,
@@ -173,7 +173,7 @@
    "maxDeckLen": 1102,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 25
+   "seconds": 27
   },
   "naldo@gpxz/noshape": {
    "steps": 0,
@@ -199,7 +199,7 @@
    "maxDeckLen": 1119,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 26
+   "seconds": 29
   },
   "naldo@gpxz/ready": {
    "steps": 0,
@@ -225,7 +225,7 @@
    "maxDeckLen": 1098,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 28
+   "seconds": 30
   },
   "naldo@t30/noshape": {
    "steps": 0,
@@ -249,7 +249,7 @@
    "maxDeckLen": 1139,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 27
+   "seconds": 26
   },
   "naldo@t30/untouched": {
    "steps": 0,
@@ -273,7 +273,7 @@
    "maxDeckLen": 1169,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 25
+   "seconds": 22
   },
   "naldo@t30/ready": {
    "steps": 0,
@@ -297,7 +297,7 @@
    "maxDeckLen": 1098,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 31
+   "seconds": 27
   },
   "kingst@gpxz/noshape": {
    "steps": 0,
@@ -323,7 +323,7 @@
    "maxDeckLen": 505,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 24
+   "seconds": 21
   },
   "kingst@gpxz/untouched": {
    "steps": 0,
@@ -347,7 +347,7 @@
    "maxDeckLen": 505,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 25
+   "seconds": 22
   },
   "kingst@gpxz/ready": {
    "steps": 0,
@@ -373,7 +373,7 @@
    "maxDeckLen": 491,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 28
+   "seconds": 27
   },
   "kingst@t30/untouched": {
    "steps": 0,
@@ -469,7 +469,7 @@
    "maxDeckLen": 575,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 35
+   "seconds": 34
   },
   "deckpark_g@gpxz/noshape": {
    "steps": 1,
@@ -495,7 +495,7 @@
    "maxDeckLen": 561,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 38
+   "seconds": 37
   },
   "deckpark_g@gpxz/ready": {
    "steps": 0,
@@ -521,7 +521,7 @@
    "maxDeckLen": 559,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 42
+   "seconds": 41
   },
   "deckpark_g@t30/noshape": {
    "steps": 0,
@@ -545,7 +545,7 @@
    "maxDeckLen": 570,
    "tunnels": 0,
    "tunnelsLeft": 2,
-   "seconds": 40
+   "seconds": 36
   },
   "deckpark_g@t30/untouched": {
    "steps": 0,
@@ -593,7 +593,7 @@
    "maxDeckLen": 597,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 46
+   "seconds": 42
   },
   "zion@gpxz/ready": {
    "steps": 0,
@@ -619,7 +619,7 @@
    "maxDeckLen": 50,
    "tunnels": 1,
    "tunnelsLeft": 0,
-   "seconds": 7
+   "seconds": 5
   },
   "zion@gpxz/noshape": {
    "steps": 0,
@@ -741,7 +741,7 @@
    "maxDeckLen": 182,
    "tunnels": 0,
    "tunnelsLeft": 1,
-   "seconds": 3
+   "seconds": 4
   },
   "stelvio@gpxz/untouched": {
    "steps": 0,
@@ -756,7 +756,7 @@
    "junctions": 3,
    "creases": 0,
    "swFloat": 420,
-   "swBuried": 389,
+   "swBuried": 392,
    "lintErrors": 0,
    "lintWarnings": 1,
    "decks": 0,
@@ -765,7 +765,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 3
+   "seconds": 4
   },
   "stelvio@gpxz/noshape": {
    "steps": 0,
@@ -779,7 +779,7 @@
    "cross": 4,
    "junctions": 2,
    "creases": 81,
-   "swFloat": 100,
+   "swFloat": 104,
    "swBuried": 22,
    "lintErrors": 0,
    "lintWarnings": 1,
@@ -802,8 +802,8 @@
    "bumps": 3,
    "cross": 4,
    "junctions": 1,
-   "creases": 268,
-   "swFloat": 20,
+   "creases": 265,
+   "swFloat": 16,
    "swBuried": 6,
    "lintErrors": 0,
    "lintWarnings": 1,
@@ -818,7 +818,7 @@
   "stelvio@t30/untouched": {
    "steps": 0,
    "steepStruct": 0,
-   "steepGround": 936,
+   "steepGround": 932,
    "shortX": 0,
    "groundGaps": 0,
    "thruDeck": 0,
@@ -827,8 +827,8 @@
    "cross": 699,
    "junctions": 3,
    "creases": 0,
-   "swFloat": 457,
-   "swBuried": 217,
+   "swFloat": 455,
+   "swBuried": 216,
    "lintErrors": 0,
    "lintWarnings": 1,
    "decks": 0,
@@ -842,7 +842,7 @@
   "stelvio@t30/noshape": {
    "steps": 0,
    "steepStruct": 0,
-   "steepGround": 824,
+   "steepGround": 820,
    "shortX": 0,
    "groundGaps": 0,
    "thruDeck": 0,
@@ -851,7 +851,7 @@
    "cross": 0,
    "junctions": 2,
    "creases": 52,
-   "swFloat": 84,
+   "swFloat": 90,
    "swBuried": 15,
    "lintErrors": 0,
    "lintWarnings": 1,
@@ -866,7 +866,7 @@
   "stelvio@t30/ready": {
    "steps": 0,
    "steepStruct": 0,
-   "steepGround": 651,
+   "steepGround": 649,
    "shortX": 0,
    "groundGaps": 0,
    "thruDeck": 0,
@@ -874,8 +874,8 @@
    "bumps": 10,
    "cross": 1,
    "junctions": 2,
-   "creases": 261,
-   "swFloat": 10,
+   "creases": 260,
+   "swFloat": 9,
    "swBuried": 0,
    "lintErrors": 0,
    "lintWarnings": 1,
@@ -909,7 +909,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 1,
-   "seconds": 14
+   "seconds": 11
   },
   "w_sf_russian@gpxz/noshape": {
    "steps": 0,
@@ -935,7 +935,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 1,
-   "seconds": 13
+   "seconds": 10
   },
   "w_sf_russian@gpxz/ready": {
    "steps": 0,
@@ -961,7 +961,7 @@
    "maxDeckLen": 175,
    "tunnels": 0,
    "tunnelsLeft": 1,
-   "seconds": 15
+   "seconds": 13
   },
   "w_sf_russian@t30/noshape": {
    "steps": 0,
@@ -985,7 +985,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 1,
-   "seconds": 12
+   "seconds": 13
   },
   "w_sf_russian@t30/untouched": {
    "steps": 0,
@@ -1033,7 +1033,7 @@
    "maxDeckLen": 175,
    "tunnels": 0,
    "tunnelsLeft": 1,
-   "seconds": 12
+   "seconds": 15
   },
   "w_barcelona@gpxz/noshape": {
    "steps": 0,
@@ -1057,7 +1057,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 19
+   "seconds": 15
   },
   "w_barcelona@gpxz/untouched": {
    "steps": 0,
@@ -1081,7 +1081,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 19
+   "seconds": 17
   },
   "w_barcelona@gpxz/ready": {
    "steps": 0,
@@ -1105,7 +1105,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 19
+   "seconds": 18
   },
   "w_barcelona@t30/noshape": {
    "steps": 0,
@@ -1129,7 +1129,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 17
+   "seconds": 16
   },
   "w_barcelona@t30/ready": {
    "steps": 0,
@@ -1153,7 +1153,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 18
+   "seconds": 16
   },
   "w_barcelona@t30/untouched": {
    "steps": 0,
@@ -1203,7 +1203,7 @@
    "maxDeckLen": 249,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 14
+   "seconds": 15
   },
   "w_amsterdam@gpxz/untouched": {
    "steps": 0,
@@ -1227,7 +1227,7 @@
    "maxDeckLen": 310,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 14
+   "seconds": 15
   },
   "w_amsterdam@gpxz/ready": {
    "steps": 0,
@@ -1236,13 +1236,13 @@
    "shortX": 0,
    "groundGaps": 0,
    "thruDeck": 43,
-   "spikes": 254,
+   "spikes": 256,
    "bumps": 7,
    "cross": 67,
    "junctions": 1,
    "creases": 74,
    "swFloat": 182,
-   "swBuried": 3250,
+   "swBuried": 3247,
    "snapMovedPct": 0,
    "snapP90cm": 0,
    "lintErrors": 0,
@@ -1253,7 +1253,7 @@
    "maxDeckLen": 163,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 15
+   "seconds": 16
   },
   "w_amsterdam@t30/ready": {
    "steps": 0,
@@ -1262,13 +1262,13 @@
    "shortX": 0,
    "groundGaps": 0,
    "thruDeck": 37,
-   "spikes": 241,
+   "spikes": 243,
    "bumps": 12,
    "cross": 62,
    "junctions": 1,
    "creases": 63,
    "swFloat": 18,
-   "swBuried": 2661,
+   "swBuried": 2660,
    "lintErrors": 0,
    "lintWarnings": 3,
    "decks": 45,
@@ -1277,7 +1277,7 @@
    "maxDeckLen": 151,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 14
+   "seconds": 15
   },
   "w_amsterdam@t30/untouched": {
    "steps": 0,
@@ -1301,7 +1301,7 @@
    "maxDeckLen": 208,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 14
+   "seconds": 16
   },
   "w_amsterdam@t30/noshape": {
    "steps": 0,
@@ -1325,7 +1325,7 @@
    "maxDeckLen": 212,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 15
+   "seconds": 16
   },
   "val_disere@gpxz/ready": {
    "steps": 0,
@@ -1336,11 +1336,11 @@
    "thruDeck": 5,
    "spikes": 29,
    "bumps": 22,
-   "cross": 33,
+   "cross": 31,
    "junctions": 6,
-   "creases": 1072,
-   "swFloat": 106,
-   "swBuried": 212,
+   "creases": 1073,
+   "swFloat": 100,
+   "swBuried": 215,
    "snapMovedPct": 13,
    "snapP90cm": 83,
    "lintErrors": 0,
@@ -1364,9 +1364,9 @@
    "bumps": 36,
    "cross": 556,
    "junctions": 5,
-   "creases": 533,
-   "swFloat": 3657,
-   "swBuried": 1578,
+   "creases": 551,
+   "swFloat": 3793,
+   "swBuried": 1589,
    "lintErrors": 0,
    "lintWarnings": 1,
    "decks": 8,
@@ -1388,9 +1388,9 @@
    "bumps": 38,
    "cross": 325,
    "junctions": 4,
-   "creases": 845,
-   "swFloat": 557,
-   "swBuried": 129,
+   "creases": 846,
+   "swFloat": 574,
+   "swBuried": 130,
    "snapMovedPct": 13,
    "snapP90cm": 83,
    "lintErrors": 0,
@@ -1415,8 +1415,8 @@
    "cross": 1178,
    "junctions": 7,
    "creases": 0,
-   "swFloat": 6442,
-   "swBuried": 2336,
+   "swFloat": 6454,
+   "swBuried": 2345,
    "lintErrors": 0,
    "lintWarnings": 1,
    "decks": 3,
@@ -1425,7 +1425,7 @@
    "maxDeckLen": 110,
    "tunnels": 0,
    "tunnelsLeft": 2,
-   "seconds": 8
+   "seconds": 9
   },
   "val_disere@t30/noshape": {
    "steps": 0,
@@ -1439,7 +1439,7 @@
    "cross": 26,
    "junctions": 6,
    "creases": 224,
-   "swFloat": 1179,
+   "swFloat": 1177,
    "swBuried": 104,
    "lintErrors": 0,
    "lintWarnings": 1,
@@ -1449,7 +1449,7 @@
    "maxDeckLen": 110,
    "tunnels": 0,
    "tunnelsLeft": 2,
-   "seconds": 9
+   "seconds": 10
   },
   "val_disere@t30/ready": {
    "steps": 0,
@@ -1463,8 +1463,8 @@
    "cross": 89,
    "junctions": 9,
    "creases": 605,
-   "swFloat": 258,
-   "swBuried": 258,
+   "swFloat": 263,
+   "swBuried": 263,
    "lintErrors": 0,
    "lintWarnings": 1,
    "decks": 2,
@@ -1473,7 +1473,7 @@
    "maxDeckLen": 17,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 11
+   "seconds": 12
   },
   "gt_chevril@gpxz/untouched": {
    "steps": 2,
@@ -1484,9 +1484,9 @@
    "thruDeck": 7,
    "spikes": 188,
    "bumps": 51,
-   "cross": 305,
+   "cross": 315,
    "junctions": 2,
-   "creases": 1114,
+   "creases": 1112,
    "swFloat": 1734,
    "swBuried": 709,
    "lintErrors": 0,
@@ -1497,7 +1497,7 @@
    "maxDeckLen": 57,
    "tunnels": 2,
    "tunnelsLeft": 1,
-   "seconds": 8
+   "seconds": 6
   },
   "gt_chevril@gpxz/noshape": {
    "steps": 1,
@@ -1510,11 +1510,11 @@
    "bumps": 22,
    "cross": 94,
    "junctions": 2,
-   "creases": 1178,
-   "swFloat": 115,
+   "creases": 1192,
+   "swFloat": 116,
    "swBuried": 55,
    "snapMovedPct": 10,
-   "snapP90cm": 51,
+   "snapP90cm": 53,
    "lintErrors": 0,
    "lintWarnings": 1,
    "decks": 3,
@@ -1523,7 +1523,7 @@
    "maxDeckLen": 57,
    "tunnels": 2,
    "tunnelsLeft": 1,
-   "seconds": 8
+   "seconds": 6
   },
   "gt_chevril@gpxz/ready": {
    "steps": 0,
@@ -1532,15 +1532,15 @@
    "shortX": 1,
    "groundGaps": 5,
    "thruDeck": 8,
-   "spikes": 243,
+   "spikes": 252,
    "bumps": 14,
-   "cross": 32,
+   "cross": 34,
    "junctions": 2,
-   "creases": 1258,
+   "creases": 1266,
    "swFloat": 116,
    "swBuried": 25,
    "snapMovedPct": 10,
-   "snapP90cm": 51,
+   "snapP90cm": 53,
    "lintErrors": 0,
    "lintWarnings": 1,
    "decks": 3,
@@ -1549,18 +1549,18 @@
    "maxDeckLen": 76,
    "tunnels": 2,
    "tunnelsLeft": 1,
-   "seconds": 10
+   "seconds": 7
   },
   "gt_chevril@t30/untouched": {
    "steps": 0,
    "steepStruct": 58,
-   "steepGround": 1584,
+   "steepGround": 1580,
    "shortX": 1,
    "groundGaps": 13,
    "thruDeck": 2,
    "spikes": 0,
-   "bumps": 110,
-   "cross": 1295,
+   "bumps": 109,
+   "cross": 1294,
    "junctions": 7,
    "creases": 8,
    "swFloat": 3907,
@@ -1578,17 +1578,17 @@
   "gt_chevril@t30/noshape": {
    "steps": 0,
    "steepStruct": 85,
-   "steepGround": 1492,
+   "steepGround": 1488,
    "shortX": 1,
    "groundGaps": 5,
    "thruDeck": 0,
    "spikes": 0,
-   "bumps": 68,
+   "bumps": 67,
    "cross": 267,
    "junctions": 7,
-   "creases": 628,
-   "swFloat": 1268,
-   "swBuried": 988,
+   "creases": 662,
+   "swFloat": 1270,
+   "swBuried": 986,
    "lintErrors": 0,
    "lintWarnings": 1,
    "decks": 2,
@@ -1602,17 +1602,17 @@
   "gt_chevril@t30/ready": {
    "steps": 0,
    "steepStruct": 54,
-   "steepGround": 695,
+   "steepGround": 693,
    "shortX": 0,
    "groundGaps": 4,
    "thruDeck": 0,
-   "spikes": 209,
-   "bumps": 33,
-   "cross": 242,
+   "spikes": 204,
+   "bumps": 31,
+   "cross": 246,
    "junctions": 6,
-   "creases": 1057,
-   "swFloat": 1104,
-   "swBuried": 807,
+   "creases": 1054,
+   "swFloat": 1102,
+   "swBuried": 810,
    "lintErrors": 0,
    "lintWarnings": 1,
    "decks": 4,
@@ -1845,7 +1845,7 @@
    "maxDeckLen": 1114,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 27
+   "seconds": 30
   },
   "kingst@mh/noshape": {
    "steps": 0,
@@ -1871,7 +1871,7 @@
    "maxDeckLen": 505,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 22
+   "seconds": 23
   },
   "kingst@mh/untouched": {
    "steps": 0,
@@ -1895,7 +1895,7 @@
    "maxDeckLen": 505,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 20
+   "seconds": 21
   },
   "kingst@mh/ready": {
    "steps": 0,
@@ -1921,7 +1921,7 @@
    "maxDeckLen": 491,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 24
+   "seconds": 26
   },
   "deckpark_g@mh/noshape": {
    "steps": 1,
@@ -1947,7 +1947,7 @@
    "maxDeckLen": 561,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 37
+   "seconds": 35
   },
   "deckpark_g@mh/untouched": {
    "steps": 4,
@@ -1971,7 +1971,7 @@
    "maxDeckLen": 575,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 38
+   "seconds": 36
   },
   "deckpark_g@mh/ready": {
    "steps": 0,
@@ -1997,7 +1997,7 @@
    "maxDeckLen": 559,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 43
+   "seconds": 42
   },
   "zion@mh/noshape": {
    "steps": 0,
@@ -2023,7 +2023,7 @@
    "maxDeckLen": 64,
    "tunnels": 0,
    "tunnelsLeft": 1,
-   "seconds": 3
+   "seconds": 4
   },
   "zion@mh/ready": {
    "steps": 0,
@@ -2084,11 +2084,11 @@
    "thruDeck": 0,
    "spikes": 0,
    "bumps": 23,
-   "cross": 285,
+   "cross": 297,
    "junctions": 1,
-   "creases": 444,
-   "swFloat": 172,
-   "swBuried": 112,
+   "creases": 440,
+   "swFloat": 181,
+   "swBuried": 113,
    "lintErrors": 0,
    "lintWarnings": 1,
    "decks": 0,
@@ -2097,12 +2097,12 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 4
+   "seconds": 5
   },
   "stelvio@mh/noshape": {
    "steps": 0,
    "steepStruct": 0,
-   "steepGround": 293,
+   "steepGround": 292,
    "shortX": 0,
    "groundGaps": 0,
    "thruDeck": 0,
@@ -2110,11 +2110,11 @@
    "bumps": 24,
    "cross": 169,
    "junctions": 1,
-   "creases": 433,
+   "creases": 455,
    "swFloat": 48,
    "swBuried": 17,
-   "snapMovedPct": 11,
-   "snapP90cm": 63,
+   "snapMovedPct": 14,
+   "snapP90cm": 77,
    "lintErrors": 0,
    "lintWarnings": 1,
    "decks": 0,
@@ -2123,7 +2123,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 4
+   "seconds": 6
   },
   "stelvio@mh/ready": {
    "steps": 0,
@@ -2136,11 +2136,11 @@
    "bumps": 10,
    "cross": 0,
    "junctions": 2,
-   "creases": 597,
-   "swFloat": 3,
-   "swBuried": 1,
-   "snapMovedPct": 11,
-   "snapP90cm": 63,
+   "creases": 609,
+   "swFloat": 2,
+   "swBuried": 3,
+   "snapMovedPct": 14,
+   "snapP90cm": 77,
    "lintErrors": 0,
    "lintWarnings": 1,
    "decks": 0,
@@ -2149,7 +2149,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 5
+   "seconds": 6
   },
   "w_sf_russian@mh/noshape": {
    "steps": 0,
@@ -2175,7 +2175,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 1,
-   "seconds": 12
+   "seconds": 10
   },
   "w_sf_russian@mh/ready": {
    "steps": 0,
@@ -2225,7 +2225,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 1,
-   "seconds": 10
+   "seconds": 11
   },
   "w_barcelona@mh/ready": {
    "steps": 0,
@@ -2275,7 +2275,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 19
+   "seconds": 18
   },
   "w_barcelona@mh/noshape": {
    "steps": 0,
@@ -2301,7 +2301,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 19
+   "seconds": 18
   },
   "w_amsterdam@mh/ready": {
    "steps": 0,
@@ -2310,13 +2310,13 @@
    "shortX": 0,
    "groundGaps": 0,
    "thruDeck": 28,
-   "spikes": 278,
+   "spikes": 280,
    "bumps": 6,
    "cross": 70,
    "junctions": 1,
    "creases": 69,
    "swFloat": 25,
-   "swBuried": 3435,
+   "swBuried": 3434,
    "snapMovedPct": 0,
    "snapP90cm": 0,
    "lintErrors": 0,
@@ -2327,7 +2327,7 @@
    "maxDeckLen": 167,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 16
+   "seconds": 13
   },
   "w_amsterdam@mh/noshape": {
    "steps": 0,
@@ -2353,7 +2353,7 @@
    "maxDeckLen": 95,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 16
+   "seconds": 14
   },
   "w_amsterdam@mh/untouched": {
    "steps": 0,
@@ -2377,7 +2377,7 @@
    "maxDeckLen": 107,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 15
+   "seconds": 13
   },
   "normandy_flat@mh/ready": {
    "steps": 0,
@@ -2427,7 +2427,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 5
+   "seconds": 3
   },
   "normandy_flat@mh/noshape": {
    "steps": 0,
@@ -2453,7 +2453,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 5
+   "seconds": 3
   },
   "val_disere@mh/untouched": {
    "steps": 2,
@@ -2464,11 +2464,11 @@
    "thruDeck": 3,
    "spikes": 3,
    "bumps": 30,
-   "cross": 509,
+   "cross": 510,
    "junctions": 5,
-   "creases": 647,
-   "swFloat": 3102,
-   "swBuried": 1635,
+   "creases": 657,
+   "swFloat": 3167,
+   "swBuried": 1643,
    "lintErrors": 0,
    "lintWarnings": 1,
    "decks": 8,
@@ -2477,7 +2477,7 @@
    "maxDeckLen": 24,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 8
+   "seconds": 9
   },
   "val_disere@mh/noshape": {
    "steps": 2,
@@ -2490,9 +2490,9 @@
    "bumps": 29,
    "cross": 291,
    "junctions": 4,
-   "creases": 911,
-   "swFloat": 423,
-   "swBuried": 108,
+   "creases": 915,
+   "swFloat": 431,
+   "swBuried": 111,
    "snapMovedPct": 14,
    "snapP90cm": 86,
    "lintErrors": 0,
@@ -2516,9 +2516,9 @@
    "bumps": 18,
    "cross": 25,
    "junctions": 6,
-   "creases": 1085,
-   "swFloat": 100,
-   "swBuried": 216,
+   "creases": 1086,
+   "swFloat": 91,
+   "swBuried": 217,
    "snapMovedPct": 14,
    "snapP90cm": 86,
    "lintErrors": 0,
@@ -2529,7 +2529,7 @@
    "maxDeckLen": 35,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 11
+   "seconds": 10
   },
   "gt_chevril@mh/noshape": {
    "steps": 1,
@@ -2542,11 +2542,11 @@
    "bumps": 14,
    "cross": 87,
    "junctions": 3,
-   "creases": 1184,
+   "creases": 1201,
    "swFloat": 87,
    "swBuried": 53,
-   "snapMovedPct": 11,
-   "snapP90cm": 62,
+   "snapMovedPct": 12,
+   "snapP90cm": 66,
    "lintErrors": 0,
    "lintWarnings": 1,
    "decks": 2,
@@ -2555,7 +2555,7 @@
    "maxDeckLen": 24,
    "tunnels": 2,
    "tunnelsLeft": 1,
-   "seconds": 7
+   "seconds": 6
   },
   "gt_chevril@mh/untouched": {
    "steps": 3,
@@ -2566,10 +2566,10 @@
    "thruDeck": 18,
    "spikes": 102,
    "bumps": 17,
-   "cross": 261,
+   "cross": 273,
    "junctions": 2,
-   "creases": 1142,
-   "swFloat": 1540,
+   "creases": 1146,
+   "swFloat": 1538,
    "swBuried": 692,
    "lintErrors": 0,
    "lintWarnings": 1,
@@ -2588,15 +2588,15 @@
    "shortX": 1,
    "groundGaps": 11,
    "thruDeck": 0,
-   "spikes": 156,
+   "spikes": 181,
    "bumps": 9,
-   "cross": 35,
+   "cross": 36,
    "junctions": 3,
-   "creases": 1234,
+   "creases": 1236,
    "swFloat": 99,
    "swBuried": 21,
-   "snapMovedPct": 11,
-   "snapP90cm": 62,
+   "snapMovedPct": 12,
+   "snapP90cm": 66,
    "lintErrors": 0,
    "lintWarnings": 1,
    "decks": 2,

@@ -70,6 +70,7 @@ export function parseRoadWidthMeters(value) {
 // outside the edge line that are usual there)
 export const LANE_WIDTH_TAG = 'mapng:lane_width';
 export const EDGE_STRIP_TAG = 'mapng:edge_strip';
+export const SINGLE_LANE_TAG = 'mapng:single_lane_min';
 const tagMetres = (tags, key) => { const v = Number(tags?.[key]); return Number.isFinite(v) && v >= 0 ? v : null; };
 
 export function getDefaultLaneWidthMeters(highway, tags = null) {
@@ -166,7 +167,7 @@ export function estimateRoadHalfWidth(tags = {}, highway, isOneWay = false, fall
   // (one lane for both directions, a single-track road: a little wider than a marked lane)
   const singleTrack = taggedLanes === 1 && !isOneWay;
   const estimatedHalf = singleTrack
-    ? Math.max(SINGLE_TRACK_MIN_M, getDefaultLaneWidthMeters(highway, tags) + SINGLE_TRACK_EXTRA_M) / 2
+    ? Math.max(tagMetres(tags, SINGLE_LANE_TAG) || SINGLE_TRACK_MIN_M, getDefaultLaneWidthMeters(highway, tags) + SINGLE_TRACK_EXTRA_M) / 2
     : (inferredLanes * getDefaultLaneWidthMeters(highway, tags)) / 2;
   // lanes counted by the mapper are kept: the class maximum is for roads with no count (a
   // six-lane primary squeezed into 12 m had 2 m lanes), up to TAGGED_LANES_MAX of them

@@ -111,29 +111,40 @@ test('a measurement wider than the class is not taken; a tagged lane count wins 
   assert.equal(2 * estimateRoadHalfWidth({ lanes: '6' }, 'primary', false), 21);
 });
 
-test('outside the Americas a road with no width gets narrower lanes and a narrow edge strip', async () => {
+test("the road width library: a country's figures, its region's where it has none, MapNG's usual ones last", async () => {
   const { applyRegionalWidths } = await import('../services/regionalWidths.js');
+  const { ROAD_WIDTH_STANDARDS, widthStandardFor } = await import('../services/roadWidthStandards.js');
   const { estimateRoadHalfWidth, estimateRoadCrossSection } = await import('../services/roadWidth.js');
   const road = (tags) => ({ type: 'road', tags, geometry: [] });
+  const lanes = (f) => 2 * estimateRoadHalfWidth(f.tags, f.tags.highway, false);
   const surface = (f) => { const cs = estimateRoadCrossSection(f.tags, f.tags.highway, false, { urban: false }); return 2 * cs.drivingHalfWidth + cs.leftExtra + cs.rightExtra; };
-  const gb = [road({ highway: 'primary' }), road({ highway: 'tertiary' }), road({ highway: 'primary', width: '8' }), road({ highway: 'trunk' })];
-  assert.equal(applyRegionalWidths(gb, { countryCode: 'GB', region: 'Europe' }), 4);
-  assert.equal(2 * estimateRoadHalfWidth(gb[0].tags, 'primary', false), 6);
-  assert.equal(surface(gb[0]), 6.5, 'a British A road: 9 m before');
-  const lane = [road({ highway: 'unclassified', lanes: '1' })];
-  applyRegionalWidths(lane, { countryCode: 'GB', region: 'Europe' });
-  assert.equal(2 * estimateRoadHalfWidth(lane[0].tags, 'unclassified', false), 3.5, 'a single-lane road is never under 3.5 m');
-  assert.equal(2 * estimateRoadHalfWidth(gb[1].tags, 'tertiary', false), 5.5);
-  assert.equal(2 * estimateRoadHalfWidth(gb[2].tags, 'primary', false), 8, 'a mapped width stays');
-  assert.equal(2 * estimateRoadHalfWidth(gb[3].tags, 'trunk', false), 14.8, 'trunk lanes as before');
-  // the Americas, and a place whose country is not known: as before
-  for (const rules of [{ countryCode: 'US', region: 'Americas' }, null]) {
-    const us = [road({ highway: 'primary' })];
-    assert.equal(applyRegionalWidths(us, rules), 0);
-    assert.equal(surface(us[0]), 9);
+  const built = (code, region, tags) => { const f = road(tags); applyRegionalWidths([f], code ? { countryCode: code, region } : null); return f; };
+  // a British A road: 9 m before any of this; the library gives 6 m (testers measured 5.5 to 6.5 m)
+  assert.equal(surface(built('GB', 'Europe', { highway: 'primary' })), 6);
+  assert.equal(lanes(built('GB', 'Europe', { highway: 'primary', width: '8' })), 8, 'a mapped width stays');
+  // Poland: a voivodeship road 6.5 m of asphalt (measured 6.45 m), a national road wider
+  assert.equal(surface(built('PL', 'Europe', { highway: 'secondary' })), 6.5);
+  assert.equal(surface(built('PL', 'Europe', { highway: 'primary' })), 7.5);
+  // Germany: RQ 11 is 8 m, a county road 6 m
+  assert.equal(surface(built('DE', 'Europe', { highway: 'primary' })), 8);
+  assert.equal(surface(built('DE', 'Europe', { highway: 'tertiary' })), 6);
+  // a single-lane road: 3.5 m, Russia's 4.5 m
+  assert.equal(lanes(built('PL', 'Europe', { highway: 'unclassified', lanes: '1' })), 3.5);
+  assert.equal(lanes(built('RU', 'Europe', { highway: 'unclassified', lanes: '1' })), 4.5);
+  // a country not in the library: its region's figures; the Americas outside it and an unknown place: as before
+  assert.equal(surface(built('ES', 'Europe', { highway: 'primary' })), 6.5);
+  assert.equal(surface(built('MX', 'Americas', { highway: 'primary' })), 9);
+  assert.equal(surface(built(null, null, { highway: 'primary' })), 9);
+  assert.equal(surface(built('US', 'Americas', { highway: 'primary' })), 9, 'the United States: MapNG\'s usual figures');
+  assert.equal(widthStandardFor({ countryCode: 'ES', region: 'Europe' }).from, 'region');
+  // every entry is whole: each class a lane, an edge default, a source
+  for (const [code, e] of Object.entries(ROAD_WIDTH_STANDARDS)) {
+    for (const c of ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'unclassified', 'residential']) assert.ok(e.lanes[c] >= 2.5 && e.lanes[c] <= 3.75, `${code} ${c}`);
+    assert.ok(e.edge.default >= 0 && e.sources.length && e.classes && ['high', 'medium', 'low'].includes(e.confidence), code);
   }
   // applied twice changes nothing more
-  assert.equal(applyRegionalWidths(gb, { countryCode: 'GB', region: 'Europe' }), 0);
+  const twice = [built('GB', 'Europe', { highway: 'primary' })];
+  assert.equal(applyRegionalWidths(twice, { countryCode: 'GB', region: 'Europe' }), 0);
 });
 
 test('with no tile budget every road is measured, a batch of pictures at a time', async () => {
