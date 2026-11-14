@@ -7,6 +7,8 @@ for _, name in ipairs(scenetree.findClassObjects('DecalRoad')) do if name:match(
     for i = 0, nc - 2 do local a, b = o:getNodePosition(i), o:getNodePosition(i+1); local len = (b - a):length(); local d = carry
       while d < len do local p = a + (b - a) * (d / len)
         local hit = castRay(vec3(p.x, p.y, p.z + 1.6), vec3(p.x, p.y, p.z - 3), true, true)
+        -- (something well over the road that is no deck: a bridge of another level, a tree, a sign. Looked under.)
+        if hit and hit.pt and hit.pt.z > p.z + 0.9 and not (hit.obj and hit.obj:getClassName() == 'MeshRoad') then local low = castRay(vec3(p.x, p.y, p.z + 0.8), vec3(p.x, p.y, p.z - 3), true, true) if low and low.pt then hit = low end end
         local z, c, n = -999, 0, 0
         if hit and hit.pt then z = hit.pt.z; local cls = hit.obj and hit.obj:getClassName() or '?'; c = (cls == 'MeshRoad' and 1) or (cls == 'TerrainBlock' and 2) or 3; n = idx(hit.obj and hit.obj:getName() or '?') end
         pts[#pts+1] = {math.floor(p.x*100+0.5)/100, math.floor(p.y*100+0.5)/100, math.floor(z*1000+0.5)/1000, c, n, math.floor(core_terrain.getTerrainHeight(vec3(p.x,p.y,0))*1000+0.5)/1000, math.floor(p.z*1000+0.5)/1000}

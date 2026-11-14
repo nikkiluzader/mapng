@@ -1,7 +1,7 @@
 {
  "_note": "Mesh Roads in-game baselines (scripts/ingame/meshRoadProfile.mjs --save): places with a step over 8 cm and 3 cm, and road samples with no deck.",
  "recorded": "2026-11-14",
- "commit": "dc1f3ec",
+ "commit": "c06d828",
  "areas": {
   "lcc": {
    "terrain": "gpxz",
@@ -20,7 +20,7 @@
   "nad_rotary": {
    "terrain": "gpxz",
    "steps8": 3,
-   "steps3": 48,
+   "steps3": 46,
    "bareRoad": 25,
    "kinds": {
     "structure": 3
@@ -28,34 +28,35 @@
   },
   "bt_monaco": {
    "terrain": "gpxz",
-   "steps8": 7,
-   "steps3": 34,
+   "steps8": 6,
+   "steps3": 32,
    "bareRoad": 124,
    "kinds": {
-    "structure": 2,
+    "structure": 1,
     "deckTerrain": 3,
     "oneDeck": 2
    }
   },
   "bt_highfive": {
    "terrain": "gpxz",
-   "steps8": 11,
-   "steps3": 32,
-   "bareRoad": 61,
+   "steps8": 10,
+   "steps3": 31,
+   "bareRoad": 70,
    "kinds": {
     "structure": 6,
-    "deckToDeck": 3,
-    "oneDeck": 2
+    "deckTerrain": 1,
+    "oneDeck": 2,
+    "deckToDeck": 1
    }
   },
   "axen": {
    "terrain": "t30",
    "steps8": 13,
-   "steps3": 47,
+   "steps3": 48,
    "bareRoad": 186,
    "kinds": {
-    "structure": 4,
     "deckTerrain": 6,
+    "structure": 4,
     "deckToDeck": 1,
     "oneDeck": 2
    }
@@ -72,8 +73,8 @@
   "kingst": {
    "terrain": "gpxz",
    "steps8": 2,
-   "steps3": 11,
-   "bareRoad": 29,
+   "steps3": 13,
+   "bareRoad": 28,
    "kinds": {
     "deckTerrain": 1,
     "deckToDeck": 1
@@ -82,80 +83,81 @@
   "normandy_flat": {
    "terrain": "gpxz",
    "steps8": 0,
-   "steps3": 7,
+   "steps3": 9,
    "bareRoad": 5,
    "kinds": {}
   },
   "w_sf_russian": {
    "terrain": "gpxz",
-   "steps8": 19,
+   "steps8": 18,
    "steps3": 115,
-   "bareRoad": 241,
+   "bareRoad": 280,
    "kinds": {
+    "deckTerrain": 7,
     "structure": 2,
-    "deckTerrain": 4,
-    "deckToDeck": 10,
-    "oneDeck": 3
+    "deckToDeck": 7,
+    "oneDeck": 2
    }
   },
   "w_amsterdam": {
    "terrain": "gpxz",
    "steps8": 18,
    "steps3": 49,
-   "bareRoad": 47,
+   "bareRoad": 48,
    "kinds": {
-    "structure": 15,
-    "deckTerrain": 3
+    "deckTerrain": 3,
+    "structure": 15
    }
   },
   "w_barcelona": {
    "terrain": "gpxz",
-   "steps8": 1,
-   "steps3": 28,
-   "bareRoad": 76,
+   "steps8": 3,
+   "steps3": 32,
+   "bareRoad": 85,
    "kinds": {
+    "deckToDeck": 2,
     "deckTerrain": 1
    }
   },
   "val_disere": {
    "terrain": "gpxz",
-   "steps8": 14,
-   "steps3": 39,
-   "bareRoad": 78,
+   "steps8": 12,
+   "steps3": 37,
+   "bareRoad": 74,
    "kinds": {
-    "structure": 10,
+    "structure": 8,
     "deckTerrain": 4
    }
   },
   "naldo": {
    "terrain": "gpxz",
-   "steps8": 12,
-   "steps3": 59,
-   "bareRoad": 147,
+   "steps8": 10,
+   "steps3": 62,
+   "bareRoad": 149,
    "kinds": {
-    "structure": 11,
+    "structure": 9,
     "deckToDeck": 1
    }
   },
   "deckpark_g": {
    "terrain": "gpxz",
-   "steps8": 41,
+   "steps8": 39,
    "steps3": 100,
-   "bareRoad": 226,
+   "bareRoad": 227,
    "kinds": {
-    "structure": 31,
-    "deckTerrain": 8,
+    "structure": 30,
+    "deckTerrain": 7,
     "oneDeck": 2
    }
   },
   "gt_chevril": {
    "terrain": "gpxz",
-   "steps8": 10,
-   "steps3": 31,
-   "bareRoad": 105,
+   "steps8": 9,
+   "steps3": 29,
+   "bareRoad": 101,
    "kinds": {
     "structure": 7,
-    "deckTerrain": 2,
+    "deckTerrain": 1,
     "oneDeck": 1
    }
   },
@@ -171,12 +173,12 @@
   },
   "gal_simplon": {
    "terrain": "gpxz",
-   "steps8": 16,
+   "steps8": 15,
    "steps3": 26,
-   "bareRoad": 95,
+   "bareRoad": 124,
    "kinds": {
-    "structure": 12,
-    "deckTerrain": 2,
+    "structure": 8,
+    "deckTerrain": 5,
     "deckToDeck": 1,
     "oneDeck": 1
    }
@@ -191,8 +193,8 @@
   "w_rome": {
    "terrain": "gpxz",
    "steps8": 11,
-   "steps3": 54,
-   "bareRoad": 137,
+   "steps3": 53,
+   "bareRoad": 140,
    "kinds": {
     "deckTerrain": 3,
     "structure": 3,
@@ -202,34 +204,35 @@
   },
   "w_seattle": {
    "terrain": "gpxz",
-   "steps8": 72,
-   "steps3": 180,
-   "bareRoad": 390,
+   "steps8": 71,
+   "steps3": 182,
+   "bareRoad": 398,
    "kinds": {
     "structure": 44,
-    "deckTerrain": 10,
-    "deckToDeck": 15,
-    "oneDeck": 3
+    "deckTerrain": 12,
+    "deckToDeck": 14,
+    "oneDeck": 1
    }
   },
   "mk_roundabouts": {
    "terrain": "gpxz",
-   "steps8": 21,
-   "steps3": 64,
-   "bareRoad": 53,
+   "steps8": 18,
+   "steps3": 60,
+   "bareRoad": 59,
    "kinds": {
-    "structure": 15,
-    "deckToDeck": 6
+    "structure": 14,
+    "deckToDeck": 3,
+    "deckTerrain": 1
    }
   },
   "lauterbrunnen": {
    "terrain": "gpxz",
-   "steps8": 6,
-   "steps3": 31,
-   "bareRoad": 53,
+   "steps8": 7,
+   "steps3": 32,
+   "bareRoad": 63,
    "kinds": {
     "structure": 3,
-    "deckTerrain": 2,
+    "deckTerrain": 3,
     "oneDeck": 1
    }
   },
@@ -245,20 +248,20 @@
   },
   "san_marino": {
    "terrain": "gpxz",
-   "steps8": 30,
-   "steps3": 114,
+   "steps8": 29,
+   "steps3": 112,
    "bareRoad": 229,
    "kinds": {
+    "deckToDeck": 9,
     "structure": 6,
-    "deckToDeck": 12,
     "oneDeck": 6,
-    "deckTerrain": 6
+    "deckTerrain": 8
    }
   },
   "fz_hairpin:gpxz:raw": {
    "terrain": "gpxz",
    "steps8": 0,
-   "steps3": 14,
+   "steps3": 12,
    "bareRoad": 47,
    "kinds": {}
   }
