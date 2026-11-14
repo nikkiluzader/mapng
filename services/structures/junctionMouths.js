@@ -15,6 +15,15 @@ const THROUGH_COS = Math.cos((35 * Math.PI) / 180);   // two roads within 35 deg
 const MERGE_COS = Math.cos((30 * Math.PI) / 180);     // a road within 30 degrees of the through road's line is merging, not crossing
 const MOUTH_MARGIN_M = 0.5;                            // beyond the through road's half width
 const MOUTH_REACH_M = 25;                              // how far along a side road its mouth is looked for
+// The landing beyond the through road's edge (road design practice: the minor road meets the major road's
+// surface and takes up its own grade over a vertical curve, not at a corner; a design manual gives 3 % as the
+// grade break to aim for and 8 % as the most on a minor approach. A hill street has more than that to turn
+// through, so the turn is spread: CURVE_RATE of grade a metre).
+const CURVE_RATE = 0.015;                              // grade taken up per metre of the landing's curve
+const CURVE_MIN_M = 3; const CURVE_MAX_M = 12;
+const REJOIN_M = 30;                                   // the side road is back on its own first line this far out
+const THROUGH_HOLD_M = 12;                             // the through road is held as first solved this far from the junction
+const REJOIN_MIN_M = 8;                                // a side road shorter than this beyond the edge: no curve
 
 const outward = (e, end) => {   // the unit direction leaving the node at `end` of e
   const n = e.x.length; const a = end === 0 ? 0 : n - 1; const b = end === 0 ? Math.min(n - 1, 2) : Math.max(0, n - 3);
@@ -27,8 +36,8 @@ const plain = (e) => e && !e.bridge && !e.tunnel && !e.rail && !e.external && e.
  * Pins [[edge, station, height]] for the side roads' mouths, from a first solve's heights z (z[k][i]).
  * Returns { pins, mouths }: mouths, the count of side-road ends pinned.
  */
-export function junctionMouthPins(graph, z) {
-  const { edges, nodes } = graph; const pins = []; let mouths = 0;
+export function junctionMouthPins(graph, z, { limitOf = null } = {}) {
+  const { edges, nodes } = graph; const pins = []; let mouths = 0; let eased = 0; let noRoom = 0;
   for (const node of nodes.values()) {
     const at = (node.edges || []).filter(({ edge }) => plain(edges[edge]) && z[edge]);
     if (at.length < 3 || at.length !== (node.edges || []).length) continue;   // (a structure or a railway at the node: left alone)
@@ -52,6 +61,7 @@ export function junctionMouthPins(graph, z) {
     if (line.length < 2) continue;
     const through = new Set(pair.map((p) => p.edge));
     const along = outward(edges[pair[0].edge], pair[0].end);
+    const before = pins.length; const mouthsBefore = mouths;
     for (const { edge, end } of at) {
       if (through.has(edge)) continue;
       // (a road that joins at a shallow angle, a slip road merging, runs inside the through road's width for
@@ -60,6 +70,7 @@ export function junctionMouthPins(graph, z) {
       const out = outward(edges[edge], end);
       if (Math.abs(out[0] * along[0] + out[1] * along[1]) > MERGE_COS) continue;
       const e = edges[edge]; const n = e.s.length; let any = false;
+      const first = pins.length; let edgeAt = -1; let edgeZ = NaN; let edgeI = -1;
       for (let i = 0; i < n; i++) {
         const fromNode = end === 0 ? e.s[i] : e.length - e.s[i];
         if (fromNode > MOUTH_REACH_M) continue;
@@ -71,12 +82,48 @@ export function junctionMouthPins(graph, z) {
           const d = Math.hypot(e.x[i] - (a[0] + dx * t), e.y[i] - (a[1] + dy * t));
           if (d < bd) { bd = d; bz = a[2] + (b[2] - a[2]) * t; bh = a[3] + (b[3] - a[3]) * t; }
         }
-        if (bd <= bh + MOUTH_MARGIN_M && Number.isFinite(bz)) { pins.push([edge, i, bz]); any = true; }
+        if (bd <= bh + MOUTH_MARGIN_M && Number.isFinite(bz)) { pins.push([edge, i, bz]); any = true; if (fromNode > edgeAt) { edgeAt = fromNode; edgeZ = bz; edgeI = i; } }
       }
       if (any) mouths++;
+      // The landing. From the through road's edge the side road is level with it (a road is level across) and
+      // turns to its own grade over a curve; its own grade is the one that brings it back to its first line
+      // REJOIN_M out. Left as a corner at the edge, a hill grid had a sharp break either side of every
+      // crossing (a sweep's bumps 12 to 35 on one).
+      if (any && limitOf && edgeI >= 0) {
+        const fromNodeOf = (i) => (end === 0 ? e.s[i] : e.length - e.s[i]);
+        const room = e.length - edgeAt; const limit = limitOf(e.highway);
+        // (first with the rejoin REJOIN_M out; over the limit, with all the length the road has)
+        let done = false;
+        for (const Lr of [Math.min(REJOIN_M, room - 2), room - 2]) {
+          if (done || Lr < REJOIN_MIN_M) continue;
+          let ir = edgeI; for (let i = 0; i < n; i++) if (Math.abs(fromNodeOf(i) - (edgeAt + Lr)) < Math.abs(fromNodeOf(ir) - (edgeAt + Lr))) ir = i;
+          const span = fromNodeOf(ir) - edgeAt; const zR = z[edge][ir];
+          const Lc = Math.max(CURVE_MIN_M, Math.min(CURVE_MAX_M, span * 0.6, Math.abs((zR - edgeZ) / span) / CURVE_RATE));
+          const g1 = (zR - edgeZ) / (span - Lc / 2);
+          if (Math.abs(g1) > limit) continue;
+          for (let i = 0; i < n; i++) {
+            const d = fromNodeOf(i) - edgeAt;
+            if (d > 1e-6 && d <= Lc) pins.push([edge, i, edgeZ + (g1 * d * d) / (2 * Lc)]);
+          }
+          eased++; done = true;
+        }
+        // (no room at all: the road is at its limit all the way, a ramp climbing to a road on a bridge
+        // approach. Its mouth is left as the first solve had it)
+        if (!done && room - 2 >= REJOIN_MIN_M) { pins.length = first; mouths--; noRoom++; }
+      }
+    }
+    // The through road keeps the heights the side roads were set against: its stations by the junction are
+    // pinned where the first solve had them. Left free, it moved in the second solve while the side roads'
+    // ends (and with them the junction's own point) stayed: on a hilltop crossing the through road came out
+    // 0.8 m higher 6 m either side of a junction held at its first height, a dip across the crossing.
+    if (mouths > mouthsBefore && pins.length > before) {
+      for (const { edge, end } of pair) {
+        const e = edges[edge]; const n = e.s.length;
+        for (let i = 0; i < n; i++) { const d = end === 0 ? e.s[i] : e.length - e.s[i]; if (d <= THROUGH_HOLD_M) pins.push([edge, i, z[edge][i]]); }
+      }
     }
   }
-  return { pins, mouths };
+  return { pins, mouths, eased, noRoom };
 }
 
 /**
