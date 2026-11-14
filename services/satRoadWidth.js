@@ -7,6 +7,7 @@
 // median of its cross-sections, and it is kept only where they agree: under trees, in shadow or between parked
 // cars they do not, and the road keeps the width it had. Opt in (Map data > Measure road widths), at Generate.
 import { loadDataImage } from './dataCache.js';
+import { estimateRoadHalfWidth, isOneWayRoad } from './roadWidth.js';
 
 export const MEASURE_WIDTHS_STORAGE_KEY = 'mapng_measureRoadWidths';
 export const WIDTH_SOURCE_TAG = 'mapng:width_source';
@@ -19,6 +20,7 @@ const MAX_SECTIONS = 160;     // per road piece (a long one: spread evenly)
 const MIN_SECTIONS = 6;
 const EDGE_RUN_M = 1;         // the colour has to stay off the road's for this long
 const MIN_WIDTH_M = 2.5, MAX_WIDTH_M = 2 * HALF_M - 2;
+const WIDEN_MAX_M = 0.5;      // a measured width this much over the class's usual one is not believed
 const MAX_TILES = 1500;       // one Generate (about 20 MB at most); main roads first
 const CONCURRENCY = 12;
 // (in order of who is measured first when the tile budget runs out)
@@ -177,14 +179,19 @@ export async function measureRoadWidths(features, { onProgress, signal, loadTile
     const w = Math.round(median(good.map((r) => r.got.width)) * 10) / 10;
     for (const r of rs) r.got = { ...(r.got || { sections: 0 }), width: w };
   }
-  let measured = 0;
+  let measured = 0; let wider = 0;
   for (const { f, got } of results) {
     if (!got) continue;
+    // A measurement may narrow a road, hardly widen it. Where verge, gravel or a stone wall is the road's own
+    // grey the edge is found too far out: a country A road with 7 m by its class read 8.3 m, the real road
+    // nearer 6 (the same tester's map). Such a width is not taken; the road keeps its class's.
+    const usual = 2 * estimateRoadHalfWidth(f.tags, f.tags.highway, isOneWayRoad(f.tags));
+    if (got.width > usual + WIDEN_MAX_M) { wider++; continue; }
     f.tags = { ...f.tags, width: String(got.width), [WIDTH_SOURCE_TAG]: 'satellite' };
     measured++;
   }
-  const summary = { asked: roads.length, measured, refused: taken.length - measured, tiles: keys.length, skippedForBudget };
-  console.log(`[Road widths] ${measured} of ${roads.length} road pieces measured from the satellite picture (${summary.refused} not clear enough, ${skippedForBudget} over the tile budget; ${keys.length} tiles)`);
+  const summary = { asked: roads.length, measured, refused: taken.length - measured, wider, tiles: keys.length, skippedForBudget };
+  console.log(`[Road widths] ${measured} of ${roads.length} road pieces measured from the satellite picture (${summary.refused} not clear enough, ${wider} of them read wider than the class and left, ${skippedForBudget} over the tile budget; ${keys.length} tiles)`);
   return summary;
 }
 

@@ -131,6 +131,7 @@ export const isRacingTrackLine = (tags = {}) => tags.leisure === 'track' && !tag
 export const racewayHalfWidth = (tags = {}) => RACEWAY_HALF_M[racewayKind(tags)];
 
 const TAGGED_LANES_MAX = 10;
+const SINGLE_TRACK_EXTRA_M = 0.5;
 /**
  * Estimate road half-width in meters from OSM tags and roadway class.
  *
@@ -148,17 +149,22 @@ export function estimateRoadHalfWidth(tags = {}, highway, isOneWay = false, fall
 
   const lanesFromTotal = parsePositiveInt(tags.lanes);
   const lanesFromDir = parsePositiveInt(tags['lanes:forward']) + parsePositiveInt(tags['lanes:backward']);
-  const inferredLanes = Math.max(
-    getDefaultLaneCount(highway, isOneWay),
-    lanesFromTotal || lanesFromDir || 0,
-  );
-  const estimatedHalf = (inferredLanes * getDefaultLaneWidthMeters(highway)) / 2;
+  // The mapper's count wins over the class's usual one, also when it is smaller. It used to be the larger of
+  // the two: a country lane tagged lanes=1 was built with two lanes, 6 m wide where the road is 3.5 (a BeamNG
+  // developer's Pennine map: "width still bork").
+  const taggedLanes = lanesFromTotal || lanesFromDir || 0;
+  const inferredLanes = taggedLanes || getDefaultLaneCount(highway, isOneWay);
+  // (one lane for both directions, a single-track road: a little wider than a marked lane)
+  const singleTrack = taggedLanes === 1 && !isOneWay;
+  const estimatedHalf = singleTrack
+    ? (getDefaultLaneWidthMeters(highway) + SINGLE_TRACK_EXTRA_M) / 2
+    : (inferredLanes * getDefaultLaneWidthMeters(highway)) / 2;
   // lanes counted by the mapper are kept: the class maximum is for roads with no count (a
   // six-lane primary squeezed into 12 m had 2 m lanes), up to TAGGED_LANES_MAX of them
   const tagged = Math.min(lanesFromTotal || lanesFromDir || 0, TAGGED_LANES_MAX);
   const max = Math.max(limits.max, (tagged * getDefaultLaneWidthMeters(highway)) / 2);
 
-  return clamp(estimatedHalf || fallbackHalfWidth, limits.min, max);
+  return clamp(estimatedHalf || fallbackHalfWidth, singleTrack ? Math.min(limits.min, MEASURED_MIN_HALF_M) : limits.min, max);
 }
 
 /**

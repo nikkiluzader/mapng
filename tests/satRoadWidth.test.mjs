@@ -63,7 +63,7 @@ test('a road under trees keeps its width; missing tiles and the tile budget leav
   const dark = [eastWest(45, 7, 300, { highway: 'residential' })];
   assert.equal((await measureRoadWidths(dark, { loadTile: async () => null })).measured, 0);
   const many = [eastWest(45, 7, 300, { highway: 'residential' }), eastWest(45.01, 7, 300, { highway: 'primary' })];
-  const b = await measureRoadWidths(many, { loadTile: async (x, y) => paintedTile(45.01, 4)(x, y), maxTiles: 16 });
+  const b = await measureRoadWidths(many, { loadTile: async (x, y) => paintedTile(45.01, 3.4)(x, y), maxTiles: 16 });
   assert.equal(b.skippedForBudget, 1); assert.ok(many[1].tags.width, 'the main road is the one measured'); assert.equal(many[0].tags.width, undefined);
 });
 
@@ -95,4 +95,18 @@ test('lanes each way come from OpenStreetMap', async () => {
   const usual = laneSplit({}, 'residential', false);
   assert.equal(usual.tagged, false); assert.ok(usual.forward >= 1 && usual.forward + usual.backward >= 1);
   assert.equal(laneSplit({}, 'residential', true).backward, 0);
+});
+
+test('a measurement wider than the class is not taken; a tagged lane count wins over the class', async () => {
+  // (a primary road by its class: two lanes of 3.5 m; painted 9 m wide: verge the road's own grey)
+  const wide = [eastWest(45, 7, 300, { highway: 'primary' })];
+  const s = await measureRoadWidths(wide, { loadTile: async (x, y) => paintedTile(45, 4.5)(x, y) });
+  assert.equal(s.measured, 0); assert.equal(s.wider, 1); assert.equal(wide[0].tags.width, undefined);
+  const { estimateRoadHalfWidth } = await import('../services/roadWidth.js');
+  // a single-track country lane: one lane for both directions
+  assert.equal(2 * estimateRoadHalfWidth({ lanes: '1' }, 'unclassified', false), 3.5);
+  assert.equal(2 * estimateRoadHalfWidth({}, 'unclassified', false), 6);
+  // two lanes tagged on a two-way trunk road are two lanes, not the class's four
+  assert.equal(2 * estimateRoadHalfWidth({ lanes: '2' }, 'trunk', false), 7.4);
+  assert.equal(2 * estimateRoadHalfWidth({ lanes: '6' }, 'primary', false), 21);
 });
