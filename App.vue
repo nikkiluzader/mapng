@@ -239,6 +239,7 @@ import MobileRestrictionOverlay from './components/modals/MobileRestrictionOverl
 import MemoryWidget from './components/ui/MemoryWidget.vue';
 import { appUpdated, codeFailed } from './services/appUpdate.js';
 import { isDiskFull } from './services/errorText.js';
+import { useMeasureRoadWidths } from './composables/useMeasureRoadWidths.js';
 import AboutModal from './components/modals/AboutModal.vue';
 import DisclaimerModal from './components/modals/DisclaimerModal.vue';
 import TechStackModal from './components/modals/TechStackModal.vue';
@@ -630,6 +631,7 @@ const signatureForKey = (key) => {
 
 // Build a cache key from the parameters that affect terrain generation.
 // If this key matches the last generation, we can skip re-fetching.
+const { on: measureRoadWidthsOn } = useMeasureRoadWidths();
 const buildGenerationKey = (c, res, osm, elevationSource, gpxzKey, uploadedElevationFile = null, elevationUnitOverride = 'auto', processingMpp = 1, gapFillSource = DEFAULT_GAP_FILL_SOURCE) => {
   const uploadSignature = Array.isArray(uploadedElevationFile)
     ? uploadedElevationFile
@@ -655,6 +657,10 @@ const buildGenerationKey = (c, res, osm, elevationSource, gpxzKey, uploadedEleva
     gapFillSource,
     uploadedAreaMode: uploadedAreaMode.value,
     rawTerrain: store.rawTerrainActive,
+    // (Map data > Measure road widths from the satellite picture: it changes the roads Generate makes. Left
+    // out of this key, switching it after a Generate did nothing: the same map was shown again, "changing
+    // this does not even let you re-generate map", a tester)
+    measureWidths: !!osm && measureRoadWidthsOn.value,
     // (the Terrain choice's generation passes: changing one generates again)
     generationEdits: terrainGenerationOptions(store.advancedMode),
     // Include file identity so changing uploads always invalidates cached terrain.

@@ -769,6 +769,7 @@ const isCached = computed(() => {
     && made.gpxzKeySig === (elevationSource.value === 'gpxz' ? signatureForKey(gpxzApiKey.value) : '')
     && (made.gapFillSource === undefined || made.gapFillSource === gapFillSource.value)
     && !!made.rawTerrain === !!store.rawTerrainActive
+    && (made.measureWidths === undefined || made.measureWidths === (!!fetchOSM.value && measureRoadWidths.value))
     && (made.generationEdits === undefined || same(made.generationEdits, terrainGenerationOptions(store.advancedMode)))
     // (background and No smoothing areas change what is fetched and how roads are smoothed: App.vue's key has them)
     && (made.backgroundMask === undefined || same(made.backgroundMask, store.backgroundActive ? store.backgroundMask : null));
