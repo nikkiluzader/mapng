@@ -12,7 +12,12 @@ export const PRECISION_LIMIT_KM = 30;
 const PRECISION_WARN_KM = 25;
 const CAPPED_BUILDINGS = 20000;   // exportBeamNGLevel.js SAFE_CAPS.buildings
 
-const RANK = { light: 0, heavy: 1, veryHeavy: 2 };
+// Past these the export itself is untried: a 66 km map of a city of 4 million buildings (a desktop user's, 2026-11)
+// generated after a fix and then failed in the export's first minute. Still a warning, never a block.
+const EXTREME_FAR_KM = 40;            // corners this far from the centre: a map about 57 km across
+const EXTREME_BUILDINGS = 1000000;    // building footprints in the area, built or not
+
+const RANK = { light: 0, heavy: 1, veryHeavy: 2, extreme: 3 };
 
 /**
  * @param {object} p
@@ -21,7 +26,7 @@ const RANK = { light: 0, heavy: 1, veryHeavy: 2 };
  * @param {number} p.buildings       building footprints in the area (OSM + Overture)
  * @param {boolean} p.safeCaps       content caps on (Build everything off)
  * @param {boolean} p.includeBuildings
- * @returns {{ rating: 'light'|'heavy'|'veryHeavy', farthestKm: number, sizeKm: number, builtBuildings: number,
+ * @returns {{ rating: 'light'|'heavy'|'veryHeavy'|'extreme', farthestKm: number, sizeKm: number, builtBuildings: number,
  *            notes: { key: string, rating: string, params: object }[] }}
  */
 export function estimateLevelWeight({ terrainPx, metersPerPixel = 1, buildings = 0, safeCaps = true, includeBuildings = true }) {
@@ -32,6 +37,9 @@ export function estimateLevelWeight({ terrainPx, metersPerPixel = 1, buildings =
   const notes = [];
   const add = (key, rating, params = {}) => notes.push({ key, rating, params });
   const km = (v) => (v < 10 ? v.toFixed(1) : String(Math.round(v)));
+
+  // (first in the list: what the size means for MapNG itself)
+  if (farthestKm > EXTREME_FAR_KM || buildings > EXTREME_BUILDINGS) add('extremeSize', 'extreme', { km: km(sizeKm), count: Math.round(buildings).toLocaleString() });
 
   if (farthestKm > PRECISION_LIMIT_KM) add('farEdge', 'veryHeavy', { km: km(farthestKm), limit: PRECISION_LIMIT_KM });
   else if (farthestKm > PRECISION_WARN_KM) add('nearEdge', 'heavy', { km: km(farthestKm), limit: PRECISION_LIMIT_KM });

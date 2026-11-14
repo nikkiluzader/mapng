@@ -176,6 +176,7 @@
                   'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300': levelWeight.rating === 'light',
                   'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300': levelWeight.rating === 'heavy',
                   'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300': levelWeight.rating === 'veryHeavy',
+                  'bg-red-600 text-white dark:bg-red-600 dark:text-white': levelWeight.rating === 'extreme',
                 }"
               >{{ t(`exportPanel.weight.rating_${levelWeight.rating}`) }}</span>
             </template>
@@ -183,6 +184,8 @@
               {{ t('exportPanel.weight.size', { km: levelWeight.sizeKm < 10 ? levelWeight.sizeKm.toFixed(1) : Math.round(levelWeight.sizeKm), far: levelWeight.farthestKm < 10 ? levelWeight.farthestKm.toFixed(1) : Math.round(levelWeight.farthestKm), buildings: levelWeight.builtBuildings.toLocaleString() }) }}
               {{ t(`exportPanel.weight.summary_${levelWeight.rating}`) }}
             </p>
+            <!-- (the top rating has a line of its own) -->
+            <p v-if="levelWeight.rating === 'extreme'" class="text-caption italic leading-snug text-red-700 dark:text-red-300" data-testid="weight-serious">{{ t('exportPanel.weight.areYouSerious') }}</p>
             <!-- a terrain that is not a power-of-two square is cut to one (services/squareCrop.js) -->
             <p v-if="squareCrop" class="flex gap-1.5 text-caption leading-snug text-amber-700 dark:text-amber-300" data-testid="square-crop">
               <AlertTriangle :size="12" class="shrink-0 mt-px" />
@@ -196,7 +199,7 @@
                 v-for="note in levelWeight.notes"
                 :key="note.key"
                 class="flex gap-1.5 text-caption leading-snug"
-                :class="note.rating === 'veryHeavy' ? 'text-red-700 dark:text-red-300' : note.rating === 'heavy' ? 'text-amber-700 dark:text-amber-300' : 'text-gray-600 dark:text-gray-300'"
+                :class="note.rating === 'extreme' ? 'text-red-700 dark:text-red-300 font-semibold' : note.rating === 'veryHeavy' ? 'text-red-700 dark:text-red-300' : note.rating === 'heavy' ? 'text-amber-700 dark:text-amber-300' : 'text-gray-600 dark:text-gray-300'"
               >
                 <AlertTriangle v-if="note.rating !== 'light'" :size="12" class="shrink-0 mt-px" />
                 <span>{{ t(`exportPanel.weight.${note.key}`, note.params) }}</span>

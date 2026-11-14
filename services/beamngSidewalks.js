@@ -337,10 +337,16 @@ const CROSSING_END_M = [1.5, 10];
  */
 export function inferCrossingSidewalks(features, project) {
   const key = (p) => `${p.lat.toFixed(7)},${p.lng.toFixed(7)}`;
+  const isCrossing = (f) => { const t = f?.tags || {}; return f?.type === 'road' && f.geometry?.length >= 2 && (t.footway === 'crossing' || t.cycleway === 'crossing' || t.path === 'crossing'); };
+  // How many ways use each crossing's end node. Only those nodes are counted: counting every road node in one
+  // Map failed a 65 km city export outright (a Map holds 16.7 million entries: "Map maximum size exceeded").
   const nodeUse = new Map();
+  for (const f of features || []) if (isCrossing(f)) for (const e of [f.geometry[0], f.geometry[f.geometry.length - 1]]) nodeUse.set(key(e), 0);
+  if (!nodeUse.size) return features;
   for (const f of features || []) {
     if (f?.type !== 'road' || !f.tags?.highway || !(f.geometry?.length >= 2)) continue;
-    for (const k of new Set(f.geometry.map(key))) nodeUse.set(k, (nodeUse.get(k) || 0) + 1);
+    const seen = new Set();
+    for (const q of f.geometry) { const k = key(q); if (nodeUse.has(k) && !seen.has(k)) { seen.add(k); nodeUse.set(k, nodeUse.get(k) + 1); } }
   }
   const ends = [];
   for (const f of features || []) {
