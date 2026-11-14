@@ -821,6 +821,11 @@ const getLaneLayout = (tags) => {
       // Driveways and drive-throughs are single-car paths, not streets.
       const minWidth = subtype === "driveway" || subtype === "drive-through" ? 3.0 : 4.0;
       layout.totalWidth = Math.max(lanesT * defaultLaneWidth, minWidth);
+    } else if (!isOneWay && parsePositiveInt(tags.lanes) === 1) {
+      // (one lane for both directions, a single-track road: as the export builds it, services/roadWidth.js.
+      // Painted two lanes wide, a dark band of asphalt lay beside the 3.5 m road in the game.)
+      layout.totalWidth = defaultLaneWidth + 0.5;
+      layout.unmarked = true;
     } else {
       layout.totalWidth = lanesT * defaultLaneWidth;
     }
