@@ -605,7 +605,7 @@
       "decalSidewalks": "Marciapiedi come decal",
       "decalSidewalksHint": "Attivo: marciapiedi e sentieri sono strisce piatte dipinte sul terreno, senza cordoli. Esportazione più veloce, livello più piccolo, e ci si può guidare sopra. Disattivo: lastre rialzate con cordoli.",
       "roadSurface": "Superfici stradali",
-      "roadSurfaceHint": "Strade decal: le normali strade di MapNG, dipinte sul terreno. Mesh Roads (sperimentale): ogni strada asfaltata riceve in più una Mesh Road di BeamNG sotto di sé, salvata nel livello, per una guida fluida. Hero Roads (sperimentale): il livello costruisce le mesh Hero Road di BeamNG sopra le strade a ogni caricamento, il che richiede uno o due minuti; gli incroci non sono ancora raccordati.",
+      "roadSurfaceHint": "Strade decal: le normali strade di MapNG, dipinte sul terreno. Mesh Roads (sperimentale): ogni strada asfaltata riceve in più una Mesh Road di BeamNG sotto di sé, salvata nel livello, per una guida fluida. Hero Roads (sperimentale): al primo caricamento il livello costruisce le mesh Hero Road di BeamNG sopra le strade e ne fa il bake, il che richiede uno o due minuti; i caricamenti successivi usano le mesh già pronte. Gli incroci non sono ancora raccordati.",
       "roadSurface_decal": "Strade decal",
       "roadSurface_mesh": "Mesh Roads (sperimentale)",
       "roadSurface_hero": "Hero Roads (sperimentale)",

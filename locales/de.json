@@ -605,7 +605,7 @@
       "decalSidewalks": "Gehwege als Decals",
       "decalSidewalksHint": "An: Gehwege und Fußwege sind flache Streifen auf dem Boden, ohne Bordsteine. Schneller im Export, ein kleineres Level, und man kann darüber fahren. Aus: erhöhte Platten mit Bordsteinen.",
       "roadSurface": "Straßenoberflächen",
-      "roadSurfaceHint": "Decal-Straßen: die normalen MapNG-Straßen, auf das Gelände gemalt. Mesh Roads (experimentell): Jede befestigte Straße bekommt zusätzlich eine BeamNG-Mesh-Road darunter, im Level gespeichert, für ruhiges Fahren. Hero Roads (experimentell): Das Level baut bei jedem Laden BeamNGs Hero-Road-Meshes über die Straßen, was ein bis zwei Minuten dauert; Kreuzungen sind noch nicht verbunden.",
+      "roadSurfaceHint": "Decal-Straßen: die normalen MapNG-Straßen, auf das Gelände gemalt. Mesh Roads (experimentell): Jede befestigte Straße bekommt zusätzlich eine BeamNG-Mesh-Road darunter, im Level gespeichert, für ruhiges Fahren. Hero Roads (experimentell): Beim ersten Laden baut das Level BeamNGs Hero-Road-Meshes über die Straßen und backt sie, was ein bis zwei Minuten dauert; spätere Ladevorgänge nutzen die gebackenen Meshes. Kreuzungen sind noch nicht verbunden.",
       "roadSurface_decal": "Decal-Straßen",
       "roadSurface_mesh": "Mesh Roads (experimentell)",
       "roadSurface_hero": "Hero Roads (experimentell)",
