@@ -226,7 +226,7 @@
         </ElevationSourceSelector>
 
       <!-- every elevation source this place has, side by side (its own section, after the choice) -->
-      <SourceComparison :center="center" :gpxz-api-key="gpxzApiKey" :elevation-source="elevationSource" :selection-meters="(Number(resolution) || 0) * (Number(metersPerPixel) || 1)" @pick="(k) => (elevationSource = k)" />
+      <SourceComparison :center="center" :gpxz-api-key="gpxzApiKey" :elevation-source="elevationSource" :selection-meters="(Number(resolution) || 0) * (Number(metersPerPixel) || 1)" :generating="!!isGenerating" @pick="(k) => (elevationSource = k)" />
 
       <SettingSection id="mapng-sec-mapdata" :changed="mapDataChanged" resettable @reset="resetMapData" :title="t('controlPanel.ui.mapData')" :icon="Trees" storage-key="mapng_ui_sec_mapdata">
         <!-- OpenStreetMap features, and Overture's buildings where OSM has none -->

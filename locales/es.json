@@ -121,6 +121,7 @@
     "compareFree": "gratis",
     "compareOneCall": "1 consulta usada",
     "compareReport": "Ver informe de calidad",
+    "compareReportReading": "Leyendo {source} con todo el detalle…",
     "compareReportBusy": "Midiendo las carreteras…",
     "compareReportFailed": "No se pudo crear el informe",
     "flatNone": "Ninguna (plano)",

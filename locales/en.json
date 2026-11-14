@@ -126,6 +126,7 @@
     "compareFree": "free",
     "compareOneCall": "1 call used",
     "compareReport": "See quality report",
+    "compareReportReading": "Reading {source} at full detail…",
     "compareReportBusy": "Measuring the roads…",
     "compareReportFailed": "Couldn't make the report",
     "flatNone": "None (flat)",

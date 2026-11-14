@@ -12957,7 +12957,10 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     : { meshes: [], runs: [], triangles: 0 };
   // (the grid points graded for a sidewalk's slab: later passes that raise the
   // ground leave them, or the slab ends up under it)
-  const sidewalkGroundIdx = new Set();
+  // (the terrain squares graded under sidewalks: a flag a square, not a Set of their indices. A Set holds 16.7
+  // million entries; a 16 km city at a metre a square has more graded squares than that, and the export ended
+  // after 46 minutes with "Set maximum size exceeded")
+  const sidewalkGroundIdx = (() => { const flags = new Uint8Array(exportTerrainData.width * exportTerrainData.height); return { add: (i) => { flags[i] = 1; }, has: (i) => flags[i] === 1 }; })();
   if (sidewalks.runs.length > 0 && shapeExtras) {
     // the ground under the slabs (they hang at road height + the curb)
     const graded = gradeSidewalkGround([...sidewalks.runs, ...sidewalks.walkRuns, ...sidewalks.cornerRuns, ...sidewalks.cornerGround], groundCarriageways, {

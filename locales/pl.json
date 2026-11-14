@@ -121,6 +121,7 @@
     "compareFree": "darmowe",
     "compareOneCall": "użyto 1 zapytania",
     "compareReport": "Zobacz raport jakości",
+    "compareReportReading": "Wczytywanie {source} w pełnej szczegółowości…",
     "compareReportBusy": "Mierzenie dróg…",
     "compareReportFailed": "Nie udało się utworzyć raportu",
     "flatNone": "Brak (płaski)",

@@ -71,6 +71,8 @@ const props = defineProps({
   elevationSource: { type: String, default: '' },
   // the selection's width in metres (resolution x metres a pixel); 0 where there is no single selection
   selectionMeters: { type: Number, default: 0 },
+  // a Generate is running (the comparison lets its heights go)
+  generating: { type: Boolean, default: false },
 });
 const emit = defineEmits(['pick']);
 const store = useMainStore();
@@ -141,7 +143,7 @@ const loadCompare = async () => {
       setCell('mapterhorn', { url: hillshadeDataUrl(h, COMPARE_PX, cell), detail: `~30 m · ${t('map.compareNoLidar')}` });
     } else {
       const h = await mapterhornPatch(c, p.zoom, { sideM: sideM.value, px: COMPARE_PX, signal });
-      compareHeights.mapterhorn = { h, res: p.metersPerPixel };
+      compareHeights.mapterhorn = { h, res: p.metersPerPixel, zoom: p.zoom };
       setCell('mapterhorn', { url: hillshadeDataUrl(h, COMPARE_PX, cell), detail: `~${fmtRes(p.metersPerPixel)} m · ${t('map.compareFree')}` });
     }
   } catch { if (!signal.aborted) setCell('mapterhorn', { note: t('map.compareFailed') }); }
@@ -172,8 +174,13 @@ const loadRegional = async (key) => {
 // has loaded; opened as one HTML page. GPXZ and the regional surveys are in it only when they were added.
 const reportBusy = ref(false);
 const reportNote = ref('');
-// (the quality report measures roads on metre cells: only at the two smallest sizes)
-const canReport = computed(() => sideM.value <= 1024 && compareCells.value.some((c) => c.url));
+// The quality report measures roads on metre cells. Past 512 m the pictures' own heights are coarser than that,
+// so the report reads each source again at a metre a cell when asked for (up to 4096 x 4096 heights a source:
+// 67 MB each, dropped once the page is written). The website stops at a 4 km square; the desktop app at 8 km,
+// read at 2 m there.
+const REPORT_MAX_M = typeof location !== 'undefined' && location.protocol === 'app:' ? 8192 : 4096;
+const REPORT_MAX_PX = 4096;
+const canReport = computed(() => sideM.value <= REPORT_MAX_M + 16 && compareCells.value.some((c) => c.url));
 const gpxzCalls = computed(() => (hasCenter.value ? gpxzCallsFor(gpxzMapBounds(centerPoint(), sideM.value)) : 1));
 watch(sizeChoice, (v) => { try { localStorage.setItem('mapng_compareSize', v); } catch { /* private window */ } compareAbort?.abort(); if (open.value) loadCompare(); else stale.value = true; });
 watch(() => props.selectionMeters, () => { if (wholeSelection.value) { compareAbort?.abort(); stale.value = true; moved.value = true; } });
@@ -209,11 +216,28 @@ const saveQualityReport = async () => {
       osmSource = getLastOSMRequestInfo()?.endpointUsed || '';
     } finally { restoreLastOSMRequestInfo(lastInfo); }
     const roads = roadsInPatch(features, c, sideM.value);
+    // (a square wider than the pictures' 512 cells: each source read again at a metre a cell for the measuring)
+    const fine = {}; const P = Math.min(REPORT_MAX_PX, Math.round(sideM.value));
+    if (sideM.value > COMPARE_PX) {
+      const signal = compareAbort?.signal; const opts = { sideM: sideM.value, px: P, signal };
+      const read = {
+        standard: () => standardPatch(c, opts),
+        mapterhorn: () => mapterhornPatch(c, compareHeights.mapterhorn?.zoom || MAPTERHORN_BASE_ZOOM, { ...opts, tilesAcross: 12 }),
+        gpxz: () => gpxzAreaPatch(c, props.gpxzApiKey, gpxzMapBounds(c, sideM.value), opts),
+        usgs: () => regionalPatch(c, 'usgs', opts), kron86: () => regionalPatch(c, 'kron86', opts),
+      };
+      for (const cell of compareCells.value) {
+        if (!compareHeights[cell.key] || !read[cell.key]) continue;
+        reportNote.value = t('map.compareReportReading', { source: cell.label });
+        try { const h = await read[cell.key](); if (h) fine[cell.key] = h; } catch (e) { if (signal?.aborted) throw e; console.warn('[Compare] report heights', cell.key, e); }
+      }
+      reportNote.value = '';
+    }
     const sources = compareCells.value.map((cell) => {
       const got = compareHeights[cell.key];
       // (a regional survey nobody added is left out of the page; GPXZ keeps its "needs a key" card)
       if (cell.regional && !got) return null;
-      return { key: cell.key, label: cell.label, detail: cell.detail || '', note: cell.note || (cell.key === 'gpxz' ? t('map.compareNeedsKey') : ''), nativeResM: got?.res ?? NaN, heights: cell.url && got ? got.h : null, px: COMPARE_PX, cellM: sideM.value / COMPARE_PX, image: cell.url || null };
+      return { key: cell.key, label: cell.label, detail: cell.detail || '', note: cell.note || (cell.key === 'gpxz' ? t('map.compareNeedsKey') : ''), nativeResM: got?.res ?? NaN, heights: cell.url && got ? (fine[cell.key] || got.h) : null, px: fine[cell.key] ? P : COMPARE_PX, cellM: sideM.value / (fine[cell.key] ? P : COMPARE_PX), image: cell.url || null };
     }).filter(Boolean);
     const result = compareSources(sources, roads, sideM.value);
     const html = qualityReportHtml(result, {
@@ -241,7 +265,11 @@ const saveQualityReport = async () => {
 
 // Opened: compare where the selection is. The selection moves: what is shown is of the old place, so it is
 // cleared and offered again (not re-read on every pan: each read is tiles from every source).
-watch(open, (v) => { if (v && stale.value) loadCompare(); else if (!v) compareAbort?.abort(); });
+// (closed, or a Generate started: the heights behind the pictures are let go. Megabytes a source; the tiles they
+// came from stay in the browser's cache, and GPXZ's answers in theirs, so opening it again costs no calls.)
+const letGo = () => { compareAbort?.abort(); compare.value = {}; recommend.value = null; reportNote.value = ''; for (const k of Object.keys(compareHeights)) delete compareHeights[k]; stale.value = true; moved.value = false; };
+watch(open, (v) => { if (v && stale.value) loadCompare(); else if (!v) letGo(); });
+watch(() => props.generating, (v) => { if (v) { letGo(); open.value = false; } });
 watch(() => [props.center?.lat, props.center?.lng], () => {
   // (a chosen spot stays where it was put: the selection moving does not move it)
   if (store.compareSpot) return;

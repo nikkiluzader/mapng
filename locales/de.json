@@ -121,6 +121,7 @@
     "compareFree": "kostenlos",
     "compareOneCall": "1 Abfrage verwendet",
     "compareReport": "Qualitätsbericht ansehen",
+    "compareReportReading": "{source} wird in voller Auflösung gelesen…",
     "compareReportBusy": "Straßen werden vermessen…",
     "compareReportFailed": "Bericht konnte nicht erstellt werden",
     "flatNone": "Keine (flach)",

@@ -121,6 +121,7 @@
     "compareFree": "бесплатно",
     "compareOneCall": "использован 1 запрос",
     "compareReport": "Посмотреть отчёт о качестве",
+    "compareReportReading": "Чтение {source} в полном разрешении…",
     "compareReportBusy": "Измерение дорог…",
     "compareReportFailed": "Не удалось создать отчёт",
     "flatNone": "Нет (плоский)",
