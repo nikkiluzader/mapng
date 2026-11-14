@@ -586,6 +586,8 @@
       "justNow": "przed chwilą",
       "minutesAgo": "{n} min temu",
       "levelChecked": "Poziom sprawdzony: wszystko jest.",
+      "levelNotChecked": "nie udało się sprawdzić poziomu",
+      "levelGone": "wyeksportowany poziom nie jest już dostępny",
       "levelRebuilt": "Budowanie od nowa: {problems}",
       "nothingChanged": "Nic się nie zmieniło od ostatniego eksportu.",
       "rebuildAnyway": "Zbuduj mimo to",
@@ -817,7 +819,7 @@
     "app": "MapNG"
   },
   "disclaimer": {
-    "title": "Zastrzeżenie dotyczące dokładności danych",
+    "title": "Zastrzeżenie",
     "lead": "Pamiętaj, że wszystkie dane terenu, mapy wysokości i modele 3D wygenerowane przez MapNG są szacunkami opartymi na dostępnych danych wysokościowych, satelitarnych i OpenStreetMap, więc są tylko tak dobre jak te źródła.",
     "resolutionTitle": "Rozdzielczość i skala",
     "resolutionBody": "Mapy wysokości są eksportowane z wybraną rozdzielczością przetwarzania, aby zachować spójną skalę w silnikach gier. Przy globalnym zestawie 30 m teren nadal jest powiększany, więc pozostaje gładszy i mniej szczegółowy niż natywne źródła wysokiej rozdzielczości, takie jak USGS lub GPXZ.",
@@ -1196,6 +1198,7 @@
     "error": {
       "fetchOsm": "Nie udało się pobrać danych OSM.",
       "osmUnavailable": "Serwery OpenStreetMap obecnie nie odpowiadają, więc teren wygenerowano bez dróg, budynków i innych obiektów mapy. Spróbuj ponownie za kilka minut.",
+      "uploadUnreadable": "Nie udało się odczytać przesłanych danych wysokości.",
       "diskFull": "Dysk jest pełny: MapNG nie mógł zapisać plików roboczych. Zwolnij miejsce (duże mapy wymagają kilku gigabajtów) i spróbuj ponownie.",
       "fetchTerrain": "Nie udało się pobrać danych terenu. Żądany obszar może być zbyt duży lub usługa jest niedostępna.",
       "usgsFallback": "Dla tego obszaru brakowało danych USGS 1m lub były uszkodzone. Używany jest globalny zestaw danych 30 m.\n\nWyjście pozostaje na obecnej siatce przetwarzania aplikacji.",

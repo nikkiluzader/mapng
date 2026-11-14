@@ -1301,6 +1301,14 @@ onMounted(() => {
 .dark .leaflet-container { background: #111827; }
 .dark .leaflet-bar a, .dark .mapng-zoom-selection { background: #1f2937; color: #e5e7eb; border-color: #4b5563; }
 .dark .leaflet-bar a:hover { background: #374151; }
+/* (Leaflet's own tooltips: spawn points, hotspot dots) */
+.dark .leaflet-tooltip { background: #1f2937; color: #e5e7eb; border-color: #4b5563; }
+.dark .leaflet-tooltip-top::before { border-top-color: #1f2937; }
+.dark .leaflet-tooltip-bottom::before { border-bottom-color: #1f2937; }
+.dark .leaflet-tooltip-left::before { border-left-color: #1f2937; }
+.dark .leaflet-tooltip-right::before { border-right-color: #1f2937; }
+.dark .leaflet-control-attribution { background: rgba(17, 24, 39, 0.8); color: #9ca3af; }
+.dark .leaflet-control-attribution a { color: #d1d5db; }
 .dark .leaflet-control-scale-line { background: rgba(31, 41, 55, 0.85); color: #e5e7eb; border-color: #9ca3af; text-shadow: none; }
 .dark .mapng-coords { background: rgba(31, 41, 55, 0.92); color: #e5e7eb; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.12); }
 .dark .mapng-coords__icon, .dark .mapng-coords__label { color: #9ca3af; }

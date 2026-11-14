@@ -23,6 +23,9 @@ body {
   background-color: #ffffff;
   color: #111827;
 }
+/* (dark mode: the browser's own scrollbars, select lists and form widgets too, and anything drawn outside the app's root) */
+:root.dark { color-scheme: dark; }
+.dark body { background-color: #111827; color: #f3f4f6; }
 
 /* Leaflet's stylesheet sets Helvetica on the whole map (tooltips, popups,
    attribution, zoom buttons): the app's text font there too */

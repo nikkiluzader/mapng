@@ -941,7 +941,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
       // BYOD path: local upload defines terrain heights while texture/OSM
       // overlays still come from the normal network tile flow.
       const parsedMeta = uploadedElevationMeta.value ?? rebuildMergedUpload();
-      if (!parsedMeta) throw new Error('Uploaded elevation could not be read.');
+      if (!parsedMeta) throw new Error(t('app.error.uploadUnreadable'));
       // The upload card can override the no-data value the loader detected.
       const meta = { ...parsedMeta, noDataOverride: uploadedNoDataOverride.value };
       const targetBounds = uploadedAreaMode.value === 'crop' && meta?.bounds

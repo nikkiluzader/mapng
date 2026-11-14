@@ -233,9 +233,7 @@ const formatDuration = (ms) => {
   clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
   overflow: hidden;
 }
-:global(.dark) .stage-loader__settings > summary { list-style: none; }
-.stage-loader__settings > summary::-webkit-details-marker { display: none; }
-.stage-loader__track { background: rgba(255, 255, 255, 0.08); }
+:global(.dark) .stage-loader__track { background: rgba(255, 255, 255, 0.08); }
 .stage-loader__fill {
   height: 100%;
   background: var(--brand);

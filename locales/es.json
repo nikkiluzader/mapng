@@ -586,6 +586,8 @@
       "justNow": "ahora mismo",
       "minutesAgo": "hace {n} min",
       "levelChecked": "Nivel comprobado: está todo.",
+      "levelNotChecked": "no se pudo comprobar el nivel",
+      "levelGone": "el nivel exportado ya no está disponible",
       "levelRebuilt": "Se vuelve a construir: {problems}",
       "nothingChanged": "Nada ha cambiado desde la última exportación.",
       "rebuildAnyway": "Reconstruir igualmente",
@@ -817,7 +819,7 @@
     "app": "MapNG"
   },
   "disclaimer": {
-    "title": "Aviso de precisión de datos",
+    "title": "Aviso",
     "lead": "Ten en cuenta que todos los datos de terreno, mapas de altura y modelos 3D generados por MapNG son estimaciones basadas en los datos de elevación, satélite y OpenStreetMap disponibles, así que solo son tan buenos como esas fuentes.",
     "resolutionTitle": "Resolución y escala",
     "resolutionBody": "Los mapas de altura se exportan con la resolución de procesamiento seleccionada para mantener una escala coherente en los motores de juego. Con el conjunto global de 30 m, el terreno se sigue remuestreando, por lo que queda más suave y con menos detalle que fuentes nativas de alta resolución como USGS o GPXZ.",
@@ -1196,6 +1198,7 @@
     "error": {
       "fetchOsm": "No se pudieron obtener los datos OSM.",
       "osmUnavailable": "Los servidores de OpenStreetMap no responden en este momento, así que el terreno se generó sin carreteras, edificios ni otros elementos del mapa. Inténtalo de nuevo en unos minutos.",
+      "uploadUnreadable": "No se pudo leer la elevación subida.",
       "diskFull": "El disco está lleno: MapNG no pudo guardar sus archivos de trabajo. Libera espacio (los mapas grandes necesitan varios gigabytes) e inténtalo de nuevo.",
       "fetchTerrain": "No se pudieron obtener los datos del terreno. El área solicitada puede ser demasiado grande o el servicio no está disponible.",
       "usgsFallback": "Los datos USGS 1m de esta zona faltan o están corruptos. Se usará el conjunto global de 30 m.\n\nLa salida se mantiene en la cuadrícula de procesamiento actual de la app.",

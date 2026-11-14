@@ -366,7 +366,7 @@
         <GenerateActions
           :is-generating="isGenerating"
           :is-cached="isCached"
-          :use-gpxz="useGPXZ"
+          :useGPXZ="useGPXZ"
           :gpxz-api-key="gpxzApiKey"
           :has-custom-elevation="!!uploadedElevationFile"
           @generate="(preview) => $emit('generate', preview, fetchOSM, elevationSource, gpxzApiKey, elevationUnitOverride, metersPerPixel, gapFillSource)"

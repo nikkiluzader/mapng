@@ -1267,11 +1267,11 @@ async function checkLevel() {
   try {
     if (desktopApp && last.desktop?.path && desktopApp.verifyLevel) {
       const r = await desktopApp.verifyLevel(last.desktop.path, last.desktop.size);
-      problems = r?.ok ? [] : (r?.problems || ['the level could not be checked']);
+      problems = r?.ok ? [] : (r?.problems || [t('exportPanel.ui.levelNotChecked')]);
     } else if (last.blob) {
       problems = levelZipProblems(await zipIndexOfBlob(last.blob));
     } else {
-      problems = ['the exported level is no longer at hand'];
+      problems = [t('exportPanel.ui.levelGone')];
     }
   } catch (err) {
     problems = [String(err?.message || err)];
@@ -2185,7 +2185,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
   // (a note that an export is running, with the settings as they are: services/sessionGuard.js)
   currentSessionCode().then((code) => { if (isExportingBeamNGLevel.value) markJobStart('export', { code, build: typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : '' }); }).catch(() => {});
   let exportSucceeded = false;
-  beamNGProgressStep.value = 'Preparing…';
+  beamNGProgressStep.value = `${t('progressStages.export.prepare')}…`;
   beamNGProgressPct.value  = 0;
   beamNGProgressDone.value = [];
   beamNGElapsedMs.value = 0;

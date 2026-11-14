@@ -354,7 +354,7 @@
     "showSettings": "Afficher les paramètres de scène",
     "sceneSettings": "Paramètres de scène",
     "meshQuality": "Qualité du maillage",
-    "qualityLow": "Low poly",
+    "qualityLow": "Peu de polygones",
     "qualityBalanced": "Équilibré",
     "qualityMaxSafe": "Détail max sûr",
     "qualityFull": "Détail complet",
@@ -511,7 +511,7 @@
     "hybrid": "Hybride",
     "surroundingTerrain": "Terrain environnant",
     "assets2d": "Ressources 2D",
-    "heightmap": "Heightmap",
+    "heightmap": "Carte de hauteur",
     "osmTexture": "Texture OSM",
     "roadMask": "Masque routier",
     "models3d": "Modèles 3D",
@@ -586,6 +586,8 @@
       "justNow": "à l'instant",
       "minutesAgo": "il y a {n} min",
       "levelChecked": "Niveau vérifié : tout y est.",
+      "levelNotChecked": "le niveau n'a pas pu être vérifié",
+      "levelGone": "le niveau exporté n'est plus disponible",
       "levelRebuilt": "Reconstruction : {problems}",
       "nothingChanged": "Rien n'a changé depuis le dernier export.",
       "rebuildAnyway": "Reconstruire quand même",
@@ -817,7 +819,7 @@
     "app": "MapNG"
   },
   "disclaimer": {
-    "title": "Avertissement sur la précision des données",
+    "title": "Avertissement",
     "lead": "Veuillez noter que toutes les données de terrain, heightmaps et modèles 3D générés par MapNG sont des estimations basées sur les données d'élévation, satellite et OpenStreetMap disponibles : ils ne valent que ce que valent ces sources.",
     "resolutionTitle": "Résolution et échelle",
     "resolutionBody": "Les heightmaps sont exportées avec la résolution de traitement sélectionnée afin de conserver une échelle cohérente dans les moteurs de jeu. Avec le jeu de données global 30 m, le terrain reste suréchantillonné, donc plus lisse et moins détaillé que des sources natives haute résolution comme USGS ou GPXZ.",
@@ -1196,6 +1198,7 @@
     "error": {
       "fetchOsm": "Échec de la récupération des données OSM.",
       "osmUnavailable": "Les serveurs OpenStreetMap ne répondent pas pour le moment : le terrain a été généré sans routes, bâtiments ni autres éléments de carte. Réessayez dans quelques minutes.",
+      "uploadUnreadable": "L'élévation importée n'a pas pu être lue.",
       "diskFull": "Le disque est plein : MapNG n'a pas pu enregistrer ses fichiers de travail. Libérez de l'espace (les grandes cartes demandent plusieurs gigaoctets) et réessayez.",
       "fetchTerrain": "Échec de la récupération des données de terrain. La zone demandée est peut-être trop grande ou le service est indisponible.",
       "usgsFallback": "Les données USGS 1m pour cette zone étaient absentes ou corrompues. Bascule vers le jeu de données global 30 m.\n\nLa sortie reste sur la grille de traitement actuelle de l'application.",
