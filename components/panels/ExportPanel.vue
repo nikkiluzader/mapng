@@ -2167,7 +2167,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       beamNGSaveHandle = await window.showSaveFilePicker({
         suggestedName,
         types: [{
-          description: 'ZIP archive',
+          description: t('exportPanel.zipArchive'),
           accept: { 'application/zip': ['.zip'] },
         }],
       });

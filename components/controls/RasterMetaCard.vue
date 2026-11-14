@@ -2,7 +2,7 @@
   <BaseCard class="bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 space-y-2" padded>
     <div class="flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 border-b border-gray-200 dark:border-gray-600 pb-2">
       <ScanLine :size="13" class="text-brand" />
-      Raster Metadata
+      {{ t('upload.meta.rasterTitle') }}
     </div>
 
     <div class="space-y-1">
@@ -16,6 +16,7 @@
 
 <script setup>
 import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { ScanLine } from 'lucide-vue-next';
 import BaseCard from '../base/BaseCard.vue';
 
@@ -23,6 +24,8 @@ const props = defineProps({
   meta: { type: Object, required: true },
   verticalUnitOverride: { type: String, default: 'auto' },
 });
+
+const { t } = useI18n({ useScope: 'global' });
 
 function fmtBytes(n) {
   if (!n) return '—';
@@ -56,30 +59,40 @@ const coverageKm = computed(() => {
 
 const detectedUnitLabel = computed(() => {
   const u = props.meta?.verticalUnitDetected;
-  if (u === 'meters') return 'meters';
-  if (u === 'feet') return 'feet (international)';
-  if (u === 'us_survey_feet') return 'feet (US survey)';
-  return 'unknown';
+  if (u === 'meters') return t('upload.meters');
+  if (u === 'feet') return t('upload.feetIntl');
+  if (u === 'us_survey_feet') return t('upload.feetUs');
+  return t('upload.meta.unitsUnknown');
 });
 
 const detectionSourceLabel = computed(() => {
   const s = props.meta?.verticalUnitDetectionSource;
   if (!s) return '—';
-  if (s === 'VerticalUnitsGeoKey') return 'GeoKey vertical units';
-  if (s === 'ProjLinearUnitsGeoKey') return 'GeoKey projected units';
-  if (s === 'GeoAsciiParamsTag') return 'GeoTIFF ASCII params';
+  if (s === 'VerticalUnitsGeoKey') return t('upload.meta.sourceVerticalGeoKey');
+  if (s === 'ProjLinearUnitsGeoKey') return t('upload.meta.sourceProjectedGeoKey');
+  if (s === 'GeoAsciiParamsTag') return t('upload.meta.sourceAsciiParams');
   return s;
+});
+
+const appliedUnitsLabel = computed(() => {
+  const u = props.verticalUnitOverride || 'auto';
+  if (u === 'auto') return t('upload.auto');
+  if (u === 'meters') return t('upload.meters');
+  if (u === 'feet') return t('upload.feetIntl');
+  if (u === 'us_survey_feet') return t('upload.feetUs');
+  return u;
 });
 
 const noDataLabel = computed(() => {
   const detection = props.meta?.noDataDetection;
   const value = props.meta?.noData;
-  if (!Number.isFinite(value)) return 'none declared';
+  if (!Number.isFinite(value)) return t('upload.meta.noDataNone');
   const shown = Math.abs(value) >= 1e6 ? value.toExponential(2) : String(Number(value.toFixed(4)));
-  if (detection?.source === 'tag') return `${shown} (tagged)`;
+  if (detection?.source === 'tag') return t('upload.meta.noDataTagged', { value: shown });
   if (detection?.source === 'detected') {
-    const pct = Number.isFinite(detection.share) ? ` — ${(detection.share * 100).toFixed(1)}% of pixels` : '';
-    return `${shown} (detected${pct})`;
+    return Number.isFinite(detection.share)
+      ? t('upload.meta.noDataDetectedShare', { value: shown, percent: (detection.share * 100).toFixed(1) })
+      : t('upload.meta.noDataDetected', { value: shown });
   }
   return shown;
 });
@@ -88,63 +101,63 @@ const rows = computed(() => {
   const m = props.meta || {};
   const list = [];
 
-  list.push({ label: 'Format', value: m.formatLabel || (m.isGeoTiff ? 'GeoTIFF' : 'TIFF (no geo metadata)') });
+  list.push({ label: t('upload.meta.format'), value: m.formatLabel || (m.isGeoTiff ? 'GeoTIFF' : t('upload.meta.tiffNoGeo')) });
 
   if (m.sourceWidth && m.sourceHeight) {
-    list.push({ label: 'Source grid', value: `${m.sourceWidth} × ${m.sourceHeight} px` });
+    list.push({ label: t('upload.meta.sourceGrid'), value: `${m.sourceWidth} × ${m.sourceHeight} px` });
   }
 
   if (m.nativeWidth && m.nativeHeight) {
-    list.push({ label: 'Native coverage grid', value: `${m.nativeWidth} × ${m.nativeHeight} px` });
+    list.push({ label: t('upload.meta.nativeCoverageGrid'), value: `${m.nativeWidth} × ${m.nativeHeight} px` });
   }
 
   if (String(m.sourceFormat || '').toLowerCase() === 'gml-zip') {
     if (Number.isFinite(m.zipOverallGridWidthPx) && Number.isFinite(m.zipOverallGridHeightPx)) {
-      list.push({ label: 'ZIP overall grid', value: `${m.zipOverallGridWidthPx} × ${m.zipOverallGridHeightPx} px` });
+      list.push({ label: t('upload.meta.zipOverallGrid'), value: `${m.zipOverallGridWidthPx} × ${m.zipOverallGridHeightPx} px` });
     }
     if (Number.isFinite(m.tileGridColumns) && Number.isFinite(m.tileGridRows)) {
-      list.push({ label: 'ZIP tile layout', value: `${m.tileGridColumns} × ${m.tileGridRows}` });
+      list.push({ label: t('upload.meta.zipTileLayout'), value: `${m.tileGridColumns} × ${m.tileGridRows}` });
     }
     if (Number.isFinite(m.sourceFileCount)) {
-      list.push({ label: 'ZIP tiles present', value: `${m.sourceFileCount}` });
+      list.push({ label: t('upload.meta.zipTilesPresent'), value: `${m.sourceFileCount}` });
     }
     if (Number.isFinite(m.expectedTileCount)) {
-      list.push({ label: 'ZIP tiles expected', value: `${m.expectedTileCount}` });
+      list.push({ label: t('upload.meta.zipTilesExpected'), value: `${m.expectedTileCount}` });
     }
     if (Number.isFinite(m.missingTileCount)) {
-      list.push({ label: 'ZIP tiles missing', value: `${m.missingTileCount}` });
+      list.push({ label: t('upload.meta.zipTilesMissing'), value: `${m.missingTileCount}` });
     }
   }
 
   if (m.suggestedResolution) {
-    list.push({ label: 'Suggested square export (optional)', value: `${m.suggestedResolution} × ${m.suggestedResolution} px` });
+    list.push({ label: t('upload.meta.suggestedSquareExport'), value: `${m.suggestedResolution} × ${m.suggestedResolution} px` });
   }
 
   if (Number.isFinite(m.nativeMetersPerPixel)) {
-    list.push({ label: 'Source resolution', value: fmtMpp(m.nativeMetersPerPixel) });
-    list.push({ label: 'Target grid resolution', value: '1.000 m/px' });
+    list.push({ label: t('upload.meta.sourceResolution'), value: fmtMpp(m.nativeMetersPerPixel) });
+    list.push({ label: t('upload.meta.targetGridResolution'), value: '1.000 m/px' });
   }
 
-  list.push({ label: 'CRS', value: m.epsgCode ? `EPSG:${m.epsgCode}` : 'Unknown / user-defined' });
+  list.push({ label: t('upload.meta.crs'), value: m.epsgCode ? `EPSG:${m.epsgCode}` : t('upload.meta.crsUserDefined') });
 
   const cov = coverageKm.value;
   if (cov) {
-    list.push({ label: 'Coverage', value: `${cov.w.toFixed(2)} × ${cov.h.toFixed(2)} km` });
+    list.push({ label: t('upload.meta.coverage'), value: `${cov.w.toFixed(2)} × ${cov.h.toFixed(2)} km` });
   }
 
-  list.push({ label: 'No-data value', value: noDataLabel.value });
+  list.push({ label: t('upload.noDataValue'), value: noDataLabel.value });
 
-  list.push({ label: 'Detected elevation units', value: detectedUnitLabel.value });
-  list.push({ label: 'Detection source', value: detectionSourceLabel.value });
-  list.push({ label: 'Applied units mode', value: props.verticalUnitOverride || 'auto' });
+  list.push({ label: t('upload.meta.detectedUnits'), value: detectedUnitLabel.value });
+  list.push({ label: t('upload.meta.detectionSource'), value: detectionSourceLabel.value });
+  list.push({ label: t('upload.meta.appliedUnitsMode'), value: appliedUnitsLabel.value });
 
   if (m.fileSize) {
-    list.push({ label: 'File size', value: fmtBytes(m.fileSize) });
+    list.push({ label: t('upload.meta.fileSize'), value: fmtBytes(m.fileSize) });
   }
 
   if (m.center) {
-    list.push({ label: 'Lat', value: fmtCoord(m.center.lat, 'N', 'S') });
-    list.push({ label: 'Lng', value: fmtCoord(m.center.lng, 'E', 'W') });
+    list.push({ label: t('upload.meta.lat'), value: fmtCoord(m.center.lat, 'N', 'S') });
+    list.push({ label: t('upload.meta.lng'), value: fmtCoord(m.center.lng, 'E', 'W') });
   }
 
   return list;

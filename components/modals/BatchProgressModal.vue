@@ -10,7 +10,7 @@
           </div>
           <div>
             <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ headerTitle }}</h2>
-            <p class="text-xs text-gray-500 dark:text-gray-400">{{ gridCols }}×{{ gridRows }} grid · {{ state.resolution }}px per tile</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('batchProgress.gridSummary', { cols: gridCols, rows: gridRows, resolution: state.resolution }) }}</p>
           </div>
         </div>
         <button v-if="!isRunning" @click="$emit('close')"
@@ -212,9 +212,9 @@
             <div v-if="jobSummary?.byStage" class="max-h-36 overflow-y-auto custom-scrollbar">
               <div v-for="(stats, stage) in jobSummary.byStage" :key="stage" class="text-micro text-gray-600 dark:text-gray-300 grid grid-cols-4 gap-2 py-0.5">
                 <span class="truncate" :title="stage">{{ stage }}</span>
-                <span>avg {{ formatDuration(stats.avgMs) }}</span>
-                <span>med {{ formatDuration(stats.medianMs) }}</span>
-                <span>max {{ formatDuration(stats.maxMs) }}</span>
+                <span>{{ t('batchProgress.statAvg', { value: formatDuration(stats.avgMs) }) }}</span>
+                <span>{{ t('batchProgress.statMed', { value: formatDuration(stats.medianMs) }) }}</span>
+                <span>{{ t('batchProgress.statMax', { value: formatDuration(stats.maxMs) }) }}</span>
               </div>
             </div>
           </div>
@@ -224,7 +224,7 @@
             <div class="max-h-56 overflow-y-auto custom-scrollbar space-y-2">
               <div v-for="tile in tilesWithInstrumentation" :key="tile.id || tile.index" class="border border-gray-200 dark:border-gray-700 rounded p-2 bg-white dark:bg-gray-900">
                 <div class="text-xs font-medium text-gray-700 dark:text-gray-200 mb-1">{{ tileLabel(tile) }} · {{ tile.status }}</div>
-                <div v-if="tile.lifecycle?.totalMs" class="text-micro text-gray-600 dark:text-gray-300 mb-1">total {{ formatDuration(tile.lifecycle.totalMs) }}</div>
+                <div v-if="tile.lifecycle?.totalMs" class="text-micro text-gray-600 dark:text-gray-300 mb-1">{{ t('batchProgress.statTotal', { value: formatDuration(tile.lifecycle.totalMs) }) }}</div>
                 <div v-if="tile.memory" class="grid grid-cols-2 gap-x-3 gap-y-0.5 mb-2">
                   <div class="text-micro text-gray-500 dark:text-gray-400">{{ t('batchProgress.heapStart') }}</div>
                   <div class="text-micro text-gray-700 dark:text-gray-300 text-right">{{ formatBytes(tile.memory.startUsedBytes) }}</div>

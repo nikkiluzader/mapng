@@ -199,7 +199,7 @@ async function download() {
       const handle = await window.showSaveFilePicker({
         suggestedName: name,
         startIn: 'downloads',
-        types: [{ description: 'OpenStreetMap data', accept: { 'application/xml': ['.osm'] } }],
+        types: [{ description: t('osmFile.saveTypeDescription'), accept: { 'application/xml': ['.osm'] } }],
       });
       const writable = await handle.createWritable();
       await writable.write(text);

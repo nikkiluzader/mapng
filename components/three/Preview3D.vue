@@ -337,7 +337,7 @@
             v-if="showSurroundings && surroundingTextureType === 'satellite' && isSurroundingsLoading"
             class="text-micro text-gray-400 dark:text-gray-500 ml-11 -mt-1"
           >
-            {{ surroundingsSatelliteProgress.completed }} of {{ surroundingsSatelliteProgress.total }} satellite images downloaded
+            {{ t('preview.surroundingsSatelliteProgress', { completed: surroundingsSatelliteProgress.completed, total: surroundingsSatelliteProgress.total }) }}
           </p>
 
           <label class="flex items-center gap-2 cursor-pointer group/check">

@@ -718,7 +718,7 @@ const handleElevationFileSelected = async (fileOrFiles) => {
     if (isValidCenter(merged?.center)) { store.clearBackgroundMask(); store.setCenter(merged.center, { force: true }); }
   } catch (e) {
     console.warn('[BYOD] Failed to read file metadata:', e);
-    elevationSlots.value = [{ ...elevationSlots.value[0], error: e.message || 'Failed to read file' }];
+    elevationSlots.value = [{ ...elevationSlots.value[0], error: e.message || t('upload.readFailed') }];
   }
 };
 
@@ -741,7 +741,7 @@ const handleElevationSlotSelected = async (slotIndex, fileOrFiles) => {
     // Mixed source types cannot share one resample pass — the worker samples
     // either GeoTIFF tiles or grid tiles, not both.
     if (base && resolvedMeta.sourceType !== base.sourceType) {
-      throw new Error(`Fallback layers must match the base upload's format (${base.sourceType}).`);
+      throw new Error(t('upload.fallbackFormatMismatch', { format: base.sourceType }));
     }
     const next = [...elevationSlots.value];
     next[slotIndex] = { ...next[slotIndex], meta: resolvedMeta };
@@ -750,7 +750,7 @@ const handleElevationSlotSelected = async (slotIndex, fileOrFiles) => {
   } catch (e) {
     console.warn('[BYOD] Failed to read fallback layer metadata:', e);
     const next = [...elevationSlots.value];
-    next[slotIndex] = { ...next[slotIndex], error: e.message || 'Failed to read file' };
+    next[slotIndex] = { ...next[slotIndex], error: e.message || t('upload.readFailed') };
     elevationSlots.value = next;
   }
 };

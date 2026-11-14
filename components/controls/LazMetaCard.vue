@@ -18,6 +18,7 @@
 
 <script setup>
 import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { ScanLine } from 'lucide-vue-next';
 import BaseCard from '../base/BaseCard.vue';
 
@@ -25,8 +26,10 @@ const props = defineProps({
   meta: { type: Object, required: true },
 });
 
+const { t } = useI18n({ useScope: 'global' });
+
 const isPointCloud = computed(() => Number.isFinite(props.meta?.pointCount));
-const title = computed(() => (isPointCloud.value ? 'LiDAR Metadata' : 'Raster Metadata'));
+const title = computed(() => (isPointCloud.value ? t('upload.meta.lidarTitle') : t('upload.meta.rasterTitle')));
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
@@ -84,52 +87,52 @@ const rows = computed(() => {
 
   if (isPointCloud.value) {
     // Format + version
-    const fmt = m.pointFormat != null ? `Format ${m.pointFormat}` : null;
+    const fmt = m.pointFormat != null ? t('upload.meta.pointFormat', { n: m.pointFormat }) : null;
     const ver = (m.versionMajor != null && m.versionMinor != null)
       ? `LAS ${m.versionMajor}.${m.versionMinor}` : null;
     if (ver || fmt) {
-      list.push({ label: 'Format', value: [ver, fmt].filter(Boolean).join(' · ') });
+      list.push({ label: t('upload.meta.format'), value: [ver, fmt].filter(Boolean).join(' · ') });
     }
   } else {
-    list.push({ label: 'Format', value: m.isGeoTiff ? 'GeoTIFF' : 'TIFF (no geo metadata)' });
+    list.push({ label: t('upload.meta.format'), value: m.isGeoTiff ? 'GeoTIFF' : t('upload.meta.tiffNoGeo') });
   }
 
   // Encoding / source type
   if (isPointCloud.value) {
-    list.push({ label: 'Encoding', value: m.isLaz ? 'LAZ (compressed)' : 'LAS (uncompressed)' });
+    list.push({ label: t('upload.meta.encoding'), value: m.isLaz ? t('upload.meta.lazCompressed') : t('upload.meta.lasUncompressed') });
   }
 
   // Source raster dimensions (if known)
   if (m.nativeWidth && m.nativeHeight) {
-    list.push({ label: 'Source grid', value: `${m.nativeWidth} × ${m.nativeHeight} px` });
+    list.push({ label: t('upload.meta.sourceGrid'), value: `${m.nativeWidth} × ${m.nativeHeight} px` });
   } else if (m.sourceWidth && m.sourceHeight) {
-    list.push({ label: 'Source grid', value: `${m.sourceWidth} × ${m.sourceHeight} px` });
+    list.push({ label: t('upload.meta.sourceGrid'), value: `${m.sourceWidth} × ${m.sourceHeight} px` });
   }
 
   // Source + processing resolution
   if (Number.isFinite(m.nativeMetersPerPixel)) {
-    list.push({ label: 'Source resolution', value: fmtMpp(m.nativeMetersPerPixel) });
-    list.push({ label: 'Processing resolution', value: fmtMpp(Math.min(1, Math.max(0.05, m.nativeMetersPerPixel))) });
+    list.push({ label: t('upload.meta.sourceResolution'), value: fmtMpp(m.nativeMetersPerPixel) });
+    list.push({ label: t('upload.meta.processingResolution'), value: fmtMpp(Math.min(1, Math.max(0.05, m.nativeMetersPerPixel))) });
   }
 
   // File size
   if (m.fileSize) {
-    list.push({ label: 'File size', value: fmtBytes(m.fileSize) });
+    list.push({ label: t('upload.meta.fileSize'), value: fmtBytes(m.fileSize) });
   }
 
   // Point count
   if (isPointCloud.value) {
-    list.push({ label: 'Points', value: fmtPoints(m.pointCount) });
+    list.push({ label: t('upload.meta.points'), value: fmtPoints(m.pointCount) });
   }
 
   // CRS
-  list.push({ label: 'CRS', value: m.epsgCode ? `EPSG:${m.epsgCode}` : 'Unknown' });
+  list.push({ label: t('upload.meta.crs'), value: m.epsgCode ? `EPSG:${m.epsgCode}` : t('upload.meta.crsUnknown') });
 
   // Coverage (from WGS84 bounds)
   const cov = coverageKm.value;
   if (cov) {
     list.push({
-      label: 'Coverage',
+      label: t('upload.meta.coverage'),
       value: `${cov.w.toFixed(2)} × ${cov.h.toFixed(2)} km`,
     });
   }
@@ -137,7 +140,7 @@ const rows = computed(() => {
   // Z range (native CRS units — meters for most, feet for ftUS CRS)
   if (isPointCloud.value && m.minZ != null && m.maxZ != null) {
     list.push({
-      label: 'Z range',
+      label: t('upload.meta.zRange'),
       value: `${m.minZ.toFixed(1)} – ${m.maxZ.toFixed(1)}`,
     });
   }
@@ -145,15 +148,15 @@ const rows = computed(() => {
   // Point density
   if (isPointCloud.value && densityPtM2.value != null) {
     list.push({
-      label: 'Density',
-      value: `${densityPtM2.value.toFixed(1)} pts/m²`,
+      label: t('upload.meta.density'),
+      value: t('upload.meta.densityValue', { value: densityPtM2.value.toFixed(1) }),
     });
   }
 
   // Center (WGS84)
   if (m.center) {
-    list.push({ label: 'Lat', value: fmtCoord(m.center.lat, 'N', 'S') });
-    list.push({ label: 'Lng', value: fmtCoord(m.center.lng, 'E', 'W') });
+    list.push({ label: t('upload.meta.lat'), value: fmtCoord(m.center.lat, 'N', 'S') });
+    list.push({ label: t('upload.meta.lng'), value: fmtCoord(m.center.lng, 'E', 'W') });
   }
 
   return list;

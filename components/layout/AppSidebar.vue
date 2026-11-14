@@ -112,8 +112,8 @@
       <!-- (the desktop app: its version and the build; the website: which branch's build) -->
       <div class="mt-0.5 text-center text-micro text-gray-400 dark:text-gray-500 leading-tight truncate">
         <template v-if="desktopVersion">{{ t('sidebar.desktopBuild', { version: desktopVersion }) }} · {{ t('sidebar.build', { hash: ownBuild.hash, time: ownBuild.time }) }}</template>
-        <template v-else-if="isProductionHost">Main · {{ t('sidebar.build', { hash: buildMainHash, time: buildMainTime }) }}</template>
-        <template v-else>Dev · {{ t('sidebar.build', { hash: buildDevHash, time: buildDevTime }) }}</template>
+        <template v-else-if="isProductionHost">{{ t('sidebar.branchMain') }} · {{ t('sidebar.build', { hash: buildMainHash, time: buildMainTime }) }}</template>
+        <template v-else>{{ t('sidebar.branchDev') }} · {{ t('sidebar.build', { hash: buildDevHash, time: buildDevTime }) }}</template>
       </div>
     </div>
   </aside>
