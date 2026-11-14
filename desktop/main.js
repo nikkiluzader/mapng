@@ -14,6 +14,30 @@ import { listMapngLevels, readZipFile, zipEntries } from './levelLibrary.js';
 import { startUpdater } from './updater.js';
 import { pendingCrash, prepareReport, sendReport, startCrashReporter } from './crashReports.js';
 
+// ---- who may ask the main process for anything ----
+// The window's bridge (preload.cjs) belongs to the window, not to the page in it: were the window
+// ever on another page (a link followed, a redirect), that page would have the bridge too. So the
+// window is kept on the app's own pages (guardNavigation, below), and every request is turned away
+// unless the app's own page sent it.
+const APP_ORIGIN = 'app://mapng';
+const isAppUrl = (url) => typeof url === 'string' && (url === APP_ORIGIN || url.startsWith(`${APP_ORIGIN}/`));
+const fromApp = (event) => { try { return isAppUrl(event.senderFrame?.url); } catch { return false; } };
+const handleUnguarded = ipcMain.handle.bind(ipcMain);
+ipcMain.handle = (channel, listener) => handleUnguarded(channel, (event, ...args) => {
+  if (!fromApp(event)) throw new Error('not allowed');
+  return listener(event, ...args);
+});
+/** Whether `file` is inside one of `roots` (after resolving: no "..", no other drive, no network share). */
+const insideAny = (file, roots) => {
+  if (typeof file !== 'string' || !file || file.startsWith('\\\\') || file.startsWith('//')) return false;
+  const full = path.resolve(file);
+  return roots.filter(Boolean).some((root) => { const r = path.resolve(root); return full === r || full.startsWith(r + path.sep); });
+};
+// A file name the page may write into its job's folder: plain, and never the job's own description
+// (Windows reads "JOB.JSON", "job.json." and "job.json::$DATA" as that same file).
+const JOB_FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,119}$/;
+const isJobFileName = (name) => typeof name === 'string' && JOB_FILE_NAME.test(name) && !name.endsWith('.') && !/^job\.json/i.test(name);
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const API_ORIGIN = process.env.MAPNG_API_ORIGIN || 'https://mapng.com';
 // (testing only: /api/share, /api/usage and /api/crash go here instead)
@@ -170,13 +194,21 @@ function createWindow() {
       sandbox: true,
     },
   });
+  // the window stays on the app's own pages: a link to anywhere else opens in the user's browser
+  const guardNavigation = (event, url) => {
+    if (isAppUrl(url)) return;
+    event.preventDefault();
+    if (/^https?:/.test(url)) shell.openExternal(url);
+  };
+  win.webContents.on('will-navigate', guardNavigation);
+  win.webContents.on('will-redirect', guardNavigation);
   // links out open in the user's browser
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:/.test(url)) shell.openExternal(url);
     // (a page the app makes itself, shown in a window of its own: the elevation sources' quality report.
     // It opens empty and is then given the page; no preload, no access to the app)
     if (url === 'about:blank' || url === '') {
-      return { action: 'allow', overrideBrowserWindowOptions: { width: 1100, height: 860, autoHideMenuBar: true, title: 'MapNG', webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } } };
+      return { action: 'allow', overrideBrowserWindowOptions: { width: 1100, height: 860, autoHideMenuBar: true, title: 'MapNG', webPreferences: { preload: undefined, sandbox: true, contextIsolation: true, nodeIntegration: false } } };
     }
     return { action: 'deny' };
   });
@@ -242,7 +274,8 @@ function createWindow() {
   return win;
 }
 
-const BATCH_FILE = /^MapNG_Batch_[^\\/]+$/;
+// (only the kinds of file a batch makes: nothing that could be run)
+const BATCH_FILE = /^MapNG_Batch_[^\\/]+\.(zip|png|txt|json|csv|tif|tiff|jpg|ter|md)$/i;
 const batchFolder = () => path.join(app.getPath('downloads'), 'MapNG Batch');
 // name.ext, or name (2).ext, name (3).ext… when it is taken
 function uniqueFile(dir, name) {
@@ -447,7 +480,9 @@ ipcMain.handle('desktop:info', () => ({
 ipcMain.handle('desktop:chooseModsFolder', (event) => chooseModsFolder(BrowserWindow.fromWebContents(event.sender)));
 
 ipcMain.handle('desktop:showItem', (_event, file) => {
-  if (typeof file === 'string' && fs.existsSync(file)) shell.showItemInFolder(file);
+  // (only what the app itself made: a job's log, a saved level, a batch file)
+  if (!insideAny(file, [app.getPath('userData'), modsFolder(), batchFolder(), app.getPath('downloads')])) return;
+  if (fs.existsSync(file)) shell.showItemInFolder(file);
 });
 
 ipcMain.handle('job:begin', () => {
@@ -458,7 +493,7 @@ ipcMain.handle('job:begin', () => {
 
 // (a file in pieces: one IPC message stays well under Chromium's size limit)
 ipcMain.handle('job:write', (_event, jobId, name, bytes, append) => {
-  if (typeof name !== 'string' || name !== path.basename(name) || name === 'job.json') throw new Error('bad file name');
+  if (!isJobFileName(name)) throw new Error('bad file name');
   const file = path.join(jobDirOf(jobId), name);
   const data = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   if (append) fs.appendFileSync(file, data); else fs.writeFileSync(file, data);
@@ -558,7 +593,7 @@ ipcMain.handle('job:cancel', (_event, jobId) => { running.get(jobId)?.kill(); })
 
 // a generated terrain's file into an export job (a hard link: no copy)
 ipcMain.handle('job:linkTerrainFile', (_event, jobId, name, sessionId, file) => {
-  if (typeof name !== 'string' || name !== path.basename(name) || name === 'job.json') throw new Error('bad file name');
+  if (!isJobFileName(name)) throw new Error('bad file name');
   const from = path.join(sessionDirOf(sessionId), path.basename(String(file)));
   const to = path.join(jobDirOf(jobId), name);
   try { fs.linkSync(from, to); } catch { fs.copyFileSync(from, to); }
@@ -707,7 +742,9 @@ function saveProject(jobDir, job, result) {
   for (const [k, v] of Object.entries(job.terrainData || {})) {
     if (!v || typeof v !== 'object' || typeof v.$file !== 'string' || linked.has(v.$file)) continue;
     if (!/(Url|Blob|Canvas)$/.test(k)) continue;
-    linkOrCopy(path.join(jobDir, v.$file), path.join(tmp, 'overrides', v.$file));
+    const own = path.basename(v.$file);
+    if (own !== v.$file) continue;
+    linkOrCopy(path.join(jobDir, own), path.join(tmp, 'overrides', own));
     overrides[k] = v;
   }
   // (files the export options point at, e.g. a tree mix: kept beside them)
@@ -1249,6 +1286,8 @@ async function gpuSummary() {
 }
 ipcMain.handle('report:prepare', async (_event, kind, ctx = {}) => {
   const { exportReport: _ignored, level: _alsoIgnored, ...rest } = ctx || {};
+  // (the log of a job is one of the app's own log files, never any other file the page names)
+  if (rest.logPath && !(insideAny(rest.logPath, [JOBS(), SESSIONS()]) && /\.log$/i.test(rest.logPath))) rest.logPath = null;
   const gpu = await gpuSummary();
   if (String(kind) === 'level') {
     const found = levelExportReport(rest.zipName, rest.levelName);

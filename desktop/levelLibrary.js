@@ -6,6 +6,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 
+const MAX_ENTRY_BYTES = 256 * 1024 * 1024;
+
 const EOCD = 0x06054b50;
 const ZIP64_LOCATOR = 0x07064b50;
 const ZIP64_EOCD = 0x06064b50;
@@ -43,6 +45,8 @@ export function zipEntries(fd, fileSize) {
     cdSize = Number(rec.readBigUInt64LE(40));
     cdOffset = Number(rec.readBigUInt64LE(48));
   }
+  // (sizes come from the file itself: a zip that claims more than it holds is not read)
+  if (!(cdSize >= 0 && cdOffset >= 0 && cdOffset + cdSize <= fs.fstatSync(fd).size)) throw new Error('bad zip directory');
   const cd = readAt(fd, cdOffset, cdSize);
   const out = [];
   let p = 0;
@@ -80,9 +84,11 @@ export function zipRead(fd, entry) {
   const head = readAt(fd, entry.offset, 30);
   if (head.readUInt32LE(0) !== LOCAL) throw new Error(`bad local header: ${entry.name}`);
   const start = entry.offset + 30 + head.readUInt16LE(26) + head.readUInt16LE(28);
+  if (!(entry.compSize >= 0 && start + entry.compSize <= fs.fstatSync(fd).size)) throw new Error(`bad zip entry: ${entry.name}`);
   const data = readAt(fd, start, entry.compSize);
   if (entry.method === 0) return data;
-  if (entry.method === 8) return zlib.inflateRawSync(data);
+  // (the files read here are small texts and a preview picture: one that unpacks far bigger is refused)
+  if (entry.method === 8) return zlib.inflateRawSync(data, { maxOutputLength: MAX_ENTRY_BYTES });
   throw new Error(`unsupported zip method ${entry.method}: ${entry.name}`);
 }
 

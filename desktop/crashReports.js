@@ -115,7 +115,8 @@ export async function sendReport(token, { includeArea = true, description = '' }
   if (!report) throw new Error('This report is no longer available. Try again.');
   const body = { ...report, description: String(description || report.description || '').slice(0, 4000) };
   // (the export report holds the location and street names all through: it goes with the location or not at all)
-  if (!includeArea) { body.area = null; body.config = ''; body.exportReport = ''; body.options = cleanOptions(body.options, { keepLocation: false }); }
+  // (and so does the job's log: its lines name the area's bounds, its country and its lakes)
+  if (!includeArea) { body.area = null; body.config = ''; body.exportReport = ''; body.log = ''; body.options = cleanOptions(body.options, { keepLocation: false }); }
   const r = await net.fetch(`${apiOrigin}/api/crash`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
