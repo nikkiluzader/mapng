@@ -188,6 +188,14 @@ road, a dense hilly city.
 - Junction as its own surface with each arm blended in over a transition length (OpenDRIVE).
 - Named reference junction cases with invariant checks (osm2streets' test pattern).
 
+## The in-game Mesh Roads test (in the repo)
+
+`node scripts/ingame/meshRoadProfile.mjs --all` (BeamNG running with the MCP mod, `NAPI_CANVAS` set): exports each
+area of `tests/fixtures/meshRoadProfileBaselines.json` with Mesh Roads, loads it, walks every paved road at 0.5 m
+and compares the stepped places and the road left without a deck with the baselines; `--save` records them.
+Run it after any change to services/meshRoads.js or to the terrain under roads: the export's own checks look at
+MapNG's data, this looks at what the game built.
+
 ## Diagram tools (in scratch/, not in the repo)
 
 - `scratch/junctions/dump_pre.mjs`: preload for a test export (`NODE_OPTIONS=--import`, `STRUCT_OUT=file.json`),
