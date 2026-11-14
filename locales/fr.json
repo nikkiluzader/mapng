@@ -821,6 +821,9 @@
     "lead": "Veuillez noter que toutes les données de terrain, heightmaps et modèles 3D générés par MapNG sont des estimations basées sur les données d'élévation, satellite et OpenStreetMap disponibles : ils ne valent que ce que valent ces sources.",
     "resolutionTitle": "Résolution et échelle",
     "resolutionBody": "Les heightmaps sont exportées avec la résolution de traitement sélectionnée afin de conserver une échelle cohérente dans les moteurs de jeu. Avec le jeu de données global 30 m, le terrain reste suréchantillonné, donc plus lisse et moins détaillé que des sources natives haute résolution comme USGS ou GPXZ.",
+    "computerTitle": "Votre ordinateur et vos fichiers",
+    "computerBody": "Construire une carte est un travail lourd. Une carte grande ou détaillée peut utiliser toute la mémoire de votre ordinateur ou remplir son disque, et le navigateur, MapNG, le jeu ou l'ordinateur entier peuvent ralentir, se figer ou planter, avec la perte du travail non enregistré dans d'autres programmes. MapNG avertit des cartes très lourdes, mais ne peut pas savoir ce que votre ordinateur supporte.",
+    "noWarranty": "MapNG est un logiciel libre, fourni tel quel et sans aucune garantie. Vous l'utilisez à vos propres risques : son développeur n'est responsable d'aucun dommage ni d'aucune perte concernant votre ordinateur, vos fichiers, votre jeu ou quoi que ce soit d'autre.",
     "usage": "Cet outil est destiné au modding et à un usage créatif. Il ne doit pas être utilisé pour la navigation, l'ingénierie ou la planification critique dans le monde réel.",
     "confirm": "J'ai compris"
   },

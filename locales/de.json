@@ -821,6 +821,9 @@
     "lead": "Bitte beachte, dass alle von MapNG erzeugten Geländedaten, Heightmaps und 3D-Modelle Schätzungen auf Basis verfügbarer Höhen-, Satelliten- und OpenStreetMap-Daten sind. Sie sind also nur so gut wie diese Quellen.",
     "resolutionTitle": "Auflösung und Maßstab",
     "resolutionBody": "Heightmaps werden mit der gewählten Verarbeitungsauflösung exportiert, damit der Maßstab in Game-Engines konsistent bleibt. Beim globalen 30-m-Datensatz wird das Gelände trotzdem hochskaliert und bleibt daher glatter und weniger detailreich als native hochauflösende Quellen wie USGS oder GPXZ.",
+    "computerTitle": "Dein Computer und deine Dateien",
+    "computerBody": "Eine Karte zu erstellen ist schwere Arbeit. Eine große oder detailreiche Karte kann den gesamten Arbeitsspeicher deines Computers belegen oder den Datenträger füllen, und der Browser, MapNG, das Spiel oder der ganze Computer können langsam werden, einfrieren oder abstürzen, wobei ungespeicherte Arbeit in anderen Programmen verloren gehen kann. MapNG warnt vor sehr schweren Karten, kann aber nicht wissen, was dein Computer aushält.",
+    "noWarranty": "MapNG ist freie Software, bereitgestellt wie sie ist und ohne jede Gewährleistung. Du nutzt sie auf eigenes Risiko: Der Entwickler haftet nicht für Schäden oder Verluste an deinem Computer, deinen Dateien, deinem Spiel oder irgendetwas anderem.",
     "usage": "Dieses Tool ist für Modding und kreative Nutzung gedacht. Es sollte nicht für Navigation, Ingenieurwesen oder kritische reale Planung verwendet werden.",
     "confirm": "Verstanden"
   },

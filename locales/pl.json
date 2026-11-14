@@ -821,6 +821,9 @@
     "lead": "Pamiętaj, że wszystkie dane terenu, mapy wysokości i modele 3D wygenerowane przez MapNG są szacunkami opartymi na dostępnych danych wysokościowych, satelitarnych i OpenStreetMap, więc są tylko tak dobre jak te źródła.",
     "resolutionTitle": "Rozdzielczość i skala",
     "resolutionBody": "Mapy wysokości są eksportowane z wybraną rozdzielczością przetwarzania, aby zachować spójną skalę w silnikach gier. Przy globalnym zestawie 30 m teren nadal jest powiększany, więc pozostaje gładszy i mniej szczegółowy niż natywne źródła wysokiej rozdzielczości, takie jak USGS lub GPXZ.",
+    "computerTitle": "Twój komputer i twoje pliki",
+    "computerBody": "Budowanie mapy to ciężka praca. Duża lub szczegółowa mapa może zająć całą pamięć komputera albo zapełnić dysk, a przeglądarka, MapNG, gra lub cały komputer mogą zwolnić, zawiesić się albo ulec awarii, z utratą niezapisanej pracy w innych programach. MapNG ostrzega przed bardzo ciężkimi mapami, ale nie może wiedzieć, ile wytrzyma twój komputer.",
+    "noWarranty": "MapNG to wolne oprogramowanie, udostępniane w takiej postaci, w jakiej jest, bez żadnej gwarancji. Używasz go na własne ryzyko: jego twórca nie odpowiada za żadne szkody ani straty dotyczące twojego komputera, plików, gry ani czegokolwiek innego.",
     "usage": "To narzędzie służy do modowania i twórczego użytku. Nie należy go używać do nawigacji, prac inżynierskich ani krytycznego planowania w świecie rzeczywistym.",
     "confirm": "Rozumiem"
   },
