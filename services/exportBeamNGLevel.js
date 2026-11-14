@@ -59,6 +59,7 @@ import { solveProfilesSteps } from './structures/profileSolve.js';
 import { appendAll, keepInPlace } from './keepInPlace.js';
 import { classifyStructures } from './structures/structureRules.js';
 import { ringPlanePins } from './structures/rings.js';
+import { junctionMouthPins } from './structures/junctionMouths.js';
 import { composeTerrain } from './structures/terrainCompose.js';
 import { addFineGroundDetail } from './terrainDetail.js';
 import { findPortalBuildings, portalBuildingTags } from './portalBuildings.js';
@@ -6210,11 +6211,22 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
         structureGraph.classes = classifyStructures(structureGraph);
         // an elevated ring is one slab: its stations pinned to a plane fitted to this first solve,
         // and the roads solved once more to meet it (structures/rings.js)
-        if (includeBridges) {
-          const ringFit = ringPlanePins(structureGraph, structureGraph.profile.z);
-          if (ringFit.pins.length) {
+        // ... and a side road's first metres, inside the through road's width, pinned to that road's height
+        // (structures/junctionMouths.js). Both from this first solve; then one more solve for both.
+        {
+          const ringFit = includeBridges ? ringPlanePins(structureGraph, structureGraph.profile.z) : { pins: [], rings: [] };
+          // (off unless asked for, EXPORT_OPTS junctionMouths: measured in game with decks on eight maps it took the
+          // steps over 8 cm from 2 to 0 on a city grid and 14 to 12 on a cliff road, but added some at an interchange
+          // (17 to 25: a ground road pinned up to a bridge approach's height) and a roundabout town (35 to 39))
+          const mouthFit = opts.junctionMouths !== true ? { pins: [], mouths: 0 } : junctionMouthPins(structureGraph, structureGraph.profile.z);
+          if (ringFit.pins.length || mouthFit.pins.length) {
             structureGraph.pins = structureGraph.pins || [];
             appendAll(structureGraph.pins, ringFit.pins);
+            // (a station on a ring's plane stays on it)
+            const ringed = new Set(ringFit.pins.map(([k, i]) => `${k}:${i}`));
+            appendAll(structureGraph.pins, mouthFit.pins.filter(([k, i]) => !ringed.has(`${k}:${i}`)));
+            structureGraph.mouths = { ends: mouthFit.mouths, stations: mouthFit.pins.length };
+            if (mouthFit.pins.length) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Junction mouths: ${mouthFit.mouths} side-road ends (${mouthFit.pins.length} stations) held at the through road's height.`);
             structureGraph.profile = yield* solveProfilesSteps(structureGraph);
             structureGraph.profile.ms = Math.round(performance.now() - t0);
             const again = structureGraph.edges.map((e, k) => ({
@@ -6224,8 +6236,8 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
             structureGraph.previewChecks = { joints: checkJoints(again), grades: checkGrades(again), crossings: checkCrossings(again) };
             Object.defineProperty(structureGraph, 'previewLines', { value: again, enumerable: false, configurable: true });
             structureGraph.classes = classifyStructures(structureGraph);
-            structureGraph.rings = ringFit.rings.map((r) => ({ length: r.length, edges: r.edges.length, tilt: Math.round(r.tilt * 1000) / 10, spread: Math.round(r.spread * 100) / 100, lift: Math.round(r.lift * 100) / 100 }));
-            console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Elevated rings: ${structureGraph.rings.map((r) => `${r.length} m of ${r.edges} pieces on one plane (tilt ${r.tilt} %; its heights were ${r.spread} m off a plane)`).join('; ')}`);
+            if (ringFit.rings.length) structureGraph.rings = ringFit.rings.map((r) => ({ length: r.length, edges: r.edges.length, tilt: Math.round(r.tilt * 1000) / 10, spread: Math.round(r.spread * 100) / 100, lift: Math.round(r.lift * 100) / 100 }));
+            if (ringFit.rings.length) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Elevated rings: ${structureGraph.rings.map((r) => `${r.length} m of ${r.edges} pieces on one plane (tilt ${r.tilt} %; its heights were ${r.spread} m off a plane)`).join('; ')}`);
           }
         }
         if (structureGraph.shaping) structureGraph.classes = rawDeckClasses(structureGraph, structureGraph.classes, structureGraph.shaping.rawDeck, structureGraph.shaping.span);
