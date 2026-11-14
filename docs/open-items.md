@@ -71,6 +71,13 @@ bridges and tunnels, 62 ground through the deck, 46 deck to deck, 20 within one 
 samples have no deck. (The commit that recorded them, 8359bbb, says 1.07 million samples: wrong, it is 711,526.)
 Tried and taken out: a higher cap on a deck's lean (no net gain), bridge decks as surfaces (worse).
 
+Then measured for the first time, on the same code: six areas on the 30 m data and two on the free lidar (the
+same picture as 1 m lidar, but a hill town on 30 m: 42 against 26), and fourteen more places. Most are quiet (a
+suburb grid 0, a flat old city 2, two other cities 4 each); a steep hill city has 118, a fjord capital 85, a ring
+road interchange 67. On the hill city half are carriageways mapped side by side (bus lanes beside the main
+road), solved 0.5 to 1.3 m apart on a cross slope, whose decks overlap in plan: walking one road's line you are
+on the other's deck. Decks side by side need one surface or a wall between them; not started.
+
 Open, by how often it was measured:
 1. **Bridge parapets across side streets** that join a bridge at its end (a canal city: a 1.1 m rail across the
    mouth of each quay street). The bridge builder leaves parapets open for ground roads it finds on the deck
