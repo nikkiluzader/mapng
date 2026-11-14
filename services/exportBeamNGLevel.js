@@ -55,11 +55,11 @@ import { parallelMap, parallelThreads } from './parallel.js';
 import { measureStructures, roadLinesFromDecals } from './structures/metrics.js';
 import { buildStructureGraph } from './structures/graph.js';
 import { findCrossings } from './structures/crossings.js';
-import { solveProfilesSteps } from './structures/profileSolve.js';
+import { solveProfilesSteps, gradeLimit } from './structures/profileSolve.js';
 import { appendAll, keepInPlace } from './keepInPlace.js';
 import { classifyStructures } from './structures/structureRules.js';
 import { ringPlanePins } from './structures/rings.js';
-import { junctionMouthPins } from './structures/junctionMouths.js';
+import { junctionMouthPins, mouthsToRefuse } from './structures/junctionMouths.js';
 import { composeTerrain } from './structures/terrainCompose.js';
 import { addFineGroundDetail } from './terrainDetail.js';
 import { findPortalBuildings, portalBuildingTags } from './portalBuildings.js';
@@ -6227,7 +6227,20 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
             appendAll(structureGraph.pins, mouthFit.pins.filter(([k, i]) => !ringed.has(`${k}:${i}`)));
             structureGraph.mouths = { ends: mouthFit.mouths, stations: mouthFit.pins.length };
             if (mouthFit.pins.length) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Junction mouths: ${mouthFit.mouths} side-road ends (${mouthFit.pins.length} stations) held at the through road's height.`);
+            const zFirst = structureGraph.profile.z;
             structureGraph.profile = yield* solveProfilesSteps(structureGraph);
+            // (a mouth pin that left its road steeper than its class allows is taken back, and the roads solved once more)
+            if (mouthFit.pins.length) {
+              const refused = mouthsToRefuse(structureGraph, zFirst, structureGraph.profile.z, mouthFit.pins, gradeLimit);
+              if (refused.size) {
+                const drop = new Set(mouthFit.pins.filter(([k]) => refused.has(k)).map(([k, i]) => `${k}:${i}`));
+                const ringKeep = new Set(ringFit.pins.map(([k, i]) => `${k}:${i}`));
+                structureGraph.pins = structureGraph.pins.filter(([k, i]) => !drop.has(`${k}:${i}`) || ringKeep.has(`${k}:${i}`));
+                structureGraph.profile = yield* solveProfilesSteps(structureGraph);
+                structureGraph.mouths.refused = refused.size;
+                console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Junction mouths: ${refused.size} side road(s) had no room to reach the through road's height within their grade: left as they were.`);
+              }
+            }
             structureGraph.profile.ms = Math.round(performance.now() - t0);
             const again = structureGraph.edges.map((e, k) => ({
               nodes: Array.from(e.s, (_, i) => [e.x[i], e.y[i], structureGraph.profile.z[k][i], e.half]),
@@ -12626,7 +12639,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const sourceHeightMap = exportTerrainData.heightMap;
 
   const decalRoads = includeRoads
-    ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_, { raisedFootways: includeSidewalks, sidewalkStrips, structureSolver: options.structureSolver, includeBridges, includeTunnels, includeDams: includeBuildings && options.includeDams !== false, includeRailways: options.includeRailways !== false, shaping: shapingOptions, lidar: lidar?.grid ? lidar : null, rawAt: rawAtWorld })
+    ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_, { raisedFootways: includeSidewalks, sidewalkStrips, junctionMouths: options.junctionMouths, structureSolver: options.structureSolver, includeBridges, includeTunnels, includeDams: includeBuildings && options.includeDams !== false, includeRailways: options.includeRailways !== false, shaping: shapingOptions, lidar: lidar?.grid ? lidar : null, rawAt: rawAtWorld })
     : [];
   // Bridges: decks for the bridge roads; nothing ground-bound (sidewalks,
   // props, lamps) is built along them, nothing tall stands up into them.

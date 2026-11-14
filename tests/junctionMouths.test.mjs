@@ -37,3 +37,9 @@ test('nothing is pinned where no road runs through, or where a bridge is at the 
   const withBridge = [edge(-40, 0, 0, 0, 4), edge(0, 0, 40, 0, 4, { bridge: true }), edge(0, 0, 0, 40, 3)];
   assert.equal(junctionMouthPins(graphOf(withBridge, [[{ edge: 0, end: 1 }, { edge: 1, end: 0 }, { edge: 2, end: 0 }]]), withBridge.map((e) => e.s.map(() => 10))).pins.length, 0);
 });
+
+test('a slip road merging at a shallow angle is not pinned', () => {
+  const edges = [edge(-40, 0, 0, 0, 4), edge(0, 0, 40, 0, 4), edge(0, 0, -38, 8, 3)];   // leaves 12 degrees off the through line
+  const z = [edges[0].s.map(() => 10), edges[1].s.map(() => 10), edges[2].s.map((d) => 10 + 0.05 * d)];
+  assert.equal(junctionMouthPins(graphOf(edges, [[{ edge: 0, end: 1 }, { edge: 1, end: 0 }, { edge: 2, end: 0 }]]), z).pins.length, 0);
+});

@@ -12,6 +12,7 @@
 // road's own grade starts at the through road's edge. Ground roads only: decks and tunnels have their own care.
 
 const THROUGH_COS = Math.cos((35 * Math.PI) / 180);   // two roads within 35 degrees of straight on: one road through
+const MERGE_COS = Math.cos((30 * Math.PI) / 180);     // a road within 30 degrees of the through road's line is merging, not crossing
 const MOUTH_MARGIN_M = 0.5;                            // beyond the through road's half width
 const MOUTH_REACH_M = 25;                              // how far along a side road its mouth is looked for
 
@@ -50,8 +51,14 @@ export function junctionMouthPins(graph, z) {
     }
     if (line.length < 2) continue;
     const through = new Set(pair.map((p) => p.edge));
+    const along = outward(edges[pair[0].edge], pair[0].end);
     for (const { edge, end } of at) {
       if (through.has(edge)) continue;
+      // (a road that joins at a shallow angle, a slip road merging, runs inside the through road's width for
+      // tens of metres and is no side road: a frontage road was pinned 0.6 m up to a ramp merging into it,
+      // a hump with a 25 % slope, plain in its long section)
+      const out = outward(edges[edge], end);
+      if (Math.abs(out[0] * along[0] + out[1] * along[1]) > MERGE_COS) continue;
       const e = edges[edge]; const n = e.s.length; let any = false;
       for (let i = 0; i < n; i++) {
         const fromNode = end === 0 ? e.s[i] : e.length - e.s[i];
@@ -71,3 +78,21 @@ export function junctionMouthPins(graph, z) {
   }
   return { pins, mouths };
 }
+
+/**
+ * The side roads a mouth pin made worse: steeper somewhere than their class allows and than they were before it
+ * (a road with no room to reach the through road's height in the length it has: under a ramp it must clear, it
+ * came out with a 25 % kick). Their pins are taken back and the roads solved once more without them.
+ * zBefore, zAfter: the heights of the first solve and of the solve with the pins. limitOf(highway) -> grade.
+ */
+export function mouthsToRefuse(graph, zBefore, zAfter, pins, limitOf) {
+  const refused = new Set();
+  const steepest = (e, z) => { let m = 0; for (let i = 1; i < e.s.length; i++) { const d = e.s[i] - e.s[i - 1]; if (d > 0.2) m = Math.max(m, Math.abs(z[i] - z[i - 1]) / d); } return m; };
+  for (const k of new Set(pins.map(([edge]) => edge))) {
+    const e = graph.edges[k]; if (!e || !zBefore[k] || !zAfter[k]) continue;
+    const after = steepest(e, zAfter[k]); const before = steepest(e, zBefore[k]);
+    if (after > Math.max(before, limitOf(e.highway)) + REFUSE_OVER) refused.add(k);
+  }
+  return refused;
+}
+const REFUSE_OVER = 0.02;   // steeper by more than two points of grade than both: refused
