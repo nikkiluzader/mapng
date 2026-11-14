@@ -135,3 +135,14 @@ test('outside the Americas a road with no width gets narrower lanes and a narrow
   // applied twice changes nothing more
   assert.equal(applyRegionalWidths(gb, { countryCode: 'GB', region: 'Europe' }), 0);
 });
+
+test('with no tile budget every road is measured, a batch of pictures at a time', async () => {
+  // forty roads 1.1 km apart: far more tiles than one batch holds
+  const roads = Array.from({ length: 40 }, (_, i) => eastWest(45 + i * 0.01, 7, 1500, { highway: 'residential' }));
+  let held = 0; let most = 0; const asked = new Set();
+  const s = await measureRoadWidths(roads, { maxTiles: Infinity, loadTile: async (x, y) => { asked.add(`${x}/${y}`); held++; most = Math.max(most, held); return paintedTile(45 + Math.round((0) * 100) / 100, 3)(x, y); } });
+  assert.equal(s.skippedForBudget, 0);
+  assert.equal(s.tiles, asked.size);
+  assert.ok(s.tiles > 1500, `tiles ${s.tiles}`);
+  assert.ok(roads[0].tags.width, 'the road the picture shows is measured');
+});

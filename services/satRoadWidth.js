@@ -7,6 +7,7 @@
 // median of its cross-sections, and it is kept only where they agree: under trees, in shadow or between parked
 // cars they do not, and the road keeps the width it had. Opt in (Map data > Measure road widths), at Generate.
 import { loadDataImage } from './dataCache.js';
+import { desktopApp } from './platform/desktop.js';
 import { estimateRoadHalfWidth, isOneWayRoad } from './roadWidth.js';
 
 export const MEASURE_WIDTHS_STORAGE_KEY = 'mapng_measureRoadWidths';
@@ -21,6 +22,7 @@ const MIN_SECTIONS = 6;
 const EDGE_RUN_M = 1;         // the colour has to stay off the road's for this long
 const MIN_WIDTH_M = 2.5, MAX_WIDTH_M = 2 * HALF_M - 2;
 const WIDEN_MAX_M = 0.5;      // a measured width this much over the class's usual one is not believed
+const BATCH_TILES = 1500;     // pictures held at a time
 const MAX_TILES = 1500;       // one Generate (about 20 MB at most); main roads first
 const CONCURRENCY = 12;
 // (in order of who is measured first when the tile budget runs out)
@@ -145,24 +147,43 @@ export async function measureRoadWidths(features, { onProgress, signal, loadTile
     for (const k of fresh) wanted.set(k, null);
     taken.push(f);
   }
-  const keys = [...wanted.keys()]; let done = 0, at = 0;
-  const worker = async () => {
-    while (at < keys.length) {
-      signal?.throwIfAborted();
-      const k = keys[at++]; const [x, y] = k.split('/').map(Number);
-      wanted.set(k, await loadTile(x, y, signal));
-      if (++done % 50 === 0 || done === keys.length) onProgress?.(`Measuring road widths from the satellite picture: ${done}/${keys.length} tiles...`);
+  // The pictures are read a batch of roads at a time and let go again: a tile's pixels are a quarter of a
+  // megabyte, and with no budget (the desktop app) a city's roads lie on tens of thousands of tiles.
+  const total = wanted.size; let done = 0;
+  if (total) onProgress?.(`Measuring road widths from the satellite picture: 0/${total} tiles...`);
+  const seen = new Set();
+  const results = [];
+  const measureBatch = async (batch, tiles) => {
+    const keys = [...tiles.keys()]; let at = 0;
+    const worker = async () => {
+      while (at < keys.length) {
+        signal?.throwIfAborted();
+        const k = keys[at++]; const [x, y] = k.split('/').map(Number);
+        tiles.set(k, await loadTile(x, y, signal));
+        if (!seen.has(k)) { seen.add(k); done++; }
+        if (done % 50 === 0 || done === total) onProgress?.(`Measuring road widths from the satellite picture: ${done}/${total} tiles...`);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, keys.length) }, worker));
+    const colourAt = (lat, lng) => {
+      const p = pixelOf(lat, lng); const data = tiles.get(`${Math.floor(p.x / 256)}/${Math.floor(p.y / 256)}`);
+      if (!data) return null;
+      const i = ((Math.floor(p.y) & 255) * 256 + (Math.floor(p.x) & 255)) * 4;
+      return [data[i], data[i + 1], data[i + 2]];
+    };
+    for (const f of batch) results.push({ f, got: measureRoad(f.geometry, colourAt) });
+  };
+  {
+    let batch = []; let tiles = new Map();
+    for (const f of taken) {
+      const keys = new Set(); for (const s of sectionsOf(f.geometry)) for (const k of tilesOfSection(s)) keys.add(k);
+      if (batch.length && tiles.size + keys.size > BATCH_TILES) { await measureBatch(batch, tiles); batch = []; tiles = new Map(); }
+      for (const k of keys) tiles.set(k, null);
+      batch.push(f);
     }
-  };
-  if (keys.length) onProgress?.(`Measuring road widths from the satellite picture: 0/${keys.length} tiles...`);
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, keys.length) }, worker));
-  const colourAt = (lat, lng) => {
-    const p = pixelOf(lat, lng); const data = wanted.get(`${Math.floor(p.x / 256)}/${Math.floor(p.y / 256)}`);
-    if (!data) return null;
-    const i = ((Math.floor(p.y) & 255) * 256 + (Math.floor(p.x) & 255)) * 4;
-    return [data[i], data[i + 1], data[i + 2]];
-  };
-  const results = taken.map((f) => ({ f, got: measureRoad(f.geometry, colourAt) }));
+    if (batch.length) await measureBatch(batch, tiles);
+  }
+  const keys = { length: total };
   // (a named road: one width for all its pieces, from the pieces that agree, when enough of it does)
   const groups = new Map();
   for (const r of results) {
@@ -198,7 +219,9 @@ export async function measureRoadWidths(features, { onProgress, signal, loadTile
 /** The step Generate runs after the map data is in: measures when the setting is on; never fails the Generate. */
 export async function withMeasuredWidths(features, { onProgress, signal } = {}) {
   if (!measureWidthsEnabled() || !Array.isArray(features) || !features.length) return features;
-  try { await measureRoadWidths(features, { onProgress, signal }); } catch (e) {
+  // (the tile budget is for the website: a browser tab's memory and its user's connection. The desktop app
+  // measures every road, however many tiles that is)
+  try { await measureRoadWidths(features, { onProgress, signal, maxTiles: desktopApp ? Infinity : MAX_TILES }); } catch (e) {
     if (signal?.aborted) throw e;
     console.warn('[Road widths] measuring failed; roads keep their usual widths:', e?.message || e);
   }
