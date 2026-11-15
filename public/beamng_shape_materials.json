@@ -132,80 +132,6 @@
       "persistentId": "cd93bb97-6110-4371-ba67-9a48bca824d3",
       "version": 1.5
     },
-    "eca_bld_cleanmetal": {
-      "Stages": [
-        {
-          "colorMap": "/assets/materials/tileable/metal/italy_corrugated_metal/null.dds",
-          "diffuseColor": [
-            0.996078014,
-            0.996078014,
-            0.996078014,
-            1
-          ],
-          "normalMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_n.dds",
-          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
-          "reflectivityMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_r.dds",
-          "roughnessFactor": 0.812008262,
-          "specularMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_s.dds",
-          "useAnisotropic": true,
-          "vertColor": true
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": true
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": null
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": null
-        }
-      ],
-      "annotation": "BUILDINGS",
-      "class": "Material",
-      "dynamicCubemap": true,
-      "groundType": "METAL",
-      "mapTo": "eca_bld_cleanmetal",
-      "materialTag0": "beamng",
-      "materialTag1": "building",
-      "materialTag2": "east_coast_usa",
-      "name": "eca_bld_cleanmetal",
-      "persistentId": "f74c972d-e96b-4e13-9f3f-524f25dc4813",
-      "translucentBlendOp": "None"
-    },
-    "eca_bld_wood": {
-      "Stages": [
-        {
-          "colorMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_d.dds",
-          "normalMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_n.dds",
-          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
-          "specularMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_s.dds",
-          "useAnisotropic": true,
-          "vertColor": true
-        },
-        {},
-        {},
-        {}
-      ],
-      "annotation": "BUILDINGS",
-      "class": "Material",
-      "groundType": "WOOD",
-      "mapTo": "eca_bld_wood",
-      "materialTag0": "beamng",
-      "materialTag1": "building",
-      "materialTag2": "east_coast_usa",
-      "name": "eca_bld_wood",
-      "persistentId": "3b7d34ad-4b02-4c3f-8fb9-26ff0c34cb70",
-      "translucentBlendOp": "None"
-    },
     "holm_oak_branches": {
       "Stages": [
         {
@@ -690,80 +616,6 @@
       "translucent": true,
       "translucentBlendOp": "None",
       "version": 1.5
-    },
-    "eca_bld_cleanmetal": {
-      "Stages": [
-        {
-          "colorMap": "/assets/materials/tileable/metal/italy_corrugated_metal/null.dds",
-          "diffuseColor": [
-            0.996078014,
-            0.996078014,
-            0.996078014,
-            1
-          ],
-          "normalMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_n.dds",
-          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
-          "reflectivityMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_r.dds",
-          "roughnessFactor": 0.812008262,
-          "specularMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_s.dds",
-          "useAnisotropic": true,
-          "vertColor": true
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": true
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": null
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": null
-        }
-      ],
-      "annotation": "BUILDINGS",
-      "class": "Material",
-      "dynamicCubemap": true,
-      "groundType": "METAL",
-      "mapTo": "eca_bld_cleanmetal",
-      "materialTag0": "beamng",
-      "materialTag1": "building",
-      "materialTag2": "east_coast_usa",
-      "name": "eca_bld_cleanmetal",
-      "persistentId": "f74c972d-e96b-4e13-9f3f-524f25dc4813",
-      "translucentBlendOp": "None"
-    },
-    "eca_bld_wood": {
-      "Stages": [
-        {
-          "colorMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_d.dds",
-          "normalMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_n.dds",
-          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
-          "specularMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_s.dds",
-          "useAnisotropic": true,
-          "vertColor": true
-        },
-        {},
-        {},
-        {}
-      ],
-      "annotation": "BUILDINGS",
-      "class": "Material",
-      "groundType": "WOOD",
-      "mapTo": "eca_bld_wood",
-      "materialTag0": "beamng",
-      "materialTag1": "building",
-      "materialTag2": "east_coast_usa",
-      "name": "eca_bld_wood",
-      "persistentId": "3b7d34ad-4b02-4c3f-8fb9-26ff0c34cb70",
-      "translucentBlendOp": "None"
     },
     "eca_rocks": {
       "Stages": [
@@ -1290,55 +1142,6 @@
       "translucentBlendOp": "None",
       "version": 1.5
     },
-    "eca_bld_cleanmetal": {
-      "Stages": [
-        {
-          "colorMap": "/assets/materials/tileable/metal/italy_corrugated_metal/null.dds",
-          "diffuseColor": [
-            0.996078014,
-            0.996078014,
-            0.996078014,
-            1
-          ],
-          "normalMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_n.dds",
-          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
-          "reflectivityMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_r.dds",
-          "roughnessFactor": 0.812008262,
-          "specularMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_s.dds",
-          "useAnisotropic": true,
-          "vertColor": true
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": true
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": null
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": null
-        }
-      ],
-      "annotation": "BUILDINGS",
-      "class": "Material",
-      "dynamicCubemap": true,
-      "groundType": "METAL",
-      "mapTo": "eca_bld_cleanmetal",
-      "materialTag0": "beamng",
-      "materialTag1": "building",
-      "materialTag2": "east_coast_usa",
-      "name": "eca_bld_cleanmetal",
-      "persistentId": "f74c972d-e96b-4e13-9f3f-524f25dc4813",
-      "translucentBlendOp": "None"
-    },
     "eca_bld_metal_01_white_annotation_pole": {
       "Stages": [
         {
@@ -1434,31 +1237,6 @@
       "name": "eca_bld_metaltrim",
       "persistentId": "7ef7b0b0-2102-4ebb-a86b-0f6ee1d5e54c",
       "specularStrength0": "0.588235",
-      "translucentBlendOp": "None"
-    },
-    "eca_bld_wood": {
-      "Stages": [
-        {
-          "colorMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_d.dds",
-          "normalMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_n.dds",
-          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
-          "specularMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_s.dds",
-          "useAnisotropic": true,
-          "vertColor": true
-        },
-        {},
-        {},
-        {}
-      ],
-      "annotation": "BUILDINGS",
-      "class": "Material",
-      "groundType": "WOOD",
-      "mapTo": "eca_bld_wood",
-      "materialTag0": "beamng",
-      "materialTag1": "building",
-      "materialTag2": "east_coast_usa",
-      "name": "eca_bld_wood",
-      "persistentId": "3b7d34ad-4b02-4c3f-8fb9-26ff0c34cb70",
       "translucentBlendOp": "None"
     },
     "eca_rocks": {
@@ -1945,80 +1723,6 @@
       "persistentId": "cd93bb97-6110-4371-ba67-9a48bca824d3",
       "version": 1.5
     },
-    "eca_bld_cleanmetal": {
-      "Stages": [
-        {
-          "colorMap": "/assets/materials/tileable/metal/italy_corrugated_metal/null.dds",
-          "diffuseColor": [
-            0.996078014,
-            0.996078014,
-            0.996078014,
-            1
-          ],
-          "normalMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_n.dds",
-          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
-          "reflectivityMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_r.dds",
-          "roughnessFactor": 0.812008262,
-          "specularMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_s.dds",
-          "useAnisotropic": true,
-          "vertColor": true
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": true
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": null
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": null
-        }
-      ],
-      "annotation": "BUILDINGS",
-      "class": "Material",
-      "dynamicCubemap": true,
-      "groundType": "METAL",
-      "mapTo": "eca_bld_cleanmetal",
-      "materialTag0": "beamng",
-      "materialTag1": "building",
-      "materialTag2": "east_coast_usa",
-      "name": "eca_bld_cleanmetal",
-      "persistentId": "f74c972d-e96b-4e13-9f3f-524f25dc4813",
-      "translucentBlendOp": "None"
-    },
-    "eca_bld_wood": {
-      "Stages": [
-        {
-          "colorMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_d.dds",
-          "normalMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_n.dds",
-          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
-          "specularMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_s.dds",
-          "useAnisotropic": true,
-          "vertColor": true
-        },
-        {},
-        {},
-        {}
-      ],
-      "annotation": "BUILDINGS",
-      "class": "Material",
-      "groundType": "WOOD",
-      "mapTo": "eca_bld_wood",
-      "materialTag0": "beamng",
-      "materialTag1": "building",
-      "materialTag2": "east_coast_usa",
-      "name": "eca_bld_wood",
-      "persistentId": "3b7d34ad-4b02-4c3f-8fb9-26ff0c34cb70",
-      "translucentBlendOp": "None"
-    },
     "eca_rocks": {
       "Stages": [
         {
@@ -2420,80 +2124,6 @@
       "name": "cork_oak_trunk",
       "persistentId": "cd93bb97-6110-4371-ba67-9a48bca824d3",
       "version": 1.5
-    },
-    "eca_bld_cleanmetal": {
-      "Stages": [
-        {
-          "colorMap": "/assets/materials/tileable/metal/italy_corrugated_metal/null.dds",
-          "diffuseColor": [
-            0.996078014,
-            0.996078014,
-            0.996078014,
-            1
-          ],
-          "normalMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_n.dds",
-          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
-          "reflectivityMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_r.dds",
-          "roughnessFactor": 0.812008262,
-          "specularMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_s.dds",
-          "useAnisotropic": true,
-          "vertColor": true
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": true
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": null
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": null
-        }
-      ],
-      "annotation": "BUILDINGS",
-      "class": "Material",
-      "dynamicCubemap": true,
-      "groundType": "METAL",
-      "mapTo": "eca_bld_cleanmetal",
-      "materialTag0": "beamng",
-      "materialTag1": "building",
-      "materialTag2": "east_coast_usa",
-      "name": "eca_bld_cleanmetal",
-      "persistentId": "f74c972d-e96b-4e13-9f3f-524f25dc4813",
-      "translucentBlendOp": "None"
-    },
-    "eca_bld_wood": {
-      "Stages": [
-        {
-          "colorMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_d.dds",
-          "normalMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_n.dds",
-          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
-          "specularMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_s.dds",
-          "useAnisotropic": true,
-          "vertColor": true
-        },
-        {},
-        {},
-        {}
-      ],
-      "annotation": "BUILDINGS",
-      "class": "Material",
-      "groundType": "WOOD",
-      "mapTo": "eca_bld_wood",
-      "materialTag0": "beamng",
-      "materialTag1": "building",
-      "materialTag2": "east_coast_usa",
-      "name": "eca_bld_wood",
-      "persistentId": "3b7d34ad-4b02-4c3f-8fb9-26ff0c34cb70",
-      "translucentBlendOp": "None"
     },
     "eca_rocks": {
       "Stages": [
@@ -2931,55 +2561,6 @@
       "translucentBlendOp": "None",
       "version": 1.5
     },
-    "eca_bld_cleanmetal": {
-      "Stages": [
-        {
-          "colorMap": "/assets/materials/tileable/metal/italy_corrugated_metal/null.dds",
-          "diffuseColor": [
-            0.996078014,
-            0.996078014,
-            0.996078014,
-            1
-          ],
-          "normalMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_n.dds",
-          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
-          "reflectivityMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_r.dds",
-          "roughnessFactor": 0.812008262,
-          "specularMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_s.dds",
-          "useAnisotropic": true,
-          "vertColor": true
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": true
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": null
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": null
-        }
-      ],
-      "annotation": "BUILDINGS",
-      "class": "Material",
-      "dynamicCubemap": true,
-      "groundType": "METAL",
-      "mapTo": "eca_bld_cleanmetal",
-      "materialTag0": "beamng",
-      "materialTag1": "building",
-      "materialTag2": "east_coast_usa",
-      "name": "eca_bld_cleanmetal",
-      "persistentId": "f74c972d-e96b-4e13-9f3f-524f25dc4813",
-      "translucentBlendOp": "None"
-    },
     "eca_bld_metal_01_white_annotation_pole": {
       "Stages": [
         {
@@ -3075,31 +2656,6 @@
       "name": "eca_bld_metaltrim",
       "persistentId": "7ef7b0b0-2102-4ebb-a86b-0f6ee1d5e54c",
       "specularStrength0": "0.588235",
-      "translucentBlendOp": "None"
-    },
-    "eca_bld_wood": {
-      "Stages": [
-        {
-          "colorMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_d.dds",
-          "normalMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_n.dds",
-          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
-          "specularMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_s.dds",
-          "useAnisotropic": true,
-          "vertColor": true
-        },
-        {},
-        {},
-        {}
-      ],
-      "annotation": "BUILDINGS",
-      "class": "Material",
-      "groundType": "WOOD",
-      "mapTo": "eca_bld_wood",
-      "materialTag0": "beamng",
-      "materialTag1": "building",
-      "materialTag2": "east_coast_usa",
-      "name": "eca_bld_wood",
-      "persistentId": "3b7d34ad-4b02-4c3f-8fb9-26ff0c34cb70",
       "translucentBlendOp": "None"
     },
     "generibush_leaves": {
@@ -4036,80 +3592,6 @@
       "persistentId": "59793931-81a3-4a73-8348-8c5e7b1e4877",
       "version": 1.5
     },
-    "eca_bld_cleanmetal": {
-      "Stages": [
-        {
-          "colorMap": "/assets/materials/tileable/metal/italy_corrugated_metal/null.dds",
-          "diffuseColor": [
-            0.996078014,
-            0.996078014,
-            0.996078014,
-            1
-          ],
-          "normalMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_n.dds",
-          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
-          "reflectivityMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_r.dds",
-          "roughnessFactor": 0.812008262,
-          "specularMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_s.dds",
-          "useAnisotropic": true,
-          "vertColor": true
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": true
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": null
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": null
-        }
-      ],
-      "annotation": "BUILDINGS",
-      "class": "Material",
-      "dynamicCubemap": true,
-      "groundType": "METAL",
-      "mapTo": "eca_bld_cleanmetal",
-      "materialTag0": "beamng",
-      "materialTag1": "building",
-      "materialTag2": "east_coast_usa",
-      "name": "eca_bld_cleanmetal",
-      "persistentId": "f74c972d-e96b-4e13-9f3f-524f25dc4813",
-      "translucentBlendOp": "None"
-    },
-    "eca_bld_wood": {
-      "Stages": [
-        {
-          "colorMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_d.dds",
-          "normalMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_n.dds",
-          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
-          "specularMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_s.dds",
-          "useAnisotropic": true,
-          "vertColor": true
-        },
-        {},
-        {},
-        {}
-      ],
-      "annotation": "BUILDINGS",
-      "class": "Material",
-      "groundType": "WOOD",
-      "mapTo": "eca_bld_wood",
-      "materialTag0": "beamng",
-      "materialTag1": "building",
-      "materialTag2": "east_coast_usa",
-      "name": "eca_bld_wood",
-      "persistentId": "3b7d34ad-4b02-4c3f-8fb9-26ff0c34cb70",
-      "translucentBlendOp": "None"
-    },
     "leaves_strong": {
       "Stages": [
         {},
@@ -4358,80 +3840,6 @@
       "translucent": true,
       "translucentBlendOp": "None",
       "version": 1.5
-    },
-    "eca_bld_cleanmetal": {
-      "Stages": [
-        {
-          "colorMap": "/assets/materials/tileable/metal/italy_corrugated_metal/null.dds",
-          "diffuseColor": [
-            0.996078014,
-            0.996078014,
-            0.996078014,
-            1
-          ],
-          "normalMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_n.dds",
-          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
-          "reflectivityMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_r.dds",
-          "roughnessFactor": 0.812008262,
-          "specularMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_s.dds",
-          "useAnisotropic": true,
-          "vertColor": true
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": true
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": null
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": null
-        }
-      ],
-      "annotation": "BUILDINGS",
-      "class": "Material",
-      "dynamicCubemap": true,
-      "groundType": "METAL",
-      "mapTo": "eca_bld_cleanmetal",
-      "materialTag0": "beamng",
-      "materialTag1": "building",
-      "materialTag2": "east_coast_usa",
-      "name": "eca_bld_cleanmetal",
-      "persistentId": "f74c972d-e96b-4e13-9f3f-524f25dc4813",
-      "translucentBlendOp": "None"
-    },
-    "eca_bld_wood": {
-      "Stages": [
-        {
-          "colorMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_d.dds",
-          "normalMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_n.dds",
-          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
-          "specularMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_s.dds",
-          "useAnisotropic": true,
-          "vertColor": true
-        },
-        {},
-        {},
-        {}
-      ],
-      "annotation": "BUILDINGS",
-      "class": "Material",
-      "groundType": "WOOD",
-      "mapTo": "eca_bld_wood",
-      "materialTag0": "beamng",
-      "materialTag1": "building",
-      "materialTag2": "east_coast_usa",
-      "name": "eca_bld_wood",
-      "persistentId": "3b7d34ad-4b02-4c3f-8fb9-26ff0c34cb70",
-      "translucentBlendOp": "None"
     },
     "jri_rocks": {
       "Stages": [
@@ -7907,80 +7315,6 @@
       "translucentBlendOp": "None",
       "version": 1.5
     },
-    "eca_bld_cleanmetal": {
-      "Stages": [
-        {
-          "colorMap": "/assets/materials/tileable/metal/italy_corrugated_metal/null.dds",
-          "diffuseColor": [
-            0.996078014,
-            0.996078014,
-            0.996078014,
-            1
-          ],
-          "normalMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_n.dds",
-          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
-          "reflectivityMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_r.dds",
-          "roughnessFactor": 0.812008262,
-          "specularMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_s.dds",
-          "useAnisotropic": true,
-          "vertColor": true
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": true
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": null
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": null
-        }
-      ],
-      "annotation": "BUILDINGS",
-      "class": "Material",
-      "dynamicCubemap": true,
-      "groundType": "METAL",
-      "mapTo": "eca_bld_cleanmetal",
-      "materialTag0": "beamng",
-      "materialTag1": "building",
-      "materialTag2": "east_coast_usa",
-      "name": "eca_bld_cleanmetal",
-      "persistentId": "f74c972d-e96b-4e13-9f3f-524f25dc4813",
-      "translucentBlendOp": "None"
-    },
-    "eca_bld_wood": {
-      "Stages": [
-        {
-          "colorMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_d.dds",
-          "normalMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_n.dds",
-          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
-          "specularMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_s.dds",
-          "useAnisotropic": true,
-          "vertColor": true
-        },
-        {},
-        {},
-        {}
-      ],
-      "annotation": "BUILDINGS",
-      "class": "Material",
-      "groundType": "WOOD",
-      "mapTo": "eca_bld_wood",
-      "materialTag0": "beamng",
-      "materialTag1": "building",
-      "materialTag2": "east_coast_usa",
-      "name": "eca_bld_wood",
-      "persistentId": "3b7d34ad-4b02-4c3f-8fb9-26ff0c34cb70",
-      "translucentBlendOp": "None"
-    },
     "juniper_bark": {
       "Stages": [
         {
@@ -8349,6 +7683,106 @@
       "translucentBlendOp": "None",
       "translucentZWrite": true,
       "version": 1.5
+    }
+  },
+  "tag_models": {
+    "eca_bld_cleanmetal": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/tileable/metal/italy_corrugated_metal/null.dds",
+          "diffuseColor": [
+            0.996078014,
+            0.996078014,
+            0.996078014,
+            1
+          ],
+          "normalMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_n.dds",
+          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
+          "reflectivityMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_r.dds",
+          "roughnessFactor": 0.812008262,
+          "specularMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_s.dds",
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": true
+        },
+        {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        }
+      ],
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "dynamicCubemap": true,
+      "groundType": "METAL",
+      "mapTo": "eca_bld_cleanmetal",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "materialTag2": "east_coast_usa",
+      "name": "eca_bld_cleanmetal",
+      "persistentId": "f74c972d-e96b-4e13-9f3f-524f25dc4813",
+      "translucentBlendOp": "None"
+    },
+    "eca_bld_wood": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_d.dds",
+          "normalMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_n.dds",
+          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
+          "specularMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_s.dds",
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {},
+        {},
+        {}
+      ],
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "groundType": "WOOD",
+      "mapTo": "eca_bld_wood",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "materialTag2": "east_coast_usa",
+      "name": "eca_bld_wood",
+      "persistentId": "3b7d34ad-4b02-4c3f-8fb9-26ff0c34cb70",
+      "translucentBlendOp": "None"
+    },
+    "lod_vertcol": {
+      "Stages": [
+        {
+          "vertColor": true
+        },
+        {
+          "vertColor": null
+        },
+        {
+          "vertColor": null
+        },
+        {
+          "vertColor": null
+        }
+      ],
+      "class": "Material",
+      "groundType": "ASPHALT_OLD",
+      "mapTo": "lod_vertcol",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "name": "lod_vertcol",
+      "persistentId": "3122f280-003f-419e-ba18-ba85683d01ed",
+      "translucentBlendOp": "None"
     }
   },
   "tree_library": {
@@ -11711,80 +11145,6 @@
       "translucentBlendOp": "None",
       "version": 1.5
     },
-    "eca_bld_cleanmetal": {
-      "Stages": [
-        {
-          "colorMap": "/assets/materials/tileable/metal/italy_corrugated_metal/null.dds",
-          "diffuseColor": [
-            0.996078014,
-            0.996078014,
-            0.996078014,
-            1
-          ],
-          "normalMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_n.dds",
-          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
-          "reflectivityMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_r.dds",
-          "roughnessFactor": 0.812008262,
-          "specularMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_s.dds",
-          "useAnisotropic": true,
-          "vertColor": true
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": true
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": null
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": null
-        }
-      ],
-      "annotation": "BUILDINGS",
-      "class": "Material",
-      "dynamicCubemap": true,
-      "groundType": "METAL",
-      "mapTo": "eca_bld_cleanmetal",
-      "materialTag0": "beamng",
-      "materialTag1": "building",
-      "materialTag2": "east_coast_usa",
-      "name": "eca_bld_cleanmetal",
-      "persistentId": "f74c972d-e96b-4e13-9f3f-524f25dc4813",
-      "translucentBlendOp": "None"
-    },
-    "eca_bld_wood": {
-      "Stages": [
-        {
-          "colorMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_d.dds",
-          "normalMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_n.dds",
-          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
-          "specularMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_s.dds",
-          "useAnisotropic": true,
-          "vertColor": true
-        },
-        {},
-        {},
-        {}
-      ],
-      "annotation": "BUILDINGS",
-      "class": "Material",
-      "groundType": "WOOD",
-      "mapTo": "eca_bld_wood",
-      "materialTag0": "beamng",
-      "materialTag1": "building",
-      "materialTag2": "east_coast_usa",
-      "name": "eca_bld_wood",
-      "persistentId": "3b7d34ad-4b02-4c3f-8fb9-26ff0c34cb70",
-      "translucentBlendOp": "None"
-    },
     "juniper_bark": {
       "Stages": [
         {
@@ -12336,80 +11696,6 @@
       "name": "deserttree_trunk",
       "persistentId": "59793931-81a3-4a73-8348-8c5e7b1e4877",
       "version": 1.5
-    },
-    "eca_bld_cleanmetal": {
-      "Stages": [
-        {
-          "colorMap": "/assets/materials/tileable/metal/italy_corrugated_metal/null.dds",
-          "diffuseColor": [
-            0.996078014,
-            0.996078014,
-            0.996078014,
-            1
-          ],
-          "normalMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_n.dds",
-          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
-          "reflectivityMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_r.dds",
-          "roughnessFactor": 0.812008262,
-          "specularMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_s.dds",
-          "useAnisotropic": true,
-          "vertColor": true
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": true
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": null
-        },
-        {
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "useAnisotropic": null,
-          "vertColor": null
-        }
-      ],
-      "annotation": "BUILDINGS",
-      "class": "Material",
-      "dynamicCubemap": true,
-      "groundType": "METAL",
-      "mapTo": "eca_bld_cleanmetal",
-      "materialTag0": "beamng",
-      "materialTag1": "building",
-      "materialTag2": "east_coast_usa",
-      "name": "eca_bld_cleanmetal",
-      "persistentId": "f74c972d-e96b-4e13-9f3f-524f25dc4813",
-      "translucentBlendOp": "None"
-    },
-    "eca_bld_wood": {
-      "Stages": [
-        {
-          "colorMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_d.dds",
-          "normalMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_n.dds",
-          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
-          "specularMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_s.dds",
-          "useAnisotropic": true,
-          "vertColor": true
-        },
-        {},
-        {},
-        {}
-      ],
-      "annotation": "BUILDINGS",
-      "class": "Material",
-      "groundType": "WOOD",
-      "mapTo": "eca_bld_wood",
-      "materialTag0": "beamng",
-      "materialTag1": "building",
-      "materialTag2": "east_coast_usa",
-      "name": "eca_bld_wood",
-      "persistentId": "3b7d34ad-4b02-4c3f-8fb9-26ff0c34cb70",
-      "translucentBlendOp": "None"
     },
     "eca_rocks": {
       "Stages": [

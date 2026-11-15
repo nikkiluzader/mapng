@@ -1,0 +1,26 @@
+{
+ "about": "Made by scripts/tag-library/from-catalogue.mjs from data/model-picks.json: the models the export places per OSM tag and region. yaw: degrees added to the direction a model should face. Read by services/tagModels.js.",
+ "tags": {
+  "amenity=bench": {
+   "any": [
+    {
+     "shape": "/levels/east_coast_usa/art/shapes/clutter/clutter_city_bench_wood.dae",
+     "yaw": -90,
+     "size": [
+      2,
+      0.56,
+      0.85
+     ],
+     "box": [
+      -1,
+      -0.36,
+      0,
+      1,
+      0.21,
+      0.85
+     ]
+    }
+   ]
+  }
+ }
+}

@@ -1,0 +1,9 @@
+{
+ "about": "The models MapNG places for an OSM tag, chosen from data/game-model-catalogue.json: per tag, per region of the world (any, north-america, europe, tropical), in order of preference; the first is the usual one, the rest are variety. And what is known of a model beyond the catalogue's own record: yaw, the degrees added to the direction it should face so its front looks that way (a bench's seat towards the road), and seen, the day it was looked at in the running game. scripts/tag-library/from-catalogue.mjs checks this file against the catalogue and writes data/tag-models.json, which the export reads (services/tagModels.js).",
+ "models": {
+  "/levels/east_coast_usa/art/shapes/clutter/clutter_city_bench_wood.dae": { "yaw": -90, "note": "the seat's front is the model's +Y" }
+ },
+ "picks": {
+  "amenity=bench": { "any": ["/levels/east_coast_usa/art/shapes/clutter/clutter_city_bench_wood.dae"] }
+ }
+}

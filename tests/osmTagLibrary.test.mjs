@@ -58,7 +58,8 @@ test('every model the code names is in the library (trees, bushes and rocks are 
 });
 
 test('a model marked as used today is one the code really names', () => {
-  const all = sources.map(([, t]) => t).join('\n').toLowerCase();
+  // (the code names a model in its own text, or through the picks it reads: data/tag-models.json)
+  const all = (sources.map(([, t]) => t).join('\n') + fs.readFileSync(new URL('data/tag-models.json', root), 'utf8')).toLowerCase();
   const stale = everyAsset.filter(([, a]) => a.usedToday).filter(([, a]) => {
     const p = norm(a.shape); const base = p.split('/').pop().replace(/\.dae$/, '');
     // (named whole, or put together from a folder and a name: the road signs)
@@ -113,4 +114,27 @@ test('every catalogue model marked use is listed under each of its tags the libr
   for (const m of cat.models) if (m.mark === 'use') for (const tag of m.tags) if (tags[tag] && !tags[tag].assets.some((a) => a.shape === m.shape)) missing.push(`${tag}: ${m.shape}`);
   assert.deepEqual(missing, [], 'run node scripts/tag-library/from-catalogue.mjs');
   for (const tag of Object.keys(cat.tagsNotInLibrary)) assert.ok(!tags[tag], `${tag} is in the library`);
+});
+
+// data/tag-models.json: what the export reads, made from the picks (data/model-picks.json).
+test('the models picked per tag are catalogue models marked use, with a pick for anywhere', async () => {
+  const picked = JSON.parse(fs.readFileSync(new URL('data/tag-models.json', root), 'utf8')).tags;
+  const picks = JSON.parse(fs.readFileSync(new URL('data/model-picks.json', root), 'utf8')).picks;
+  assert.deepEqual(Object.keys(picked).sort(), Object.keys(picks).sort(), 'run node scripts/tag-library/from-catalogue.mjs');
+  for (const [tag, byRegion] of Object.entries(picked)) {
+    assert.ok(tags[tag], `${tag} is in the library`);
+    assert.ok(byRegion.any?.length, `${tag}: a model for anywhere`);
+    for (const [region, models] of Object.entries(byRegion)) {
+      assert.ok(lib.regions.includes(region), `${tag}: region ${region}`);
+      assert.deepEqual(models.map((m) => m.shape), picks[tag][region], `${tag} ${region}: run node scripts/tag-library/from-catalogue.mjs`);
+      for (const m of models) { assert.equal(inCat.get(m.shape)?.mark, 'use', `${tag}: ${m.shape}`); assert.ok(Number.isFinite(m.yaw) && m.size?.length === 3 && m.box?.length === 6, `${tag}: ${m.shape} yaw, size, box`); }
+    }
+  }
+  const { tagModel, tagModelsFor, regionOfBiome } = await import('../services/tagModels.js');
+  assert.equal(regionOfBiome('italy'), 'europe'); assert.equal(regionOfBiome('nowhere'), 'any');
+  const bench = tagModel('amenity=bench', 'italy');
+  assert.ok(bench.shapeFile.endsWith('.dae') && Number.isFinite(bench.yawOffset));
+  // (the same n, the same model; a tag with no pick, none)
+  assert.equal(tagModel('amenity=bench', 'utah', 7).shapeFile, tagModel('amenity=bench', 'utah', 7).shapeFile);
+  assert.equal(tagModel('amenity=nothing_picked', 'utah'), null); assert.deepEqual(tagModelsFor('amenity=nothing_picked', 'utah'), []);
 });

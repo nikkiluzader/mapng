@@ -663,7 +663,7 @@
       "assumeParking": "Assume street parking",
       "assumeParkingHint": "On: town streets with no parking tags get a parking lane each side (about 2.3 m), as many real streets have. Off: only mapped parking, so those streets come out narrower.",
       "followSurvey": "Every road follows the lidar survey",
-      "followSurveyHint": "On: on lidar (a few metres or finer) every road, main roads and motorways too, runs at the slope the survey measured along it, 35% at most. Off: tertiary roads and smaller do; main roads keep their class's grade. Never beside a bridge or tunnel, and not on the global 30 m.",
+      "followSurveyHint": "On: on lidar (a few metres or finer) every road, primary and secondary roads too, runs at the slope the survey measured along it, 35% at most. Off: tertiary roads and smaller do; main roads keep their class's grade. Motorways and trunk roads always keep their class's grade. Never beside a bridge or tunnel, and not on the global 30 m.",
       "decalSidewalks": "Sidewalks as decals",
       "decalSidewalksHint": "On: sidewalks and footpaths are flat strips painted on the ground, with no curbs. Quicker to export, a smaller level, and you can drive over them. Off: raised slabs with curbs.",
       "roadSurface": "Road surfaces",

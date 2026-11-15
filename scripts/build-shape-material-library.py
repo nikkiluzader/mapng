@@ -180,6 +180,11 @@ def main():
     if os.path.exists(PROP_LIBRARY):
         prop_src = open(PROP_LIBRARY, encoding="utf-8").read()
         sets["prop_library"] = sorted(set(re.findall(r"shapeFile:\s*'([^']+\.(?:dae|cdae))'", prop_src, re.I)))
+    # The models picked per OSM tag (data/tag-models.json, services/tagModels.js): their own set too.
+    tag_models = os.path.join(REPO, "data/tag-models.json")
+    if os.path.exists(tag_models):
+        picked = json.load(open(tag_models, encoding="utf-8"))["tags"]
+        sets["tag_models"] = sorted({m["shape"] for by_region in picked.values() for models in by_region.values() for m in models})
     out = {}
     problems = []
     for set_id, daes in sets.items():

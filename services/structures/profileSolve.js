@@ -71,7 +71,10 @@ const FINE_SHORT_OVER_LONG = 1.3;
 const FINE_CLEAR_OF_STRUCTURE_M = 60;
 // (nor a primary or secondary road: built to its grade, and where the survey shows more along its mapped line the
 // line is off the road, on the slope beside it)
-const NEVER_FOLLOWS = new Set(['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link']);
+const MAIN_ROADS = new Set(['primary', 'primary_link', 'secondary', 'secondary_link']);
+// (the sweep with every class following: the decks of a motorway interchange three times as often too steep, its
+// ramps down the walls a bare-earth survey leaves where their structures were. They never follow.)
+const NEVER_FOLLOWS = new Set(['motorway', 'motorway_link', 'trunk', 'trunk_link']);
 const GROUND_BAND_M = 6;      // an untagged road's free fill / cut for grades
 const UNDER_FREE_M = 3;       // a road under a deck is cleared from at most this over its ground
 const PIN_REACH_FACTOR = 2.5; // a lift reaches no higher than this many times the grade limit climbs from a pinned road
@@ -158,8 +161,8 @@ function allowedRise(e, structure = !!(e.bridge || e.tunnel), fine = false, stru
   const slope = (p, q, need) => { const span = e.s[q] - e.s[p]; return span >= need ? Math.abs(g(q) - g(p)) / span : 0; };
   const rail = railKindOfClass(e.highway);
   const ceiling = (GRADE_CEILING[e.highway] ?? RAIL_GRADE_CEILING[rail] ?? GRADE_CEILING_DEFAULT) * 0.97;   // (a margin under the checks)
-  // (everyClass: the export's "Every road follows the lidar survey", main roads and motorways too)
-  const follows = fine && !rail && (everyClass || !NEVER_FOLLOWS.has(e.highway));
+  // (everyClass: the export's "Every road follows the lidar survey", primary and secondary roads too)
+  const follows = fine && !rail && !NEVER_FOLLOWS.has(e.highway) && (everyClass || !MAIN_ROADS.has(e.highway));
   let a = 0; let b = 0; let a2 = 0; let b2 = 0; let a3 = 0; let b3 = 0;
   for (let i = 0; i + 1 < n; i++) {
     const ds = e.s[i + 1] - e.s[i];

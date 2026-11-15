@@ -658,7 +658,7 @@
       "assumeParking": "Supposer du stationnement sur rue",
       "assumeParkingHint": "Activé : les rues de ville sans balises de stationnement reçoivent une bande de stationnement de chaque côté (environ 2,3 m), comme beaucoup de rues réelles. Désactivé : seul le stationnement cartographié ; ces rues sont plus étroites.",
       "followSurvey": "Chaque route suit le relevé lidar",
-      "followSurveyHint": "Activé : sur lidar (quelques mètres ou plus fin), chaque route, y compris les routes principales et les autoroutes, suit la pente que le relevé a mesurée le long de son tracé, 35 % au plus. Désactivé : seulement les routes tertiaires et plus petites ; les routes principales gardent la pente de leur classe. Jamais près d’un pont ou d’un tunnel, ni sur les 30 m mondiaux.",
+      "followSurveyHint": "Activé : sur lidar (quelques mètres ou plus fin), chaque route, y compris les routes primaires et secondaires, suit la pente que le relevé a mesurée le long de son tracé, 35 % au plus. Désactivé : seulement les routes tertiaires et plus petites ; les routes principales gardent la pente de leur classe. Les autoroutes et voies rapides gardent toujours la pente de leur classe. Jamais près d’un pont ou d’un tunnel, ni sur les 30 m mondiaux.",
       "decalSidewalks": "Trottoirs en décalques",
       "decalSidewalksHint": "Activé : les trottoirs et les chemins sont des bandes plates peintes au sol, sans bordures. Export plus rapide, niveau plus léger, et on peut rouler dessus. Désactivé : dalles surélevées avec bordures.",
       "roadSurface": "Surfaces des routes",

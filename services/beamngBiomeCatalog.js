@@ -182,11 +182,6 @@ const ASSET_SETS = {
         lightForward: 2.4,
         yawOffset: 0,
       },
-      bench: {
-        shapeFile: '/levels/east_coast_usa/art/shapes/clutter/clutter_city_bench_wood.dae',
-        // Seat front assumed local +Y; flip the sign if benches face away in-game.
-        yawOffset: -Math.PI / 2,
-      },
     },
     managedItemTemplates: {
       cypress_tree: {
@@ -392,11 +387,6 @@ const ASSET_SETS = {
         lightForward: 0.8,
         yawOffset: 0,
       },
-      bench: {
-        shapeFile: '/levels/east_coast_usa/art/shapes/clutter/clutter_city_bench_wood.dae',
-        // Seat front assumed local +Y; flip the sign if benches face away in-game.
-        yawOffset: -Math.PI / 2,
-      },
     },
     managedItemTemplates: {
       Juniper_tree_01: {
@@ -471,11 +461,6 @@ const ASSET_SETS = {
         lightForward: 0.8,
         yawOffset: 0,
       },
-      bench: {
-        shapeFile: '/levels/east_coast_usa/art/shapes/clutter/clutter_city_bench_wood.dae',
-        // Seat front assumed local +Y; flip the sign if benches face away in-game.
-        yawOffset: -Math.PI / 2,
-      },
     },
     managedItemTemplates: {
       Juniper_tree_01: {
@@ -525,11 +510,6 @@ const ASSET_SETS = {
         lightHeight: 6.4,
         lightForward: 0.8,
         yawOffset: 0,
-      },
-      bench: {
-        shapeFile: '/levels/east_coast_usa/art/shapes/clutter/clutter_city_bench_wood.dae',
-        // Seat front assumed local +Y; flip the sign if benches face away in-game.
-        yawOffset: -Math.PI / 2,
       },
     },
     managedItemTemplates: {
@@ -603,11 +583,6 @@ const ASSET_SETS = {
         lightForward: 0.8,
         yawOffset: 0,
       },
-      bench: {
-        shapeFile: '/levels/east_coast_usa/art/shapes/clutter/clutter_city_bench_wood.dae',
-        // Seat front assumed local +Y; flip the sign if benches face away in-game.
-        yawOffset: -Math.PI / 2,
-      },
     },
     managedItemTemplates: {
       deserttree_bush_medium: {
@@ -663,11 +638,6 @@ const ASSET_SETS = {
         lightHeight: 6.4,
         lightForward: 0.8,
         yawOffset: 0,
-      },
-      bench: {
-        shapeFile: '/levels/east_coast_usa/art/shapes/clutter/clutter_city_bench_wood.dae',
-        // Seat front assumed local +Y; flip the sign if benches face away in-game.
-        yawOffset: -Math.PI / 2,
       },
     },
     managedItemTemplates: {
@@ -733,11 +703,6 @@ const ASSET_SETS = {
         lightForward: 0.8,
         yawOffset: 0,
       },
-      bench: {
-        shapeFile: '/levels/east_coast_usa/art/shapes/clutter/clutter_city_bench_wood.dae',
-        // Seat front assumed local +Y; flip the sign if benches face away in-game.
-        yawOffset: -Math.PI / 2,
-      },
     },
     managedItemTemplates: {
       palm_medium: {
@@ -800,11 +765,6 @@ const ASSET_SETS = {
         lightForward: 0.8,
         yawOffset: 0,
       },
-      bench: {
-        shapeFile: '/levels/east_coast_usa/art/shapes/clutter/clutter_city_bench_wood.dae',
-        // Seat front assumed local +Y; flip the sign if benches face away in-game.
-        yawOffset: -Math.PI / 2,
-      },
     },
     managedItemTemplates: {
       cork_oak_bush_large: {
@@ -848,11 +808,6 @@ const ASSET_SETS = {
         lightHeight: 6.4,
         lightForward: 0.8,
         yawOffset: 0,
-      },
-      bench: {
-        shapeFile: '/levels/east_coast_usa/art/shapes/clutter/clutter_city_bench_wood.dae',
-        // Seat front assumed local +Y; flip the sign if benches face away in-game.
-        yawOffset: -Math.PI / 2,
       },
     },
     managedItemTemplates: {
@@ -913,11 +868,6 @@ const ASSET_SETS = {
         lightForward: 0.8,
         yawOffset: 0,
       },
-      bench: {
-        shapeFile: '/levels/east_coast_usa/art/shapes/clutter/clutter_city_bench_wood.dae',
-        // Seat front assumed local +Y; flip the sign if benches face away in-game.
-        yawOffset: -Math.PI / 2,
-      },
     },
     managedItemTemplates: {
       cork_oak_bush_large: {
@@ -952,11 +902,6 @@ const ASSET_SETS = {
         lightHeight: 7.6,
         lightForward: 2.4,
         yawOffset: 0,
-      },
-      bench: {
-        shapeFile: '/levels/east_coast_usa/art/shapes/clutter/clutter_city_bench_wood.dae',
-        // Seat front assumed local +Y; flip the sign if benches face away in-game.
-        yawOffset: -Math.PI / 2,
       },
     },
     managedItemTemplates: {
@@ -1469,7 +1414,8 @@ export async function getShapeMaterialDefsForBiome(biome) {
   const library = await loadShapeMaterialLibrary();
   // The regional tree palette and the street props first, so the biome's own
   // sets win name clashes.
-  const merged = { ...(library?.tree_library ?? {}), ...(library?.prop_library ?? {}) };
+  // (tag_models: the models picked per OSM tag, data/tag-models.json)
+  const merged = { ...(library?.tree_library ?? {}), ...(library?.prop_library ?? {}), ...(library?.tag_models ?? {}) };
   for (const assetSetId of biome?.assetSetIds ?? []) {
     Object.assign(merged, library?.[assetSetId] ?? {});
   }

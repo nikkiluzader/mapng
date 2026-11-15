@@ -388,7 +388,9 @@ test('profile: with "Every road follows the lidar survey" a main road follows th
     const { z } = solveProfiles({ edges: [e], nodes, pins: [], fineGround: true, followSurvey, crossings: { crossings: [], water: [] } });
     return Math.max(...Array.from(e.s, (_, i) => Math.abs(z[0][i] - e.g[i])));
   };
-  for (const highway of ['secondary', 'primary', 'motorway']) {
+  // (never a motorway or trunk road: switched on or off, its class holds)
+  assert.ok(off('motorway', true) > 2 && off('trunk_link', true) > 2, `a motorway, switched on: ${off('motorway', true).toFixed(2)} m`);
+  for (const highway of ['secondary', 'primary']) {
     assert.ok(off(highway, true) < 1.2, `${highway}, switched on: ${off(highway, true).toFixed(2)} m off its ground`);
     assert.ok(off(highway, false) > off(highway, true) + 1, `${highway}, off: ${off(highway, false).toFixed(2)} m (its class grade)`);
   }

@@ -55,6 +55,7 @@ import { parallelMap, parallelThreads } from './parallel.js';
 import { measureStructures, roadLinesFromDecals } from './structures/metrics.js';
 import { buildStructureGraph } from './structures/graph.js';
 import { findCrossings } from './structures/crossings.js';
+import { tagModel } from './tagModels.js';
 import { solveProfilesSteps, gradeLimit } from './structures/profileSolve.js';
 import { appendAll, keepInPlace } from './keepInPlace.js';
 import { classifyStructures } from './structures/structureRules.js';
@@ -8167,7 +8168,8 @@ function buildBeamNGExportReport({
     'Summary',
     `- Level display name: ${levelDisplayName}`,
     `- Level folder name: ${levelName}`,
-    `- Biome: ${biome?.label || biome?.name || biome?.id || 'n/a'}`,
+    // (nobody picks it any more: worked out from the place, services/beamngRegion.js)
+    `- Regional look (worked out from the place; the ground textures, lamps, rocks and ground cover follow it): ${biome?.label || biome?.name || biome?.id || 'n/a'}`,
     `- Export started (UTC): ${formatIsoTimestamp(exportStartedAt)}`,
     `- Report generated (UTC): ${formatIsoTimestamp(reportGeneratedAt)}`,
     `- Processing time before ZIP compression: ${formatDurationMs(totalDurationMs)}`,
@@ -8224,7 +8226,7 @@ function buildBeamNGExportReport({
     ...(sanitizeTreeModelsOff(options?.treeModelsOff).length ? [`- Tree models left out (Fine-tuning): ${sanitizeTreeModelsOff(options.treeModelsOff).join(', ')}`] : []),
     `- Include rocks: ${formatBool(options?.includeRocks)}`,
     `- Street parking assumed where none is mapped: ${formatBool(options?.assumeParking === true)}`,
-    `- Roads follow the lidar survey's slope: ${originalTerrainData?.coarseElevation ? 'no (coarse elevation here: class grades)' : options?.roadsFollowSurvey !== false ? 'every road, 35% at most' : 'tertiary roads and smaller, 35% at most; main roads keep their class grade (switched off)'}`,
+    `- Roads follow the lidar survey's slope: ${originalTerrainData?.coarseElevation ? 'no (coarse elevation here: class grades)' : options?.roadsFollowSurvey !== false ? 'every road but motorways and trunk roads, 35% at most' : 'tertiary roads and smaller, 35% at most; main roads keep their class grade (switched off)'}`,
     `- View distance: ${viewDistanceChoice(options?.viewDistance) === 'auto' ? 'auto (the map\'s width, 4 km at least, 16 km at most)' : `${viewDistanceChoice(options?.viewDistance)} m`} (LevelInfo visibleDistance)`,
     `- Road surfaces: ${options?.roadSurface === 'hero' ? 'Hero Roads (experimental): built by a script when the level loads, over MapNG\'s decal roads (hidden under them, kept for traffic); editable in the World Editor > Hero Road, rebuilt from MapNG\'s roads at each load' : options?.roadSurface === 'mesh' ? 'Mesh Roads (experimental): a MeshRoad deck saved in the level under each paved road on the ground, MapNG\'s decal roads drawn on it (and kept for traffic)' : 'decal roads'}`,
     `- Include sidewalks: ${formatBool(options?.includeSidewalks !== false)}${options?.includeSidewalks !== false ? ` (${options?.sidewalkStyle === 'decal' ? 'as decals: flat strips on the ground, no curbs' : `as meshes: raised slabs with curbs, ${Math.round((CURB_HEIGHTS_M[options?.curbHeight] ?? CURB_HEIGHTS_M.standard) * 100)} cm high`})` : ''}`,
@@ -9729,6 +9731,7 @@ function nearestDeckRoad(carriageways, x, y) {
 
 function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriageways = [], deckCarriageways = [], deckParts = [], props = null, underDeck = () => false, deckAt = () => null, seaZ = -Infinity, roadLamps = true } = {}) {
   const profile = getStreetFurnitureProfile(biome);
+  const benchModel = tagModel('amenity=bench', biome);
   if (!profile) return [];
 
   const features = terrainData.osmFeatures?.filter((feature) => (
@@ -9818,7 +9821,8 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
     // (a marina's seating isn't worth placing by guess: none on a deck)
     if (deckZ !== null && isBench) continue;
 
-    const asset = isLamp ? profile.lamp : profile.bench;
+    // (a bench: the model picked for amenity=bench in this region, services/tagModels.js)
+    const asset = isLamp ? profile.lamp : benchModel;
     if (!asset?.shapeFile) continue;
 
     // Face the nearest road; explicit OSM direction tags override.
@@ -9891,15 +9895,15 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
   // Benches along major town streets (streetProps.js), facing the road.
   for (let i = 0; i < (props?.benches.length ?? 0) && benchCount < caps.benches; i++) {
     const b = props.benches[i];
-    if (!profile.bench?.shapeFile) break;
+    if (!benchModel?.shapeFile) break;
     objects.push({
       __parent: 'street_furniture',
       class: 'TSStatic',
       name: `bench_gen_${i}`,
       persistentId: generatePersistentId(),
       position: [roundTo(b.x, 3), roundTo(b.y, 3), roundTo(b.z, 3)],
-      rotationMatrix: rotationMatrixFromYaw(b.yaw + (profile.bench.yawOffset ?? 0)),
-      shapeName: profile.bench.shapeFile,
+      rotationMatrix: rotationMatrixFromYaw(b.yaw + (benchModel.yawOffset ?? 0)),
+      shapeName: benchModel.shapeFile,
       useInstanceRenderData: true,
     });
     benchCount++;

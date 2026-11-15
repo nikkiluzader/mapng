@@ -17,6 +17,8 @@ const data = JSON.parse(fs.readFileSync(`${REFS}/organizer-data.json`, 'utf8'));
 const mine = fs.existsSync(`${REFS}/organizer-result.json`) ? JSON.parse(fs.readFileSync(`${REFS}/organizer-result.json`, 'utf8')) : {};
 const lib = JSON.parse(fs.readFileSync('data/osm-tag-library.json', 'utf8'));
 const TODAY = '2026-11-15';
+// The models chosen per tag and region, and what is known of a model beyond its record (data/model-picks.json).
+const picks = JSON.parse(fs.readFileSync('data/model-picks.json', 'utf8'));
 
 // The catalogue as it stands: the first sort, with the owner's own moves, marks and tags on top.
 const catName = Object.fromEntries([...data.categories, ...(mine.customCategories || [])].map((c) => [c.id, c.name]));
@@ -42,6 +44,7 @@ const record = (m) => ({
   mark: m.use, is: m.useWhy || '', tags: m.osm,
   size: m.size ? m.size.map((v) => round(v, 2)) : null, box: m.box ? m.box.map((v) => round(v, 2)) : null,
   materials: m.materials || [], ...(copiesOf[m.path] ? { copies: copiesOf[m.path].sort() } : {}),
+  ...(Number.isFinite(picks.models?.[m.path]?.yaw) ? { yaw: picks.models[m.path].yaw } : {}),
 });
 const records = kept.map(record).sort((a, b) => a.shape.localeCompare(b.shape));
 const inCatalogue = new Map(records.map((r) => [r.shape, r]));
@@ -63,7 +66,8 @@ const catalogue = {
 // The tag library's model lists.
 // (a model the code names stays listed even where it is not marked as placed today: the test asks for it)
 const code = fs.readdirSync('services').filter((f) => f.endsWith('.js')).map((f) => fs.readFileSync(`services/${f}`, 'utf8')).join('\n').toLowerCase();
-const namedInCode = (shape) => code.includes(shape.toLowerCase()) || code.includes(shape.toLowerCase().replace(/^\//, ''));
+const picked = new Set(Object.values(picks.picks).flatMap((byRegion) => Object.values(byRegion).flat()).map((s) => s.toLowerCase()));
+const namedInCode = (shape) => picked.has(shape.toLowerCase()) || code.includes(shape.toLowerCase()) || code.includes(shape.toLowerCase().replace(/^\//, ''));
 const verdictOf = new Map(models.map((m) => [m.path, m]));
 let removed = 0; let noted = 0; let added = 0; let keptCurated = 0;
 const changes = [];
@@ -93,6 +97,27 @@ for (const [tag, e] of [...Object.entries(lib.tags), ...Object.entries(lib.untag
   e.assets = out;
 }
 lib.about = 'Every OpenStreetMap tag MapNG cares about, what it builds for it, and the game\'s own models that stand for it. status: built | partial | planned | ignored. tests/osmTagLibrary.test.mjs keeps it in step with the code (What to build, what is fetched, the models the code names) and with data/game-model-catalogue.json, where each model\'s size, anchor and materials are. A model\'s entry: usedToday (the code places it now), from: "catalogue" (listed by scripts/tag-library/from-catalogue.mjs from the picture review of ' + TODAY + '), maybe (needs a decision before use), picture (what its photo shows, where that is not what the code uses it for), seen (looked at in the running game). A model from another level needs that level\'s materials shipped with the export: public/beamng_shape_materials.json, made by scripts/build-shape-material-library.py.';
+
+// data/tag-models.json: what the export reads (services/tagModels.js). Small: only the tags with a pick, each
+// model with what a placer needs (its yaw, size and anchor box).
+const tagModels = {};
+for (const [tag, byRegion] of Object.entries(picks.picks)) {
+  if (!lib.tags[tag]) throw new Error(`model-picks.json: ${tag} is not in the tag library`);
+  tagModels[tag] = {};
+  for (const [region, shapes] of Object.entries(byRegion)) {
+    if (!lib.regions.includes(region)) throw new Error(`model-picks.json: ${tag}: no region ${region}`);
+    tagModels[tag][region] = shapes.map((shape) => {
+      const r = inCatalogue.get(shape);
+      if (!r || r.mark !== 'use') throw new Error(`model-picks.json: ${tag}: ${shape} is not a model marked use in the catalogue`);
+      if (!r.tags.includes(tag) && !lib.tags[tag].assets.some((a) => a.shape === shape && a.usedToday)) throw new Error(`model-picks.json: ${tag}: ${shape} does not carry the tag`);
+      return { shape, yaw: r.yaw ?? 0, size: r.size, box: r.box };
+    });
+  }
+  if (!tagModels[tag].any?.length) throw new Error(`model-picks.json: ${tag} needs a pick for "any" (what is placed where no region's own is chosen)`);
+  // (the library says which of a tag's models are the picks, first choice first)
+  for (const a of lib.tags[tag].assets) { delete a.pick; const at = Object.values(byRegion).map((s) => s.indexOf(a.shape)).filter((i) => i >= 0); if (at.length) a.pick = Math.min(...at) + 1; }
+}
+fs.writeFileSync('data/tag-models.json', JSON.stringify({ about: 'Made by scripts/tag-library/from-catalogue.mjs from data/model-picks.json: the models the export places per OSM tag and region. yaw: degrees added to the direction a model should face. Read by services/tagModels.js.', tags: tagModels }, null, 1) + '\n');
 
 // Written with one model per line, so the files stay readable and their diffs small.
 const oneLine = (key) => (k, v) => (k === key && Array.isArray(v) ? v.map((x) => `\u0001${JSON.stringify(x)}\u0001`) : v);

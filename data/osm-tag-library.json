@@ -453,7 +453,7 @@
    "fetched": true,
    "builds": "A bench facing the nearest road (or its mapped direction)",
    "assets": [
-    {"shape":"/levels/east_coast_usa/art/shapes/clutter/clutter_city_bench_wood.dae","region":"north-america","setting":"city","usedToday":true},
+    {"shape":"/levels/east_coast_usa/art/shapes/clutter/clutter_city_bench_wood.dae","region":"north-america","setting":"city","usedToday":true,"pick":1},
     {"shape":"/levels/italy/art/shapes/buildings/italy_clutter_metalbench.dae","region":"europe","setting":"city","usedToday":false},
     {"shape":"/levels/italy/art/shapes/buildings/italy_clutter_pstone_bench.dae","region":"europe","setting":"city","usedToday":false},
     {"shape":"/levels/italy/art/shapes/buildings/italy_clutter_pwood_bench.dae","region":"europe","usedToday":false},
