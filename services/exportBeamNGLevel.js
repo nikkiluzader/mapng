@@ -9655,6 +9655,8 @@ const lampLink = (lightName) => ({ child: lightName, instanceColor: [0, 0, 0, 1]
  * ([[x, y, z]...]). High-voltage lines (power=line) stand on lattice towers, one at every
  * vertex of the line.
  */
+// A lattice tower's base is 7.8 m square: a line's vertex this near a building's wall has the tower in the wall.
+const TOWER_BASE_CLEAR_M = 7;
 function collectMappedStreetProps(terrainData, squareSize) {
   const out = { hydrants: [], bins: [], benches: [], poles: [], powerLines: [] };
   const toWorld = (p) => {
@@ -9678,6 +9680,17 @@ function collectMappedStreetProps(terrainData, squareSize) {
         if ((a.lat > p.lat) !== (b.lat > p.lat) && p.lng < ((b.lng - a.lng) * (p.lat - a.lat)) / (b.lat - a.lat) + a.lng) inside = !inside;
       }
       if (inside) return r.on;
+    }
+    // (beside a building's wall, within a tower's own base: the tower would stand in the wall. Hoover Dam's
+    // powerhouse: seven mapped 3 to 4 m outside its outline stood inside it)
+    const kx = 111320 * Math.cos((p.lat * Math.PI) / 180); const ky = 110574; const m = TOWER_BASE_CLEAR_M;
+    for (const r of solids) {
+      if (r.on === 'water' || p.lat < r.s - m / ky || p.lat > r.n + m / ky || p.lng < r.w - m / kx || p.lng > r.e + m / kx) continue;
+      for (let i = 0, j = r.g.length - 1; i < r.g.length; j = i++) {
+        const ax = (r.g[i].lng - p.lng) * kx; const ay = (r.g[i].lat - p.lat) * ky; const bx = (r.g[j].lng - p.lng) * kx; const by = (r.g[j].lat - p.lat) * ky;
+        const vx = bx - ax; const vy = by - ay; const u = Math.max(0, Math.min(1, -(ax * vx + ay * vy) / (vx * vx + vy * vy || 1e-9)));
+        if (Math.hypot(ax + vx * u, ay + vy * u) < m) return r.on;
+      }
     }
     return false;
   };
