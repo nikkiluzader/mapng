@@ -75,3 +75,42 @@ test('every model exists in the game (checked where the catalogue of the game\'s
   const have = new Set(JSON.parse(fs.readFileSync(catalogue, 'utf8')).map((m) => m.path));
   assert.deepEqual(everyAsset.filter(([, a]) => !have.has(a.shape)).map(([name, a]) => `${name}: ${a.shape}`), []);
 });
+
+// data/game-model-catalogue.json: the models MapNG can place, by path; the library lists the same models by tag.
+const cat = JSON.parse(fs.readFileSync(new URL('data/game-model-catalogue.json', root), 'utf8'));
+const inCat = new Map(cat.models.map((m) => [m.shape, m]));
+
+test('the model catalogue is well formed', () => {
+  assert.equal(inCat.size, cat.models.length, 'a model is listed once');
+  for (const m of cat.models) {
+    assert.match(m.shape, /^\/(levels|art|assets)\/.+\.dae$/i, m.shape);
+    assert.ok(['use', 'maybe'].includes(m.mark), `${m.shape}: mark`);
+    assert.ok(cat.categories[m.category], `${m.shape}: category ${m.category}`);
+    assert.ok(lib.regions.includes(m.region), `${m.shape}: region`);
+    assert.ok(m.size === null || (m.size.length === 3 && m.size.every((v) => v >= 0)), `${m.shape}: size`);
+    assert.ok(m.box === null || m.box.length === 6, `${m.shape}: box`);
+    for (const tag of m.tags) assert.match(tag, /^[A-Za-z0-9_:]+=[^\s=]+$/, `${m.shape}: ${tag}`);
+    // (a copy of a kept model is not a model of its own)
+    for (const c of m.copies || []) assert.ok(!inCat.has(c), `${m.shape}: its copy ${c} is listed too`);
+  }
+  assert.deepEqual(cat.counts, { use: cat.models.filter((m) => m.mark === 'use').length, maybe: cat.models.filter((m) => m.mark === 'maybe').length });
+});
+
+test('a model listed under a tag is in the catalogue with that tag, unless the code places it today', () => {
+  const wrong = [];
+  for (const [tag, e] of Object.entries(tags)) for (const a of e.assets) {
+    if (a.usedToday || a.picture) continue;   // (named by the code: listed whatever its picture shows, with a note)
+    const m = inCat.get(a.shape);
+    if (!m) wrong.push(`${tag}: ${a.shape} is not in the catalogue`);
+    else if (!m.tags.includes(tag)) wrong.push(`${tag}: ${a.shape} does not carry the tag`);
+    else if ((m.mark === 'maybe') !== Boolean(a.maybe)) wrong.push(`${tag}: ${a.shape} is ${m.mark} in the catalogue`);
+  }
+  assert.deepEqual(wrong, [], 'run node scripts/tag-library/from-catalogue.mjs');
+});
+
+test('every catalogue model marked use is listed under each of its tags the library has', () => {
+  const missing = [];
+  for (const m of cat.models) if (m.mark === 'use') for (const tag of m.tags) if (tags[tag] && !tags[tag].assets.some((a) => a.shape === m.shape)) missing.push(`${tag}: ${m.shape}`);
+  assert.deepEqual(missing, [], 'run node scripts/tag-library/from-catalogue.mjs');
+  for (const tag of Object.keys(cat.tagsNotInLibrary)) assert.ok(!tags[tag], `${tag} is in the library`);
+});
