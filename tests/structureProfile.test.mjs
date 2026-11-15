@@ -358,3 +358,20 @@ test('profile: on fine elevation a street follows the slope the survey measured,
   // a motorway ramp never follows a wall in the data
   assert.ok(deepest('motorway_link', true) > 2, `a motorway ramp on fine elevation: ${deepest('motorway_link', true).toFixed(2)} m`);
 });
+
+test('profile: a street beside a bridge does not follow the wall a bare-earth survey shows at its abutment', async () => {
+  const { solveProfiles } = await import('../services/structures/profileSolve.js');
+  // flat ground at 20 m, a 7 m drop over 12 m where the abutment was (the survey took the bridge out), then the
+  // bridge over a trench: the street stays up to meet its bridge
+  const x = []; const g = [];
+  for (let d = 0; d <= 200; d += 4) { x.push(d); g.push(d < 180 ? 20 : Math.max(13, 20 - (d - 180) * (7 / 12))); }
+  const n = x.length;
+  const street = { x: Float64Array.from(x), y: new Float64Array(n), s: Float64Array.from(x), g: Float64Array.from(g), from: 'A', to: 'B', highway: 'residential', layer: 0, half: 3.5, bridge: false, tunnel: false };
+  const bx = []; for (let d = 0; d <= 60; d += 4) bx.push(200 + d);
+  const bridge = { x: Float64Array.from(bx), y: new Float64Array(bx.length), s: Float64Array.from(bx.map((v) => v - 200)), g: Float64Array.from(bx.map(() => 13)), from: 'B', to: 'C', highway: 'residential', layer: 1, half: 3.5, bridge: true, tunnel: false };
+  const nodes = new Map([['A', { edges: [{ edge: 0, end: 0 }] }], ['B', { edges: [{ edge: 0, end: 1 }, { edge: 1, end: 0 }] }], ['C', { edges: [{ edge: 1, end: 1 }] }]]);
+  const { z } = solveProfiles({ edges: [street, bridge], nodes, pins: [], fineGround: true, crossings: { crossings: [], water: [] } });
+  let steepest = 0;
+  for (let i = 0; i + 1 < n; i++) steepest = Math.max(steepest, Math.abs(z[0][i + 1] - z[0][i]) / 4);
+  assert.ok(steepest <= 0.26, `the street runs at ${(steepest * 100).toFixed(0)}% at most (its class, not the wall's 58%)`);
+});
