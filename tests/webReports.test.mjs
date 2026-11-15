@@ -54,3 +54,32 @@ test('a job that never ended leaves a note; one that ends, or a page closed the 
   markJobStart('generate', { code: 'x'.repeat(2 * 1024 * 1024) }); assert.equal(unfinishedJob().code, '');
   markJobEnd();
 });
+
+test('a report\'s log never holds a key: named values, GPXZ-shaped keys and address passwords are hidden', async () => {
+  const { hideSecretsInText } = await import('../services/personalKeys.js');
+  const key = 'ak_' + 'Ab12Cd34_Ef56Gh78Ij90KlMn0';
+  // (the line a website report carried: the export options as the page logged them)
+  const line = `[BeamNG Export UI] Effective export options: {"baseTexture":"satellite","backdropGpxzApiKey":"${key}","backdropImagery":"standard"}`;
+  const out = hideSecretsInText(line);
+  assert.ok(!out.includes(key) && !out.includes(key.slice(0, 12)), out);
+  assert.match(out, /"baseTexture":"satellite"/);
+  assert.match(out, /"backdropImagery":"standard"/);
+  // (a key with no name beside it, a query value, a password in an address, an escaped JSON string)
+  assert.ok(!hideSecretsInText(`limit reached for ${key} today`).includes(key));
+  assert.ok(!hideSecretsInText(`https://x.example/v1?api_key=${key}&res=1`).includes(key));
+  assert.match(hideSecretsInText('https://me:hunter2@overpass.example/api'), /^https:\/\/overpass\.example\/api$/);
+  assert.ok(!hideSecretsInText(JSON.stringify({ o: JSON.stringify({ gpxzApiKey: 'plainsecretvalue123' }) })).includes('plainsecretvalue123'));
+  // (and ordinary lines are left as they are)
+  const plain = '[BeamNG Export Service] Street props: 0 hydrants, 131 poles, 706 wires in 7 tile(s).';
+  assert.equal(hideSecretsInText(plain), plain);
+});
+
+test('failures with a plain reason: the browser\'s storage giving out, a part of the map no longer held', async () => {
+  const { isBrowserStorageGone, isMapPartGone, MAP_PART_GONE, isDiskFull } = await import('../services/errorText.js');
+  const real = Object.assign(new Error('The requested file could not be read, typically due to permission problems that have occurred after a reference to a file was acquired.'), { name: 'NotReadableError' });
+  assert.ok(isBrowserStorageGone(real));
+  assert.ok(isBrowserStorageGone({ message: real.message }));
+  assert.ok(!isBrowserStorageGone(new Error('Failed to fetch')) && !isDiskFull(real.message));
+  assert.ok(isMapPartGone(new Error(`${MAP_PART_GONE}: "satelliteTextureUrl" (Failed to fetch)`)));
+  assert.ok(!isMapPartGone(new Error('Failed to fetch')));
+});

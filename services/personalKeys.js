@@ -30,3 +30,15 @@ export function withoutPersonal(value, depth = 0) {
   }
   return out;
 }
+
+/**
+ * Text (a log, an error) with anything key-like hidden: a value beside a name like key, token or password, the
+ * user:password part of an address, and anything shaped like a GPXZ key. A problem report's log goes through
+ * this before it is kept or sent (a website report held its sender's GPXZ key: the page logs its export options).
+ */
+export function hideSecretsInText(text) {
+  return String(text || '')
+    .replace(/([a-z][a-z0-9+.-]*:\/\/)[^/@\s"']*@/gi, '$1')
+    .replace(/((?:api[_-]?key|key|token|secret|password)\\?["']?\s*[:=]\s*\\?["']?)[^\s"'&,}\\]+/gi, '$1[hidden]')
+    .replace(/\bak_[A-Za-z0-9_-]{8,}/g, '[hidden]');
+}

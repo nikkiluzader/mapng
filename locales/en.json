@@ -1265,6 +1265,8 @@
       "osmUnavailable": "OpenStreetMap servers aren't responding right now, so the terrain was generated without roads, buildings or other map features. Try again in a few minutes.",
       "uploadUnreadable": "The uploaded elevation could not be read.",
       "diskFull": "The disk is full: MapNG could not save its working files. Free up some space (large maps need several gigabytes) and try again.",
+      "browserStorage": "The browser could not keep this level's files: a map this large needs more temporary room than the browser allows. Free up disk space and close other tabs, pick a smaller size, or use the MapNG desktop app, which has no such limit.",
+      "mapPartGone": "MapNG no longer holds part of this map (it was cleared from memory). Run Generate again, then export.",
       "fetchTerrain": "Failed to fetch terrain data. The requested area might be too large or service is down.",
       "usgsFallback": "USGS 1m data for this area was missing or corrupt. Falling back to the global 30 m dataset.\n\nOutput remains on the app's current processing grid.",
       "kron86Fallback": "NMT EVRF2007 data is only available for supported Poland tiles. Falling back to the global 30 m dataset."

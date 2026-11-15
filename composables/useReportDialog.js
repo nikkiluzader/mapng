@@ -1,5 +1,6 @@
 import { ref } from 'vue';
 import { encodeSessionCode } from '../services/sessionConfig.js';
+import { consoleTail } from '../services/webReports.js';
 
 // The desktop app's report dialog (components/modals/ReportDialog.vue),
 // opened from anywhere: after a crash (on start), a failed export, generate
@@ -20,7 +21,12 @@ export async function currentSessionCode() {
   try { return config ? await encodeSessionCode(config) : ''; } catch { return ''; }
 }
 
-export function openReportDialog(kind, ctx = {}) { request.value = { kind, ctx: JSON.parse(JSON.stringify(ctx || {})) }; }
+export function openReportDialog(kind, ctx = {}) {
+  const copy = JSON.parse(JSON.stringify(ctx || {}));
+  // (no job log to send: the window's own last lines, keys hidden, go in its place on the desktop)
+  if (!copy.logPath) copy.pageLog = consoleTail();
+  request.value = { kind, ctx: copy };
+}
 export function closeReportDialog() { request.value = null; }
 export const useReportDialog = () => ({ request, openReportDialog, closeReportDialog });
 

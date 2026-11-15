@@ -72,7 +72,9 @@ export function prepareReport(kind, ctx = {}, { build = '', settings = {}, gpu =
     memory: { totalGB: +(os.totalmem() / 2 ** 30).toFixed(1), freeGB: +(os.freemem() / 2 ** 30).toFixed(1), cpus: os.cpus().length },
     // (graphics: what the window's WebGL names, then what the app itself knows: device ids, driver, features switched off)
     gpu: [String(ctx.gpu || '').slice(0, 400), String(gpu || '').slice(0, 600)].filter(Boolean).join(' | '),
-    log: ctx.logPath ? scrubText(readTail(ctx.logPath, MAX_LOG_CHARS)) : '',
+    // (a failure before any job ran has no job log: the window's own last lines then. A report of "Failed to fetch"
+    // while the map was handed to the exporter came with nothing to go on)
+    log: ctx.logPath ? scrubText(readTail(ctx.logPath, MAX_LOG_CHARS)) : typeof ctx.pageLog === 'string' ? scrubText(ctx.pageLog).slice(-MAX_LOG_CHARS) : '',
     // (a level's own export_report.txt, read from its zip by the main process: kind 'level')
     level: String(ctx.level || '').slice(0, 120),
     exportReport: typeof ctx.exportReport === 'string' ? scrubText(ctx.exportReport).slice(0, MAX_EXPORT_REPORT_CHARS) : '',

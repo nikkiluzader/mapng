@@ -11,7 +11,7 @@
 // It is posted to /api/crash (worker/crashReports.js), which keeps it in
 // private storage only the developer reads.
 
-import { withoutPersonal } from './personalKeys.js';
+import { withoutPersonal, hideSecretsInText } from './personalKeys.js';
 
 const TAIL_LINES = 400;
 const LINE_CHARS = 400;
@@ -28,14 +28,15 @@ export function installConsoleTail(target = globalThis.console) {
     target[level] = (...args) => {
       try {
         const text = args.map((a) => (typeof a === 'string' ? a : a instanceof Error ? `${a.name}: ${a.message}` : (() => { try { return JSON.stringify(a); } catch { return String(a); } })())).join(' ');
-        tail.push(`${level === 'log' ? '' : `${level.toUpperCase()} `}${String(text).slice(0, LINE_CHARS)}`);
+        // (keys hidden before the line is cut: a cut key would no longer look like one)
+        tail.push(`${level === 'log' ? '' : `${level.toUpperCase()} `}${hideSecretsInText(text).slice(0, LINE_CHARS)}`);
         if (tail.length > TAIL_LINES) tail.splice(0, tail.length - TAIL_LINES);
       } catch { /* a line that cannot be kept */ }
       original(...args);
     };
   }
 }
-export const consoleTail = () => tail.join('\n');
+export const consoleTail = () => hideSecretsInText(tail.join('\n'));
 
 /** The browser and system in a few words, from the user agent: "Chrome 142 on Windows". */
 export function browserSummary(ua = globalThis.navigator?.userAgent || '') {
@@ -59,7 +60,7 @@ export async function prepareReport(kind, ctx = {}) {
     build: String(ctx.build || ''),
     platform: 'web',
     os: browserSummary(),
-    error: String(ctx.error || '').slice(0, 4000),
+    error: hideSecretsInText(ctx.error).slice(0, 4000),
     description: String(ctx.description || '').slice(0, 4000),
     options: ctx.options && typeof ctx.options === 'object' ? withoutPersonal(JSON.parse(JSON.stringify(ctx.options, (k, v) => (typeof v === 'function' || /key|token|secret|password/i.test(k) ? undefined : v)))) : null,
     area: ctx.area && typeof ctx.area === 'object' ? ctx.area : null,

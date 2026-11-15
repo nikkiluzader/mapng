@@ -634,7 +634,7 @@
 
 <script setup>
 import { backdropSourceCovers, effectiveBackdropSource } from '../../services/backdropSources.js';
-import { isDiskFull } from '../../services/errorText.js';
+import { isDiskFull, isBrowserStorageGone, isMapPartGone } from '../../services/errorText.js';
 import { ref, shallowRef, computed, watch, nextTick, onUnmounted, toRaw } from 'vue';
 import { useMainStore } from '../../stores/mainStore';
 import { useI18n } from 'vue-i18n';
@@ -1023,7 +1023,8 @@ const terrainChoiceChangedSinceGenerate = computed(() => {
 });
 let lastExportOptions = null;
 const reportDesktopExportFailure = () => openReportDialog('export', {
-  error: beamNGDesktopFailed.value?.message || '',
+  // (the failure as it was raised, not the translated line on the card: a report is read in English)
+  error: beamNGDesktopFailed.value?.raw || beamNGDesktopFailed.value?.message || '',
   logPath: beamNGDesktopFailed.value?.logPath || null,
   options: lastExportOptions,
   area: { lat: props.center?.lat, lng: props.center?.lng, resolution: props.terrainData?.width, metersPerPixel: resolveProcessingMetersPerPixel(props.terrainData) },
@@ -2260,7 +2261,8 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       roadType: effectiveRoadType,
       includeBackdrop: effectiveIncludeBackdrop,
       backdropElevationSource: effectiveBackdropSource,
-      backdropGpxzApiKey: effectiveBackdropGpxzApiKey,
+      // (whether there is a key, never the key: these lines are a problem report's log)
+      hasBackdropGpxzKey: !!effectiveBackdropGpxzApiKey,
       backdropImagery: effectiveBackdropSource === 'global30m' ? beamNGBackdropImagery.value : 'standard',
       backdropStitchLimit,
       includeBuildings: effectiveIncludeBuildings,
@@ -2426,7 +2428,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
     });
     // (the desktop app says why and keeps the export's log)
     // (why it failed, kept on screen with the offer to send a report: the desktop app's log, or the page's last lines)
-    beamNGDesktopFailed.value = { message: isDiskFull(error?.message || error) ? t('app.error.diskFull') : (error?.message || String(error) || t('export.errorBeamngLevel')), logPath: error?.logPath || null }; showExportOutcome('mapng-export-outcome-failed');
+    beamNGDesktopFailed.value = { raw: `${error?.name && error.name !== 'Error' ? `${error.name}: ` : ''}${error?.message || error}`, message: isDiskFull(error?.message || error) ? t('app.error.diskFull') : isBrowserStorageGone(error) ? t('app.error.browserStorage') : isMapPartGone(error) ? t('app.error.mapPartGone') : (error?.message || String(error) || t('export.errorBeamngLevel')), logPath: error?.logPath || null }; showExportOutcome('mapng-export-outcome-failed');
   } finally {
     markJobEnd();
     heavyJobRunning.value = false;

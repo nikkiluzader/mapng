@@ -4,6 +4,7 @@
 // The terrain data goes over as files of a job (desktop/runner/jobFormat.mjs
 // reads them back): the OSM features as JSON, typed arrays as their bytes,
 // canvases and images as PNGs, the rest inline in job.json.
+import { MAP_PART_GONE } from '../errorText.js';
 import { jsonArrayChunks, jsonArrayReader } from '../bigJson.js';
 import { getLoadedOsmFile } from '../osmFile.js';
 import { toRaw } from 'vue';
@@ -67,7 +68,8 @@ async function pack(value, key, job) {
     }
     // (images by blob:/data: URL: the URL dies with the page, so the image goes)
     if (/^(blob|data):/.test(value)) {
-      const blob = await (await fetch(value)).blob();
+      // (a link that no longer leads anywhere fails as "Failed to fetch", which names nothing: say which value)
+      const blob = await fetch(value).then((r) => r.blob()).catch((e) => { throw new Error(`${MAP_PART_GONE}: "${key}" (${e?.message || e})`); });
       const file = name();
       await sendBlob(job.id, file, blob);
       return { $file: file, as: 'blobUrl', type: blob.type };

@@ -5,6 +5,7 @@
 // the developer when the CRASH_MAIL send_email binding is configured; read
 // back only with the CRASH_ADMIN_TOKEN secret (public/crash-reports.html).
 import { countReport } from './publicStats.js';
+import { hideSecretsInText } from '../services/personalKeys.js';
 import { DAILY, overBudget, overRate } from './limits.js';
 
 const PREFIX = 'crash-reports/';
@@ -53,7 +54,7 @@ export function reportSummary(body, id, receivedAt) {
     build: oneLine(body.build, 80),
     platform: oneLine(body.platform, 40),
     os: oneLine(body.os, 120),
-    error: clip(body.error, 4000),
+    error: clip(hideSecretsInText(body.error), 4000),
     description: clip(body.description, 4000),
     options: smallObject(body.options),
     area: smallObject(body.area),
@@ -210,8 +211,8 @@ export async function handleCrashReports(request, env, ctx, url, json) {
     const dir = `${PREFIX}${receivedAt.slice(0, 10)}/${receivedAt.slice(11, 19).replace(/:/g, '')}-${id}/`;
     const summary = reportSummary(body, id, receivedAt);
     const writes = [env.OSM_TILES.put(`${dir}report.json`, JSON.stringify(summary, null, 1), { httpMetadata: { contentType: 'application/json' } })];
-    if (summary.hasLog) writes.push(env.OSM_TILES.put(`${dir}log.txt`, body.log.slice(-MAX_LOG_CHARS), { httpMetadata: { contentType: 'text/plain; charset=utf-8' } }));
-    if (summary.hasExportReport) writes.push(env.OSM_TILES.put(`${dir}export_report.txt`, body.exportReport.slice(0, MAX_EXPORT_REPORT_CHARS), { httpMetadata: { contentType: 'text/plain; charset=utf-8' } }));
+    if (summary.hasLog) writes.push(env.OSM_TILES.put(`${dir}log.txt`, hideSecretsInText(body.log.slice(-MAX_LOG_CHARS)), { httpMetadata: { contentType: 'text/plain; charset=utf-8' } }));
+    if (summary.hasExportReport) writes.push(env.OSM_TILES.put(`${dir}export_report.txt`, hideSecretsInText(body.exportReport.slice(0, MAX_EXPORT_REPORT_CHARS)), { httpMetadata: { contentType: 'text/plain; charset=utf-8' } }));
     if (summary.hasDump) {
       try {
         const bin = Uint8Array.from(atob(body.minidump), (c) => c.charCodeAt(0));

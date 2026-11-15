@@ -1260,6 +1260,8 @@
       "osmUnavailable": "Los servidores de OpenStreetMap no responden en este momento, así que el terreno se generó sin carreteras, edificios ni otros elementos del mapa. Inténtalo de nuevo en unos minutos.",
       "uploadUnreadable": "No se pudo leer la elevación subida.",
       "diskFull": "El disco está lleno: MapNG no pudo guardar sus archivos de trabajo. Libera espacio (los mapas grandes necesitan varios gigabytes) e inténtalo de nuevo.",
+      "browserStorage": "El navegador no pudo conservar los archivos de este nivel: un mapa tan grande necesita más espacio temporal del que permite el navegador. Libera espacio en disco y cierra otras pestañas, elige un tamaño menor o usa la aplicación de escritorio de MapNG, que no tiene ese límite.",
+      "mapPartGone": "MapNG ya no conserva parte de este mapa (se borró de la memoria). Vuelve a pulsar Generar y luego exporta.",
       "fetchTerrain": "No se pudieron obtener los datos del terreno. El área solicitada puede ser demasiado grande o el servicio no está disponible.",
       "usgsFallback": "Los datos USGS 1m de esta zona faltan o están corruptos. Se usará el conjunto global de 30 m.\n\nLa salida se mantiene en la cuadrícula de procesamiento actual de la app.",
       "kron86Fallback": "Los datos NMT EVRF2007 solo están disponibles para teselas compatibles de Polonia. Se usará el conjunto global de 30 m."

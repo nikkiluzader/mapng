@@ -37,5 +37,7 @@ export function scrubText(text, home = os.homedir()) {
   }
   // (and no address keeps a user:password part)
   t = t.replace(/([a-z][a-z0-9+.-]*:\/\/)[^/@\s"']*@/gi, '$1');
-  return t.replace(/((?:api[_-]?key|key|token|secret|password)["']?\s*[:=]\s*["']?)[^\s"'&,}]+/gi, '$1[hidden]');
+  // (and anything shaped like a GPXZ key, whatever stands beside it)
+  t = t.replace(/((?:api[_-]?key|key|token|secret|password)["']?\s*[:=]\s*["']?)[^\s"'&,}]+/gi, '$1[hidden]');
+  return t.replace(/\bak_[A-Za-z0-9_-]{8,}/g, '[hidden]');
 }
