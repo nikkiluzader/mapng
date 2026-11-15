@@ -1,6 +1,6 @@
 {
  "version": 1,
- "about": "Every OpenStreetMap tag MapNG cares about, what it builds for it, and the game's own models that stand for it. status: built | partial | planned | ignored. A reference for now: tests/osmTagLibrary.test.mjs keeps it in step with the code (What to build, what is fetched, the models the code names). Researched 2026-11-15; models were matched by name and most have not been looked at in the game yet.",
+ "about": "Every OpenStreetMap tag MapNG cares about, what it builds for it, and the game's own models that stand for it. status: built | partial | planned | ignored. A reference for now: tests/osmTagLibrary.test.mjs keeps it in step with the code (What to build, what is fetched, the models the code names). Researched 2026-11-15; models were matched by name, and only those with `seen` have been looked at in the game (`is`: what it really is, `size`: metres across, deep, high). A model from another level needs that level's materials shipped with the export: public/beamng_shape_materials.json, made by scripts/build-shape-material-library.py.",
  "countsFrom": "taginfo, 2026-11-14",
  "regions": [
   "any",
@@ -30,7 +30,14 @@
     {
      "shape": "/levels/hirochi_raceway/art/shapes/objects/billboard_10x5.dae",
      "region": "any",
-     "usedToday": false
+     "usedToday": false,
+     "is": "A billboard on legs",
+     "size": [
+      11.7,
+      0.4,
+      10.3
+     ],
+     "seen": "2026-11-15"
     },
     {
      "shape": "/levels/italy/art/shapes/buildings/italy_billboard_cola_independent.dae",
@@ -416,7 +423,14 @@
     {
      "shape": "/levels/small_island/art/shapes/buildings/si_wind_vane.dae",
      "region": "tropical",
-     "usedToday": false
+     "usedToday": false,
+     "is": "A thin mast with a fitting on top (not made out from a distance)",
+     "size": [
+      0.8,
+      0.6,
+      6.4
+     ],
+     "seen": "2026-11-15"
     },
     {
      "shape": "/levels/small_island/art/shapes/buildings/si_wind_vane_flag.dae",
@@ -916,18 +930,26 @@
     {
      "shape": "/levels/west_coast_usa/art/shapes/objects/postbox_blue.dae",
      "region": "north-america",
-     "usedToday": false
-    },
-    {
-     "shape": "/levels/johnson_valley/art/shapes/building/s_postbox.dae",
-     "region": "north-america",
-     "setting": "rural",
-     "usedToday": false
+     "usedToday": false,
+     "is": "A blue street collection box (American)",
+     "size": [
+      0.6,
+      0.6,
+      1.6
+     ],
+     "seen": "2026-11-15"
     },
     {
      "shape": "/levels/italy/art/shapes/buildings/italy_clutter_mailbox.dae",
      "region": "europe",
-     "usedToday": false
+     "usedToday": false,
+     "is": "A small red post box, wall or post mounted (Italian)",
+     "size": [
+      0.5,
+      0.3,
+      0.7
+     ],
+     "seen": "2026-11-15"
     },
     {
      "shape": "/levels/italy/art/shapes/buildings/italy_clutter_mailboxstand.dae",
@@ -1053,7 +1075,14 @@
      "shape": "/levels/west_coast_usa/art/shapes/buildings/busstop_wca.dae",
      "region": "north-america",
      "setting": "city",
-     "usedToday": false
+     "usedToday": false,
+     "is": "A small bus shelter",
+     "size": [
+      1.4,
+      4.1,
+      3.1
+     ],
+     "seen": "2026-11-15"
     },
     {
      "shape": "/levels/Utah/art/shapes/buildings/ut_BBQ_roof_a.dae",
@@ -1119,7 +1148,14 @@
     {
      "shape": "/levels/hirochi_raceway/art/shapes/objects/toilet.dae",
      "region": "any",
-     "usedToday": false
+     "usedToday": false,
+     "is": "A portable toilet cabin",
+     "size": [
+      1.2,
+      1.2,
+      2.5
+     ],
+     "seen": "2026-11-15"
     },
     {
      "shape": "/levels/automation_test_track/art/shapes/buildings/s_bld_toilet_nz.dae",
@@ -1228,7 +1264,14 @@
     {
      "shape": "/levels/west_coast_usa/art/shapes/objects/dumpster.dae",
      "region": "north-america",
-     "usedToday": false
+     "usedToday": false,
+     "is": "A large roll-off skip, lorry sized: not a small wheeled bin",
+     "size": [
+      2.6,
+      5.3,
+      2.3
+     ],
+     "seen": "2026-11-15"
     },
     {
      "shape": "/art/shapes/garage_and_dealership/Clutter/ind_dumpster_full.dae",
@@ -2655,7 +2698,14 @@
      "shape": "/levels/west_coast_usa/art/shapes/buildings/s_cement_silo.dae",
      "region": "north-america",
      "setting": "industrial",
-     "usedToday": false
+     "usedToday": false,
+     "is": "A tall narrow silo",
+     "size": [
+      4.4,
+      4.4,
+      17
+     ],
+     "seen": "2026-11-15"
     }
    ],
    "generated": "Cylinder in the building tiles",
@@ -2765,7 +2815,14 @@
     {
      "shape": "/levels/hirochi_raceway/art/shapes/objects/toilet.dae",
      "region": "any",
-     "usedToday": false
+     "usedToday": false,
+     "is": "A portable toilet cabin",
+     "size": [
+      1.2,
+      1.2,
+      2.5
+     ],
+     "seen": "2026-11-15"
     }
    ],
    "generated": "Extruded building with textured facades, windows and a roof (building tiles)",
@@ -3053,7 +3110,14 @@
      "shape": "/levels/west_coast_usa/art/shapes/buildings/busstop_wca.dae",
      "region": "north-america",
      "setting": "city",
-     "usedToday": false
+     "usedToday": false,
+     "is": "A small bus shelter",
+     "size": [
+      1.4,
+      4.1,
+      3.1
+     ],
+     "seen": "2026-11-15"
     },
     {
      "shape": "/levels/east_coast_usa/art/shapes/buildings/busstop_eca.dae",
@@ -3065,7 +3129,14 @@
      "shape": "/levels/italy/art/shapes/buildings/italy_city_busstop.dae",
      "region": "europe",
      "setting": "city",
-     "usedToday": false
+     "usedToday": false,
+     "is": "A bus shelter with an advertising panel",
+     "size": [
+      6.1,
+      2.6,
+      3.8
+     ],
+     "seen": "2026-11-15"
     },
     {
      "shape": "/levels/Utah/art/shapes/buildings/busstop_utah.dae",
@@ -3731,7 +3802,14 @@
      "shape": "/levels/Utah/art/shapes/buildings/ut_picnic_table_a.dae",
      "region": "north-america",
      "setting": "rural",
-     "usedToday": false
+     "usedToday": false,
+     "is": "A picnic table with benches",
+     "size": [
+      2,
+      1.4,
+      0.9
+     ],
+     "seen": "2026-11-15"
     },
     {
      "shape": "/levels/west_coast_usa/art/shapes/objects/garbage_bin_a.dae",
@@ -3741,7 +3819,14 @@
     {
      "shape": "/levels/hirochi_raceway/art/shapes/objects/toilet.dae",
      "region": "any",
-     "usedToday": false
+     "usedToday": false,
+     "is": "A portable toilet cabin",
+     "size": [
+      1.2,
+      1.2,
+      2.5
+     ],
+     "seen": "2026-11-15"
     }
    ],
    "generated": "Asphalt paint over the outline",
@@ -3831,7 +3916,14 @@
     {
      "shape": "/levels/west_coast_usa/art/shapes/objects/s_camera_speed1.dae",
      "region": "north-america",
-     "usedToday": false
+     "usedToday": false,
+     "is": "A speed camera head only: needs a pole",
+     "size": [
+      0.6,
+      0.4,
+      0.5
+     ],
+     "seen": "2026-11-15"
     },
     {
      "shape": "/levels/west_coast_usa/art/shapes/objects/s_camera_speed2.dae",
@@ -5090,7 +5182,14 @@
      "shape": "/levels/Utah/art/shapes/buildings/ut_picnic_table_a.dae",
      "region": "north-america",
      "setting": "rural",
-     "usedToday": false
+     "usedToday": false,
+     "is": "A picnic table with benches",
+     "size": [
+      2,
+      1.4,
+      0.9
+     ],
+     "seen": "2026-11-15"
     },
     {
      "shape": "/levels/Utah/art/shapes/buildings/ut_picnic_table_b.dae",
@@ -5701,7 +5800,14 @@
     {
      "shape": "/levels/west_coast_usa/art/shapes/buildings/celltower.dae",
      "region": "north-america",
-     "usedToday": false
+     "usedToday": false,
+     "is": "A cell tower",
+     "size": [
+      5.5,
+      4.9,
+      28.9
+     ],
+     "seen": "2026-11-15"
     },
     {
      "shape": "/levels/johnson_valley/art/shapes/misc/celltower.dae",
@@ -5754,7 +5860,14 @@
     {
      "shape": "/levels/west_coast_usa/art/shapes/objects/pumpjack_a.dae",
      "region": "north-america",
-     "usedToday": false
+     "usedToday": false,
+     "is": "An oil pumpjack",
+     "size": [
+      4.1,
+      15.6,
+      10.5
+     ],
+     "seen": "2026-11-15"
     },
     {
      "shape": "/levels/west_coast_usa/art/shapes/objects/pumpjack_b.dae",
@@ -5924,7 +6037,14 @@
      "shape": "/levels/west_coast_usa/art/shapes/buildings/s_cement_silo.dae",
      "region": "north-america",
      "setting": "industrial",
-     "usedToday": false
+     "usedToday": false,
+     "is": "A tall narrow silo",
+     "size": [
+      4.4,
+      4.4,
+      17
+     ],
+     "seen": "2026-11-15"
     }
    ],
    "generated": "Cylinder in the building tiles",
@@ -6117,7 +6237,14 @@
     {
      "shape": "/levels/west_coast_usa/art/shapes/buildings/celltower.dae",
      "region": "north-america",
-     "usedToday": false
+     "usedToday": false,
+     "is": "A cell tower",
+     "size": [
+      5.5,
+      4.9,
+      28.9
+     ],
+     "seen": "2026-11-15"
     },
     {
      "shape": "/levels/johnson_valley/art/shapes/building/s_building_radio_tower.dae",
@@ -6212,7 +6339,14 @@
     {
      "shape": "/levels/west_coast_usa/art/shapes/objects/industrial_watertower.dae",
      "region": "north-america",
-     "usedToday": false
+     "usedToday": false,
+     "is": "A water tower on legs",
+     "size": [
+      7,
+      7,
+      26.2
+     ],
+     "seen": "2026-11-15"
     },
     {
      "shape": "/levels/automation_test_track/art/shapes/buildings/s_industrial_watertower.dae",
@@ -7053,7 +7187,14 @@
     {
      "shape": "/levels/driver_training/art/shapes/objects/turbine_tower.dae",
      "region": "any",
-     "usedToday": false
+     "usedToday": false,
+     "is": "A wind turbine tower (the blades are separate models)",
+     "size": [
+      3.7,
+      7.6,
+      130
+     ],
+     "seen": "2026-11-15"
     },
     {
      "shape": "/levels/west_coast_usa/art/shapes/objects/solarpanel.dae",
@@ -7107,12 +7248,26 @@
     {
      "shape": "/levels/west_coast_usa/art/shapes/objects/pylon.dae",
      "region": "north-america",
-     "usedToday": false
+     "usedToday": false,
+     "is": "A lattice transmission tower for high-voltage lines",
+     "size": [
+      7.8,
+      8.6,
+      35.8
+     ],
+     "seen": "2026-11-15"
     },
     {
      "shape": "/levels/automation_test_track/art/shapes/objects/pylon.dae",
      "region": "any",
-     "usedToday": false
+     "usedToday": false,
+     "is": "The same lattice transmission tower",
+     "size": [
+      7.8,
+      8.6,
+      35.8
+     ],
+     "seen": "2026-11-15"
     },
     {
      "shape": "/levels/automation_test_track/art/shapes/objects/s_powerlines_01.dae",
@@ -7325,12 +7480,26 @@
     {
      "shape": "/levels/west_coast_usa/art/shapes/objects/pylon.dae",
      "region": "north-america",
-     "usedToday": false
+     "usedToday": false,
+     "is": "A lattice transmission tower for high-voltage lines",
+     "size": [
+      7.8,
+      8.6,
+      35.8
+     ],
+     "seen": "2026-11-15"
     },
     {
      "shape": "/levels/automation_test_track/art/shapes/objects/pylon.dae",
      "region": "any",
-     "usedToday": false
+     "usedToday": false,
+     "is": "The same lattice transmission tower",
+     "size": [
+      7.8,
+      8.6,
+      35.8
+     ],
+     "seen": "2026-11-15"
     }
    ],
    "generated": "A lattice tower mesh if the native pylon does not fit",
@@ -7407,13 +7576,27 @@
      "shape": "/levels/west_coast_usa/art/shapes/buildings/busstop_wca.dae",
      "region": "north-america",
      "setting": "city",
-     "usedToday": false
+     "usedToday": false,
+     "is": "A small bus shelter",
+     "size": [
+      1.4,
+      4.1,
+      3.1
+     ],
+     "seen": "2026-11-15"
     },
     {
      "shape": "/levels/italy/art/shapes/buildings/italy_city_busstop.dae",
      "region": "europe",
      "setting": "city",
-     "usedToday": false
+     "usedToday": false,
+     "is": "A bus shelter with an advertising panel",
+     "size": [
+      6.1,
+      2.6,
+      3.8
+     ],
+     "seen": "2026-11-15"
     }
    ],
    "generated": "Raised slab where it is a way or area",
@@ -7868,13 +8051,27 @@
      "shape": "/levels/italy/art/shapes/buildings/italy_city_busstop.dae",
      "region": "europe",
      "setting": "city",
-     "usedToday": false
+     "usedToday": false,
+     "is": "A bus shelter with an advertising panel",
+     "size": [
+      6.1,
+      2.6,
+      3.8
+     ],
+     "seen": "2026-11-15"
     },
     {
      "shape": "/levels/west_coast_usa/art/shapes/buildings/busstop_wca.dae",
      "region": "north-america",
      "setting": "city",
-     "usedToday": false
+     "usedToday": false,
+     "is": "A small bus shelter",
+     "size": [
+      1.4,
+      4.1,
+      3.1
+     ],
+     "seen": "2026-11-15"
     }
    ],
    "properties": {
@@ -8143,7 +8340,14 @@
     {
      "shape": "/levels/Utah/art/shapes/buildings/ut_picnic_table_a.dae",
      "region": "north-america",
-     "usedToday": false
+     "usedToday": false,
+     "is": "A picnic table with benches",
+     "size": [
+      2,
+      1.4,
+      0.9
+     ],
+     "seen": "2026-11-15"
     },
     {
      "shape": "/levels/east_coast_usa/art/shapes/clutter/clutter_city_wood_table.dae",

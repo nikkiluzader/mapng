@@ -55,12 +55,42 @@ draft.assetLibraries = {
   trees: { file: 'services/beamngTreeLibrary.js', models: count(/TreeLibrary/), what: 'Tree and bush models by species, leaf type, size and region: used by natural=tree, tree rows, woods, forests, orchards, scrub and hedges' },
   biome: { file: 'services/beamngBiomeCatalog.js', models: count(/BiomeCatalog/), what: 'Rocks, ground cover and filler vegetation by the region\'s look' },
 };
+// Models looked at in the game (2026-11-15, placed side by side and measured): what each really is, and its
+// size in metres [across, deep, high]. A name alone misleads: "s_postbox" is a household mailbox on a post.
+const SEEN = {
+  '/levels/west_coast_usa/art/shapes/objects/pylon.dae': { is: 'A lattice transmission tower for high-voltage lines', size: [7.8, 8.6, 35.8] },
+  '/levels/automation_test_track/art/shapes/objects/pylon.dae': { is: 'The same lattice transmission tower', size: [7.8, 8.6, 35.8] },
+  '/levels/hirochi_raceway/art/shapes/objects/toilet.dae': { is: 'A portable toilet cabin', size: [1.2, 1.2, 2.5] },
+  '/levels/johnson_valley/art/shapes/building/s_postbox.dae': { is: 'A household mailbox on a post (American, at a driveway): not a street post box', size: [0.7, 0.6, 1.2] },
+  '/levels/italy/art/shapes/buildings/italy_clutter_mailbox.dae': { is: 'A small red post box, wall or post mounted (Italian)', size: [0.5, 0.3, 0.7] },
+  '/levels/west_coast_usa/art/shapes/objects/postbox_blue.dae': { is: 'A blue street collection box (American)', size: [0.6, 0.6, 1.6] },
+  '/levels/hirochi_raceway/art/shapes/objects/gazebo_black.dae': { is: 'A pop-up event canopy, roof on four legs: not a park gazebo', size: [6.0, 6.0, 2.5] },
+  '/levels/west_coast_usa/art/shapes/buildings/s_cement_silo.dae': { is: 'A tall narrow silo', size: [4.4, 4.4, 17.0] },
+  '/levels/small_island/art/shapes/buildings/si_wind_vane.dae': { is: 'A thin mast with a fitting on top (not made out from a distance)', size: [0.8, 0.6, 6.4] },
+  '/levels/west_coast_usa/art/shapes/buildings/celltower.dae': { is: 'A cell tower', size: [5.5, 4.9, 28.9] },
+  '/levels/west_coast_usa/art/shapes/objects/industrial_watertower.dae': { is: 'A water tower on legs', size: [7.0, 7.0, 26.2] },
+  '/levels/west_coast_usa/art/shapes/buildings/busstop_wca.dae': { is: 'A small bus shelter', size: [1.4, 4.1, 3.1] },
+  '/levels/italy/art/shapes/buildings/italy_city_busstop.dae': { is: 'A bus shelter with an advertising panel', size: [6.1, 2.6, 3.8] },
+  '/levels/driver_training/art/shapes/objects/turbine_tower.dae': { is: 'A wind turbine tower (the blades are separate models)', size: [3.7, 7.6, 130.0] },
+  '/levels/west_coast_usa/art/shapes/objects/pumpjack_a.dae': { is: 'An oil pumpjack', size: [4.1, 15.6, 10.5] },
+  '/levels/Utah/art/shapes/buildings/ut_picnic_table_a.dae': { is: 'A picnic table with benches', size: [2.0, 1.4, 0.9] },
+  '/levels/west_coast_usa/art/shapes/objects/dumpster.dae': { is: 'A large roll-off skip, lorry sized: not a small wheeled bin', size: [2.6, 5.3, 2.3] },
+  '/levels/west_coast_usa/art/shapes/objects/s_camera_speed1.dae': { is: 'A speed camera head only: needs a pole', size: [0.6, 0.4, 0.5] },
+  '/levels/hirochi_raceway/art/shapes/objects/billboard_10x5.dae': { is: 'A billboard on legs', size: [11.7, 0.4, 10.3] },
+};
+// (the household mailbox is no street post box: taken off that tag)
+if (tags['amenity=post_box']) tags['amenity=post_box'].assets = tags['amenity=post_box'].assets.filter((x) => !/s_postbox\.dae$/i.test(x.shape));
+let seen = 0;
+for (const e of [...Object.values(tags), ...Object.values(draft.untagged)]) for (const x of e.assets) {
+  const s = SEEN[real(x.shape) || x.shape]; if (s) { x.is = s.is; x.size = s.size; x.seen = '2026-11-15'; seen++; }
+}
+console.log(`looked at in the game: ${Object.keys(SEEN).length} models, on ${seen} references`);
 // every model checked against the game, spelled as the game spells it
 let n = 0;
 for (const e of [...Object.values(tags), ...Object.values(draft.untagged)]) for (const a of e.assets) { const r = real(a.shape); if (!r) throw new Error(`not in the game: ${a.shape}`); a.shape = r; n++; }
 const out = {
   version: 1,
-  about: 'Every OpenStreetMap tag MapNG cares about, what it builds for it, and the game\'s own models that stand for it. status: built | partial | planned | ignored. A reference for now: tests/osmTagLibrary.test.mjs keeps it in step with the code (What to build, what is fetched, the models the code names). Researched 2026-11-15; models were matched by name and most have not been looked at in the game yet.',
+  about: 'Every OpenStreetMap tag MapNG cares about, what it builds for it, and the game\'s own models that stand for it. status: built | partial | planned | ignored. A reference for now: tests/osmTagLibrary.test.mjs keeps it in step with the code (What to build, what is fetched, the models the code names). Researched 2026-11-15; models were matched by name, and only those with `seen` have been looked at in the game (`is`: what it really is, `size`: metres across, deep, high). A model from another level needs that level\'s materials shipped with the export: public/beamng_shape_materials.json, made by scripts/build-shape-material-library.py.',
   countsFrom: draft.countsFrom, regions: draft.regions,
   tags: Object.fromEntries(Object.entries(tags).sort((a, b) => a[0].localeCompare(b[0]))),
   untagged: draft.untagged, assetLibraries: draft.assetLibraries,
