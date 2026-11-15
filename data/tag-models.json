@@ -5,7 +5,7 @@
    "any": [
     {
      "shape": "/levels/east_coast_usa/art/shapes/clutter/clutter_city_bench_wood.dae",
-     "yaw": -90,
+     "yaw": 90,
      "size": [
       2,
       0.56,

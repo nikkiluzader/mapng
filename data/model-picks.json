@@ -1,9 +1,9 @@
 {
- "about": "The models MapNG places for an OSM tag, chosen from data/game-model-catalogue.json: per tag, per region of the world (any, north-america, europe, tropical), in order of preference; the first is the usual one, the rest are variety. A pick's key is the tag, or the tag and a variant after # (highway=bus_stop#shelter: the model for a stop with a shelter). And what is known of a model beyond the catalogue's own record: yaw, the degrees added to the direction it should face so its front looks that way (a bench's seat towards the road), and seen, the day it was looked at in the running game. scripts/tag-library/from-catalogue.mjs checks this file against the catalogue and writes data/tag-models.json, which the export reads (services/tagModels.js). objects: the mapped points the export places a picked model at, each a rule: tag (the OSM tag of the point), when / unless (other tags it must or must not have, a list of values each), pick (the key in picks), face (road: its front to the nearest road; along: its long side along the road; none), item (the What to build switch it belongs to), cap (the most placed in one level). parts: the models the code builds with by name (a street light for a class of road, a gate, a rail and its post, a sign): each the tag it stands for in the library (or untagged:<name>), its shape, and facts, what the code needs to know of that model (where its lamp is, how long a piece runs). Read through services/tagModels.js part(). A part with ship: true has its materials sent with every export (models from one level's files); one without relies on materials the game loads by itself, as it did before it was moved here.",
+ "about": "The models MapNG places for an OSM tag, chosen from data/game-model-catalogue.json: per tag, per region of the world (any, north-america, europe, tropical), in order of preference; the first is the usual one, the rest are variety. A pick's key is the tag, or the tag and a variant after # (highway=bus_stop#shelter: the model for a stop with a shelter). And what is known of a model beyond the catalogue's own record: yaw, the degrees added to the direction it should face so its front looks that way (a bench's seat towards the road): set here only where it differs from, or adds to, the front the catalogue records for the model (+x: 0, +y: -90, -x: 180, -y: 90), and seen, the day it was looked at in the running game. scripts/tag-library/from-catalogue.mjs checks this file against the catalogue and writes data/tag-models.json, which the export reads (services/tagModels.js). objects: the mapped points the export places a picked model at, each a rule: tag (the OSM tag of the point), when / unless (other tags it must or must not have, a list of values each), pick (the key in picks), face (road: its front to the nearest road; along: its long side along the road; none), item (the What to build switch it belongs to), cap (the most placed in one level). parts: the models the code builds with by name (a street light for a class of road, a gate, a rail and its post, a sign): each the tag it stands for in the library (or untagged:<name>), its shape, and facts, what the code needs to know of that model (where its lamp is, how long a piece runs). Read through services/tagModels.js part(). A part with ship: true has its materials sent with every export (models from one level's files); one without relies on materials the game loads by itself, as it did before it was moved here.",
  "models": {
   "/levels/east_coast_usa/art/shapes/clutter/clutter_city_bench_wood.dae": {
-   "yaw": -90,
-   "note": "the seat's front is the model's +Y"
+   "yaw": 90,
+   "note": "the seat faces the model's -Y, its backrest at +Y (four sides photographed 2026-11-15). The code had taken +Y for the front since benches were first placed: they stood with their backs to the road"
   },
   "/levels/west_coast_usa/art/shapes/objects/busstop.dae": {
    "yaw": 0,
@@ -27,7 +27,7 @@
   },
   "/levels/west_coast_usa/art/shapes/objects/postbox_blue.dae": {
    "yaw": 0,
-   "note": "the door is on +X"
+   "note": "taken as +X: the model's two arched faces are alike, no door drawn on either"
   },
   "/levels/italy/art/shapes/buildings/italy_clutter_mailboxstand.dae": {
    "yaw": 90,

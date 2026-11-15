@@ -91,6 +91,8 @@ test('the model catalogue is well formed', () => {
     assert.ok(m.size === null || (m.size.length === 3 && m.size.every((v) => v >= 0)), `${m.shape}: size`);
     assert.ok(m.box === null || m.box.length === 6, `${m.shape}: box`);
     for (const tag of m.tags) assert.match(tag, /^[A-Za-z0-9_:]+=[^\s=]+$/, `${m.shape}: ${tag}`);
+    if (m.front !== undefined) { assert.ok(['+x', '+y', '-x', '-y', 'none'].includes(m.front), `${m.shape}: front ${m.front}`); assert.ok(['x', 'y', 'none'].includes(m.long), `${m.shape}: long`); }
+    if (m.front && m.front !== 'none') assert.ok(Number.isFinite(m.yaw), `${m.shape}: a model with a front has a yaw`);
     // (a copy of a kept model is not a model of its own)
     for (const c of m.copies || []) assert.ok(!inCat.has(c), `${m.shape}: its copy ${c} is listed too`);
   }
@@ -168,4 +170,12 @@ test('a mapped point falls under one object rule, and stands beside its road fac
   assert.ok(clear.y === 12 && Math.abs(clear.facing) < 1e-9);
   // no road near: placed, turned the same way every time
   assert.equal(standTagObject(rule, 0, 0, null, {}, 5).facing, standTagObject(rule, 0, 0, null, {}, 5).facing);
+});
+
+test('a bench faces the road: its seat is the model\'s -Y', async () => {
+  const { tagModel } = await import('../services/tagModels.js');
+  const bench = cat.models.find((m) => m.shape.endsWith('clutter_city_bench_wood.dae'));
+  assert.equal(bench.front, '-y');
+  // (facing + yawOffset turns the model's +X to that angle: its -Y then looks along `facing`)
+  assert.ok(Math.abs(tagModel('amenity=bench', 'utah').yawOffset - Math.PI / 2) < 1e-9);
 });

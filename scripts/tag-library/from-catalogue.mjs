@@ -19,6 +19,10 @@ const lib = JSON.parse(fs.readFileSync('data/osm-tag-library.json', 'utf8'));
 const TODAY = '2026-11-15';
 // The models chosen per tag and region, and what is known of a model beyond its record (data/model-picks.json).
 const picks = JSON.parse(fs.readFileSync('data/model-picks.json', 'utf8'));
+// Which way a model faces: read from photographs of its four sides in the game (refs/.../front/final.json), for
+// the models that have a front (signs, street furniture, lights, vehicles, gates, tents, stands).
+const fronts = fs.existsSync(`${REFS}/front/final.json`) ? JSON.parse(fs.readFileSync(`${REFS}/front/final.json`, 'utf8')) : {};
+const YAW_OF_FRONT = { '+x': 0, '+y': -90, '-x': 180, '-y': 90 };
 
 // The catalogue as it stands: the first sort, with the owner's own moves, marks and tags on top.
 const catName = Object.fromEntries([...data.categories, ...(mine.customCategories || [])].map((c) => [c.id, c.name]));
@@ -44,7 +48,11 @@ const record = (m) => ({
   mark: m.use, is: m.useWhy || '', tags: m.osm,
   size: m.size ? m.size.map((v) => round(v, 2)) : null, box: m.box ? m.box.map((v) => round(v, 2)) : null,
   materials: m.materials || [], ...(copiesOf[m.path] ? { copies: copiesOf[m.path].sort() } : {}),
-  ...(Number.isFinite(picks.models?.[m.path]?.yaw) ? { yaw: picks.models[m.path].yaw } : {}),
+  // front: the side that looks at the road or the person using it (+x, +y, -x, -y; none: no front, or two-sided);
+  // long: the axis it is longest along; yaw: the degrees added to the direction it should face (the picks' own
+  // value where one is set, else from the front); frontUnsure: the photographs did not settle it
+  ...(fronts[m.path] ? { front: fronts[m.path].front, long: fronts[m.path].long, ...(fronts[m.path].sure ? {} : { frontUnsure: true }) } : {}),
+  ...(Number.isFinite(picks.models?.[m.path]?.yaw) ? { yaw: picks.models[m.path].yaw } : fronts[m.path] && fronts[m.path].front in YAW_OF_FRONT ? { yaw: YAW_OF_FRONT[fronts[m.path].front] } : {}),
 });
 const records = kept.map(record).sort((a, b) => a.shape.localeCompare(b.shape));
 const inCatalogue = new Map(records.map((r) => [r.shape, r]));
@@ -55,7 +63,7 @@ for (const r of records) if (r.mark === 'use') for (const t of r.tags) if (!libr
 
 const catalogue = {
   version: 1,
-  about: 'The game\'s own models MapNG can place, one record each, keyed by the model\'s path (shape). Every model in the game was photographed alone on a grid floor and sorted by its picture; here are the ones marked use (placeable as it is) or maybe (needs a decision: a kit piece, a fixed-length span, a one-sided building ...). Skipped models, whole-level meshes and copies of a kept model in other levels are left out (a kept model lists its copies). size: metres across, deep, high. box: the model\'s own box around its origin (min x, y, z, max x, y, z): where its anchor sits. tags: the OpenStreetMap tags it stands for; data/osm-tag-library.json lists the same models by tag. Made by scripts/tag-library/from-catalogue.mjs from the full catalogue (photos and all 5,566 models: kept outside the repository).',
+  about: 'The game\'s own models MapNG can place, one record each, keyed by the model\'s path (shape). Every model in the game was photographed alone on a grid floor and sorted by its picture; here are the ones marked use (placeable as it is) or maybe (needs a decision: a kit piece, a fixed-length span, a one-sided building ...). Skipped models, whole-level meshes and copies of a kept model in other levels are left out (a kept model lists its copies). size: metres across, deep, high. box: the model\'s own box around its origin (min x, y, z, max x, y, z): where its anchor sits. front: the side of the model that looks at the road or at the person using it (+x, +y, -x, -y, or none: no front, or the same on two sides), read from photographs of its four sides, for models that have one; long: the axis it is longest along; yaw: the degrees to add to the direction it should face; frontUnsure: the photographs did not settle it. tags: the OpenStreetMap tags it stands for; data/osm-tag-library.json lists the same models by tag. Made by scripts/tag-library/from-catalogue.mjs from the full catalogue (photos and all 5,566 models: kept outside the repository).',
   made: TODAY,
   counts: { use: records.filter((r) => r.mark === 'use').length, maybe: records.filter((r) => r.mark === 'maybe').length },
   categories: Object.fromEntries(data.categories.concat((mine.customCategories || []).map((c) => ({ ...c, group: 'Own' }))).filter((c) => usedCats.includes(c.id)).map((c) => [c.id, { name: c.name, group: c.group || '' }])),
