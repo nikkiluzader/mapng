@@ -331,3 +331,30 @@ test('profile: a divided road\'s two decks side by side meet at one height (no s
   assert.ok(Math.abs(z[0][50] - z[1][50]) < 0.02, `a step of ${(z[1][50] - z[0][50]).toFixed(2)} m mid-span`);
   assert.ok(Math.abs(z[0][0] - 60) < 1e-6 && Math.abs(z[1][0] - 60.6) < 1e-6, 'the ends moved');
 });
+
+test('profile: on fine elevation a street follows the slope the survey measured, steeper than its class', async () => {
+  const { solveProfiles } = await import('../services/structures/profileSolve.js');
+  // a hillside town's street as a lidar survey has it: pitches of 22% with easier stretches of 8% between them
+  // (16% over its length). Held to its class it was dug metres into the hill, its sidewalks left on the rim.
+  const road = (highway) => {
+    const x = [0]; const g = [100];
+    for (const [len, grade] of [[60, 0.02], [80, 0.22], [60, 0.08], [80, 0.22], [60, 0.08], [80, 0.22], [60, 0.02]]) for (let d = 4; d <= len; d += 4) { x.push(x.at(-1) + 4); g.push(g.at(-1) - 4 * grade); }
+    const n = x.length;
+    return { x: Float64Array.from(x), y: new Float64Array(n), s: Float64Array.from(x), g: Float64Array.from(g), from: 'A', to: 'B', highway, layer: 0, half: 3.5, bridge: false, tunnel: false };
+  };
+  const deepest = (highway, fineGround) => {
+    const e = road(highway);
+    const nodes = new Map([['A', { edges: [{ edge: 0, end: 0 }] }], ['B', { edges: [{ edge: 0, end: 1 }] }]]);
+    const { z } = solveProfiles({ edges: [e], nodes, pins: [], fineGround, crossings: { crossings: [], water: [] } });
+    let worst = 0;
+    for (let i = 0; i < e.s.length; i++) worst = Math.max(worst, Math.abs(z[0][i] - e.g[i]));
+    return worst;
+  };
+  // (what is left is the rounding of each sudden change of slope, a vertical curve)
+  assert.ok(deepest('tertiary', true) < 1.2, `fine elevation: ${deepest('tertiary', true).toFixed(2)} m off its ground`);
+  assert.ok(deepest('residential', true) < 1.2, `fine elevation, a residential street: ${deepest('residential', true).toFixed(2)} m`);
+  // coarse elevation says nothing of an 80 m pitch: the class limit holds as before
+  assert.ok(deepest('tertiary', false) > deepest('tertiary', true) + 1, `coarse elevation: ${deepest('tertiary', false).toFixed(2)} m (held to its class)`);
+  // a motorway ramp never follows a wall in the data
+  assert.ok(deepest('motorway_link', true) > 2, `a motorway ramp on fine elevation: ${deepest('motorway_link', true).toFixed(2)} m`);
+});

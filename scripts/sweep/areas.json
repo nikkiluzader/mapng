@@ -593,6 +593,7 @@
     "tunnel",
     "motorway"
    ]
-  }
- ]
+  },
+  {"name": "tychonas", "lat": 34.727648, "lng": 33.136198, "size": 1024, "dem": "gpxz", "categories": ["hillside", "steep-streets", "sidewalks"], "smoke": true, "note": "a hillside village on 1 m lidar (Mapterhorn) with streets at 20 to 30%: held to their class grade they were dug 6 m into the hill (2026-11)"}
+  ]
 }

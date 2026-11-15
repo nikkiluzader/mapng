@@ -56,6 +56,14 @@ const HILLSIDE_FACTOR = 1.5;  // a road on a hillside may run this much steeper 
 const HILLSIDE_MAX = 0.35;
 const HILLSIDE_LONG = 1.1;    // a hillside is no steeper than this times the slope over +-HILLSIDE_M
 const HILLSIDE_GAIN = 1.5;    // grade allowed per grade the hillside is over the class ceiling
+// On fine elevation (a lidar survey at a few metres or finer: the road's own surface is in the data) a ground road
+// follows the slope the survey measured along it, up to this: a town on a hillside has streets at 20 and 30%
+// whatever their class, and held to a class limit they were dug metres into the hill, their sidewalks left on the
+// rim. Never a motorway or trunk road or their ramps: a bare-earth survey shows a wall where their structure was
+// taken out, and they are built on fill or a deck.
+const FINE_FOLLOW_MAX = 0.35;
+const FINE_GRADE_M = 12;      // ... read over this far either side (a pitch between two easier stretches is real there), on 8 m of road at least
+const NEVER_FOLLOWS = new Set(['motorway', 'motorway_link', 'trunk', 'trunk_link']);
 const GROUND_BAND_M = 6;      // an untagged road's free fill / cut for grades
 const UNDER_FREE_M = 3;       // a road under a deck is cleared from at most this over its ground
 const PIN_REACH_FACTOR = 2.5; // a lift reaches no higher than this many times the grade limit climbs from a pinned road
@@ -134,7 +142,7 @@ function tautProfile(Z, L, U, idx, s, freeA = false, freeB = false, G = null) {
 // keeps its slope; a short hollow or spike in the elevation data, steeper
 // than the slope around it, is bridged by fill or cut). A deck or tunnel
 // does not follow the ground: its class limit only.
-function allowedRise(e, structure = !!(e.bridge || e.tunnel)) {
+function allowedRise(e, structure = !!(e.bridge || e.tunnel), fine = false) {
   const lim = gradeLimit(e.highway);
   const n = e.s.length; const out = new Float64Array(Math.max(0, n - 1));
   const g = (i) => (Number.isFinite(e.g[i]) ? e.g[i] : 0);
@@ -142,7 +150,8 @@ function allowedRise(e, structure = !!(e.bridge || e.tunnel)) {
   const slope = (p, q, need) => { const span = e.s[q] - e.s[p]; return span >= need ? Math.abs(g(q) - g(p)) / span : 0; };
   const rail = railKindOfClass(e.highway);
   const ceiling = (GRADE_CEILING[e.highway] ?? RAIL_GRADE_CEILING[rail] ?? GRADE_CEILING_DEFAULT) * 0.97;   // (a margin under the checks)
-  let a = 0; let b = 0; let a2 = 0; let b2 = 0;
+  const follows = fine && !rail && !NEVER_FOLLOWS.has(e.highway);
+  let a = 0; let b = 0; let a2 = 0; let b2 = 0; let a3 = 0; let b3 = 0;
   for (let i = 0; i + 1 < n; i++) {
     const ds = e.s[i + 1] - e.s[i];
     if (structure) { out[i] = lim * ds; continue; }
@@ -152,6 +161,12 @@ function allowedRise(e, structure = !!(e.bridge || e.tunnel)) {
     while (a2 + 1 < n && e.s[a2 + 1] <= mid - HILLSIDE_M) a2++;
     while (b2 + 1 < n && e.s[b2] < mid + HILLSIDE_M) b2++;
     const terrain = slope(a, b, LONG_GRADE_M);
+    let measured = 0;
+    if (follows) {
+      while (a3 + 1 < n && e.s[a3 + 1] <= mid - FINE_GRADE_M) a3++;
+      while (b3 + 1 < n && e.s[b3] < mid + FINE_GRADE_M) b3++;
+      measured = Math.min(FINE_FOLLOW_MAX, Math.max(terrain, slope(a3, b3, 8)));
+    }
     // a hillside steeper than the class ceiling, as steep over +-HILLSIDE_M:
     // the road may run steeper than it, so a lift or cut near a structure
     // fades back to the ground (at the ceiling alone it never could)
@@ -162,7 +177,7 @@ function allowedRise(e, structure = !!(e.bridge || e.tunnel)) {
     // 230 m and let go at 21% over the last 24 m, a ramp across its junction)
     const hillside = Math.min(terrain, slope(a2, b2, HILLSIDE_M) * HILLSIDE_LONG);
     const hill = !rail && hillside > ceiling ? Math.min(HILLSIDE_MAX, hillside * HILLSIDE_FACTOR, ceiling + (hillside - ceiling) * HILLSIDE_GAIN) : 0;
-    out[i] = Math.max(lim, Math.min(terrain, ceiling), hill) * ds;
+    out[i] = Math.max(lim, Math.min(terrain, ceiling), hill, measured) * ds;
   }
   return out;
 }
@@ -232,7 +247,7 @@ export function* solveProfilesSteps(graph) {
   });
   // (a plain deck between held approaches, terrain shaping off, may ramp
   // this much steeper than its class: it must rise within its own length)
-  const stepRise = edges.map((e, k) => (graph.noCut?.[k] ? allowedRise(e, asStructure(e)).map((r) => r * RAW_DECK_RAMP_FACTOR) : allowedRise(e, asStructure(e))));
+  const stepRise = edges.map((e, k) => (graph.noCut?.[k] ? allowedRise(e, asStructure(e), !!graph.fineGround).map((r) => r * RAW_DECK_RAMP_FACTOR) : allowedRise(e, asStructure(e), !!graph.fineGround)));
   // neighbours: along each edge (with the step's allowed rise) and between
   // the ends meeting at a node (no rise)
   const nbr = Array.from({ length: N }, () => []);
@@ -946,7 +961,7 @@ export function profileResidual(graph, z) {
     crossing = Math.max(crossing, c.sep - (zu - zd));
   }
   edges.forEach((e, k) => {
-    const rise = allowedRise(e, asStructure(e));
+    const rise = allowedRise(e, asStructure(e), !!graph.fineGround);
     for (let i = 0; i + 1 < e.s.length; i++) {
       const moved = Math.abs(z[k][i] - e.g[i]) > 0.05 || Math.abs(z[k][i + 1] - e.g[i + 1]) > 0.05;
       if (!(asStructure(e) || moved)) continue;

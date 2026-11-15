@@ -6073,6 +6073,8 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
         return clipGeometryToMargin(geometry, terrainData.bounds, 0).map((part) => part.map((p) => (own.has(p) ? p : { ...p, cut: true })));
       },
     });
+    // (fine elevation: ground roads follow the slope the survey measured along them, structures/profileSolve.js)
+    structureGraph.fineGround = !terrainData?.coarseElevation;
     // (bridges / tunnels switched off: those roads are plain roads)
     if (!includeBridges) for (const e of structureGraph.edges) e.bridge = false;
     if (!includeTunnels) for (const e of structureGraph.edges) e.tunnel = false;
