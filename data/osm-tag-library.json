@@ -941,11 +941,16 @@
     {"shape":"/levels/east_coast_usa/art/shapes/clutter/clutter_city_chalkboard_sign.dae","region":"north-america","usedToday":false,"is":"A-frame chalkboard pavement sign for cafes","from":"catalogue"},
     {"shape":"/levels/italy/art/shapes/buildings/italy_clutter_big_umbrella_a.dae","region":"europe","usedToday":false,"is":"Large square white terrace parasol","from":"catalogue"},
     {"shape":"/levels/italy/art/shapes/buildings/italy_clutter_big_umbrella_b.dae","region":"europe","usedToday":false,"is":"Large square white terrace parasol","from":"catalogue"},
+    {"shape":"/levels/italy/art/shapes/buildings/italy_clutter_keg_table.dae","region":"europe","usedToday":false,"is":"Barrel table for pub terraces","from":"catalogue"},
+    {"shape":"/levels/italy/art/shapes/buildings/italy_clutter_stool.dae","region":"europe","usedToday":false,"is":"Dark wooden bar stool for terraces","from":"catalogue"},
+    {"shape":"/levels/italy/art/shapes/buildings/italy_clutter_table_high.dae","region":"europe","usedToday":false,"is":"Tall standing table for terraces","from":"catalogue"},
     {"shape":"/levels/italy/art/shapes/misc/italy_table_double.dae","region":"europe","usedToday":false,"is":"Restaurant table for six with cloth and chairs","from":"catalogue"},
+    {"shape":"/levels/johnson_valley/art/shapes/building/s_inflatable_icecream.dae","region":"north-america","usedToday":false,"is":"Inflatable ice cream cone advert","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_diner.dae","region":"north-america","usedToday":false,"is":"Round retro diner with roof sign; North America","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_restaurant_001.dae","region":"north-america","usedToday":false,"is":"Two-storey restaurant with terraces and glass","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_restaurant_002.dae","region":"north-america","usedToday":false,"is":"Two-storey restaurant with terraces and glass","from":"catalogue"},
-    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_restaurant_004.dae","region":"north-america","usedToday":false,"is":"Restaurant with terraces and low walls","from":"catalogue"}
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_restaurant_004.dae","region":"north-america","usedToday":false,"is":"Restaurant with terraces and low walls","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_turbo_burger.dae","region":"north-america","usedToday":false,"is":"Burger restaurant with drive-through canopy; fictional brand","from":"catalogue"}
    ],
    "generated": "Facade style of the building it is in",
    "properties": {
@@ -1935,6 +1940,8 @@
    "fetched": true,
    "builds": "A generated bridge: deck, parapets, piers, abutments and its structure type",
    "assets": [
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_bridge_not_motorway.dae","region":"any","usedToday":false,"is":"Blue bridge sign on post, Europe","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_bridge.dae","region":"any","usedToday":false,"is":"Green motorway bridge sign on post, Europe","from":"catalogue"},
     {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_narrowbridge.dae","region":"north-america","usedToday":false,"is":"US narrow-bridge warning diamond on post","from":"catalogue"},
     {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_narrow_bridge.dae","region":"north-america","usedToday":false,"is":"US narrow-bridge warning diamond on post","from":"catalogue"}
    ],
@@ -2467,6 +2474,7 @@
     {"shape":"/levels/small_island/art/shapes/buildings/si_big_shack.dae","region":"tropical","usedToday":false,"is":"tin-roofed tropical shack with porch","from":"catalogue"},
     {"shape":"/levels/small_island/art/shapes/buildings/si_fishingDwellings.dae","region":"tropical","usedToday":false,"is":"two-storey wooden dwelling with outside stair, tropical","from":"catalogue"},
     {"shape":"/levels/small_island/art/shapes/buildings/si_res_small_building.dae","region":"tropical","usedToday":false,"is":"Wooden cabin with gambrel roof; tropics","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/buildings/ranger_station.dae","region":"north-america","usedToday":false,"is":"Stone and timber ranger lodge, complete","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/cabin1.dae","region":"north-america","usedToday":false,"is":"dark timber cabin with tiled roof, complete","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/cabin2.dae","region":"north-america","usedToday":false,"is":"A-frame cabin with deck on short posts","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/house_small1.dae","region":"north-america","usedToday":false,"is":"small single-storey house, US west coast","from":"catalogue"},
@@ -2517,8 +2525,10 @@
     {"shape":"/levels/automation_test_track/art/shapes/buildings/s_factorystorage.dae","region":"any","usedToday":false,"is":"Dark factory storage hall","from":"catalogue"},
     {"shape":"/levels/derby/art/shapes/buildings/ind_bld_09_conc-towers.dae","region":"any","usedToday":false,"is":"Concrete plant with rusty silo towers","from":"catalogue"},
     {"shape":"/levels/derby/art/shapes/buildings/ind_bld_tin_01_tower_a.dae","region":"any","usedToday":false,"is":"Derelict rusty tin tower","from":"catalogue"},
+    {"shape":"/levels/derby/art/shapes/buildings/ind_bld_tin_01_warehouse_huge.dae","region":"any","usedToday":false,"is":"Huge derelict tin warehouse","from":"catalogue"},
     {"shape":"/levels/driver_training/art/shapes/buildings/s_building_a.dae","region":"any","usedToday":false,"is":"Dark modern industrial unit with roof plant","from":"catalogue"},
     {"shape":"/levels/driver_training/art/shapes/buildings/s_building_b.dae","region":"any","usedToday":false,"is":"Dark modern industrial unit with roof plant","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/buildings/eca_bld_fv_warehouse_b.dae","region":"north-america","usedToday":false,"is":"Gambrel-roof warehouse with loading hoist","from":"catalogue"},
     {"shape":"/levels/east_coast_usa/art/shapes/buildings/eca_bld_fv_warehouse.dae","region":"north-america","usedToday":false,"is":"Tin-roofed warehouse shed","from":"catalogue"},
     {"shape":"/levels/east_coast_usa/art/shapes/buildings/eca_bld_warehouse_01_a.dae","region":"north-america","usedToday":false,"is":"Brick three-storey warehouse; North America","from":"catalogue"},
     {"shape":"/levels/east_coast_usa/art/shapes/buildings/eca_bld_warehouse_02_a.dae","region":"north-america","usedToday":false,"is":"Brick three-storey warehouse; North America","from":"catalogue"},
@@ -2559,11 +2569,13 @@
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_buildng_stage_b.dae","region":"north-america","usedToday":false,"is":"Film sound stage hall; works as large industrial hall","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_controlroom.dae","region":"north-america","usedToday":false,"is":"Blue-roofed tin control room","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_port_warehouse.dae","region":"north-america","usedToday":false,"is":"Very large curved-roof port warehouse","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_warehouse_storage_5bay.dae","region":"north-america","usedToday":false,"is":"Five-bay corrugated storage building","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_workshop.dae","region":"north-america","usedToday":false,"is":"Long dark workshop building","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/steel_factory/s_steel_factory_chimney_01.dae","region":"north-america","usedToday":false,"is":"Steel works block with tall stacks","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/steel_factory/s_steel_factory_chimney_02.dae","region":"north-america","usedToday":false,"is":"Steel works block with tall stacks","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/warehouse_awning.dae","region":"north-america","usedToday":false,"is":"White hall with blue trim and doors","from":"catalogue"},
-    {"shape":"/levels/west_coast_usa/art/shapes/buildings/workshop1.dae","region":"north-america","usedToday":false,"is":"Long workshop with brick base","from":"catalogue"}
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/workshop1.dae","region":"north-america","usedToday":false,"is":"Long workshop with brick base","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/objects/sign_logistics.dae","region":"north-america","usedToday":false,"is":"Logistics company sign on posts, fictional brand","from":"catalogue"}
    ],
    "generated": "Extruded building with textured facades, windows and a roof (building tiles)",
    "code": "services/beamngBuildings.js",
@@ -2793,6 +2805,7 @@
     {"shape":"/levels/italy/art/shapes/buildings/town_bld_Com_Corner_30x30x34_TerraConcreteYellowBricks_a.dae","region":"europe","usedToday":false,"is":"Italian corner town building with ground-floor shops","from":"catalogue"},
     {"shape":"/levels/johnson_valley/art/shapes/building/s_gasstation_tyrannos_shop.dae","region":"north-america","usedToday":false,"is":"Yellow-trim station shop building","from":"catalogue"},
     {"shape":"/levels/johnson_valley/art/shapes/misc/s_gasstation_tacosaurus_shop.dae","region":"north-america","usedToday":false,"is":"Station shop with side slab; fictional brand","from":"catalogue"},
+    {"shape":"/levels/small_island/art/shapes/buildings/si_office_bld.dae","region":"tropical","usedToday":false,"is":"Blue tin site office with air conditioner","from":"catalogue"},
     {"shape":"/levels/Utah/art/shapes/buildings/Dealer_b.dae","region":"north-america","usedToday":false,"is":"Low car dealership building with glass front; North America","from":"catalogue"},
     {"shape":"/levels/Utah/art/shapes/buildings/Dealer_c.dae","region":"north-america","usedToday":false,"is":"Glass car showroom pavilion with roof sign","from":"catalogue"},
     {"shape":"/levels/Utah/art/shapes/buildings/ut_auto_repairs.dae","region":"north-america","usedToday":false,"is":"Yellow auto repair building; floats above floor, needs sinking","from":"catalogue"},
@@ -2800,6 +2813,8 @@
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/dealership_mid.dae","region":"north-america","usedToday":false,"is":"Mid-size dealership building with round signs","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/dealership_new.dae","region":"north-america","usedToday":false,"is":"Large modern glass car dealership","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/dealership_sport.dae","region":"north-america","usedToday":false,"is":"Long grey sports-car dealership building","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/island/s_island_logisitcs_office.dae","region":"north-america","usedToday":false,"is":"Logistics office with loading doors","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_big_white_angle.dae","region":"north-america","usedToday":false,"is":"White four-storey office with glass roof","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_chiantown_angle_001.dae","region":"north-america","usedToday":false,"is":"Complete three-storey corner block with shopfronts","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_chinatown_006.dae","region":"north-america","usedToday":false,"is":"Brick corner building with green shopfront awnings","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_chinatown_011.dae","region":"north-america","usedToday":false,"is":"Brick city building with shopfront and fire escapes","from":"catalogue"},
@@ -2811,14 +2826,32 @@
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_fuel_station_nodeoline_001.dae","region":"north-america","usedToday":false,"is":"Fuel station store building; fictional brand, North America","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_fuel_station_trilobite_001.dae","region":"north-america","usedToday":false,"is":"Fuel station store building; fictional brand, North America","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_laundomat_001.dae","region":"north-america","usedToday":false,"is":"Small laundromat building with canopy","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_office_001.dae","region":"north-america","usedToday":false,"is":"Mid-rise office with bay windows","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_office_005.dae","region":"north-america","usedToday":false,"is":"L-shaped glazed office building","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_office_006.dae","region":"north-america","usedToday":false,"is":"Rounded white office tower on stepped podium","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_office_007.dae","region":"north-america","usedToday":false,"is":"Mid-rise office with brick centre section","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_office_008_b.dae","region":"north-america","usedToday":false,"is":"Three-storey commercial block with shopfronts","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_office_008.dae","region":"north-america","usedToday":false,"is":"Pink brick four-storey block with shopfronts","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_office_009.dae","region":"north-america","usedToday":false,"is":"Twin white office slabs with dark glass block","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_office_010.dae","region":"north-america","usedToday":false,"is":"Glass office with rounded bay towers","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_office_012.dae","region":"north-america","usedToday":false,"is":"Glass slab office building","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_restaurant_001.dae","region":"north-america","usedToday":false,"is":"Two-storey restaurant with terraces and glass","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_restaurant_002.dae","region":"north-america","usedToday":false,"is":"Two-storey restaurant with terraces and glass","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_restaurant_004.dae","region":"north-america","usedToday":false,"is":"Restaurant with terraces and low walls","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_shops_002.dae","region":"north-america","usedToday":false,"is":"Brick corner shop building with arched windows","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_shops_003.dae","region":"north-america","usedToday":false,"is":"Long shop row with red roof and arcade","from":"catalogue"},
-    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_turbo_burger.dae","region":"north-america","usedToday":false,"is":"Burger restaurant with drive-through canopy; fictional brand","from":"catalogue"}
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_turbo_burger.dae","region":"north-america","usedToday":false,"is":"Burger restaurant with drive-through canopy; fictional brand","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_career_garage.dae","region":"north-america","usedToday":false,"is":"Art-deco garage building with GARAGE sign","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_concrete_store_office.dae","region":"north-america","usedToday":false,"is":"Brick store office with large flat canopy","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_movie_studio_visitor_center.dae","region":"north-america","usedToday":false,"is":"Low flat-roofed visitor centre, generic","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/tower_office1.dae","region":"north-america","usedToday":false,"is":"Generic downtown office skyscraper; large cities","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/tower_office2.dae","region":"north-america","usedToday":false,"is":"Generic downtown office skyscraper; large cities","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/tower_office3.dae","region":"north-america","usedToday":false,"is":"Generic downtown office skyscraper; large cities","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/tower_office4.dae","region":"north-america","usedToday":false,"is":"Generic downtown office skyscraper; large cities","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/tower_office5.dae","region":"north-america","usedToday":false,"is":"Generic downtown office skyscraper; large cities","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/tower_office6.dae","region":"north-america","usedToday":false,"is":"Generic downtown office skyscraper; large cities","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/tower_office7.dae","region":"north-america","usedToday":false,"is":"Generic downtown office skyscraper; large cities","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/tower_office8.dae","region":"north-america","usedToday":false,"is":"Generic downtown office skyscraper; large cities","from":"catalogue"}
    ],
    "generated": "Extruded building with textured facades, windows and a roof (building tiles)",
    "code": "services/beamngBuildings.js",
@@ -2953,13 +2986,20 @@
     {"shape":"/levels/italy/art/shapes/buildings/italy_bld_shed_d.dae","region":"europe","usedToday":false,"is":"Small tile-roofed shed with porch","from":"catalogue"},
     {"shape":"/levels/italy/art/shapes/buildings/italy_bld_shed_e.dae","region":"europe","usedToday":false,"is":"Small Italian shed or outhouse; rural Europe","from":"catalogue"},
     {"shape":"/levels/italy/art/shapes/buildings/italy_bld_shed_f.dae","region":"europe","usedToday":false,"is":"Small Italian shed or outhouse; rural Europe","from":"catalogue"},
+    {"shape":"/levels/italy/art/shapes/buildings/italy_petrolstation_shopSt_S.dae","region":"europe","usedToday":false,"is":"Tiny petrol station kiosk booth","from":"catalogue"},
     {"shape":"/levels/italy/art/shapes/misc/port_storage_shack.dae","region":"europe","usedToday":false,"is":"Port cabin under scaffold canopy","from":"catalogue"},
+    {"shape":"/levels/johnson_valley/art/shapes/building/s_building_radio_tower.dae","region":"north-america","usedToday":false,"is":"Hut with roof antennas; hut not a tower","from":"catalogue"},
+    {"shape":"/levels/johnson_valley/art/shapes/building/s_settlement_barn.dae","region":"north-america","usedToday":false,"is":"Gambrel-roof barn open at front, complete","from":"catalogue"},
     {"shape":"/levels/johnson_valley/art/shapes/building/s_settlement_shed.dae","region":"north-america","usedToday":false,"is":"Plain grey tin shed","from":"catalogue"},
+    {"shape":"/levels/jungle_rock_island/art/shapes/buildings/tankfarm/ind_control_shed.dae","region":"tropical","usedToday":false,"is":"Small concrete utility hut with cabinets","from":"catalogue"},
+    {"shape":"/levels/small_island/art/shapes/buildings/si_big_shack.dae","region":"tropical","usedToday":false,"is":"tin-roofed tropical shack with porch","from":"catalogue"},
+    {"shape":"/levels/small_island/art/shapes/buildings/si_res_small_building.dae","region":"tropical","usedToday":false,"is":"Wooden cabin with gambrel roof; tropics","from":"catalogue"},
     {"shape":"/levels/small_island/art/shapes/buildings/si_small_shack.dae","region":"tropical","usedToday":false,"is":"Dark timber shack on concrete base","from":"catalogue"},
     {"shape":"/levels/Utah/art/shapes/buildings/ut_old_shed.dae","region":"north-america","usedToday":false,"is":"Collapsing wooden shed; desert West","from":"catalogue"},
     {"shape":"/levels/Utah/art/shapes/buildings/ut_runway_shed.dae","region":"north-america","usedToday":false,"is":"Weathered wooden shed with tin roof","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_controlroom.dae","region":"north-america","usedToday":false,"is":"Blue-roofed tin control room","from":"catalogue"},
-    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_warehouse_storage_5bay.dae","region":"north-america","usedToday":false,"is":"Five-bay corrugated storage building","from":"catalogue"}
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_warehouse_storage_5bay.dae","region":"north-america","usedToday":false,"is":"Five-bay corrugated storage building","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/shack_electrical.dae","region":"north-america","usedToday":false,"is":"Brick electrical hut on legs with platform","from":"catalogue"}
    ],
    "generated": "Extruded building with textured facades, windows and a roof (building tiles)",
    "code": "services/beamngBuildings.js",
@@ -3628,7 +3668,10 @@
    "fetched": true,
    "builds": "A drivable road with paint, signs and AI lanes",
    "assets": [
-    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_bridge.dae","region":"any","usedToday":false,"is":"Green motorway bridge sign on post, Europe","from":"catalogue"}
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_bridge.dae","region":"any","usedToday":false,"is":"Green motorway bridge sign on post, Europe","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_advisory_ramp_speed.dae","region":"north-america","usedToday":false,"is":"US ramp advisory speed 30 sign on post","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_merge_left.dae","region":"north-america","usedToday":false,"is":"US merge warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_merge_right.dae","region":"north-america","usedToday":false,"is":"US merge warning diamond on post","from":"catalogue"}
    ],
    "generated": "DecalRoad surface with lane paint and AI lanes (optionally Mesh Roads / Hero Roads); no model",
    "properties": {
@@ -4971,11 +5014,18 @@
    "fetched": true,
    "builds": "Bare cultivated ground paint",
    "assets": [
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/big_pile.dae","region":"any","usedToday":false,"is":"rubble heap of concrete and brick; dresses ruins, demolition sites","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/medium_pile.dae","region":"any","usedToday":false,"is":"medium rubble heap with slabs; dresses ruins, demolition sites","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/small_pile_a.dae","region":"any","usedToday":false,"is":"small heap of broken bricks and dust","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/small_pile_b.dae","region":"any","usedToday":false,"is":"small scatter of concrete blocks and dust","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/small_pile_c.dae","region":"any","usedToday":false,"is":"small heap of bricks and litter","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/small_pile_d.dae","region":"any","usedToday":false,"is":"small flat heap of bricks, glass and litter","from":"catalogue"},
     {"shape":"/art/shapes/objects/s_wheelbarrow.dae","region":"any","usedToday":false,"is":"Wheelbarrow; dresses construction sites and farms","from":"catalogue"},
     {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_tractor.dae","region":"north-america","usedToday":false,"is":"US farm tractor warning diamond on post","from":"catalogue"},
     {"shape":"/levels/hirochi_raceway/art/shapes/objects/farm_fence1.dae","region":"any","usedToday":false,"is":"Wooden board farm fence panel","from":"catalogue"},
     {"shape":"/levels/Utah/art/shapes/buildings/ut_debris_a.dae","region":"north-america","usedToday":false,"is":"round low heap of brown earth","from":"catalogue"},
-    {"shape":"/levels/Utah/art/shapes/buildings/ut_debris_b.dae","region":"north-america","usedToday":false,"is":"long low heap of brown earth","from":"catalogue"}
+    {"shape":"/levels/Utah/art/shapes/buildings/ut_debris_b.dae","region":"north-america","usedToday":false,"is":"long low heap of brown earth","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/clutter/ut_debri_tin_panel.dae","region":"north-america","usedToday":false,"is":"heap of rusty tin sheets; dresses ruins and scrap yards","from":"catalogue"}
    ],
    "generated": "Terrain material (paint); no object",
    "properties": {
@@ -6571,6 +6621,12 @@
     {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_80_speed_limit.dae","usedToday":true,"region":"north-america"},
     {"shape":"/levels/west_coast_usa/art/shapes/objects/sign_speed25.dae","usedToday":true,"region":"north-america"},
     {"shape":"/levels/west_coast_usa/art/shapes/objects/sign_speed5.dae","usedToday":true,"region":"north-america"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_speed_100.dae","region":"any","usedToday":false,"is":"Speed limit 100 sign, Europe","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_speed_30.dae","region":"any","usedToday":false,"is":"Speed limit 30 sign, Europe","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_speed_50.dae","region":"any","usedToday":false,"is":"Speed limit 50 sign, Europe","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_speed_60.dae","region":"any","usedToday":false,"is":"Speed limit 60 sign, Europe","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_speed_80.dae","region":"any","usedToday":false,"is":"Speed limit 80 sign, Europe","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_speed_90.dae","region":"any","usedToday":false,"is":"Speed limit 90 sign, Europe","from":"catalogue"},
     {"shape":"/levels/driver_training/art/shapes/race/sign_speed100kph.dae","region":"any","usedToday":false,"is":"Blue km/h training-ground speed board, not a real road sign","from":"catalogue"},
     {"shape":"/levels/driver_training/art/shapes/race/sign_speed25.dae","region":"any","usedToday":false,"is":"Orange MPH training-ground speed board, not a real road sign","from":"catalogue"},
     {"shape":"/levels/driver_training/art/shapes/race/sign_speed40.dae","region":"any","usedToday":false,"is":"Orange MPH training-ground speed board, not a real road sign","from":"catalogue"},
@@ -6643,6 +6699,14 @@
     {"shape":"/assets/meshes/rocks/johnson_valley/s_rocks_desert_small_06.dae","region":"any","usedToday":false,"is":"dark grey desert small rock, generic and complete","from":"catalogue"},
     {"shape":"/assets/meshes/rocks/johnson_valley/s_rocks_desert_small_07.dae","region":"any","usedToday":false,"is":"dark grey desert small rock, generic and complete","from":"catalogue"},
     {"shape":"/assets/meshes/rocks/johnson_valley/s_rocks_desert_small_08.dae","region":"any","usedToday":false,"is":"dark grey desert small rock, generic and complete","from":"catalogue"},
+    {"shape":"/assets/meshes/rocks/johnson_valley/s_rocks_desert_small_09.dae","region":"any","usedToday":false,"is":"dark grey desert pebble, generic and complete","from":"catalogue"},
+    {"shape":"/assets/meshes/rocks/johnson_valley/s_rocks_desert_tiny_01.dae","region":"any","usedToday":false,"is":"dark grey desert pebble, generic and complete","from":"catalogue"},
+    {"shape":"/assets/meshes/rocks/johnson_valley/s_rocks_desert_tiny_02.dae","region":"any","usedToday":false,"is":"dark grey desert pebble, generic and complete","from":"catalogue"},
+    {"shape":"/assets/meshes/rocks/johnson_valley/s_rocks_desert_tiny_03.dae","region":"any","usedToday":false,"is":"dark grey desert pebble, generic and complete","from":"catalogue"},
+    {"shape":"/assets/meshes/rocks/johnson_valley/s_rocks_desert_tiny_04.dae","region":"any","usedToday":false,"is":"dark grey desert pebble, generic and complete","from":"catalogue"},
+    {"shape":"/assets/meshes/rocks/johnson_valley/s_rocks_desert_tiny_05.dae","region":"any","usedToday":false,"is":"dark grey desert pebble, generic and complete","from":"catalogue"},
+    {"shape":"/assets/meshes/rocks/johnson_valley/s_rocks_desert_tiny_06.dae","region":"any","usedToday":false,"is":"dark grey desert pebble, generic and complete","from":"catalogue"},
+    {"shape":"/assets/meshes/rocks/johnson_valley/s_rocks_desert_tiny_07.dae","region":"any","usedToday":false,"is":"dark grey desert pebble, generic and complete","from":"catalogue"},
     {"shape":"/levels/automation_test_track/art/shapes/rocks/rock1.dae","region":"any","usedToday":false,"is":"pale sandstone boulder, generic and complete","from":"catalogue"},
     {"shape":"/levels/automation_test_track/art/shapes/rocks/rock2.dae","region":"any","usedToday":false,"is":"pale sandstone boulder, generic and complete","from":"catalogue"},
     {"shape":"/levels/automation_test_track/art/shapes/rocks/rock3.dae","region":"any","usedToday":false,"is":"pale sandstone boulder, generic and complete","from":"catalogue"},
@@ -6660,6 +6724,7 @@
     {"shape":"/levels/automation_test_track/art/shapes/rocks/s_rocks_nz_jagged_small_2.dae","region":"any","usedToday":false,"is":"brown jagged small rock, generic and complete","from":"catalogue"},
     {"shape":"/levels/automation_test_track/art/shapes/rocks/s_rocks_nz_jagged_small_3.dae","region":"any","usedToday":false,"is":"brown jagged small rock, generic and complete","from":"catalogue"},
     {"shape":"/levels/automation_test_track/art/shapes/rocks/s_rocks_nz_jagged_small_4.dae","region":"any","usedToday":false,"is":"brown jagged small rock, generic and complete","from":"catalogue"},
+    {"shape":"/levels/automation_test_track/art/shapes/rocks/s_rocks_nz_jagged_small_5.dae","region":"any","usedToday":false,"is":"brown jagged pebble, generic and complete","from":"catalogue"},
     {"shape":"/levels/automation_test_track/art/shapes/rocks/s_rocks_nz_jagged_small.dae","region":"any","usedToday":false,"is":"brown jagged boulder, generic and complete","from":"catalogue"},
     {"shape":"/levels/east_coast_usa/art/shapes/rocks/eca_rock_big_narrow.dae","region":"north-america","usedToday":false,"is":"6 m flat grey rock slab","from":"catalogue"},
     {"shape":"/levels/east_coast_usa/art/shapes/rocks/eca_rock_big_wide.dae","region":"north-america","usedToday":false,"is":"6 m wide low rock outcrop","from":"catalogue"},
@@ -6672,6 +6737,7 @@
     {"shape":"/levels/italy/art/shapes/rocks/italy_rockface_short_wide.dae","region":"europe","usedToday":false,"is":"10 m long, 3 m high rock ridge","from":"catalogue"},
     {"shape":"/levels/italy/art/shapes/rocks/italy_rockface_tall_narrow.dae","region":"europe","usedToday":false,"is":"tall narrow grey rock face slab, cliff piece","from":"catalogue"},
     {"shape":"/levels/italy/art/shapes/rocks/italy_rockface_tall_wide.dae","region":"europe","usedToday":false,"is":"13 m wide grey rock face slab, cliff piece","from":"catalogue"},
+    {"shape":"/levels/italy/art/shapes/rocks/italy_rockface_tiny_9.dae","region":"europe","usedToday":false,"is":"grey pebble, generic and complete","from":"catalogue"},
     {"shape":"/levels/johnson_valley/art/shapes/rocks/s_rocks_desert_huge_sheet_1.dae","region":"north-america","usedToday":false,"is":"wide low rock outcrop sheet, dark desert stone","from":"catalogue"},
     {"shape":"/levels/johnson_valley/art/shapes/rocks/s_rocks_desert_small_01.dae","region":"north-america","usedToday":false,"is":"dark grey desert small rock, generic and complete","from":"catalogue"},
     {"shape":"/levels/jungle_rock_island/art/shapes/rocks/pac_rock_large_1.dae","region":"tropical","usedToday":false,"is":"dark grey tropical boulder, generic and complete","from":"catalogue"},
@@ -6684,12 +6750,26 @@
     {"shape":"/levels/jungle_rock_island/art/shapes/rocks/pac_rock_medium_flat.dae","region":"tropical","usedToday":false,"is":"dark grey tropical boulder, generic and complete","from":"catalogue"},
     {"shape":"/levels/jungle_rock_island/art/shapes/rocks/pac_rock_small_2.dae","region":"tropical","usedToday":false,"is":"dark grey tropical small rock, generic and complete","from":"catalogue"},
     {"shape":"/levels/jungle_rock_island/art/shapes/rocks/pac_rock_small_3.dae","region":"tropical","usedToday":false,"is":"dark grey tropical small rock, generic and complete","from":"catalogue"},
+    {"shape":"/levels/jungle_rock_island/art/shapes/rocks/pac_rock_small_4.dae","region":"tropical","usedToday":false,"is":"dark grey tropical pebble, generic and complete","from":"catalogue"},
+    {"shape":"/levels/jungle_rock_island/art/shapes/rocks/pac_rock_small_5.dae","region":"tropical","usedToday":false,"is":"dark grey tropical pebble, generic and complete","from":"catalogue"},
+    {"shape":"/levels/jungle_rock_island/art/shapes/rocks/pac_rock_tiny_1.dae","region":"tropical","usedToday":false,"is":"dark grey tropical pebble, generic and complete","from":"catalogue"},
+    {"shape":"/levels/jungle_rock_island/art/shapes/rocks/pac_rock_tiny_2.dae","region":"tropical","usedToday":false,"is":"dark grey tropical pebble, generic and complete","from":"catalogue"},
+    {"shape":"/levels/jungle_rock_island/art/shapes/rocks/pac_rock_tiny_3.dae","region":"tropical","usedToday":false,"is":"dark grey tropical pebble, generic and complete","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/groundcover/pebbles/s_cg_pebble_01.dae","region":"north-america","usedToday":false,"is":"red desert pebble, generic and complete","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/groundcover/pebbles/s_cg_pebble_02.dae","region":"north-america","usedToday":false,"is":"red desert pebble, generic and complete","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/groundcover/pebbles/s_cg_pebble_03.dae","region":"north-america","usedToday":false,"is":"red desert pebble, generic and complete","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/groundcover/pebbles/s_cg_pebble_04.dae","region":"north-america","usedToday":false,"is":"red desert pebble, generic and complete","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/groundcover/pebbles/s_cg_pebble_05.dae","region":"north-america","usedToday":false,"is":"red desert pebble, generic and complete","from":"catalogue"},
     {"shape":"/levels/Utah/art/shapes/rocks/utah_boulder_1.dae","region":"north-america","usedToday":false,"is":"red desert boulder, generic and complete","from":"catalogue"},
     {"shape":"/levels/Utah/art/shapes/rocks/utah_boulder_2.dae","region":"north-america","usedToday":false,"is":"red desert boulder, generic and complete","from":"catalogue"},
     {"shape":"/levels/Utah/art/shapes/rocks/utah_boulder_3.dae","region":"north-america","usedToday":false,"is":"red desert boulder, generic and complete","from":"catalogue"},
     {"shape":"/levels/Utah/art/shapes/rocks/utah_boulder_4.dae","region":"north-america","usedToday":false,"is":"red desert small rock, generic and complete","from":"catalogue"},
     {"shape":"/levels/Utah/art/shapes/rocks/utah_boulder_5.dae","region":"north-america","usedToday":false,"is":"red desert small rock, generic and complete","from":"catalogue"},
     {"shape":"/levels/Utah/art/shapes/rocks/utah_boulder_6.dae","region":"north-america","usedToday":false,"is":"red desert small rock, generic and complete","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/rocks/utah_boulder_7.dae","region":"north-america","usedToday":false,"is":"red desert pebble, generic and complete","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/rocks/utah_boulder_8.dae","region":"north-america","usedToday":false,"is":"red desert pebble, generic and complete","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/rocks/utah_boulder_9.dae","region":"north-america","usedToday":false,"is":"red desert pebble, generic and complete","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/rocks/utah_pebble_1.dae","region":"north-america","usedToday":false,"is":"red desert pebble, generic and complete","from":"catalogue"},
     {"shape":"/levels/Utah/art/shapes/rocks/utah_rock_big_2_b_top.dae","region":"north-america","usedToday":false,"is":"layered red sandstone block, desert outcrop","from":"catalogue"},
     {"shape":"/levels/Utah/art/shapes/rocks/utah_rock_big_2_b.dae","region":"north-america","usedToday":false,"is":"16 m red sandstone wall block, desert cliff","from":"catalogue"},
     {"shape":"/levels/Utah/art/shapes/rocks/utah_rock_big_2_c.dae","region":"north-america","usedToday":false,"is":"layered red sandstone block, desert outcrop","from":"catalogue"},
@@ -6700,7 +6780,8 @@
     {"shape":"/levels/Utah/art/shapes/rocks/utah_rock_flat_c.dae","region":"north-america","usedToday":false,"is":"flat red sandstone slab, desert","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/rocks/eca_rock_big_narrow.dae","region":"north-america","usedToday":false,"is":"6 m flat grey rock slab","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/rocks/eca_rock_big_wide.dae","region":"north-america","usedToday":false,"is":"6 m wide low rock outcrop","from":"catalogue"},
-    {"shape":"/levels/west_coast_usa/art/shapes/rocksJV/s_rocks_desert_huge_sheet_1.dae","region":"north-america","usedToday":false,"is":"wide low rock outcrop sheet, dark desert stone","from":"catalogue"}
+    {"shape":"/levels/west_coast_usa/art/shapes/rocksJV/s_rocks_desert_huge_sheet_1.dae","region":"north-america","usedToday":false,"is":"wide low rock outcrop sheet, dark desert stone","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/rocksJV/s_rocks_desert_tiny_04.dae","region":"north-america","usedToday":false,"is":"dark grey desert pebble, generic and complete","from":"catalogue"}
    ],
    "generated": "Terrain material (paint); no object",
    "code": "services/osmTerrainMaterials.js",
@@ -8716,8 +8797,65 @@
    "fetchedNote": "On a building outline it arrives with the building; shop nodes are not fetched",
    "builds": "A shopfront on the ground floor of its building",
    "assets": [
+    {"shape":"/art/shapes/garage_and_dealership/deal_covered_car_barstow_1.dae","region":"any","usedToday":false,"is":"Car under a dust cover; dresses dealerships and lots","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/deal_covered_car_roamer_1.dae","region":"any","usedToday":false,"is":"Car under a dust cover; dresses dealerships and lots","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/deal_covered_car_sunburst_2.dae","region":"any","usedToday":false,"is":"Car under a dust cover; dresses dealerships and lots","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/s_flag_floor_feather_01.dae","region":"any","usedToday":false,"is":"Car dealer floor banner flag","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/s_flag_floor_feather_02.dae","region":"any","usedToday":false,"is":"Car dealer floor banner flag","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/s_flag_floor_portrait_01.dae","region":"any","usedToday":false,"is":"Car dealer floor banner flag","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/s_flag_floor_portrait_02.dae","region":"any","usedToday":false,"is":"Car dealer floor banner flag","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/s_flag_floor_portrait_03.dae","region":"any","usedToday":false,"is":"Car dealer floor banner flag","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/s_flag_floor_portrait_04.dae","region":"any","usedToday":false,"is":"Car dealer floor banner flag","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/s_flag_floor_portrait_05.dae","region":"any","usedToday":false,"is":"Car dealer floor banner flag","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/s_flag_floor_portrait_06.dae","region":"any","usedToday":false,"is":"Car dealer floor banner flag","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/s_flag_floor_teardrop_01.dae","region":"any","usedToday":false,"is":"Plain blue teardrop flag","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/s_flag_floor_teardrop_02.dae","region":"any","usedToday":false,"is":"Chequered teardrop flag","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/buildings/eca_bld_grocerystore.dae","region":"north-america","usedToday":false,"is":"Complete grey grocery store with hip roof; North America","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/buildings/eca_bld_store_fish_a.dae","region":"north-america","usedToday":false,"is":"Small shingle fish store with red roof","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/buildings/eca_gastation_auto_repair.dae","region":"north-america","usedToday":false,"is":"Blue-roofed gas station repair shop","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/buildings/eca_offroad_dealership_main.dae","region":"north-america","usedToday":false,"is":"Small barn-like dealership building, red base","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/buildings/eca_offroad_dealership_sign.dae","region":"north-america","usedToday":false,"is":"Off-road dealer sign on two posts, fictional brand","from":"catalogue"},
+    {"shape":"/levels/italy/art/shapes/buildings/dealerships/claudio_motors_sign02.dae","region":"europe","usedToday":false,"is":"Fictional car dealer logo sign on low stand","from":"catalogue"},
+    {"shape":"/levels/italy/art/shapes/buildings/dealerships/Italy_dealership_01.dae","region":"europe","usedToday":false,"is":"Small flat-roofed Italian dealership on a plinth","from":"catalogue"},
+    {"shape":"/levels/italy/art/shapes/buildings/dealerships/Italy_dealership_02.dae","region":"europe","usedToday":false,"is":"Low Italian dealership building, flat roof","from":"catalogue"},
+    {"shape":"/levels/italy/art/shapes/buildings/italy_petrolstation_shopSt_L.dae","region":"europe","usedToday":false,"is":"Small Italian petrol station shop","from":"catalogue"},
+    {"shape":"/levels/italy/art/shapes/buildings/italy_petrolstation_shopSt_M.dae","region":"europe","usedToday":false,"is":"Small Italian petrol station shop","from":"catalogue"},
+    {"shape":"/levels/italy/art/shapes/buildings/italy_petrolstation_shopSt_S_wBase.dae","region":"europe","usedToday":false,"is":"Kiosk booth on concrete island","from":"catalogue"},
+    {"shape":"/levels/italy/art/shapes/buildings/italy_petrolstation_shopSt_S.dae","region":"europe","usedToday":false,"is":"Tiny petrol station kiosk booth","from":"catalogue"},
+    {"shape":"/levels/johnson_valley/art/shapes/building/s_gasstation_tyrannos_shop.dae","region":"north-america","usedToday":false,"is":"Yellow-trim station shop building","from":"catalogue"},
+    {"shape":"/levels/johnson_valley/art/shapes/misc/s_gasstation_tacosaurus_shop.dae","region":"north-america","usedToday":false,"is":"Station shop with side slab; fictional brand","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/buildings/Dealer_b.dae","region":"north-america","usedToday":false,"is":"Low car dealership building with glass front; North America","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/buildings/Dealer_c_gas_station.dae","region":"north-america","usedToday":false,"is":"Old brick gas station with round canopy; North America","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/buildings/Dealer_c.dae","region":"north-america","usedToday":false,"is":"Glass car showroom pavilion with roof sign","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/buildings/ut_auto_repairs.dae","region":"north-america","usedToday":false,"is":"Yellow auto repair building; floats above floor, needs sinking","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/buildings/ut_car_dealer.dae","region":"north-america","usedToday":false,"is":"Dark flat-roofed car dealer with roof plant; North America","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/dealership_mid.dae","region":"north-america","usedToday":false,"is":"Mid-size dealership building with round signs","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/dealership_new.dae","region":"north-america","usedToday":false,"is":"Large modern glass car dealership","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/dealership_sport.dae","region":"north-america","usedToday":false,"is":"Long grey sports-car dealership building","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_belasco_auto_sign.dae","region":"north-america","usedToday":false,"is":"Tall car dealer sign on two poles, fictional brand","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_food_mart_001.dae","region":"north-america","usedToday":false,"is":"Food mart with striped fascia, flat roof","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_fuel_station_apex_001.dae","region":"north-america","usedToday":false,"is":"Fuel station store building; fictional brand, North America","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_fuel_station_nodeoline_001.dae","region":"north-america","usedToday":false,"is":"Fuel station store building; fictional brand, North America","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_fuel_station_trilobite_001.dae","region":"north-america","usedToday":false,"is":"Fuel station store building; fictional brand, North America","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_laundomat_001.dae","region":"north-america","usedToday":false,"is":"Small laundromat building with canopy","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_shops_002.dae","region":"north-america","usedToday":false,"is":"Brick corner shop building with arched windows","from":"catalogue"},
-    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_shops_003.dae","region":"north-america","usedToday":false,"is":"Long shop row with red roof and arcade","from":"catalogue"}
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_shops_003.dae","region":"north-america","usedToday":false,"is":"Long shop row with red roof and arcade","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_car_parts_sign_001.dae","region":"north-america","usedToday":false,"is":"Car parts shop sign on lattice mast","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_career_garage.dae","region":"north-america","usedToday":false,"is":"Art-deco garage building with GARAGE sign","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_exhaust_sign_001.dae","region":"north-america","usedToday":false,"is":"Exhaust/stereo shop sign on post","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_food_mart_sign_001.dae","region":"north-america","usedToday":false,"is":"Deli and food mart sign on pole","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_fuel_island_main.dae","region":"north-america","usedToday":false,"is":"Brick station shop with canopy posts","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_fuel_main_05.dae","region":"north-america","usedToday":false,"is":"Brick station shop with canopy posts","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_smash_auto_sign_001.dae","region":"north-america","usedToday":false,"is":"Retro body-shop sign on lattice frame","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_sound_sign_001.dae","region":"north-america","usedToday":false,"is":"Sound and tint shop sign on lattice mast","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_torres_tires_sign_001.dae","region":"north-america","usedToday":false,"is":"Tyre shop sign on lattice mast, fictional brand","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_torres_tires_sign_003.dae","region":"north-america","usedToday":false,"is":"Tyre shop sign on lattice mast, fictional brand","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/objects/featherflag_bruckell.dae","region":"north-america","usedToday":false,"is":"Feather flag, fictional car brand","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/objects/featherflag_gavril.dae","region":"north-america","usedToday":false,"is":"Feather flag, fictional car brand","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/objects/featherflag_ibishu.dae","region":"north-america","usedToday":false,"is":"Feather flag, fictional car brand","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/objects/featherflag_repair.dae","region":"north-america","usedToday":false,"is":"Feather flag reading auto repair","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/objects/s_dealership_sign.dae","region":"north-america","usedToday":false,"is":"Car dealer sign on pole, fictional brand","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/objects/sign_rentabox.dae","region":"north-america","usedToday":false,"is":"Self-storage sign on posts, fictional brand","from":"catalogue"}
    ],
    "generated": "Shopfront facade",
    "code": "services/beamngBuildings.js"
@@ -8874,7 +9012,9 @@
     {"shape":"/levels/italy/art/shapes/buildings/italy_village_hotel.dae","region":"europe","usedToday":false,"is":"Italian village hotel, six storeys, tile roof","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_hotel_002.dae","region":"north-america","usedToday":false,"is":"Tall slender hotel tower","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_hotel_003.dae","region":"north-america","usedToday":false,"is":"Mid-rise hotel block on green base","from":"catalogue"},
-    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_hotel_004.dae","region":"north-america","usedToday":false,"is":"Brick high-rise hotel with balconies","from":"catalogue"}
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_hotel_004.dae","region":"north-america","usedToday":false,"is":"Brick high-rise hotel with balconies","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_motel.dae","region":"north-america","usedToday":false,"is":"Two-storey motel with pool; North America","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_motel_sign.dae","region":"north-america","usedToday":false,"is":"Retro motel sign on pole","from":"catalogue"}
    ],
    "generated": "Facade style of the building it is in",
    "code": "services/buildingUses.js",
@@ -9130,9 +9270,9 @@
    "fetched": false,
    "builds": "The matching native sign on the kerb side, facing its traffic",
    "assets": [
-    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_speed_50.dae","region":"europe","usedToday":true,"picture":"Speed limit 50 sign, Europe"},
-    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_speedlimit_50.dae","region":"north-america","usedToday":true,"picture":"US speed limit sign on post; pictured from behind"},
-    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_30_speed_limit.dae","region":"north-america","usedToday":true,"picture":"US speed limit sign on post, Utah set"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_speed_50.dae","region":"europe","usedToday":true},
+    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_speedlimit_50.dae","region":"north-america","usedToday":true},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_30_speed_limit.dae","region":"north-america","usedToday":true},
     {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_do_not_enter.dae","region":"north-america","usedToday":false},
     {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_drivestraight.dae","region":"any","usedToday":false,"is":"Mandatory straight ahead sign, Europe","from":"catalogue"},
     {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_keep_left.dae","region":"any","usedToday":false,"is":"Keep left sign for islands, Europe","from":"catalogue"},
@@ -9140,12 +9280,18 @@
     {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_left_only_ahead.dae","region":"any","usedToday":false,"is":"Left turn only ahead sign, Europe","from":"catalogue"},
     {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_min30_end.dae","region":"any","usedToday":false,"is":"End of minimum speed 30 sign, Europe","from":"catalogue"},
     {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_min30.dae","region":"any","usedToday":false,"is":"Minimum speed 30 sign, Europe","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_no_overtaking_end.dae","region":"any","usedToday":false,"is":"Red-ring overtaking sign; picture looks like the ban, not its end","from":"catalogue"},
     {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_no_parking.dae","region":"any","usedToday":false,"is":"No parking sign with time plate, Europe","from":"catalogue"},
     {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_noentry.dae","region":"any","usedToday":false,"is":"No entry sign, for the wrong end of one-ways","from":"catalogue"},
     {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_pass_either_side.dae","region":"any","usedToday":false,"is":"Pass either side sign for islands, Europe","from":"catalogue"},
     {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_priority_oncoming.dae","region":"any","usedToday":false,"is":"Give priority to oncoming traffic sign, Europe","from":"catalogue"},
     {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_priority_over_oncoming.dae","region":"any","usedToday":false,"is":"Priority over oncoming traffic sign, Europe","from":"catalogue"},
     {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_right_only_ahead.dae","region":"any","usedToday":false,"is":"Right turn only ahead sign, Europe","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_speed_100.dae","region":"any","usedToday":false,"is":"Speed limit 100 sign, Europe","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_speed_30.dae","region":"any","usedToday":false,"is":"Speed limit 30 sign, Europe","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_speed_60.dae","region":"any","usedToday":false,"is":"Speed limit 60 sign, Europe","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_speed_80.dae","region":"any","usedToday":false,"is":"Speed limit 80 sign, Europe","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_speed_90.dae","region":"any","usedToday":false,"is":"Speed limit 90 sign, Europe","from":"catalogue"},
     {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_speed_adv_100_end.dae","region":"any","usedToday":false,"is":"End of advisory speed 100 sign, Europe","from":"catalogue"},
     {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_speed_adv_60_end.dae","region":"any","usedToday":false,"is":"End of advisory speed 60 sign, Europe","from":"catalogue"},
     {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_straight_or_left.dae","region":"any","usedToday":false,"is":"Straight or left only sign, Europe","from":"catalogue"},
@@ -9153,6 +9299,13 @@
     {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_turn_left.dae","region":"any","usedToday":false,"is":"Turn left mandatory sign, Europe","from":"catalogue"},
     {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_turn_leftorright.dae","region":"any","usedToday":false,"is":"Turn left or right mandatory sign, Europe","from":"catalogue"},
     {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_turnright.dae","region":"any","usedToday":false,"is":"Turn right mandatory sign, Europe","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_speedlimit_40.dae","region":"north-america","usedToday":false,"is":"US speed limit sign on post; pictured from behind","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_weightlimit.dae","region":"north-america","usedToday":false,"is":"US weight limit 10 tons sign on post","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_40_speed_limit.dae","region":"north-america","usedToday":false,"is":"US speed limit sign on post, Utah set","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_50_speed_limit.dae","region":"north-america","usedToday":false,"is":"US speed limit sign on post, Utah set","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_60_speed_limit.dae","region":"north-america","usedToday":false,"is":"US speed limit sign on post, Utah set","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_70_speed_limit.dae","region":"north-america","usedToday":false,"is":"US speed limit sign on post, Utah set","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_80_speed_limit.dae","region":"north-america","usedToday":false,"is":"US speed limit sign on post, Utah set","from":"catalogue"},
     {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_trucks_advisory.dae","region":"north-america","usedToday":false,"is":"US trucks-use-right-lane sign on post, for climbs","from":"catalogue"}
    ],
    "fallback": "Signs MapNG derives from maxspeed, oneway and junction layout",
@@ -9183,7 +9336,10 @@
    "fetched": true,
    "builds": "A bored tunnel, cut-and-cover box or gallery with portals and lights",
    "assets": [
-    {"shape":"/levels/west_coast_usa/art/shapes/objects/ceiling_light_tunnel.dae","region":"north-america","usedToday":true}
+    {"shape":"/levels/west_coast_usa/art/shapes/objects/ceiling_light_tunnel.dae","region":"north-america","usedToday":true},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_tunnel_not_motorway.dae","region":"any","usedToday":false,"is":"Blue tunnel sign on post, Europe","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/buildings/eca_drain_12m.dae","region":"north-america","usedToday":false,"is":"Large concrete culvert pipe, 12 m long","from":"catalogue"},
+    {"shape":"/levels/hirochi_raceway/art/shapes/objects/concrete_tube.dae","region":"any","usedToday":false,"is":"Concrete pipe lying on its side, yard dressing","from":"catalogue"}
    ],
    "generated": "Tunnel tube and portal meshes; terrain holes at the mouths",
    "properties": {
@@ -9507,6 +9663,352 @@
      "used": false
     }
    }
+  },
+  "hazard=*": {
+   "what": "A hazard on the road a warning sign stands for: a bend, a dip, a slippery stretch, a narrowing, falling rocks ...",
+   "on": [
+    "node",
+    "way"
+   ],
+   "status": "partial",
+   "fetched": false,
+   "builds": "Curve warnings (chevrons, bend and winding-road signs) from the road's own bends; a mapped hazard=* is not read yet",
+   "code": "services/roadCurves.js",
+   "also": [
+    "traffic_sign=hazard"
+   ],
+   "group": "roads",
+   "item": "signs",
+   "note": "The game's warning signs (bend, double bend, dip, bump, slippery, loose gravel, road narrows, side winds, low aircraft) are listed for when mapped hazards are read",
+   "assets": [
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_crossroad.dae","region":"any","usedToday":false,"is":"Crossroads warning triangle, Europe","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_junction_left.dae","region":"any","usedToday":false,"is":"Side road junction warning triangle, Europe","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_junction_merge_left.dae","region":"any","usedToday":false,"is":"Merging traffic warning triangle, Europe","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_junction_merge_right.dae","region":"any","usedToday":false,"is":"Merging traffic warning triangle, Europe","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_junction_right.dae","region":"any","usedToday":false,"is":"Side road junction warning triangle, Europe","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_bend_l.dae","region":"any","usedToday":false,"is":"Left bend warning triangle, Europe","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_dangerous_verges.dae","region":"any","usedToday":false,"is":"Dangerous verges warning triangle, Europe","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_dip.dae","region":"any","usedToday":false,"is":"Dip warning triangle, Europe","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_doublebend_l.dae","region":"any","usedToday":false,"is":"Double bend warning triangle, Europe","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_humps.dae","region":"any","usedToday":false,"is":"Speed hump warning triangle, Europe","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_loose_chippings.dae","region":"any","usedToday":false,"is":"Loose chippings warning triangle, Europe","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_low_aircraft.dae","region":"any","usedToday":false,"is":"Italian low-aircraft warning triangle on post","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_other_danger.dae","region":"any","usedToday":false,"is":"Italian general danger warning triangle on post","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_road_narrows.dae","region":"any","usedToday":false,"is":"Italian road-narrows warning triangle on post","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_roundabout_warning.dae","region":"any","usedToday":false,"is":"Italian roundabout-ahead warning triangle on post","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_slippery.dae","region":"any","usedToday":false,"is":"Italian slippery-road warning triangle on post","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_steep_down.dae","region":"any","usedToday":false,"is":"Italian steep-descent warning triangle on post","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_steep_up.dae","region":"any","usedToday":false,"is":"Italian steep-climb warning triangle on post","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_strong_winds.dae","region":"any","usedToday":false,"is":"Italian side-wind warning triangle on post","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_uneven_road.dae","region":"any","usedToday":false,"is":"Italian uneven-road warning triangle on post","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_zebra_warning.dae","region":"any","usedToday":false,"is":"Italian pedestrian-crossing warning triangle on post","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_zebra_warning.dae","region":"any","usedToday":false,"is":"Italian pedestrian-crossing warning triangle on post","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_2way.dae","region":"north-america","usedToday":false,"is":"US double-arrow T-junction end sign on post","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_4way.dae","region":"north-america","usedToday":false,"is":"US crossroads warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_bend_left.dae","region":"north-america","usedToday":false,"is":"US bend warning diamond on post; curve warning signs","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_bend_right.dae","region":"north-america","usedToday":false,"is":"US bend warning diamond on post; curve warning signs","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_bump.dae","region":"north-america","usedToday":false,"is":"US BUMP warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_chevron_left.dae","region":"north-america","usedToday":false,"is":"US chevron marker on post for sharp curves","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_chevron_right.dae","region":"north-america","usedToday":false,"is":"US chevron marker on post for sharp curves","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_corner_left25.dae","region":"north-america","usedToday":false,"is":"US sharp-turn warning with 25 advisory plate, on post","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_corner_right25.dae","region":"north-america","usedToday":false,"is":"US sharp-turn warning with 25 advisory plate, on post","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_dip.dae","region":"north-america","usedToday":false,"is":"US DIP warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_gravel.dae","region":"north-america","usedToday":false,"is":"US GRAVEL warning plate on post","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_intersection_left.dae","region":"north-america","usedToday":false,"is":"US side-road junction warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_intersection_offset_left.dae","region":"north-america","usedToday":false,"is":"US side-road junction warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_intersection_offset_right.dae","region":"north-america","usedToday":false,"is":"US side-road junction warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_intersection_right.dae","region":"north-america","usedToday":false,"is":"US side-road junction warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_narrowbridge.dae","region":"north-america","usedToday":false,"is":"US narrow-bridge warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_narrows.dae","region":"north-america","usedToday":false,"is":"US road-narrows warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_sbend_left.dae","region":"north-america","usedToday":false,"is":"US reverse-curve warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_sbend_right.dae","region":"north-america","usedToday":false,"is":"US reverse-curve warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_slippery.dae","region":"north-america","usedToday":false,"is":"US slippery-when-wet warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_stop_ahead.dae","region":"north-america","usedToday":false,"is":"US stop-ahead warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_t-intersection.dae","region":"north-america","usedToday":false,"is":"US T-intersection warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_tractor.dae","region":"north-america","usedToday":false,"is":"US farm tractor warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_yield_ahead.dae","region":"north-america","usedToday":false,"is":"US yield-ahead warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/buildings/ut_roadsign_turn_warn.dae","region":"north-america","usedToday":false,"is":"Double chevron board on two posts for sharp bends","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_chevron_left.dae","region":"north-america","usedToday":false,"is":"US chevron marker on post for sharp curves","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_chevron_right.dae","region":"north-america","usedToday":false,"is":"US chevron marker on post for sharp curves","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_crossroads.dae","region":"north-america","usedToday":false,"is":"US crossroads warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_curve_left.dae","region":"north-america","usedToday":false,"is":"US curve warning diamond on post; curve warning signs","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_curve_right.dae","region":"north-america","usedToday":false,"is":"US curve warning diamond on post; curve warning signs","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_DIP.dae","region":"north-america","usedToday":false,"is":"US DIP warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_divided_highway.dae","region":"north-america","usedToday":false,"is":"US divided-highway-begins warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_double_arrow.dae","region":"north-america","usedToday":false,"is":"US double-arrow T-junction end sign on post","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_left_turn.dae","region":"north-america","usedToday":false,"is":"US sharp-turn warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_merge_left.dae","region":"north-america","usedToday":false,"is":"US merge warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_merge_right.dae","region":"north-america","usedToday":false,"is":"US merge warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_narrow_bridge.dae","region":"north-america","usedToday":false,"is":"US narrow-bridge warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_offset_side_roads_left.dae","region":"north-america","usedToday":false,"is":"US offset side-roads warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_offset_side_roads_right.dae","region":"north-america","usedToday":false,"is":"US offset side-roads warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_reverse_curve_left.dae","region":"north-america","usedToday":false,"is":"US reverse-curve warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_reverse_curve_right.dae","region":"north-america","usedToday":false,"is":"US reverse-curve warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_right_turn.dae","region":"north-america","usedToday":false,"is":"US sharp-turn warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_road_narrows.dae","region":"north-america","usedToday":false,"is":"US road-narrows warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_side_road_diag_left.dae","region":"north-america","usedToday":false,"is":"US side-road junction warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_side_road_diag_right.dae","region":"north-america","usedToday":false,"is":"US side-road junction warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_side_road_left.dae","region":"north-america","usedToday":false,"is":"US side-road junction warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_side_road_right.dae","region":"north-america","usedToday":false,"is":"US side-road junction warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_slippery_when_wet.dae","region":"north-america","usedToday":false,"is":"US slippery-when-wet warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_stop_ahead.dae","region":"north-america","usedToday":false,"is":"US stop-ahead warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_T_intersection.dae","region":"north-america","usedToday":false,"is":"US T-intersection warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_unimproved_road.dae","region":"north-america","usedToday":false,"is":"US unimproved-road warning with GRAVEL plate, on post","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_winding_road_left.dae","region":"north-america","usedToday":false,"is":"US winding-road warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_winding_road_right.dae","region":"north-america","usedToday":false,"is":"US winding-road warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_yield_ahead.dae","region":"north-america","usedToday":false,"is":"US yield-ahead warning diamond on post","from":"catalogue"},
+    {"shape":"/levels/west_coast_usa/art/shapes/race/sign_arrows.dae","region":"north-america","usedToday":false,"is":"Low black-white chevron board for sharp bends, stands alone","from":"catalogue"}
+   ]
+  },
+  "junction=roundabout": {
+   "what": "A roundabout",
+   "on": [
+    "way"
+   ],
+   "status": "built",
+   "fetched": true,
+   "builds": "Roundabout signs before each entry (and give-way signs at them)",
+   "code": "services/roadSigns.js",
+   "group": "roads",
+   "item": "signs",
+   "assets": [
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_roundabout.dae","region":"any","usedToday":false,"is":"Roundabout mandatory sign, Europe","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_roundabout_warning.dae","region":"any","usedToday":false,"is":"Italian roundabout-ahead warning triangle on post","from":"catalogue"}
+   ]
+  },
+  "priority_road=*": {
+   "what": "A road with priority, where it begins and ends",
+   "on": [
+    "way",
+    "node"
+   ],
+   "status": "partial",
+   "fetched": true,
+   "builds": "Priority-road signs worked out from the road classes at junctions; the tag itself is not read",
+   "code": "services/roadSigns.js",
+   "group": "roads",
+   "item": "signs",
+   "assets": [
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_priorityroad_end.dae","region":"any","usedToday":false,"is":"End of priority road sign, Europe","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_priorityroad.dae","region":"any","usedToday":false,"is":"Yellow diamond priority road sign, Europe","from":"catalogue"}
+   ]
+  },
+  "overtaking=*": {
+   "what": "Where overtaking is not allowed",
+   "on": [
+    "way"
+   ],
+   "status": "planned",
+   "fetched": true,
+   "builds": "No-overtaking signs and their end signs where the value changes",
+   "group": "roads",
+   "item": "signs",
+   "assets": [
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_no_overtaking_end.dae","region":"any","usedToday":false,"is":"Red-ring overtaking sign; picture looks like the ban, not its end","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_no_overtaking.dae","region":"any","usedToday":false,"is":"Round sign; face shows grey in picture, cannot confirm","from":"catalogue"}
+   ]
+  },
+  "noexit=yes": {
+   "what": "A dead end: a road with no way out",
+   "on": [
+    "node",
+    "way"
+   ],
+   "status": "planned",
+   "fetched": false,
+   "builds": "A dead-end sign at its entrance",
+   "group": "roads",
+   "item": "signs",
+   "assets": [
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_dead_end.dae","region":"any","usedToday":false,"is":"Dead end sign, Europe","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_dead_end.dae","region":"north-america","usedToday":false,"is":"US DEAD END warning diamond on post","from":"catalogue"}
+   ]
+  },
+  "maxspeed:advisory=*": {
+   "what": "An advisory speed (a bend, a ramp)",
+   "on": [
+    "way"
+   ],
+   "status": "planned",
+   "fetched": true,
+   "builds": "An advisory speed plate where it starts",
+   "group": "roads",
+   "item": "signs",
+   "assets": [
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_speed_adv_100.dae","region":"any","usedToday":false,"is":"Blue advisory speed 100 sign, Europe","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_speed_adv_60.dae","region":"any","usedToday":false,"is":"Blue advisory speed 60 sign, Europe","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/ut_roadsigns/ut_advisory_ramp_speed.dae","region":"north-america","usedToday":false,"is":"US ramp advisory speed 30 sign on post","from":"catalogue"}
+   ]
+  },
+  "maxweight=*": {
+   "what": "A weight limit (a bridge, a weak road)",
+   "on": [
+    "way"
+   ],
+   "status": "planned",
+   "fetched": true,
+   "builds": "A weight-limit sign at each end",
+   "group": "roads",
+   "item": "signs",
+   "assets": [
+    {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_weightlimit.dae","region":"north-america","usedToday":false,"is":"US weight limit 10 tons sign on post","from":"catalogue"}
+   ]
+  },
+  "minspeed=*": {
+   "what": "A minimum speed",
+   "on": [
+    "way"
+   ],
+   "status": "planned",
+   "fetched": true,
+   "builds": "A minimum-speed sign where it starts",
+   "group": "roads",
+   "item": "signs",
+   "assets": [
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_min30.dae","region":"any","usedToday":false,"is":"Minimum speed 30 sign, Europe","from":"catalogue"}
+   ]
+  },
+  "motor_vehicle=no": {
+   "what": "A road closed to motor vehicles",
+   "on": [
+    "way"
+   ],
+   "status": "planned",
+   "fetched": true,
+   "builds": "A no-motor-vehicles sign at each end",
+   "also": [
+    "vehicle=no"
+   ],
+   "group": "roads",
+   "item": "signs",
+   "assets": [
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_restricted.dae","region":"any","usedToday":false,"is":"No vehicles sign, Europe","from":"catalogue"}
+   ]
+  },
+  "craft=sawmill": {
+   "what": "A sawmill",
+   "on": [
+    "node",
+    "area"
+   ],
+   "status": "planned",
+   "fetched": false,
+   "builds": "Log and timber stacks on its yard",
+   "group": "industry",
+   "assets": [
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/wood_stack_a.dae","region":"any","usedToday":false,"is":"Stack of sawn planks","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/wood_stack_b.dae","region":"any","usedToday":false,"is":"Timber stack under tarp","from":"catalogue"},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/wood_stack_c.dae","region":"any","usedToday":false,"is":"Low stack of sawn planks","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/misc/sawmill_log_long1.dae","region":"north-america","usedToday":false,"is":"Straight sawn log; log barrier or timber yard","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/misc/sawmill_log_long2.dae","region":"north-america","usedToday":false,"is":"Straight sawn log; log barrier or timber yard","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/misc/sawmill_log_short1.dae","region":"north-america","usedToday":false,"is":"Straight sawn log; log barrier or timber yard","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/misc/sawmill_log_short2.dae","region":"north-america","usedToday":false,"is":"Straight sawn log; log barrier or timber yard","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/misc/sawmill_log_thick.dae","region":"north-america","usedToday":false,"is":"Short thick log, 1 m diameter; barrier","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/misc/sawmill_logstack.dae","region":"north-america","usedToday":false,"is":"Stack of logs; dresses sawmills and timber yards","from":"catalogue"},
+    {"shape":"/levels/east_coast_usa/art/shapes/misc/sawmill_timberstack1.dae","region":"north-america","usedToday":false,"is":"Stack of sawn timber, 6 m","from":"catalogue"}
+   ]
+  },
+  "historic=mine": {
+   "what": "A historic mine",
+   "on": [
+    "node",
+    "area"
+   ],
+   "status": "planned",
+   "fetched": false,
+   "builds": "A mine entrance and its head frame",
+   "group": "landmarks",
+   "assets": [
+    {"shape":"/levels/Utah/art/shapes/buildings/ut_old_mine_.dae","region":"north-america","usedToday":false,"is":"Old mine building with timber headframe; desert West","from":"catalogue"},
+    {"shape":"/levels/Utah/art/shapes/buildings/ut_old_mine_v2.dae","region":"north-america","usedToday":false,"is":"Old mine building with timber headframe; desert West","from":"catalogue"}
+   ]
+  },
+  "emergency=life_ring": {
+   "what": "A life ring on a quay or a bank",
+   "on": [
+    "node"
+   ],
+   "status": "planned",
+   "fetched": false,
+   "builds": "A life ring on its post",
+   "group": "furniture",
+   "item": "benches",
+   "assets": [
+    {"shape":"/levels/small_island/art/shapes/buildings/si_life_preserver.dae","region":"tropical","usedToday":false,"is":"Life ring; pier and marina dressing","from":"catalogue"}
+   ]
+  },
+  "emergency=fire_hose": {
+   "what": "A fire hose cabinet",
+   "on": [
+    "node"
+   ],
+   "status": "planned",
+   "fetched": false,
+   "builds": "A hose cabinet on a wall or post",
+   "group": "furniture",
+   "item": "benches",
+   "assets": [
+    {"shape":"/levels/hirochi_raceway/art/shapes/buildings/hr_firehydrantreel.dae","region":"any","usedToday":false,"is":"Red fire hose reel, pit lane or yard dressing","from":"catalogue"}
+   ]
+  },
+  "tourism=museum": {
+   "what": "A museum",
+   "on": [
+    "node",
+    "area"
+   ],
+   "status": "planned",
+   "fetched": false,
+   "builds": "Its building, as any other; the game's own museum building is listed for a landmark later",
+   "group": "buildings",
+   "item": "buildings",
+   "assets": [
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_canal_museum.dae","region":"north-america","usedToday":false,"is":"Long classical museum hall, complete building","from":"catalogue"}
+   ]
+  },
+  "golf=clubhouse": {
+   "what": "A golf course's clubhouse",
+   "on": [
+    "node",
+    "area"
+   ],
+   "status": "planned",
+   "fetched": false,
+   "builds": "Its building, as any other; the game's clubhouse is listed for later",
+   "group": "buildings",
+   "item": "buildings",
+   "assets": [
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_club_house.dae","region":"north-america","usedToday":false,"is":"Long low club house, complete","from":"catalogue"}
+   ]
+  },
+  "leisure=sports_centre": {
+   "what": "A sports centre",
+   "on": [
+    "node",
+    "area"
+   ],
+   "status": "planned",
+   "fetched": false,
+   "builds": "Its building, as any other; the game's sports hall is listed for later",
+   "group": "buildings",
+   "item": "buildings",
+   "assets": [
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_bld_club_house.dae","region":"north-america","usedToday":false,"is":"Long low club house, complete","from":"catalogue"}
+   ]
+  },
+  "waterway=boatyard": {
+   "what": "A boatyard",
+   "on": [
+    "node",
+    "area"
+   ],
+   "status": "planned",
+   "fetched": false,
+   "builds": "Boats on stands and cradles on its hard standing",
+   "group": "water",
+   "assets": [
+    {"shape":"/levels/east_coast_usa/art/shapes/buildings/eca_fv_shore_boat_covered.dae","region":"north-america","usedToday":false,"is":"Covered boat on a stand, for dry land","from":"catalogue"}
+   ]
   }
  },
  "untagged": {

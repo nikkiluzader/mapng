@@ -100,12 +100,15 @@ test('the model catalogue is well formed', () => {
 });
 
 test('a model listed under a tag is in the catalogue with that tag, unless the code places it today', () => {
+  // (with that tag, one it lists among its variants, or a value of its wildcard: as the generator matches them)
+  const alsoOf = new Map(Object.entries(tags).flatMap(([k, e]) => (e.also || []).map((x) => [x, k])));
+  const entryOf = (x) => (tags[x] ? x : alsoOf.get(x) ?? (tags[`${x.split('=')[0]}=*`] ? `${x.split('=')[0]}=*` : null));
   const wrong = [];
   for (const [tag, e] of Object.entries(tags)) for (const a of e.assets) {
     if (a.usedToday || a.picture) continue;   // (named by the code: listed whatever its picture shows, with a note)
     const m = inCat.get(a.shape);
     if (!m) wrong.push(`${tag}: ${a.shape} is not in the catalogue`);
-    else if (!m.tags.includes(tag)) wrong.push(`${tag}: ${a.shape} does not carry the tag`);
+    else if (!m.tags.some((x) => entryOf(x) === tag)) wrong.push(`${tag}: ${a.shape} does not carry the tag`);
     else if ((m.mark === 'maybe') !== Boolean(a.maybe)) wrong.push(`${tag}: ${a.shape} is ${m.mark} in the catalogue`);
   }
   assert.deepEqual(wrong, [], 'run node scripts/tag-library/from-catalogue.mjs');

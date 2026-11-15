@@ -57,9 +57,15 @@ const record = (m) => ({
 const records = kept.map(record).sort((a, b) => a.shape.localeCompare(b.shape));
 const inCatalogue = new Map(records.map((r) => [r.shape, r]));
 const usedCats = [...new Set(records.map((r) => r.category))];
-const libraryTags = new Set([...Object.keys(lib.tags), ...Object.values(lib.tags).flatMap((t) => t.also || [])]);
+// The library entry a model's tag belongs to: its own, the one that lists it among its `also`, or the key's
+// wildcard (maxspeed=30 under maxspeed=*, shop=car under shop=*). A tag that is a property of an entry (leaf_type on
+// natural=tree, tower:type on man_made=tower) is described there, with no entry of its own.
+const alsoOf = new Map(Object.entries(lib.tags).flatMap(([k, e]) => (e.also || []).map((x) => [x, k])));
+const entryOf = (tag) => (lib.tags[tag] ? tag : alsoOf.get(tag) ?? (lib.tags[`${tag.split('=')[0]}=*`] ? `${tag.split('=')[0]}=*` : null));
+const propertyKeys = new Set(Object.values(lib.tags).flatMap((e) => Object.keys(e.properties || {})));
+const carries = (r, tag) => r.tags.some((t) => entryOf(t) === tag);
 const notInLibrary = {};
-for (const r of records) if (r.mark === 'use') for (const t of r.tags) if (!libraryTags.has(t)) notInLibrary[t] = (notInLibrary[t] || 0) + 1;
+for (const r of records) if (r.mark === 'use') for (const t of r.tags) if (!entryOf(t) && !propertyKeys.has(t.split('=')[0])) notInLibrary[t] = (notInLibrary[t] || 0) + 1;
 
 const catalogue = {
   version: 1,
@@ -85,7 +91,7 @@ for (const [tag, e] of [...Object.entries(lib.tags), ...Object.entries(lib.untag
   for (const a of e.assets) {
     if (a.from === 'catalogue') continue;                                   // (made here last time: made again below)
     const m = verdictOf.get(a.shape); const r = inCatalogue.get(a.shape);
-    const confirmed = untagged || (r && r.tags.includes(tag));
+    const confirmed = untagged || (r && carries(r, tag));
     if (a.usedToday || namedInCode(a.shape)) {
       // The code places it today: it stays listed. Where the picture says it is something else, or not fit to
       // place, the entry says so, for a decision in the code.
@@ -100,7 +106,7 @@ for (const [tag, e] of [...Object.entries(lib.tags), ...Object.entries(lib.untag
   }
   if (!untagged) {
     const have = new Set(out.map((a) => a.shape));
-    for (const r of records) if (r.mark === 'use' && r.tags.includes(tag) && !have.has(r.shape)) { out.push({ shape: r.shape, region: r.region, usedToday: false, is: r.is, from: 'catalogue' }); added++; }
+    for (const r of records) if (r.mark === 'use' && carries(r, tag) && !have.has(r.shape)) { out.push({ shape: r.shape, region: r.region, usedToday: false, is: r.is, from: 'catalogue' }); added++; }
   }
   e.assets = out;
 }
