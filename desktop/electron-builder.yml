@@ -24,6 +24,7 @@ files:
   - installCheck.js
   - menuText.js
   - reportScrub.js
+  - updateSignature.js
   - package.json
 extraResources:
   - from: ../dist

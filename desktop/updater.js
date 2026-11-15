@@ -5,7 +5,8 @@
 import fs from 'node:fs';
 import { updaterText, fill } from './menuText.js';
 import path from 'node:path';
-import { app, BrowserWindow, dialog, shell } from 'electron';
+import { app, BrowserWindow, dialog, net, shell } from 'electron';
+import { verifyUpdate } from './updateSignature.js';
 import electronUpdater from 'electron-updater';
 
 const { autoUpdater } = electronUpdater;
@@ -108,6 +109,14 @@ export function startUpdater({ settings, busy, ready = () => true }) {
   });
 
   autoUpdater.on('update-available', async (info) => {
+    // Is it MapNG's own? The release's signed list of files is checked before anything is offered
+    // (desktop/updateSignature.js). One that fails is not offered and not downloaded.
+    const checked = await verifyUpdate(info, (url) => net.fetch(url, { redirect: 'follow' }));
+    if (!checked.ok) {
+      state = 'idle';
+      if (manual && !quiet) await ask({ type: 'warning', message: u().unverified, detail: `${fill(u().unverifiedDetail, { new: info.version })}\n\n(${checked.why})` });
+      return;
+    }
     found = true;
     const s = settings.read();
     if (!manual && s.skipVersion === info.version) { state = 'idle'; return; }
