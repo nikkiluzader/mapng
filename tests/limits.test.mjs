@@ -54,3 +54,16 @@ test("a day's total is taken until it is used up, then refused", async () => {
   // (a name that is not a plain word is refused, not stored)
   assert.equal(object.takeBudget("x'; DROP", 5), false);
 });
+
+// ---- desktop: keys and private addresses stay out of what is written down ----
+import { shownUrl } from '../desktop/runner/browserShims.mjs';
+import { scrubText } from '../desktop/reportScrub.js';
+
+test("the user's own Overpass server and user:password parts are never written down", () => {
+  const custom = 'https://overpass.example.org/k/SECRETKEY/api/interpreter?key=ALSOSECRET';
+  assert.equal(shownUrl('https://overpass.example.org/k/SECRETKEY/api/interpreter?data=x', custom), 'custom-overpass:');
+  assert.equal(shownUrl('https://tiles.mapterhorn.com/12/1/2.webp', custom), 'https://tiles.mapterhorn.com/12/1/2.webp');
+  assert.equal(shownUrl('https://user:pass@host.example/api?x=1', ''), 'https://host.example/api?x=1');
+  assert.equal(shownUrl('/api/osm?bbox=1,2,3,4', custom), '/api/osm?bbox=1,2,3,4');
+  assert.equal(scrubText('fetch failed https://me:hunter2@host.example/x and key=abc123', '/home/someone'), 'fetch failed https://host.example/x and key=[hidden]');
+});

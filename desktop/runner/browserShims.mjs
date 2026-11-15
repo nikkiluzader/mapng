@@ -220,6 +220,19 @@ function bitmapOf(drawable) {
 const PASS_THROUGH = /^(blob:|data:|\/(?!api\/))/;
 
 /** The request a recorded response answers (the same whichever mirror served it). */
+/**
+ * An address as it may be written down (a log line, an error, a recorded source's note): the user's
+ * own Overpass server is "custom-overpass:" (its address can hold a paid key, in its path, its query
+ * or as user:password), and no address keeps a user:password part.
+ */
+export function shownUrl(url, custom = (() => { try { return String(globalThis.localStorage?.getItem('mapng_customOverpassUrl') || '').trim(); } catch { return ''; } })()) {
+  const u = String(url);
+  if (custom) {
+    try { if (new URL(u).host === new URL(custom).host) return 'custom-overpass:'; } catch { /* not an address: as it is */ }
+  }
+  return u.replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/@\s]*@/i, '$1');
+}
+
 function sourceKey(url, init = {}, bodyText = '') {
   const u = String(url).replace(/^https?:\/\/[^/]+(\/api\/interpreter)/, 'overpass:$1');
   const range = new Headers(init.headers || undefined).get('range') || '';
@@ -322,9 +335,9 @@ export function installSourceRecorder({ dir, mode = 'record', fallback = true, r
         const body = meta.status === 204 || meta.status === 304 ? null : fs.readFileSync(bodyFile);
         return new Response(body, { status: meta.status, statusText: meta.statusText, headers: meta.headers });
       }
-      if (stats.strict) throw new TypeError(`fetch refused: the export downloads nothing, and this is not in the download cache (${url})`);
+      if (stats.strict) throw new TypeError(`fetch refused: the export downloads nothing, and this is not in the download cache (${shownUrl(url)})`);
       stats.downloaded++;
-      if (stats.downloadedUrls.length < 20) stats.downloadedUrls.push(url.slice(0, 160));
+      if (stats.downloadedUrls.length < 20) stats.downloadedUrls.push(shownUrl(url).slice(0, 160));
       const live = await inner(input, init);
       const recMeta = recordDir ? path.join(recordDir, `${key}.json`) : metaFile;
       const recBody = recordDir ? path.join(recordDir, `${key}.bin`) : bodyFile;
@@ -353,10 +366,10 @@ export function installSourceRecorder({ dir, mode = 'record', fallback = true, r
         return new Response(body, { status: meta.status, statusText: meta.statusText, headers: meta.headers });
       }
       stats.missed++;
-      if (stats.missedUrls.length < 20) stats.missedUrls.push(url.slice(0, 160));
+      if (stats.missedUrls.length < 20) stats.missedUrls.push(shownUrl(url).slice(0, 160));
       // (an OSM request the first run did not get fails the same way now)
       const normalized = String(url).replace(/^https?:\/\/[^/]+(\/api\/interpreter)/, 'overpass:$1');
-      if (!fallback || OSM_REQUEST.test(normalized)) throw new TypeError(`fetch failed: not in the recorded sources (${url})`);
+      if (!fallback || OSM_REQUEST.test(normalized)) throw new TypeError(`fetch failed: not in the recorded sources (${shownUrl(url)})`);
       stats.downloaded++;
       const live = await inner(input, init);
       if (recordDir) await save(live, path.join(recordDir, `${key}.json`), path.join(recordDir, `${key}.bin`), url, init);
@@ -371,7 +384,7 @@ export function installSourceRecorder({ dir, mode = 'record', fallback = true, r
       const bytes = Buffer.from(await r.clone().arrayBuffer());
       const headers = Object.fromEntries([...r.headers.entries()].filter(([k]) => !/^(content-encoding|content-length|transfer-encoding|set-cookie)$/i.test(k)));
       fs.writeFileSync(bodyPath, bytes);
-      fs.writeFileSync(metaPath, JSON.stringify({ url, method: init.method || 'GET', status: r.status, statusText: r.statusText, headers, savedAt: Date.now() }));
+      fs.writeFileSync(metaPath, JSON.stringify({ url: shownUrl(url), method: init.method || 'GET', status: r.status, statusText: r.statusText, headers, savedAt: Date.now() }));
       stats.recorded++;
     } catch { /* an unreadable body (aborted): the caller sees the same */ }
   }

@@ -333,6 +333,16 @@ function spawnRunner(script, dir) {
   child.stdout.pipe(logFile, { end: false });
   child.stderr.pipe(logFile, { end: false });
   child.on('exit', () => logFile.end());
+  // The job's description held the user's keys (GPXZ, their own Overpass server) for the runner to
+  // use. Once the runner has ended they are taken out: the folder is kept for its log, and is the
+  // one Help > Logs opens, the one a user zips up to show a problem.
+  child.on('exit', () => {
+    const file = path.join(dir, 'job.json');
+    try {
+      const job = JSON.parse(fs.readFileSync(file, 'utf8'));
+      fs.writeFileSync(file, JSON.stringify(withoutPersonal(job)));
+    } catch { /* gone already, or never written */ }
+  });
   return child;
 }
 const exportUsage = new Map();   // jobId → the runner's last { rss, heapLimit, cores }

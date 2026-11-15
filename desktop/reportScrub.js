@@ -35,5 +35,7 @@ export function scrubText(text, home = os.homedir()) {
   if (home) {
     for (const h of new Set([home, home.replace(/\\/g, '/')])) t = t.split(h).join('~');
   }
+  // (and no address keeps a user:password part)
+  t = t.replace(/([a-z][a-z0-9+.-]*:\/\/)[^/@\s"']*@/gi, '$1');
   return t.replace(/((?:api[_-]?key|key|token|secret|password)["']?\s*[:=]\s*["']?)[^\s"'&,}]+/gi, '$1[hidden]');
 }
