@@ -174,6 +174,7 @@
           resettable
           @reset="resetElevation"
           v-model:elevationSource="elevationSource"
+          v-model:fallbackSource="fallbackSource"
           :usgsStatus="usgsStatus"
           v-model:gpxzApiKey="gpxzApiKey"
           :gpxzStatus="gpxzStatus"
@@ -323,7 +324,7 @@
         <button
           type="button"
           class="px-3 py-1 rounded bg-brand hover:bg-brand-500 text-white text-caption font-semibold"
-          @click="$emit('generate', false, fetchOSM, elevationSource, gpxzApiKey, elevationUnitOverride, metersPerPixel, gapFillSource)"
+          @click="$emit('generate', false, fetchOSM, elevationSource, gpxzApiKey, elevationUnitOverride, metersPerPixel, gapFillSource, normalizeFallbackSource(fallbackSource, elevationSource))"
         >{{ t('wizard.generateAgain') }}</button>
       </div>
       <h3 v-if="terrainData && !isGenerating" class="flex items-center gap-2 pt-4 border-t border-gray-200 dark:border-gray-600 text-sm font-semibold text-emerald-700 dark:text-emerald-400">
@@ -369,7 +370,7 @@
           :useGPXZ="useGPXZ"
           :gpxz-api-key="gpxzApiKey"
           :has-custom-elevation="!!uploadedElevationFile"
-          @generate="(preview) => $emit('generate', preview, fetchOSM, elevationSource, gpxzApiKey, elevationUnitOverride, metersPerPixel, gapFillSource)"
+          @generate="(preview) => $emit('generate', preview, fetchOSM, elevationSource, gpxzApiKey, elevationUnitOverride, metersPerPixel, gapFillSource, normalizeFallbackSource(fallbackSource, elevationSource))"
           @ready="step = 4; if (store.viewMode === 'location' && terrainData) store.viewMode = 'preview2d'"
         />
       </template>
@@ -450,6 +451,7 @@ import { withoutPersonal } from '../../services/personalKeys.js';
 import { setSessionConfigSource } from '../../composables/useReportDialog.js';
 import { getMaxSquareCropResolution, scaleNativeDimsToProcessingMpp } from '../../services/uploadBounds';
 import { normalizeGapFillSource } from '../../services/gapFillSources.js';
+import { normalizeFallbackSource } from '../../services/elevationFallback.js';
 import TerrainChoice from '../ui/TerrainChoice.vue';
 import WizardLayout from '../ui/WizardLayout.vue';
 import { BIG_AREA_KM, reachesShakeDistance } from '../../services/levelLimits.js';
@@ -483,6 +485,9 @@ const useGPXZ = ref(false);
 const elevationUnitOverride = ref(localStorage.getItem('mapng_elevationUnitOverride') || 'auto');
 // Which dataset fills the parts of an export the upload does not cover.
 const gapFillSource = ref(normalizeGapFillSource(localStorage.getItem('mapng_gapFillSource')));
+// the source tried when the chosen one has nothing here, before the global 30 m (services/elevationFallback.js)
+const fallbackSource = ref(normalizeFallbackSource(localStorage.getItem('mapng_elevationFallback')));
+watch(fallbackSource, (v) => localStorage.setItem('mapng_elevationFallback', normalizeFallbackSource(v)));
 const elevationSource = ref(initialElevationSource('mapng_elevationSource'));
 const gpxzApiKey = ref(localStorage.getItem('mapng_gpxzApiKey') || '');
 const gpxzStatus = ref(null); // { plan, used, limit, remaining, concurrency, valid }
@@ -719,6 +724,7 @@ watch(
     props.uploadedNoDataOverride,
     props.uploadedLayerOrder,
     gapFillSource.value,
+    fallbackSource.value,
     elevationUnitOverride.value,
     fetchOSM.value,
     // Crop position only changes the output in square-crop mode.
@@ -768,6 +774,7 @@ const isCached = computed(() => {
     && made.elevationSource === elevationSource.value
     && made.gpxzKeySig === (elevationSource.value === 'gpxz' ? signatureForKey(gpxzApiKey.value) : '')
     && (made.gapFillSource === undefined || made.gapFillSource === gapFillSource.value)
+    && (made.fallbackSource === undefined || made.fallbackSource === normalizeFallbackSource(fallbackSource.value, elevationSource.value))
     && !!made.rawTerrain === !!store.rawTerrainActive
     && (made.measureWidths === undefined || made.measureWidths === (!!fetchOSM.value && measureRoadWidths.value))
     && (made.generationEdits === undefined || same(made.generationEdits, terrainGenerationOptions(store.advancedMode)))
@@ -882,6 +889,7 @@ const applyPendingConfig = () => {
       // (the code's terrain edits went into the old keys: the Terrain choice reads them back)
       reloadTerrainSettings();
       reloadContentSettings();
+      fallbackSource.value = normalizeFallbackSource(localStorage.getItem('mapng_elevationFallback'));
       if (config.export.baseTexture) setBaseTexture(config.export.baseTexture);
       exportPanelKey.value += 1;
     }

@@ -10,6 +10,7 @@ import { fetchWord, replayingSources, gpxzUsable } from './sourceWording.js';
 import { parseRasterOrGridElevationFile, parseTifFile, parseTifFiles, parseGridFiles } from "./tifLoader.js";
 import { resolveNoDataValue, NODATA_AUTO, NODATA_FALLBACK } from "./nodataDetect.js";
 import { GAP_FILL_STANDARD, GAP_FILL_GPXZ, GAP_FILL_NONE } from "./gapFillSources.js";
+import { elevationTryOrder } from "./elevationFallback.js";
 import { applyLayerOrder, assignLayerIndices } from "./elevationLayers.js";
 export { parseRasterOrGridElevationFile };
 // Backward-compatible export; prefer parseElevationFile() in new call sites.
@@ -1995,6 +1996,8 @@ export const fetchTerrainData = async (
     raw = false,
     // free Mapterhorn lidar where it exists (elevation source "mapterhorn")
     useMapterhorn = false,
+    // the source tried when the chosen one has nothing here, before the global 30 m (elevationFallback.js)
+    fallbackSource = '',
     // buildings, woods and viaduct decks taken out of the global 30 m (dsmGround.js); off: as downloaded
     groundFilter = true,
     // river water brought down to its banks on the global 30 m (waterBanks.js); off: as downloaded
@@ -2049,8 +2052,13 @@ export const fetchTerrainData = async (
   let gpxzChunkFailures = false;
   let sourceGeoTiffs = undefined;
 
+  // Each source's attempt, tried in order until one has data: the chosen source, then the fallback
+  // (elevationFallback.js); the global 30 m backs whatever is left.
+  const trySource = {};
   // (with a key, or from a level's saved GPXZ downloads: sourceWording.js gpxzUsable)
-  if (gpxzUsable(useGPXZ, gpxzApiKey)) {
+  trySource.gpxz = async (chosen) => {
+  // (as a fallback: only with a key)
+  if (gpxzUsable(true, gpxzApiKey) && (chosen || !!gpxzApiKey)) {
     onProgress?.(`${fetchWord()} high-res GPXZ elevation data...`);
     const gpxzResult = await fetchGPXZRaw(fetchBounds, gpxzApiKey, onProgress, signal, { skipBox });
     if (gpxzResult) {
@@ -2066,10 +2074,12 @@ export const fetchTerrainData = async (
       }
     }
   }
+  };
 
   // Mapterhorn: free lidar tiles where a national model exists (deeper than z12); the standard 30 m fills the rest.
   let mapterhornInfo = null;
-  if (!rawData && useMapterhorn && !flat) {
+  trySource.mapterhorn = async () => {
+  if (!rawData && !flat) {
     try {
       const mh = await fetchMapterhornRaw(fetchBounds, {
         metersPerPixel: effectiveMetersPerPixel, onProgress, signal,
@@ -2094,8 +2104,10 @@ export const fetchTerrainData = async (
       onProgress?.('Mapterhorn did not answer. Using the global 30 m elevation...');
     }
   }
+  };
 
-  if (!rawData && useKRON86) {
+  trySource.kron86 = async () => {
+  if (!rawData) {
     if (!isWithinKron86Coverage(fetchBounds)) {
       kron86Fallback = true;
       kron86FallbackReason = 'outside_poland';
@@ -2122,6 +2134,7 @@ export const fetchTerrainData = async (
       }
     }
   }
+  };
 
   const isCONUS =
     fetchBounds.north < 50 &&
@@ -2139,7 +2152,8 @@ export const fetchTerrainData = async (
     fetchBounds.west > -161 &&
     fetchBounds.east < -154;
 
-  if (!rawData && useUSGS && (isCONUS || isAlaska || isHawaii)) {
+  trySource.usgs = async () => {
+  if (!rawData && (isCONUS || isAlaska || isHawaii)) {
     const usgsResult = await fetchUSGSRaw(fetchBounds, onProgress, signal, { metersPerPixel: effectiveMetersPerPixel });
     if (usgsResult) {
       rawData = usgsResult.data;
@@ -2155,6 +2169,16 @@ export const fetchTerrainData = async (
         "[USGS] Failed to fetch raw data, falling back to global tiles.",
       );
     }
+  }
+  };
+
+  // (flat ground asks nobody)
+  const chosenCount = flat ? 0 : elevationTryOrder({ useGPXZ, useMapterhorn, useKRON86, useUSGS }).length;
+  const tryOrder = flat ? [] : elevationTryOrder({ useGPXZ, useMapterhorn, useKRON86, useUSGS, fallbackSource });
+  let elevationFallbackUsed = null;
+  for (let i = 0; i < tryOrder.length && !rawData; i++) {
+    await trySource[tryOrder[i]](i < chosenCount);
+    if (rawData && i >= chosenCount) elevationFallbackUsed = tryOrder[i];
   }
 
   // 3. Prepare Samplers
@@ -2610,6 +2634,9 @@ export const fetchTerrainData = async (
     kron86Fallback,
     kron86FallbackReason,
     mapterhornInfo,
+    // the fallback source that gave the elevation, when the chosen one had none here (elevationFallback.js)
+    elevationFallbackUsed,
+    elevationFallbackAsked: tryOrder.length > chosenCount ? tryOrder[tryOrder.length - 1] : null,
     groundFilterInfo,
     // built from the global 30 m, or a source that only had coarse data
     // here (GPXZ / Mapterhorn smoothed as 30 m; no raw or flat): the export

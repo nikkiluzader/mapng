@@ -7431,6 +7431,12 @@ function summarizeOsmFeatures(features = []) {
  * Build a human-readable elevation source label for export reports.
  */
 function resolveElevationSourceLabel(terrainData, selectedElevationSource) {
+  // (the chosen source had nothing here and the fallback gave the elevation: elevationFallback.js)
+  if (terrainData?.elevationFallbackUsed && !terrainData.__labelling) {
+    const names = { mapterhorn: 'Mapterhorn', kron86: 'NMT EVRF2007 (Poland)', usgs: 'USGS', gpxz: 'GPXZ' };
+    const chosen = names[String(selectedElevationSource || '').toLowerCase()] || String(selectedElevationSource || 'The chosen source');
+    return `${chosen} had no data here; the fallback was used: ${resolveElevationSourceLabel({ ...terrainData, elevationFallbackUsed: null, usgsFallback: false, kron86Fallback: false }, terrainData.elevationFallbackUsed)}`;
+  }
   const explicit = typeof selectedElevationSource === 'string' ? selectedElevationSource.trim() : '';
   const normalized = explicit.toLowerCase();
   const sourceGeoTiffsSource = terrainData?.sourceGeoTiffs?.source;

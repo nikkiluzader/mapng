@@ -17,8 +17,20 @@
             <option value="gpxz">{{ t('map.gpxzPremium') }}</option>
         </select>
 
+        <!-- The source tried when the one above has nothing here, before the global 30 m (elevationFallback.js) -->
+        <label v-if="takesFallback" class="flex items-center gap-2 text-micro text-gray-600 dark:text-gray-300" :title="t('map.fallbackHint')">
+          <span class="shrink-0">{{ t('map.fallbackLabel') }}</span>
+          <select :value="fallbackShown" @change="emit('update:fallbackSource', $event.target.value)" :class="SELECT_SM" data-testid="fallback-source">
+            <option value="standard">{{ t('map.standard30m') }}</option>
+            <option v-if="localElevationSource !== 'mapterhorn'" value="mapterhorn">{{ t('map.mapterhornFree') }}</option>
+            <option v-if="localElevationSource !== 'kron86'" value="kron86">{{ t('map.kron86Poland') }}</option>
+            <option v-if="localElevationSource !== 'usgs'" value="usgs">{{ t('map.usgs1m') }}</option>
+            <option v-if="localElevationSource !== 'gpxz' && localGpxzApiKey" value="gpxz">{{ t('map.gpxzPremium') }}</option>
+          </select>
+        </label>
+
         <p v-if="selectedOutsideCoverage" class="text-micro text-amber-600 dark:text-amber-500 font-medium leading-tight">
-          <AlertTriangle :size="11" class="inline -mt-0.5 mr-0.5" />{{ t('map.selectedSourceOutsideCoverage') }}
+          <AlertTriangle :size="11" class="inline -mt-0.5 mr-0.5" />{{ t(fallbackShown !== 'standard' ? 'map.outsideCoverageFallback' : 'map.selectedSourceOutsideCoverage') }}
         </p>
 
         <!-- What free lidar holds here (Mapterhorn), measured over the selection when it settles -->
@@ -134,10 +146,13 @@ import { boxAround, probeMapterhorn, probeGpxz } from '../../services/sourceAdvi
 import { mapterhornZoomFor, mapterhornMosaicBudget, mapterhornMetersPerPixel } from '../../services/mapterhorn.js';
 import { desktopApp } from '../../services/platform/desktop.js';
 import { REGIONAL_COVERAGE } from '../../services/sourceCompare.js';
+import { normalizeFallbackSource, sourceTakesFallback } from '../../services/elevationFallback.js';
 
 const { t } = useI18n({ useScope: 'global' });
 
 const props = defineProps({
+  // the source tried when the chosen one has nothing here ('standard': the global 30 m at once)
+  fallbackSource: { type: String, default: 'standard' },
   // (the selection's metres per pixel: how fine the lidar is read for it)
   metersPerPixel: { type: Number, default: 1 },
   elevationSource: {
@@ -199,9 +214,11 @@ const selectedOutsideCoverage = computed(() => (
   || (localElevationSource.value === 'kron86' && !coverage.value.kron86)
 ));
 
-const emit = defineEmits(['update:elevationSource', 'update:gpxzApiKey', 'verifyGpxzKey']);
+const emit = defineEmits(['update:elevationSource', 'update:gpxzApiKey', 'verifyGpxzKey', 'update:fallbackSource']);
 
 const localElevationSource = ref(props.elevationSource);
+const takesFallback = computed(() => sourceTakesFallback(localElevationSource.value));
+const fallbackShown = computed(() => normalizeFallbackSource(props.fallbackSource, localElevationSource.value));
 const localGpxzApiKey = ref(props.gpxzApiKey);
 const showElevationSource = ref(localStorage.getItem('mapng_showElevationSource') !== 'false');
 

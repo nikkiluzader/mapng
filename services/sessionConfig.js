@@ -53,12 +53,13 @@ const LIST_KINDS = { contentList: sanitizeContentOff, tagList: sanitizeExcludeTa
 /** Whether a field holds a list (stored as JSON; not counted in the settings stats). */
 export const isListField = ([, , kind]) => Object.hasOwn(LIST_KINDS, kind);
 // (not counted in the settings stats: public/data.html lists every counted setting)
-const NOT_COUNTED = new Set(['contentOff', 'excludeTags', 'basicPreset', 'viewDistance', 'assumeParking', 'decalSidewalks', 'curbHeight']);
+const NOT_COUNTED = new Set(['fallbackSource', 'contentOff', 'excludeTags', 'basicPreset', 'viewDistance', 'assumeParking', 'decalSidewalks', 'curbHeight']);
 export const isCountedField = (field) => !NOT_COUNTED.has(field[0]) && !isListField(field);
 
 /** Data-part settings kept outside the run configuration: [name, key, kind, default]. */
 export const DATA_FIELDS = [
   ['gapFillSource', 'mapng_gapFillSource', 'string', ''],
+  ['fallbackSource', 'mapng_elevationFallback', ['standard', 'mapterhorn', 'kron86', 'usgs', 'gpxz'], 'standard'],   // (services/elevationFallback.js)
   ['elevationUnitOverride', 'mapng_elevationUnitOverride', 'string', 'auto'],
   ['advancedMode', 'mapng_advanced_mode', 'bool', false],
   ['overtureBuildings', 'mapng_overtureBuildings', 'bool', true],
@@ -274,7 +275,7 @@ export function sanitizeSessionConfig(config) {
 // ---- what a config would change, for the confirm dialog ------------------
 
 // (the fields of a config that have a row of their own in the dialog; the rest are counted)
-const OTHER_TOP_FIELDS = ['zoom', 'gapFillSource', 'elevationUnitOverride', 'overtureBuildings', 'workflow'];
+const OTHER_TOP_FIELDS = ['zoom', 'gapFillSource', 'fallbackSource', 'elevationUnitOverride', 'overtureBuildings', 'workflow'];
 const DESCRIBED_EXPORT_FIELDS = new Set(['baseTexture', 'buildings', 'water', 'trees', 'rocks', 'roads', 'basicPreset', 'contentOff', 'excludeTags', 'forestDensity', 'assumeParking', 'decalSidewalks', 'curbHeight', 'viewDistance', 'bridges', 'tunnels', 'measuredBridgeHeights', 'terrainEdits', 'shapeRoads', 'shapeBridges', 'shapeOverpasses', 'shapeTunnels', 'shapeExtras', 'shapeDetail', 'backdrop', 'safeCaps', 'roadSurface']);
 
 /**

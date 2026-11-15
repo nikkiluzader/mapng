@@ -48,7 +48,7 @@
         @update:processingMetersPerPixel="handleProcessingMetersPerPixelChange"
         @update:preview-stale="(v) => previewStale = v"
         @zoom-change="store.setZoom"
-        @generate="(preview, fetchOSM, elevationSource, gpxzApiKey, elevationUnitOverride, metersPerPixel, gapFillSource) => handleGenerate(preview, fetchOSM, elevationSource, gpxzApiKey, elevationUnitOverride, metersPerPixel, gapFillSource)"
+        @generate="(preview, fetchOSM, elevationSource, gpxzApiKey, elevationUnitOverride, metersPerPixel, gapFillSource, fallbackSource) => handleGenerate(preview, fetchOSM, elevationSource, gpxzApiKey, elevationUnitOverride, metersPerPixel, gapFillSource, fallbackSource)"
         @fetch-osm="handleFetchOSM"
         @surrounding-tiles-change="(v) => surroundingTilePositions = v"
         @elevation-file-selected="handleElevationFileSelected"
@@ -276,6 +276,7 @@ import { applyAscCoordinateSystem } from './services/ascLoader.js';
 import { NODATA_AUTO } from './services/nodataDetect.js';
 import { mergeElevationSlots } from './services/tifLoader.js';
 import { DEFAULT_GAP_FILL_SOURCE } from './services/gapFillSources.js';
+import { normalizeFallbackSource } from './services/elevationFallback.js';
 import { computeUploadedCropBounds } from './services/uploadBounds';
 import {
   computeGridTiles,
@@ -632,7 +633,7 @@ const signatureForKey = (key) => {
 // Build a cache key from the parameters that affect terrain generation.
 // If this key matches the last generation, we can skip re-fetching.
 const { on: measureRoadWidthsOn } = useMeasureRoadWidths();
-const buildGenerationKey = (c, res, osm, elevationSource, gpxzKey, uploadedElevationFile = null, elevationUnitOverride = 'auto', processingMpp = 1, gapFillSource = DEFAULT_GAP_FILL_SOURCE) => {
+const buildGenerationKey = (c, res, osm, elevationSource, gpxzKey, uploadedElevationFile = null, elevationUnitOverride = 'auto', processingMpp = 1, gapFillSource = DEFAULT_GAP_FILL_SOURCE, fallbackSource = 'standard') => {
   const uploadSignature = Array.isArray(uploadedElevationFile)
     ? uploadedElevationFile
         .map((file) => `${file.name}|${file.size}|${file.lastModified}`)
@@ -655,6 +656,8 @@ const buildGenerationKey = (c, res, osm, elevationSource, gpxzKey, uploadedEleva
     uploadedNoDataOverride: uploadedNoDataOverride.value,
     uploadedLayerOrder: uploadedLayerOrder.value,
     gapFillSource,
+    // (the source tried when the chosen one has nothing here: another fallback generates again)
+    fallbackSource: normalizeFallbackSource(fallbackSource, elevationSource),
     uploadedAreaMode: uploadedAreaMode.value,
     rawTerrain: store.rawTerrainActive,
     // (Map data > Measure road widths from the satellite picture: it changes the roads Generate makes. Left
@@ -833,7 +836,7 @@ const applyLoadingUpdate = (update) => {
   }
 };
 
-const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default', gpxzApiKey = '', elevationUnitOverride = 'auto', processingMpp = 1, gapFillSource = DEFAULT_GAP_FILL_SOURCE) => {
+const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default', gpxzApiKey = '', elevationUnitOverride = 'auto', processingMpp = 1, gapFillSource = DEFAULT_GAP_FILL_SOURCE, fallbackSource = 'standard') => {
   // The website, at a size a browser tab does not finish (8192 and up: the tab's memory limit): asked first.
   if (!desktopApp && Number(resolution.value) >= 8192 && !window.confirm(t(Number(resolution.value) >= 16384 ? 'controlPanel.browserSizeConfirm16k' : 'controlPanel.browserSizeConfirm8k'))) return;
   const normalizedSource = String(elevationSource || 'default').toLowerCase();
@@ -853,7 +856,8 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
     uploadedElevationFile.value,
     elevationUnitOverride,
     processingMpp,
-    gapFillSource
+    gapFillSource,
+    fallbackSource
   );
 
   // If we already have terrain data for the exact same parameters, reuse it
@@ -974,6 +978,8 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         flat: useFlat,
         raw,
         useMapterhorn: normalizedSource === 'mapterhorn',
+        // (the source tried when this one has nothing here, before the global 30 m: services/elevationFallback.js)
+        fallbackSource: normalizeFallbackSource(fallbackSource, normalizedSource),
         ...generationEdits,
         // (all three textures, every time: services/textureOnDemand.js)
         ...texturesToGenerate(baseTexture.value),
