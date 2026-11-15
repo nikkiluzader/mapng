@@ -78,6 +78,12 @@ const SEEN = {
   '/levels/west_coast_usa/art/shapes/objects/s_camera_speed1.dae': { is: 'A speed camera head only: needs a pole', size: [0.6, 0.4, 0.5] },
   '/levels/hirochi_raceway/art/shapes/objects/billboard_10x5.dae': { is: 'A billboard on legs', size: [11.7, 0.4, 10.3] },
 };
+// Meshes of one whole level, 150 m and more across: a level's whole rumble strips, dam, power lines, pipeline or
+// toll plaza in that level's own place. Nothing that can be put down somewhere else, whatever the name says.
+const WHOLE_LEVEL = ['racetrack_rumblestrip', 's_dam', 's_powerlines_01', 'construction_tollbooth', 'pipeline_segment1'];
+let dropped = 0;
+for (const e of Object.values(tags)) { const n = e.assets.length; e.assets = e.assets.filter((x) => !WHOLE_LEVEL.some((w) => new RegExp(`/${w}\\.dae$`, 'i').test(x.shape))); dropped += n - e.assets.length; }
+console.log(`whole-level meshes taken off their tags: ${dropped}`);
 // (the household mailbox is no street post box: taken off that tag)
 if (tags['amenity=post_box']) tags['amenity=post_box'].assets = tags['amenity=post_box'].assets.filter((x) => !/s_postbox\.dae$/i.test(x.shape));
 let seen = 0;

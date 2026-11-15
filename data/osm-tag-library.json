@@ -2016,11 +2016,6 @@
      "usedToday": false
     },
     {
-     "shape": "/levels/west_coast_usa/art/shapes/buildings/construction_tollbooth.dae",
-     "region": "north-america",
-     "usedToday": false
-    },
-    {
      "shape": "/levels/italy/art/shapes/buildings/italy_bld_boomgate_4.5m.dae",
      "region": "europe",
      "usedToday": false
@@ -5950,12 +5945,6 @@
    "builds": "Overground only: a pipe on supports",
    "assets": [
     {
-     "shape": "/levels/west_coast_usa/art/shapes/buildings/pipeline_segment1.dae",
-     "region": "north-america",
-     "setting": "industrial",
-     "usedToday": false
-    },
-    {
      "shape": "/levels/west_coast_usa/art/shapes/objects/pipeline_support1.dae",
      "region": "north-america",
      "setting": "industrial",
@@ -7268,11 +7257,6 @@
       35.8
      ],
      "seen": "2026-11-15"
-    },
-    {
-     "shape": "/levels/automation_test_track/art/shapes/objects/s_powerlines_01.dae",
-     "region": "any",
-     "usedToday": false
     }
    ],
    "generated": "Wire meshes between towers (the minor-line wire builder exists)",
@@ -8582,11 +8566,6 @@
      "shape": "/levels/johnson_valley/art/shapes/building/s_rumblestrip.dae",
      "region": "north-america",
      "usedToday": false
-    },
-    {
-     "shape": "/levels/Industrial/art/shapes/roads/racetrack_rumblestrip.dae",
-     "region": "any",
-     "usedToday": false
     }
    ],
    "note": "Both native strips were made for race kerbs; fit to a road is unchecked"
@@ -8835,11 +8814,6 @@
    "fetched": true,
    "builds": "A concrete dam standing in the gap lidar leaves, crest drivable",
    "assets": [
-    {
-     "shape": "/levels/automation_test_track/art/shapes/buildings/s_dam.dae",
-     "region": "any",
-     "usedToday": false
-    },
     {
      "shape": "/levels/jungle_rock_island/art/shapes/buildings/small_dam.dae",
      "region": "tropical",
