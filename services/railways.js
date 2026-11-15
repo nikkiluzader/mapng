@@ -21,8 +21,11 @@ const RAIL_KIND_SET = new Set(RAIL_KINDS);
 // bridges mostly still stand, and a level without them had a river crossing missing.)
 // An abandoned tram line is the exception: its rails in the street are long paved over.
 const LIFECYCLE_SET = new Set(RAILWAY_LIFECYCLE_WAYS);
+const TRAIL_HIGHWAYS = new Set(['cycleway', 'footway', 'path', 'bridleway', 'track', 'pedestrian']);
 const lifecycleKind = (tags, state) => {
-  const was = String(tags[`${state}:railway`] ?? tags[`railway:${state}`] ?? '').toLowerCase();
+  // (the older way of saying what it was, `disused=tram`, as well: Kraków's closed tram lines were built as main-line
+  // track, ballast and all, down its streets)
+  const was = String(tags[`${state}:railway`] ?? tags[`railway:${state}`] ?? (RAIL_KIND_SET.has(String(tags[state] ?? '').toLowerCase()) ? tags[state] : '')).toLowerCase();
   const kind = RAIL_KIND_SET.has(was) ? was : 'rail';
   return state === 'abandoned' && (kind === 'tram' || kind === 'subway') ? null : kind;
 };
@@ -67,7 +70,12 @@ export function railKindOf(tags = {}) {
  */
 export function activeRailKind(tags = {}) {
   let kind = String(tags.railway ?? '').toLowerCase();
-  if (LIFECYCLE_SET.has(kind)) kind = lifecycleKind(tags, kind);
+  if (LIFECYCLE_SET.has(kind)) {
+    // (a closed line that is a path now, a rail trail: its rails are gone. The way is a cycleway, footpath or track
+    // with the old railway kept on it; laying track along it put rails down a bike path)
+    if (kind !== 'preserved' && TRAIL_HIGHWAYS.has(String(tags.highway ?? '').toLowerCase())) return null;
+    kind = lifecycleKind(tags, kind);
+  }
   if (!kind || !RAIL_KIND_SET.has(kind)) return null;
   if (tags.area === 'yes') return null;
   if (LIFECYCLE_FLAGS.some((k) => tags[k] && tags[k] !== 'no')) return null;

@@ -161,3 +161,18 @@ test('abandoned lines are off unless switched on: in every quick-select preset, 
   assert.equal(presetOf(['railwaysAbandoned']), 'all');
   assert.equal(presetOf([]), 'custom');     // (everything and the abandoned lines too: a choice of one's own)
 });
+
+test('a closed line\'s old kind said the older way (disused=tram) is that kind; a closed line that is a path now has no rails', () => {
+  assert.equal(railKindOf({ railway: 'disused', disused: 'tram' }), 'tram');
+  assert.equal(railKindOf({ railway: 'disused', disused: 'yes' }), 'rail');
+  assert.equal(railKindOf({ railway: 'abandoned', abandoned: 'tram' }), null, 'an abandoned tram line: paved over');
+  // (a rail trail: the way is a cycleway, a footpath or a track with the old railway left on it)
+  for (const highway of ['cycleway', 'footway', 'path', 'track']) {
+    assert.equal(railKindOf({ railway: 'abandoned', highway, 'abandoned:railway': 'rail' }), null, highway);
+    assert.equal(railKindOf({ railway: 'disused', highway }), null, highway);
+  }
+  // (a heritage line beside a path keeps its track; a closed tram line in a street keeps its rails in the road)
+  assert.equal(railKindOf({ railway: 'preserved', highway: 'footway' }), 'rail');
+  assert.equal(railKindOf({ railway: 'disused', highway: 'residential', 'disused:railway': 'tram' }), 'tram');
+  assert.equal(railKindOf({ railway: 'rail', highway: 'service' }), 'rail');
+});
