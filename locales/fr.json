@@ -1959,7 +1959,7 @@
     "detail_serviceRoads": "allées, ruelles, allées de parking",
     "item_tracks": "Chemins",
     "detail_tracks": "chemins agricoles et forestiers",
-    "followSurvey": "chaque route suit le relevé",
+    "followSurvey": "les routes principales gardent la pente de leur classe",
     "noAssumedParking": "pas de stationnement supposé",
     "trees": {
       "title": "Arbres choisis pour cette zone",

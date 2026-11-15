@@ -1959,7 +1959,7 @@
     "detail_serviceRoads": "accessi, vicoli, corsie dei parcheggi",
     "item_tracks": "Sterrate",
     "detail_tracks": "strade agricole e forestali",
-    "followSurvey": "ogni strada segue il rilievo",
+    "followSurvey": "le principali mantengono la pendenza di classe",
     "noAssumedParking": "nessuna sosta presunta",
     "trees": {
       "title": "Alberi scelti per quest'area",

@@ -1959,7 +1959,7 @@
     "detail_serviceRoads": "dojazdy, zaułki, alejki parkingowe",
     "item_tracks": "Drogi gruntowe",
     "detail_tracks": "polne i leśne",
-    "followSurvey": "każda droga podąża za pomiarem",
+    "followSurvey": "drogi główne zachowują spadek klasy",
     "noAssumedParking": "bez zakładanego parkowania",
     "trees": {
       "title": "Drzewa wybrane dla tego obszaru",

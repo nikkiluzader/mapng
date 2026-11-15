@@ -1959,7 +1959,7 @@
     "detail_serviceRoads": "accesos, callejones, pasillos de aparcamiento",
     "item_tracks": "Pistas",
     "detail_tracks": "caminos agrícolas y forestales",
-    "followSurvey": "todas las carreteras siguen el lidar",
+    "followSurvey": "las principales mantienen su pendiente de clase",
     "noAssumedParking": "sin aparcamiento supuesto",
     "trees": {
       "title": "Árboles elegidos para esta zona",

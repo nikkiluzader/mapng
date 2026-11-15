@@ -277,7 +277,7 @@ const props = defineProps({
   lidarDecks: { type: Boolean, default: true },
   safeCaps: { type: Boolean, default: true },
   assumeParking: { type: Boolean, default: true },
-  followSurvey: { type: Boolean, default: false },
+  followSurvey: { type: Boolean, default: true },
   decalSidewalks: { type: Boolean, default: false },
   roadSurface: { type: String, default: 'decal' },
   curbHeight: { type: String, default: 'standard' },
@@ -381,7 +381,7 @@ const footer = computed(() => {
     props.lidarDecks ? t('build.measuredDecks') : null,
     props.safeCaps ? t('build.capped') : t('build.noCaps'),
     props.assumeParking ? null : t('build.noAssumedParking'),
-    props.followSurvey ? t('build.followSurvey') : null,
+    props.followSurvey ? null : t('build.followSurvey'),
     props.decalSidewalks ? t('build.decalSidewalks') : props.curbHeight !== 'standard' ? `${t('exportPanel.ui.curbHeight').toLowerCase()}: ${t(`exportPanel.ui.curbHeight_${props.curbHeight}`).toLowerCase()}` : null,
   ].filter(Boolean).join(' · ');
   return contentTab.value === 'features'

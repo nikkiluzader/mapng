@@ -1959,7 +1959,7 @@
     "detail_serviceRoads": "Zufahrten, Gassen, Parkplatzwege",
     "item_tracks": "Wirtschaftswege",
     "detail_tracks": "Feld- und Waldwege",
-    "followSurvey": "jede Straße folgt der Vermessung",
+    "followSurvey": "Hauptstraßen behalten ihr Klassengefälle",
     "noAssumedParking": "kein angenommenes Parken",
     "trees": {
       "title": "Bäume für dieses Gebiet",

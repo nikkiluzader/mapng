@@ -908,7 +908,7 @@ const beamNGSafeCaps = ref(storedOn('mapng_beamNGSafeCaps'));
 // tester's 6 m streets came out 10.6 m wide and over where the sidewalks belong)
 const beamNGAssumeParking = ref(localStorage.getItem('mapng_beamNGAssumeParking') === 'true');
 // every road follows the slope the lidar survey measured, main roads too (off: tertiary and smaller only)
-const beamNGFollowSurvey = ref(localStorage.getItem('mapng_beamNGFollowSurvey') === 'true');
+const beamNGFollowSurvey = ref(localStorage.getItem('mapng_beamNGFollowSurvey') !== 'false');   // (on unless switched off)
 // (Fine-tuning: sidewalks as flat decals instead of raised meshes; exportBeamNGLevel.js sidewalkStyle)
 const beamNGDecalSidewalks = ref(localStorage.getItem('mapng_beamNGDecalSidewalks') === 'true');
 // (Fine-tuning: road surfaces as MapNG's decal roads, or experimental Hero Roads; exportBeamNGLevel.js roadSurface)
@@ -2272,7 +2272,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       includeRocks: effectiveIncludeRocks,
       safeCaps: !advanced || beamNGSafeCaps.value,
       assumeParking: advanced && beamNGAssumeParking.value,
-      roadsFollowSurvey: advanced && beamNGFollowSurvey.value,
+      roadsFollowSurvey: advanced ? beamNGFollowSurvey.value : true,
       sidewalkStyle: advanced && beamNGDecalSidewalks.value ? 'decal' : 'mesh',
       roadSurface: advanced && ['hero', 'mesh'].includes(beamNGRoadSurface.value) ? beamNGRoadSurface.value : 'decal',
       curbHeight: advanced ? beamNGCurbHeight.value : 'standard',
@@ -2307,7 +2307,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       includeRocks: effectiveIncludeRocks,
       safeCaps: !advanced || beamNGSafeCaps.value,
       assumeParking: advanced && beamNGAssumeParking.value,
-      roadsFollowSurvey: advanced && beamNGFollowSurvey.value,
+      roadsFollowSurvey: advanced ? beamNGFollowSurvey.value : true,
       sidewalkStyle: advanced && beamNGDecalSidewalks.value ? 'decal' : 'mesh',
       roadSurface: advanced && ['hero', 'mesh'].includes(beamNGRoadSurface.value) ? beamNGRoadSurface.value : 'decal',
       curbHeight: advanced ? beamNGCurbHeight.value : 'standard',

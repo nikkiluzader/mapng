@@ -26,7 +26,7 @@ export const EXPORT_FIELDS = [
   ['curbHeight', 'mapng_beamNGCurbHeight', ['standard', 'low', 'flush'], 'standard'],   // (raised sidewalks' height: beamngSidewalks.js CURB_HEIGHTS_M)
   ['roadSurface', 'mapng_beamNGRoadSurface', ['decal', 'mesh', 'hero'], 'decal'],   // (experimental: mesh, meshRoads.js; hero, heroRoadsLua.js)
   ['decalSidewalks', 'mapng_beamNGDecalSidewalks', 'bool', false],   // (on: sidewalks as flat decals, exportBeamNGLevel.js sidewalkStyle)
-  ['followSurvey', 'mapng_beamNGFollowSurvey', 'bool', false],   // (on: every road at the lidar survey's slope, structures/profileSolve.js)
+  ['followSurvey', 'mapng_beamNGFollowSurvey', 'bool', true],   // (on: every road at the lidar survey's slope; off: tertiary and smaller only, structures/profileSolve.js)
   ['assumeParking', 'mapng_beamNGAssumeParking', 'bool', false],   // (on: a parking lane each side of town streets with no parking tags, services/roadWidth.js)
   ['bridges', 'mapng_beamNGIncludeBridges', 'bool', true],
   ['tunnels', 'mapng_beamNGIncludeTunnels', 'bool', true],
@@ -331,7 +331,7 @@ export function describeSessionConfig(config, { hasGpxzKey = false } = {}) {
     if (advanced && tagList.length) add('export', 'config.excludeTags', { value: tagList.slice(0, 6).join(', ') + (tagList.length > 6 ? ` +${tagList.length - 6}` : '') });
     if (advanced && e.trees !== false && e.forestDensity && e.forestDensity !== 'normal') add('export', 'config.forestDensity', { valueKey: `exportPanel.ui.forestDensity_${e.forestDensity}` });
     if (advanced && e.assumeParking === true) add('export', 'config.assumeParking', { valueKey: 'config.on' });
-    if (advanced && e.followSurvey === true) add('export', 'config.followSurvey', { valueKey: 'config.on' });
+    if (advanced && e.followSurvey === false) add('export', 'config.followSurvey', { valueKey: 'config.off' });
     if (advanced && e.decalSidewalks === true) add('export', 'config.decalSidewalks', { valueKey: 'config.on' });
     if (advanced && e.decalSidewalks !== true && e.curbHeight && e.curbHeight !== 'standard') add('export', 'config.curbHeight', { valueKey: `exportPanel.ui.curbHeight_${e.curbHeight}` });
     if (advanced && e.viewDistance && String(e.viewDistance) !== 'auto') add('export', 'config.viewDistance', { value: `${Number(e.viewDistance) / 1000} km` });

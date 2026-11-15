@@ -1964,7 +1964,7 @@
     "detail_serviceRoads": "driveways, alleys, car park aisles",
     "item_tracks": "Tracks",
     "detail_tracks": "farm and forest tracks",
-    "followSurvey": "every road follows the survey",
+    "followSurvey": "main roads keep their class grade",
     "noAssumedParking": "no assumed parking",
     "trees": {
       "title": "Trees picked for this area",
