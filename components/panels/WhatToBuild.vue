@@ -216,7 +216,7 @@
         </div>
       </section>
       <section class="space-y-1.5 pt-1" :class="bridgesBuilt ? '' : 'opacity-50'">
-        <h4 class="text-micro font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('build.group_structures') }}</h4>
+        <h4 class="text-micro font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('build.group_bridges') }}</h4>
         <div class="flex items-start gap-2">
           <div class="flex-1 min-w-0">
             <div class="text-xs font-medium text-gray-800 dark:text-gray-100">{{ t('exportPanel.lidarDecks') }}</div>

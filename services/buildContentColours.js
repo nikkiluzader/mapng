@@ -3,7 +3,9 @@
 // one another on the OSM and satellite maps.
 export const GROUP_COLOURS = {
   roads: '#64748b',
-  structures: '#1e293b',
+  bridges: '#1e293b',
+  tunnels: '#9a3412',
+  railways: '#be185d',
   buildings: '#c08457',
   walk: '#a855f7',
   furniture: '#dc2626',

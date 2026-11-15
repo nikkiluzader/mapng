@@ -32,12 +32,19 @@ export const CONTENT_GROUPS = [
     { id: 'lamps', tags: ['highway=street_lamp'] },
     { id: 'calming', tags: ['traffic_calming=*'] },
   ] },
-  { id: 'structures', items: [
+  // (bridges, tunnels and railways each a group of their own, so each has its switch, its count and
+  // its colour on the 2D preview in plain sight: asked for 2026-11-15, after a tester could not tell
+  // whether railways were built at all)
+  { id: 'bridges', items: [
     { id: 'bridges', option: { includeBridges: false } },
     // (the bridges of footpaths, cycleways and steps: footBridgeOf below)
     { id: 'footBridges' },
-    { id: 'tunnels', option: { includeTunnels: false } },
     { id: 'dams', option: { includeDams: false } },
+  ] },
+  { id: 'tunnels', items: [
+    { id: 'tunnels', option: { includeTunnels: false } },
+  ] },
+  { id: 'railways', items: [
     { id: 'railways', tags: ['railway=rail', 'railway=light_rail', 'railway=subway', 'railway=tram', 'railway=narrow_gauge', 'railway=monorail', 'railway=funicular'], option: { includeRailways: false } },
   ] },
   { id: 'buildings', items: [
