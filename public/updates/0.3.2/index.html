@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MapNG 0.3.2: MapNG in Numbers, and Locks on the Doors</title>
+<meta name="description" content="MapNG 0.3.2: a public stats page (where people build, which settings they pick, what goes wrong: counts only), and a security pass over the site and the desktop app: signed updates, a content policy, limits that hold, reports that keep their promises.">
+<link rel="canonical" href="https://mapng.com/updates/0.3.2/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MapNG 0.3.2: MapNG in numbers, and locks on the doors">
+<meta property="og:description" content="A public stats page with counts only, and a security pass: signed updates, a content policy, limits that hold.">
+<meta property="og:url" content="https://mapng.com/updates/0.3.2/">
+<meta property="og:image" content="https://mapng.com/updates/0.3.2/images/stats-world.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  /* BeamNG.drive's UI fonts, as the app (public/fonts, SIL OFL) */
+  @font-face { font-family: "Noto Sans"; src: url(/fonts/noto-sans-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass"; src: url(/fonts/overpass-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass Mono"; src: url(/fonts/overpass-mono-latin-wght-normal.woff2) format("woff2"); font-weight: 300 700; font-display: swap; }
+  :root {
+    --bg: #f7f7f8; --surface: #ffffff; --surface-2: #f2f2f4; --border: #e3e3e8;
+    --text: #1d1d22; --text-2: #4a4a55; --muted: #6e6e7a;
+    --brand: #ff6600; --brand-ink: #c2410c; --brand-tint: #fff4ec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+      --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+      --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+    --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+    --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.65 "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--brand-ink); }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 16px; }
+  h1, h2, h3 { font-family: "Overpass", "Noto Sans", system-ui, sans-serif; letter-spacing: -0.01em; }
+
+  /* hero: a plain band (a small release: no in-game shot) */
+  .hero { position: relative; color: #fff; background: linear-gradient(135deg, #1b1b22 0%, #2a1c12 60%, #7a3300 100%); }
+  .hero::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.15) 45%, rgba(0,0,0,.75) 100%); }
+  .hero .wrap { position: relative; padding-top: 18px; padding-bottom: 46px; min-height: min(46vh, 360px); display: flex; flex-direction: column; }
+  .brand { display: inline-flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; }
+  .brand img { width: 22px; height: 22px; }
+  .hero .spacer { flex: 1; }
+  .tag { display: inline-block; align-self: flex-start; background: var(--brand); color: #fff; font: 700 13px/1 "Overpass", sans-serif; letter-spacing: .08em; text-transform: uppercase; padding: 7px 12px; border-radius: 4px; transform: skewX(-12deg); }
+  .tag span { display: inline-block; transform: skewX(12deg); }
+  .hero h1 { font-size: clamp(34px, 7vw, 60px); line-height: 1.05; margin: 14px 0 10px; font-style: italic; text-shadow: 0 2px 18px rgba(0,0,0,.5); }
+  .hero p { margin: 0; font-size: 18px; max-width: 640px; color: rgba(255,255,255,.92); text-shadow: 0 1px 8px rgba(0,0,0,.6); }
+  .hero .cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 15px; text-decoration: none; }
+  .btn.primary { background: var(--brand); color: #fff; }
+  .btn.ghost { background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.35); backdrop-filter: blur(4px); }
+  .credit { position: absolute; right: 16px; top: 20px; max-width: 46%; text-align: right; font-size: 12px; line-height: 1.3; color: rgba(255,255,255,.75); text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+  @media (max-width: 560px) { .credit { display: none; } }
+
+  /* quick jump chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: -20px 0 0; position: relative; }
+  .chips a { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; font-size: 14px; color: var(--text); text-decoration: none; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  .chips a:hover { border-color: var(--brand); color: var(--brand-ink); }
+
+  main { padding-bottom: 72px; }
+  section { margin-top: 64px; scroll-margin-top: 16px; }
+  .kicker { font: 700 13px/1 "Overpass", sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--brand-ink); }
+  h2 { font-size: clamp(26px, 4.4vw, 34px); line-height: 1.15; margin: 8px 0 12px; }
+  h3 { font-size: 20px; margin: 30px 0 6px; }
+  p, li { color: var(--text-2); }
+  li { margin: 4px 0; }
+  b, strong { color: var(--text); }
+  code { font-family: "Overpass Mono", ui-monospace, monospace; background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; font-size: .9em; color: var(--text); }
+
+  figure { margin: 18px 0 0; }
+  figure img { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); box-shadow: 0 6px 24px rgba(0,0,0,.08); }
+  figcaption { margin-top: 8px; font-size: 14px; color: var(--muted); }
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: center; }
+  .split.narrow-img { grid-template-columns: minmax(0, 380px) minmax(0, 1fr); }
+  @media (max-width: 720px) { .split, .split.narrow-img { grid-template-columns: 1fr; } }
+
+  ol.callouts { list-style: none; padding: 0; margin: 16px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; counter-reset: c; }
+  ol.callouts li { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px 10px 48px; margin: 0; counter-increment: c; }
+  ol.callouts li::before { content: counter(c); position: absolute; left: 12px; top: 10px; width: 26px; height: 26px; border-radius: 50%; background: var(--brand); color: #fff; font: 800 14px/26px "Overpass", sans-serif; text-align: center; }
+
+  .note { background: var(--brand-tint); border-left: 3px solid var(--brand); border-radius: 0 8px 8px 0; padding: 12px 14px; color: var(--text); font-size: 15px; margin-top: 18px; }
+  .regions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; list-style: none; margin: 12px 0 0; }
+  .regions li { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-size: 14px; margin: 0; color: var(--text); }
+  .polish { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 14px; }
+  .polish div { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; font-size: 15px; color: var(--text-2); }
+  .polish b { display: block; margin-bottom: 2px; }
+
+  .outro { margin-top: 72px; text-align: center; }
+  .outro figure img { border-radius: 14px; }
+  .outro p { max-width: 620px; margin: 18px auto 0; }
+  footer { border-top: 1px solid var(--border); margin-top: 56px; padding-top: 18px; font-size: 14px; color: var(--muted); }
+  footer p { color: var(--muted); }
+
+  /* the cliff profile (inline SVG; series colours checked for colour-blind separation in both modes) */
+  .chart { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 14px 8px; margin-top: 18px; position: relative; }
+  .chart .legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 14px; color: var(--text-2); margin: 0 0 6px 4px; }
+  .chart .legend i { display: inline-block; width: 18px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  .profile { width: 100%; height: auto; display: block; --s1: #2f6fd6; --s2: #e85d00; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .profile, :root:not([data-theme="light"]) .chart .legend { --s1: #5b93ea; --s2: #e2650a; } }
+  :root[data-theme="dark"] .profile, :root[data-theme="dark"] .chart .legend { --s1: #5b93ea; --s2: #e2650a; }
+  .profile .g { stroke: var(--border); stroke-width: 1; }
+  .profile .t { fill: var(--muted); font: 12px "Noto Sans", sans-serif; }
+  .profile .lab { fill: var(--text); font: 600 13px "Noto Sans", sans-serif; }
+  .profile .cliff { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 4; }
+  .profile .s1, .profile .s2 { fill: none; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+  .profile .s1 { stroke: var(--s1); } .profile .s2 { stroke: var(--s2); }
+  .profile .xh { stroke: var(--muted); stroke-width: 1; }
+  .tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; font-size: 13px; color: var(--text); box-shadow: 0 4px 14px rgba(0,0,0,.12); white-space: nowrap; display: none; }
+  .tip i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+  table.nums { border-collapse: collapse; width: 100%; margin-top: 14px; font-size: 15px; }
+  table.nums th, table.nums td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  table.nums td.n { font-variant-numeric: tabular-nums; }
+  table.nums th { color: var(--muted); font-weight: 600; }
+  .bts { font-size: 14px; color: var(--muted); }
+  /* diagrams (inline SVG): colours from the page tokens, both modes */
+  .dia { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-top: 18px; }
+  .dia svg { width: 100%; height: auto; display: block; --d1: #2f6fd6; --d2: #e85d00; --d3: #3a9a4a; --dg: #b9cf9f; --dw: #9cc3e6; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .dia svg { --d1: #5b93ea; --d2: #ff8a3d; --d3: #5fbf6d; --dg: #4a5a3c; --dw: #2c4a66; } }
+  :root[data-theme="dark"] .dia svg { --d1: #5b93ea; --d2: #ff8a3d; --d3: #5fbf6d; --dg: #4a5a3c; --dw: #2c4a66; }
+  .dia text { fill: var(--text); font: 13px "Noto Sans", sans-serif; }
+  .dia .sm { fill: var(--muted); font-size: 12px; }
+  .dia .box { fill: var(--surface-2); stroke: var(--border); }
+  .dia .boxb { fill: var(--brand-tint); stroke: var(--brand); }
+  .dia .arrow { stroke: var(--muted); stroke-width: 1.5; fill: none; marker-end: url(#ah); }
+  .refs { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .refs figcaption a { color: var(--muted); }
+  .pair2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+  @media (max-width: 720px) { .pair2 { grid-template-columns: 1fr; } }
+  .stat { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-top: 16px; }
+  .stat div { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+  .stat b { display: block; font: 800 26px/1.1 "Overpass", sans-serif; color: var(--brand-ink); }
+  .stat span { font-size: 14px; color: var(--muted); }
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/favicon.svg" alt="">MapNG</a>
+    <div class="spacer"></div>
+    <span class="tag"><span>Update · 0.3.2</span></span>
+    <h1>MapNG in numbers, and locks on the doors</h1>
+    <p>Two things in this one. A new public page shows MapNG's numbers to everyone: where people build, which settings they pick, what goes wrong. And before putting more of the project in the open, the whole thing got a security pass: the site, its server and the desktop app. Nothing was found being misused. Several doors were found unlocked, and they are locked now.</p>
+    <div class="cta">
+      <a class="btn primary" href="/stats.html">See the stats page</a>
+      <a class="btn ghost" href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <nav class="chips" aria-label="On this page">
+    <a href="#stats">The stats page</a><a href="#privacy">What it shows, and what it never will</a><a href="#desktop">Desktop app</a><a href="#updates">Signed updates</a><a href="#site">The website</a><a href="#reports">Problem reports</a><a href="#codes">Send codes and configs</a><a href="#limits">Limits</a><a href="#know">Good to know</a>
+  </nav>
+
+  <section id="stats">
+    <div class="kicker">The headline</div>
+    <h2>📊 MapNG in numbers</h2>
+    <p><a href="/stats.html">mapng.com/stats.html</a> is a new page of live counts. MapNG is open source and built in the open, and there was never a reason for its numbers to be private. You can reach it from the new bar-chart icon at the bottom of the control panel, next to <b>Your data</b>.</p>
+    <figure><img src="images/stats-world.jpg" alt="The stats page world map. Countries are shaded from pale to dark orange by shared exports: the United States, Russia and France darkest. Three numbered outlines: 1 the switch between Shared exports, Visits and Exports per 1,000 visits; 2 dots over the United States; 3 a line of numbers for Germany under the map" loading="lazy"><figcaption>The world map: <b>1</b> shade the countries by shared exports, visits, or exports per 1,000 visits; <b>2</b> each dot is a roughly 5 km square someone shared an export from; <b>3</b> click a country and its numbers stay under the map.</figcaption></figure>
+    <p>What is on it:</p>
+    <ul>
+      <li><b>Top 10s:</b> the countries with the most shared exports (website and desktop app apart), the most visits, and the "keenest builders": exports per 1,000 visits.</li>
+      <li><b>What people build with:</b> the typical MapNG level in one row, the ten choices nearly everyone makes, the ten hardly anyone makes (some never), and every setting as its own little chart, with a filter.</li>
+      <li><b>How rare is your setup?</b> Pick how you build and it says about one in how many shared exports looks like yours. A toy: it treats your choices as if they had nothing to do with each other.</li>
+      <li><b>Map nerdery:</b> the northernmost and southernmost square, the busiest one, how much is north of the equator, how much is in countries that drive on the left, exports by latitude.</li>
+      <li><b>Who drops by:</b> thirty days of visitors, page views and requests, how much data was served, browsers, the days of the week.</li>
+      <li><b>What goes wrong:</b> how many problem reports arrived, what happened, during what, on which system.</li>
+      <li><b>The desktop app:</b> downloads per release and per kind.</li>
+    </ul>
+    <figure><img src="images/stats-countries.jpg" alt="Three ranked lists side by side: most shared exports, most visits in 30 days, and keenest builders by exports per 1,000 visits, each a column of countries with a bar and a number" loading="lazy"><figcaption>The Top 10s. The export bars are split: orange from the website, blue from the desktop app.</figcaption></figure>
+    <figure><img src="images/stats-rare.jpg" alt="A panel of twelve drop-down choices such as Made with, Map size, Detail and Elevation source, three buttons (Most common, Rarest, Surprise me) and a verdict: About 1 in 330" loading="lazy"><figcaption>How rare is your setup? The most common combination of all is still only about one export in 330.</figcaption></figure>
+  </section>
+
+  <section id="privacy">
+    <div class="kicker">The promise</div>
+    <h2>🔒 What the stats page shows, and what it never will</h2>
+    <p>Every number on the page is a <b>count</b>. None is about a person, and none can be turned back into one.</p>
+    <ul>
+      <li><b>Export areas and settings</b> are there only from people who chose to share them, the same two switches as before. The two questions MapNG asks after your first export now say, in every language, that the totals are public on the stats page.</li>
+      <li><b>Visits</b> are the totals Cloudflare, which serves the site, already counts without cookies. A country is listed only from 25 visits up.</li>
+      <li><b>Problem reports</b> appear only as how many arrived, under fixed headings such as "ran out of memory". Nothing from inside a report is shown: not the place, not the error's text, not what you wrote, not the report's ID. A report itself is never public.</li>
+      <li><b>Never there:</b> a name, an account, an internet address, an exact location, a level's name, your settings as a set.</li>
+    </ul>
+    <p>The page is drawn in your browser from three public files, which you can open yourself; they are linked at its foot. <a href="/data.html#stats">Your data and MapNG</a> has a table of every number, where it comes from and how fine it gets.</p>
+    <figure><img src="images/stats-problems.jpg" alt="The What goes wrong section: 33 reports so far, then three lists of bars: what happened (ran out of memory 24 percent, the page closed mid-job 18 percent, the app crashed 18 percent), while doing what, and on which system" loading="lazy"><figcaption>What goes wrong, in counts. A quarter of all reports are a computer running out of memory on a very large map.</figcaption></figure>
+  </section>
+
+  <section id="desktop">
+    <div class="kicker">Security: the desktop app</div>
+    <h2>🖥️ The app's window stays the app's</h2>
+    <p>The desktop app's window has a private line to the part of the app that reads and writes files and runs exports. The security pass found that the line belonged to the window, not to MapNG's page in it: clicking the map's "OpenStreetMap" credit loaded that website <i>into the app's window</i>, and the website then had the same line.</p>
+    <ul>
+      <li><b>The window no longer leaves MapNG.</b> A link to anywhere else opens in your browser.</li>
+      <li><b>Every request is checked for who sent it,</b> and turned away unless MapNG's own page did.</li>
+      <li><b>Files stay in their folders.</b> A problem report's log can only be one of MapNG's own logs (it could name any file on the computer). File names written into a job, "show in folder" and batch downloads keep to what MapNG itself makes.</li>
+      <li><b>Your keys leave a job's folder when the job ends.</b> A job's settings file held your GPXZ key in plain text for as long as the folder was kept, in the folder <b>Help &gt; Logs</b> opens: the one you might zip up to show a problem. Your own Overpass server's address no longer appears in logs either.</li>
+      <li><b>A content policy:</b> the app's page runs only MapNG's own script files. A script that somehow got into the page, out of map data or a pasted config, does not run.</li>
+    </ul>
+    <p>No sign was found that any of this had been used against anyone. Update to 0.3.2 all the same.</p>
+  </section>
+
+  <section id="updates">
+    <div class="kicker">Security: updates</div>
+    <h2>✍️ Updates signed by MapNG</h2>
+    <p>The Windows build is not code-signed (that takes a paid certificate), so until now an update was trusted because the installer matched a checksum, and the checksum sat on the same GitHub release as the installer. Whoever could replace one could replace the other.</p>
+    <p>From this version on, every release's list of files is signed with a key that is not in the repository, and the app takes an update only if the signature is good and the list names the very installer it is about to download.</p>
+    <figure><img src="images/update-check.jpg" alt="A diagram in two rows. When a release is built: the installer, then its list of files with a checksum, then MapNG’s signature made with a key not in the repository; all three go on the GitHub release. When your app is offered an update: 1 is the signature good, 2 does the list name this version and this very installer, 3 download and match the checksum; a no at 1 or 2 means not offered and not downloaded" loading="lazy"><figcaption>Behind the scenes: how an update is checked from 0.3.2 on.</figcaption></figure>
+    <p>What this does not do: it does not make Windows SmartScreen stop warning about a new installer, and it does not help if GitHub's own build of MapNG were tampered with. It closes the gap where a finished release's files could be swapped.</p>
+  </section>
+
+  <section id="site">
+    <div class="kicker">Security: the website</div>
+    <h2>🌐 The site serves only what the app asks for</h2>
+    <ul>
+      <li><b>The pass-through routes are narrowed.</b> mapng.com passes some requests on to other servers (the address lookup, Poland's geoportal, GPXZ) so that your browser can reach them. Those routes served the whole of each server under mapng.com's name. They now take only the paths the app uses, and nothing they answer can ever run as a page of mapng.com.</li>
+      <li><b>An address lookup can no longer be answered wrongly for everyone:</b> an extra word in the request could put a wrong answer into the site's cache for a week.</li>
+      <li><b>The same content policy as the desktop app,</b> https only from now on, and no cookies set by anything passed through.</li>
+      <li><b>No keys anywhere they should not be:</b> every key the project uses was checked against the public code, its whole history and the built site. None is there.</li>
+    </ul>
+  </section>
+
+  <section id="reports">
+    <div class="kicker">Security: reports</div>
+    <h2>📝 Problem reports that keep their promise</h2>
+    <ul>
+      <li><b>Unticking the location now leaves out the log too.</b> A report sent with "include the location" unticked still carried the job's log, and the log's lines name the area. Website and desktop app: the log, the settings code and the export settings all go with the location, or not at all. This was a broken promise, and it is fixed.</li>
+      <li>A report far too large is cut down instead of stopping the list of reports from loading; a report's text cannot pass itself off as part of the alert it sends; report files are always downloads, never pages.</li>
+    </ul>
+  </section>
+
+  <section id="codes">
+    <div class="kicker">Security: sharing settings</div>
+    <h2>🔑 Longer send codes, and a confirm window that hides nothing</h2>
+    <ul>
+      <li><b>Send codes are eight characters now</b> (like <code>K7F2-9QXM</code>), up from six: from 729 million possible codes to 656 thousand million, with a limit on how often anyone may try one. A code holds a map's location, so it should not be guessable.</li>
+      <li><b>A config from someone else is checked before it is shown:</b> a place on Earth, a sane scale, a drawing of bearable size.</li>
+      <li><b>The confirm window always names the settings that matter</b> (size limits off, an experimental road surface, measuring road widths from the satellite picture), whatever mode you are in, and counts every other setting the config would change.</li>
+    </ul>
+  </section>
+
+  <section id="limits">
+    <div class="kicker">Security: limits</div>
+    <h2>🚦 Limits that hold</h2>
+    <p>The site's limits were per internet address and lived in the server's memory, which empties whenever the server restarts. Someone with many addresses could have filled the storage, flooded the public counts, or hammered OpenStreetMap's servers in MapNG's name. Now:</p>
+    <ul>
+      <li>each sender is limited by Cloudflare's own rate limiter, and a home connection that cycles through addresses counts as one;</li>
+      <li>everything that costs storage, mail or the public counts has a total for the day, for everyone together: problem reports, settings reports, send codes, new squares on the export map, elevation tiles kept for good.</li>
+    </ul>
+    <p>Each total is far above what MapNG's users reach. If you ever meet one ("Too many requests"), wait a minute and try again.</p>
+  </section>
+
+  <section id="know">
+    <div class="kicker">Before you update</div>
+    <h2>📌 Good to know</h2>
+    <ul>
+      <li><b>Desktop 0.3.1 and older cannot open the new eight-character send codes.</b> Update, or use the long code (<b>Copy long code</b>), which works everywhere.</li>
+      <li><b>This is the first signed release.</b> 0.3.1 installs take this update the old way; from 0.3.2 on, every update is checked.</li>
+      <li><b>Still open:</b> a code-signing certificate for Windows; and the limits above have run in tests, not yet under real load.</li>
+      <li>Nothing about what MapNG builds changed in this version: levels come out as in 0.3.1.</li>
+    </ul>
+    <figure><img src="images/footer-stats.jpg" alt="The bottom of the control panel: a row of small icons under the Generate button, with the bar-chart icon highlighted and labelled Stats" loading="lazy"><figcaption>The new Stats link, between Your data and How it’s built.</figcaption></figure>
+  </section>
+
+  <section id="thanks">
+    <div class="kicker">Thanks</div>
+    <h2>🙏 Thanks</h2>
+    <p>To everyone who turned on <b>Share my exports</b> or <b>Share which settings I use</b>: the stats page is made of your counts, and nothing else of you. And to everyone who pressed <b>Send report</b>: a quarter of you told us the same thing, and it is first on the list for the next update.</p>
+  </section>
+
+  <footer>
+    <p>MapNG is free and open source. <a href="https://github.com/nikkiluzader/mapng">GitHub</a> · <a href="/data.html">Your data</a> · <a href="/stats.html">Stats</a> · <a href="/updates/0.3.1/">Previous update (0.3.1)</a> · <a href="/">mapng.com</a></p>
+  </footer>
+</main>
+</body>
+</html>
