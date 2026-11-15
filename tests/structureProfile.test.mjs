@@ -355,6 +355,8 @@ test('profile: on fine elevation a street follows the slope the survey measured,
   assert.ok(deepest('residential', true) < 1.2, `fine elevation, a residential street: ${deepest('residential', true).toFixed(2)} m`);
   // coarse elevation says nothing of an 80 m pitch: the class limit holds as before
   assert.ok(deepest('tertiary', false) > deepest('tertiary', true) + 1, `coarse elevation: ${deepest('tertiary', false).toFixed(2)} m (held to its class)`);
+  // a main road is built to its grade: its class holds
+  assert.ok(deepest('secondary', true) > deepest('tertiary', true) + 1, `a secondary road on fine elevation: ${deepest('secondary', true).toFixed(2)} m`);
   // a motorway ramp never follows a wall in the data
   assert.ok(deepest('motorway_link', true) > 2, `a motorway ramp on fine elevation: ${deepest('motorway_link', true).toFixed(2)} m`);
 });

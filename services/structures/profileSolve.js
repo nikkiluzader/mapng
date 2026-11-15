@@ -69,7 +69,9 @@ const FINE_SHORT_OVER_LONG = 1.3;
 // ... and not within this far of a bridge or tunnel joining the road: the ground there is the abutment's or the
 // portal's, cut away under the structure, and a road following it dived towards what its bridge crosses
 const FINE_CLEAR_OF_STRUCTURE_M = 60;
-const NEVER_FOLLOWS = new Set(['motorway', 'motorway_link', 'trunk', 'trunk_link']);
+// (nor a primary or secondary road: built to its grade, and where the survey shows more along its mapped line the
+// line is off the road, on the slope beside it)
+const NEVER_FOLLOWS = new Set(['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link']);
 const GROUND_BAND_M = 6;      // an untagged road's free fill / cut for grades
 const UNDER_FREE_M = 3;       // a road under a deck is cleared from at most this over its ground
 const PIN_REACH_FACTOR = 2.5; // a lift reaches no higher than this many times the grade limit climbs from a pinned road
