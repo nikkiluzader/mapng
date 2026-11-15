@@ -170,7 +170,8 @@ function allowedRise(e, structure = !!(e.bridge || e.tunnel), fine = false, stru
     while (b2 + 1 < n && e.s[b2] < mid + HILLSIDE_M) b2++;
     const terrain = slope(a, b, LONG_GRADE_M);
     let measured = 0;
-    if (follows && !((structureAt?.[0] && mid - e.s[0] < FINE_CLEAR_OF_STRUCTURE_M) || (structureAt?.[1] && e.s[n - 1] - mid < FINE_CLEAR_OF_STRUCTURE_M))) {
+    if (follows && !((structureAt?.[0] && mid - e.s[0] < FINE_CLEAR_OF_STRUCTURE_M) || (structureAt?.[1] && e.s[n - 1] - mid < FINE_CLEAR_OF_STRUCTURE_M)
+      || (structureAt?.[2] || []).some(([s0, s1]) => mid > s0 - FINE_CLEAR_OF_STRUCTURE_M && mid < s1 + FINE_CLEAR_OF_STRUCTURE_M))) {
       while (a3 + 1 < n && e.s[a3 + 1] <= mid - FINE_GRADE_M) a3++;
       while (b3 + 1 < n && e.s[b3] < mid + FINE_GRADE_M) b3++;
       measured = Math.min(FINE_FOLLOW_MAX, Math.max(terrain, Math.min(slope(a3, b3, 8), terrain * FINE_SHORT_OVER_LONG)));
@@ -220,11 +221,16 @@ function makeHeap(key, sign) {
 // 24 m under a Monaco hill with no tube round it)
 const structureFor = (graph) => (e) => !!(e.bridge || (e.tunnel && (e.external || !graph.tunnelsPinned)));
 
-// Whether a bridge or tunnel joins edge k at its first / last point.
+// Whether a bridge or tunnel joins edge k at its first / last point, and the stretches of it (from, to along
+// the edge) where it crosses another road at another level or runs over water: there too the surveyed ground is a
+// structure's, cut away or built up.
 function structureEnds(graph, k) {
   const asStructure = structureFor(graph); const e = graph.edges[k];
   const at = (id) => (graph.nodes.get(id)?.edges || []).some(({ edge }) => edge !== k && asStructure(graph.edges[edge]));
-  return [at(e.from), at(e.to)];
+  const near = [];
+  for (const c of graph.crossings?.crossings || []) for (const side of [c.a, c.b]) if (side?.edge === k && Number.isFinite(e.s[side.i])) near.push([e.s[side.i], e.s[Math.min(side.i + 1, e.s.length - 1)]]);
+  for (const run of graph.crossings?.water || []) if (run.edge === k) near.push([e.s[run.i0], e.s[run.i1]]);
+  return [at(e.from), at(e.to), near];
 }
 
 export function* solveProfilesSteps(graph) {
