@@ -1881,6 +1881,8 @@
     "item_tunnels": "Tunnels",
     "item_dams": "Barrages",
     "item_railways": "Voies ferrées",
+    "item_railwaysDisused": "Lignes désaffectées",
+    "item_railwaysAbandoned": "Lignes abandonnées",
     "item_buildings": "Bâtiments",
     "item_sidewalks": "Trottoirs et bordures",
     "item_paths": "Chemins piétons et pistes cyclables",

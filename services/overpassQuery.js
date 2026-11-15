@@ -6,7 +6,7 @@
  * Bump OVERPASS_QUERY_VERSION whenever the query changes: it is part of the
  * Worker's cache key, so stale answers to an old query are never served.
  */
-export const OVERPASS_QUERY_VERSION = 4;   // 2: traffic_calming nodes; 3: food, drink and lodging nodes; 4: railways
+export const OVERPASS_QUERY_VERSION = 5;   // 2: traffic_calming nodes; 3: food, drink and lodging nodes; 4: railways; 5: disused, preserved and abandoned lines
 
 // Public Overpass mirrors (volunteer-run; any of them may be down).
 export const OVERPASS_ENDPOINTS = [
@@ -66,10 +66,14 @@ export const BUSINESS_NODES = [
   ...['hotel', 'motel', 'guest_house', 'hostel'].map((v) => ['tourism', v]),
 ];
 
-// Active railways (services/railways.js: the kinds built as track; a subway
-// in its tunnel is dropped there). The lifecycle values (abandoned, disused,
-// razed, construction, proposed) are left out by asking for these alone.
+// Railways (services/railways.js: the kinds built as track; a subway in its
+// tunnel is dropped there). Razed, dismantled, under construction and proposed
+// lines are left out by asking for these alone.
 export const RAILWAY_WAYS = ['rail', 'light_rail', 'subway', 'tram', 'narrow_gauge', 'monorail', 'funicular'];
+// Lines no longer run, or run as a heritage line: built as track too (the rails and
+// the bridges of a disused line mostly still stand; an abandoned line's alignment is
+// built where the map keeps it; each has its own switch in What to build).
+export const RAILWAY_LIFECYCLE_WAYS = ['disused', 'preserved', 'abandoned'];
 
 export const OSM_FILTER = {
   wayKeys: [
@@ -77,7 +81,7 @@ export const OSM_FILTER = {
     'power', 'military', 'historic', 'tourism', 'amenity', 'landuse', 'natural', 'leisure',
     'water', 'wetland', 'surface', 'landcover', 'golf',
   ],
-  wayTags: [['area', 'yes'], ['natural', 'tree_row'], ...RAILWAY_WAYS.map((v) => ['railway', v])],
+  wayTags: [['area', 'yes'], ['natural', 'tree_row'], ...[...RAILWAY_WAYS, ...RAILWAY_LIFECYCLE_WAYS].map((v) => ['railway', v])],
   relationKeys: [
     'building', 'waterway', 'aeroway', 'man_made', 'military', 'historic', 'tourism', 'amenity',
     'landuse', 'natural', 'leisure', 'water', 'wetland', 'landcover',

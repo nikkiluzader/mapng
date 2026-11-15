@@ -1881,6 +1881,8 @@
     "item_tunnels": "Tunele",
     "item_dams": "Zapory",
     "item_railways": "Koleje",
+    "item_railwaysDisused": "Linie nieczynne",
+    "item_railwaysAbandoned": "Linie zlikwidowane",
     "item_buildings": "Budynki",
     "item_sidewalks": "Chodniki i krawężniki",
     "item_paths": "Ścieżki piesze i rowerowe",

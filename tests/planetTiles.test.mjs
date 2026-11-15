@@ -12,7 +12,8 @@ test('the filter on reading keeps what the Overpass query asks for, and nothing 
   for (const [k, v] of OSM_FILTER.nodeTags) assert.equal(matchesOsmFilter({ type: 'node', tags: { [k]: v } }), true, `${k}=${v}`);
   // what a planet tile also holds
   assert.equal(matchesOsmFilter({ type: 'way', tags: { boundary: 'administrative' } }), false);
-  assert.equal(matchesOsmFilter({ type: 'way', tags: { railway: 'abandoned' } }), false);
+  assert.equal(matchesOsmFilter({ type: 'way', tags: { railway: 'razed' } }), false);
+  assert.equal(matchesOsmFilter({ type: 'way', tags: { railway: 'abandoned' } }), true);   // (built since 2026-11-15, with disused and preserved)
   assert.equal(matchesOsmFilter({ type: 'relation', tags: { type: 'route', route: 'bus' } }), false);
   assert.equal(matchesOsmFilter({ type: 'relation', tags: { highway: 'pedestrian', type: 'multipolygon' } }), false);   // (the query asks for no relation by highway)
   assert.equal(matchesOsmFilter({ type: 'node', tags: { amenity: 'school' } }), false);

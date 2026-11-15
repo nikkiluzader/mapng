@@ -3,25 +3,38 @@ import assert from 'node:assert/strict';
 
 import { parseOverpassResponse } from '../services/osm.js';
 import { OSM_FILTER, buildOverpassQuery } from '../services/overpassQuery.js';
-import { railKindOf, railHalfWidth, gaugeOf, tracksOf, railSegmentsFrom, streetRunningTest, undergroundRailIds } from '../services/railways.js';
+import { railKindOf, railHalfWidth, gaugeOf, tracksOf, railSegmentsFrom, streetRunningTest, undergroundRailIds, railStateOf } from '../services/railways.js';
 
 const line = (id, tags, pts) => ({ type: 'way', id, tags, geometry: pts.map(([lng, lat]) => ({ lat, lon: lng })) });
 const bounds = { north: 1, south: 0, east: 1, west: 0 };
 
-test('the Overpass query and the tile filter ask for the active railway kinds only', () => {
+test('the Overpass query and the tile filter ask for the lines built: those in use, and disused, preserved and abandoned ones', () => {
   const asked = OSM_FILTER.wayTags.filter(([k]) => k === 'railway').map(([, v]) => v).sort();
-  assert.deepEqual(asked, ['funicular', 'light_rail', 'monorail', 'narrow_gauge', 'rail', 'subway', 'tram']);
+  assert.deepEqual(asked, ['abandoned', 'disused', 'funicular', 'light_rail', 'monorail', 'narrow_gauge', 'preserved', 'rail', 'subway', 'tram']);
   const q = buildOverpassQuery({ south: 0, west: 0, north: 1, east: 1 });
   assert.match(q, /way\["railway"="rail"\]\(0,0,1,1\);/);
-  assert.doesNotMatch(q, /abandoned|disused/);
+  assert.match(q, /way\["railway"="disused"\]\(0,0,1,1\);/);
+  assert.doesNotMatch(q, /razed|dismantled|construction|proposed/);
 });
 
-test('railKindOf: active lines in, lifecycle and underground subways out', () => {
+test('railKindOf: lines in use and closed lines in; lines never or no longer there, and underground subways, out', () => {
   assert.equal(railKindOf({ railway: 'rail' }), 'rail');
   assert.equal(railKindOf({ railway: 'tram' }), 'tram');
-  assert.equal(railKindOf({ railway: 'abandoned' }), null);
+  // closed lines are built as the kind of line they were (plain rail when the map does not say)
+  assert.equal(railKindOf({ railway: 'abandoned' }), 'rail');
+  assert.equal(railKindOf({ railway: 'disused' }), 'rail');
+  assert.equal(railKindOf({ railway: 'preserved' }), 'rail');
+  assert.equal(railKindOf({ railway: 'disused', 'disused:railway': 'narrow_gauge' }), 'narrow_gauge');
+  assert.equal(railKindOf({ railway: 'abandoned', 'abandoned:railway': 'tram' }), null);   // (its rails in the street are paved over)
+  assert.equal(railKindOf({ railway: 'razed' }), null);
+  assert.equal(railKindOf({ railway: 'dismantled' }), null);
+  assert.equal(railKindOf({ railway: 'proposed' }), null);
+  assert.equal(railStateOf({ railway: 'disused' }), 'disused');
+  assert.equal(railStateOf({ railway: 'rail', abandoned: 'yes' }), 'abandoned');
+  assert.equal(railStateOf({ railway: 'rail' }), null);
   assert.equal(railKindOf({ railway: 'construction', construction: 'rail' }), null);
-  assert.equal(railKindOf({ railway: 'rail', disused: 'yes' }), null);
+  assert.equal(railKindOf({ railway: 'rail', disused: 'yes' }), 'rail');
+  assert.equal(railKindOf({ railway: 'rail', razed: 'yes' }), null);
   assert.equal(railKindOf({ railway: 'platform' }), null);
   assert.equal(railKindOf({ railway: 'rail', area: 'yes' }), null);
   // a subway: only where it is above ground
@@ -39,12 +52,15 @@ test('a railway way becomes a railway feature with its tags, clipped as a line',
   const tags = { railway: 'rail', bridge: 'yes', layer: '1', gauge: '1435', electrified: 'contact_line', tracks: '2', usage: 'main', name: 'Main Line', 'bridge:structure': 'truss' };
   const features = parseOverpassResponse({ elements: [
     line(1, tags, [[-0.5, 0.5], [0.5, 0.5], [1.5, 0.5]]),
-    line(2, { railway: 'disused' }, [[0.1, 0.1], [0.9, 0.1]]),
+    line(2, { railway: 'razed' }, [[0.1, 0.1], [0.9, 0.1]]),
+    line(4, { railway: 'disused' }, [[0.1, 0.3], [0.9, 0.3]]),
     line(3, { railway: 'subway', tunnel: 'yes', layer: '-1' }, [[0.1, 0.2], [0.9, 0.2]]),
   ] }, bounds);
   // (the subway in its tunnel is kept as data: the export builds what is above ground)
   const rail = features.filter((f) => f.type === 'railway' && f.tags.railway === 'rail');
-  assert.equal(features.filter((f) => f.type === 'railway').length, 2);
+  // (the razed line is not there; the disused one is kept, to be built)
+  assert.equal(features.filter((f) => f.type === 'railway').length, 3);
+  assert.equal(features.filter((f) => f.type === 'railway' && f.tags.railway === 'disused').length, 1);
   assert.equal(rail.length, 1);
   assert.deepEqual(rail[0].tags, tags);
   assert.ok(rail[0].geometry.every((p) => p.lng >= 0 && p.lng <= 1), 'clipped to the map');
@@ -123,4 +139,15 @@ test('a main line tunnel passing under the whole map (every end on the map\'s ed
   assert.deepEqual(railSegmentsFrom(feats, { bounds }).map((s) => s.sourceFeature.id).sort(), ['p1', 'p2']);
   // (no bounds given: as before)
   assert.equal(undergroundRailIds(feats).size, 0);
+});
+
+test('What to build: disused and abandoned lines have rows of their own, and switching one off leaves the others', async () => {
+  const { CONTENT_GROUPS, filterOsmByTags, contentExportOptions } = await import('../services/buildContent.js');
+  const group = CONTENT_GROUPS.find((g) => g.id === 'railways');
+  assert.deepEqual(group.items.map((i) => i.id), ['railways', 'railwaysDisused', 'railwaysAbandoned']);
+  assert.ok(group.items[0].tags.includes('railway=preserved'));
+  const feats = [{ id: 'a', type: 'railway', tags: { railway: 'rail' } }, { id: 'b', type: 'railway', tags: { railway: 'disused' } }, { id: 'c', type: 'railway', tags: { railway: 'abandoned' } }];
+  const choice = contentExportOptions ? contentExportOptions(['railwaysAbandoned'], []) : null;
+  const tags = choice?.excludeTags || ['railway=abandoned'];
+  assert.deepEqual(filterOsmByTags(feats, tags).features.map((f) => f.id), ['a', 'b']);
 });

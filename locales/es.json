@@ -1881,6 +1881,8 @@
     "item_tunnels": "Túneles",
     "item_dams": "Presas",
     "item_railways": "Ferrocarriles",
+    "item_railwaysDisused": "Líneas en desuso",
+    "item_railwaysAbandoned": "Líneas abandonadas",
     "item_buildings": "Edificios",
     "item_sidewalks": "Aceras y bordillos",
     "item_paths": "Sendas y carriles bici",

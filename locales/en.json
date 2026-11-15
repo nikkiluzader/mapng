@@ -1886,6 +1886,8 @@
     "item_tunnels": "Tunnels",
     "item_dams": "Dams",
     "item_railways": "Railways",
+    "item_railwaysDisused": "Disused lines",
+    "item_railwaysAbandoned": "Abandoned lines",
     "item_buildings": "Buildings",
     "item_sidewalks": "Sidewalks and curbs",
     "item_paths": "Footpaths and cycleways",

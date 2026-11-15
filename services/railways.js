@@ -8,15 +8,34 @@
 // any place.
 
 import { getEffectiveRoadLayer } from './roadNetwork.js';
-import { RAILWAY_WAYS } from './overpassQuery.js';
+import { RAILWAY_WAYS, RAILWAY_LIFECYCLE_WAYS } from './overpassQuery.js';
 
-// Active railways. railway=abandoned / disused / razed / construction /
-// proposed are values of their own, so they never match; a line kept as
-// railway=rail with disused=yes (the old lifecycle tagging) is left out too.
-// (the same list the Overpass query asks for: overpassQuery.js)
+// The kinds of line (the same list the Overpass query asks for: overpassQuery.js).
+// railway=razed / dismantled / construction / proposed are values of their own, so
+// they never match: there is no track there.
 export const RAIL_KINDS = RAILWAY_WAYS;
 const RAIL_KIND_SET = new Set(RAIL_KINDS);
-const LIFECYCLE_FLAGS = ['abandoned', 'disused', 'razed', 'demolished', 'construction', 'proposed'];
+// A line no longer run (railway=disused, railway=abandoned) or run as a heritage line
+// (railway=preserved) is built as track of the kind it was: `disused:railway=narrow_gauge`
+// says which, plain rail otherwise. (Asked for 2026-11-15: a closed line's rails and
+// bridges mostly still stand, and a level without them had a river crossing missing.)
+// An abandoned tram line is the exception: its rails in the street are long paved over.
+const LIFECYCLE_SET = new Set(RAILWAY_LIFECYCLE_WAYS);
+const lifecycleKind = (tags, state) => {
+  const was = String(tags[`${state}:railway`] ?? tags[`railway:${state}`] ?? '').toLowerCase();
+  const kind = RAIL_KIND_SET.has(was) ? was : 'rail';
+  return state === 'abandoned' && (kind === 'tram' || kind === 'subway') ? null : kind;
+};
+// (the old way of saying it, on a line still tagged railway=rail: disused=yes and abandoned=yes
+// are built as the line they are on; these mean there is no track)
+const LIFECYCLE_FLAGS = ['razed', 'demolished', 'construction', 'proposed'];
+/** 'disused' | 'abandoned' | 'preserved' for such a line, or null for one in use (What to build's rows). */
+export function railStateOf(tags = {}) {
+  const v = String(tags.railway ?? '').toLowerCase();
+  if (LIFECYCLE_SET.has(v)) return v;
+  for (const k of ['abandoned', 'disused']) if (tags[k] && tags[k] !== 'no') return k;
+  return null;
+}
 
 // A subway in its tunnel is underground for the whole of it: only where it
 // comes up (an elevated stretch, a cutting to a depot) is it built. So are a
@@ -47,8 +66,9 @@ export function railKindOf(tags = {}) {
  * side of it, railSegmentsFrom); railKindOf picks the ones built.
  */
 export function activeRailKind(tags = {}) {
-  const kind = String(tags.railway ?? '').toLowerCase();
-  if (!RAIL_KIND_SET.has(kind)) return null;
+  let kind = String(tags.railway ?? '').toLowerCase();
+  if (LIFECYCLE_SET.has(kind)) kind = lifecycleKind(tags, kind);
+  if (!kind || !RAIL_KIND_SET.has(kind)) return null;
   if (tags.area === 'yes') return null;
   if (LIFECYCLE_FLAGS.some((k) => tags[k] && tags[k] !== 'no')) return null;
   return kind;

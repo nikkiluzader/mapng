@@ -1881,6 +1881,8 @@
     "item_tunnels": "Tunnel",
     "item_dams": "Staumauern",
     "item_railways": "Bahnstrecken",
+    "item_railwaysDisused": "Stillgelegte Strecken",
+    "item_railwaysAbandoned": "Aufgegebene Strecken",
     "item_buildings": "Gebäude",
     "item_sidewalks": "Gehwege und Bordsteine",
     "item_paths": "Fuß- und Radwege",

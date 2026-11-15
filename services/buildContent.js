@@ -45,7 +45,11 @@ export const CONTENT_GROUPS = [
     { id: 'tunnels', option: { includeTunnels: false } },
   ] },
   { id: 'railways', items: [
-    { id: 'railways', tags: ['railway=rail', 'railway=light_rail', 'railway=subway', 'railway=tram', 'railway=narrow_gauge', 'railway=monorail', 'railway=funicular'], option: { includeRailways: false } },
+    { id: 'railways', tags: ['railway=rail', 'railway=light_rail', 'railway=subway', 'railway=tram', 'railway=narrow_gauge', 'railway=monorail', 'railway=funicular', 'railway=preserved'], option: { includeRailways: false } },
+    // (lines no longer run, built as track like the rest: each its own row, so one can be left out.
+    // A disused line's rails mostly still lie there; an abandoned line's are mostly gone)
+    { id: 'railwaysDisused', tags: ['railway=disused'] },
+    { id: 'railwaysAbandoned', tags: ['railway=abandoned'] },
   ] },
   { id: 'buildings', items: [
     { id: 'buildings', option: { includeBuildings: false } },
@@ -99,7 +103,7 @@ const keepOnly = (ids) => CONTENT_IDS.filter((id) => !ids.includes(id));
 export const CONTENT_PRESETS = {
   all: [],
   clean: ['benches', 'bins', 'hydrants', 'poles', 'parkedCars', 'calming', 'gates'],
-  roads: keepOnly(['roadSurfaces', ...ROAD_CLASS_IDS, 'markings', 'crosswalks', 'signals', 'signs', 'lamps', 'calming', 'bridges', 'tunnels', 'dams', 'railways']),
+  roads: keepOnly(['roadSurfaces', ...ROAD_CLASS_IDS, 'markings', 'crosswalks', 'signals', 'signs', 'lamps', 'calming', 'bridges', 'tunnels', 'dams', 'railways', 'railwaysDisused', 'railwaysAbandoned']),
   scenery: keepOnly(['trees', 'groundCover', 'rocks', 'rivers', 'lakes', 'sea']),
 };
 export const PRESET_IDS = Object.keys(CONTENT_PRESETS);

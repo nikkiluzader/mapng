@@ -7960,7 +7960,7 @@ function buildDetailedReportSections(d) {
   const rw = d.railways?.stats;
   section('Railways');
   if (!rw) {
-    lines.push('- No railway built (none in the map data, or the structure solver off). Active railway=rail, light_rail, subway (above ground), tram, narrow_gauge, monorail and funicular lines are built; abandoned, disused, razed, construction and proposed ones are not.');
+    lines.push('- No railway built (none in the map data, or the structure solver off). Lines of railway=rail, light_rail, subway (above ground), tram, narrow_gauge, monorail and funicular are built, and disused, preserved and abandoned lines as the kind they were (each can be left out in What to build); razed, construction and proposed ones are not.');
   } else {
     lines.push('- Each line\'s height is solved with the roads (grade limits per kind: rail 2.5 %, narrow gauge and subway 4 %, light rail 6 %, tram 7 %, funicular none), bridges and tunnels from its tags and what it crosses; the track (rails, concrete or timber sleepers, gravel ballast) is laid on the solved profile, its formation shaped into the terrain.');
     lines.push(`- Lines: ${rw.lines}; track: ${formatNumber(rw.trackKm, 2)} km (every track of a multi-track line counted), ${rw.sleepers} sleepers, ${rw.triangles} triangles in ${d.railways.daes.length} object(s)`);

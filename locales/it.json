@@ -1881,6 +1881,8 @@
     "item_tunnels": "Gallerie",
     "item_dams": "Dighe",
     "item_railways": "Ferrovie",
+    "item_railwaysDisused": "Linee dismesse",
+    "item_railwaysAbandoned": "Linee abbandonate",
     "item_buildings": "Edifici",
     "item_sidewalks": "Marciapiedi e cordoli",
     "item_paths": "Percorsi pedonali e ciclabili",
