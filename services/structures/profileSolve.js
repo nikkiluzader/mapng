@@ -69,6 +69,10 @@ const FINE_SHORT_OVER_LONG = 1.3;
 // ... and not within this far of a bridge or tunnel joining the road: the ground there is the abutment's or the
 // portal's, cut away under the structure, and a road following it dived towards what its bridge crosses
 const FINE_CLEAR_OF_STRUCTURE_M = 60;
+// ... and a little steeper than the ground beside that, so a road lifted or cut down at a structure finds its ground
+// again: held to the ground's own slope on a hill it could never close the gap, and a main road lifted 1.8 m at a
+// small bridge stayed 1.8 m over the hillside for the 306 m to the map's edge
+const FINE_REJOIN = 0.02;
 // (nor a primary or secondary road: built to its grade, and where the survey shows more along its mapped line the
 // line is off the road, on the slope beside it)
 const MAIN_ROADS = new Set(['primary', 'primary_link', 'secondary', 'secondary_link']);
@@ -178,7 +182,7 @@ function allowedRise(e, structure = !!(e.bridge || e.tunnel), fine = false, stru
       || (structureAt?.[2] || []).some(([s0, s1]) => mid > s0 - FINE_CLEAR_OF_STRUCTURE_M && mid < s1 + FINE_CLEAR_OF_STRUCTURE_M))) {
       while (a3 + 1 < n && e.s[a3 + 1] <= mid - FINE_GRADE_M) a3++;
       while (b3 + 1 < n && e.s[b3] < mid + FINE_GRADE_M) b3++;
-      measured = Math.min(FINE_FOLLOW_MAX, Math.max(terrain, Math.min(slope(a3, b3, 8), terrain * FINE_SHORT_OVER_LONG)));
+      measured = Math.min(FINE_FOLLOW_MAX, Math.max(terrain, Math.min(slope(a3, b3, 8), terrain * FINE_SHORT_OVER_LONG)) + FINE_REJOIN);
     }
     // a hillside steeper than the class ceiling, as steep over +-HILLSIDE_M:
     // the road may run steeper than it, so a lift or cut near a structure
