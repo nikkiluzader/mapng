@@ -1,6 +1,6 @@
 # MapNG open items
 
-Written 2026-11-14. The working order of open work, most important first, and the test list for Mesh Roads.
+Written 2026-11-14, brought up to date 2026-11-15. The working order of open work, most important first, and the test list for Mesh Roads.
 The long backlog with every request and its history is kept outside the repo; this is the short list to work from.
 
 Rule for all road, junction, terrain and structure work: **draw it first.** A top view and long sections of the
@@ -9,14 +9,30 @@ alone have misled this work more than once. Tools are listed at the end.
 
 ## State of the branches
 
-As of 2026-11-14, late:
+As of 2026-11-15, evening:
 
-- `main` and desktop test build 0.3.1-dev.11: everything up to the Hero Roads work below (lane widths, pieces
-  joined, fewer nodes, baked on the first load), the Mesh Roads night, the lock button, the update notice on a
-  page older than the site, proposed roads and tunnels kept out of the painted texture.
-- `dev` since then, not on main and not in a test build: the buildings step of a very large map hands its
-  features to the workers in pieces (the real cause of a reported "Invalid string length"), and a full disk
-  during Generate or Export is said plainly.
+- `main` (7823057) and published 0.3.2 / test build 0.3.3-dev.3: lattice towers on high-voltage lines with roof
+  anchors, problem reports that never carry a key, plain reasons for two export failures.
+- `dev` since then, not on main and not in a test build: power towers mapped on their own, a tower's whole base
+  kept clear of bridge decks, no track on rail trails, `disused=tram` built as tram, survey-following roads
+  finding their ground again after a structure, every catalogue tag in the tag library, and the asset organiser
+  showing which way each model faces (the organiser lives outside the repo).
+
+## This week's list (2026-11-15)
+
+1. Hoover Dam towers beside the access road bridge: measured, 10.6 and 11.3 m from its centre line (about 3 m
+   clear of the deck), as mapped. The deck check now covers a tower's whole base. A close-up in game is owed.
+2. Benches turned to face the road: right in the model photos; a look in game is owed.
+3. Phantom rails in Poland (a BeamNG developer): no export report yet. A survey of three Polish areas from the
+   planet tiles (`scripts/planet/railSurvey.mjs`) found rail trails built as track and closed tram lines built as
+   main line; both fixed. Abandoned lines stay off by default; a settings code made before that default may
+   still switch them on.
+4. Asset catalogue: tag library complete (0 catalogue tags without an entry); front direction shown in the
+   organiser; **67 models still to be photographed again** (framed too small), in game.
+5. Power towers mapped on their own: done (no wires: there is no line to say where they go).
+6. "Every road follows the survey" on a steep main road: Trollstigen checked from the solved data (9 to 10%,
+   as the real road); a 306 m stretch held 1.8 m over the ground after a bridge fixed. In-game look owed.
+7. New mapped objects in the 2D preview: confirmed (hover shows "Bus stops", "Information boards").
 
 ### Hero Roads (experimental), 2026-11-14
 
@@ -124,18 +140,16 @@ Open, by how often it was measured:
 
 ## 2. Checks owed on work already on dev
 
-1. Poland's sheet joins and the reservoir rule: measured in the data only. Export that level and look in game.
-2. The source comparison in the desktop app: GPXZ answers reaching the generate job's download cache (written, not
-   run in the app), and the 8 km report size.
-3. The quality report on a dense city at 4 km, and with GPXZ or USGS included (only a foothill suburb was run).
-4. "Extremely heavy" card, the Mapterhorn base tile and the new size selector looked at in the running app.
-5. The new 3D model rows (Area, Tiles, Point spacing) in all seven languages.
-6. A sweep against the re-recorded baselines; Barcelona with shaping off (buried sidewalks 34 to 157) in game.
+1. "Extremely heavy" card, the Mapterhorn base tile and the new size selector looked at in the running app.
+2. The new 3D model rows (Area, Tiles, Point spacing) in all seven languages.
+
+(Poland's sheet joins and reservoirs in game, the quality report on a dense city, Barcelona with shaping off and
+the source comparison in the desktop app: looked at by the project owner, 2026-11-15.)
 
 ## 3. Release steps waiting on a go-ahead
 
-1. Push `dev` to `main` (the two fixes above).
-2. The next desktop test build, and a desktop release: people on 0.3.0 only get the very-large-map fix with one.
+1. Push `dev` to `main` after a clean sweep.
+2. The next desktop test build (0.3.3-dev.4) once this week's list is through.
 
 ## 4. Optimization pass (asked for, one item done)
 
