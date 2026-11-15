@@ -443,6 +443,10 @@ export const parseOverpassResponse = (data, bounds) => {
   for (const r of relations) {
     const tags = r.tags || {};
     if (tags.type === "route" || tags.type === "superroute") continue;
+    // (only a multipolygon is an area of its own. A waterway relation gathers a river's ways under its name: built
+    // from it, the ways' own tags were lost with them, and Bologna's Torrente Aposa, in a culvert under the old
+    // town, ran as an open stream across it. Its ways are built one by one, each with its own tags)
+    if (tags.type && tags.type !== "multipolygon") continue;
     const type = getFeatureType(tags);
     if (type && r.members) {
       const outerWays = r.members

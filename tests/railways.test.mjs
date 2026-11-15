@@ -176,3 +176,15 @@ test('a closed line\'s old kind said the older way (disused=tram) is that kind; 
   assert.equal(railKindOf({ railway: 'disused', highway: 'residential', 'disused:railway': 'tram' }), 'tram');
   assert.equal(railKindOf({ railway: 'rail', highway: 'service' }), 'rail');
 });
+
+test('a waterway relation is no feature of its own: its ways are built with their own tags (a stream in a culvert stays one)', () => {
+  const features = parseOverpassResponse({ elements: [
+    line(11, { waterway: 'stream', name: 'Brook', tunnel: 'culvert', layer: '-1' }, [[0.1, 0.4], [0.5, 0.4]]),
+    line(12, { waterway: 'stream', name: 'Brook' }, [[0.5, 0.4], [0.9, 0.4]]),
+    { type: 'relation', id: 99, tags: { type: 'waterway', waterway: 'stream', name: 'Brook' }, members: [{ type: 'way', ref: 11, role: '' }, { type: 'way', ref: 12, role: '' }] },
+  ] }, bounds);
+  const water = features.filter((f) => f.type === 'water');
+  assert.ok(!water.some((f) => String(f.id).startsWith('rel_')), 'nothing built from the relation');
+  assert.equal(water.length, 2);
+  assert.equal(water.find((f) => String(f.id).startsWith('11')).tags.tunnel, 'culvert');
+});
