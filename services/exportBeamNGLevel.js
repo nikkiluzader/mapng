@@ -8720,7 +8720,7 @@ function racesideWalls(osmFeatures, barriers) {
 /**
  * Resolve OSM barrier tags to one of the native BeamNG barrier asset presets.
  */
-function resolveNativeBarrierAsset(tags = {}, biome = null) {
+export function resolveNativeBarrierAsset(tags = {}, biome = null) {
   const barrierType = String(tags.barrier ?? '').trim().toLowerCase();
   const material = String(tags.material ?? '').trim().toLowerCase();
   const levelName = String(biome?.levelName ?? '').toLowerCase();
@@ -8774,10 +8774,13 @@ function resolveNativeBarrierAsset(tags = {}, biome = null) {
     return NATIVE_BARRIER_ASSETS.concrete;
   }
 
+  // (a line of concrete blocks across or along a road is concrete, not a garden fence)
+  if (barrierType === 'block') return NATIVE_BARRIER_ASSETS.concrete;
+  // (a wire-rope safety barrier runs along a road as a guard rail does)
+  if (barrierType === 'cable_barrier') return NATIVE_BARRIER_ASSETS.guardrail;
+
   if (
     barrierType === 'fence'
-    || barrierType === 'block'
-    || barrierType === 'cable_barrier'
     || barrierType === 'wire_fence'
     || barrierType === 'gate'
   ) {
@@ -8802,7 +8805,10 @@ function resolveNativeBarrierAsset(tags = {}, biome = null) {
     return NATIVE_BARRIER_ASSETS.chainLinkFence;
   }
 
-  return NATIVE_BARRIER_ASSETS.guardrail;
+  // A kind this list does not name is not built. It used to get a guard rail: a ditch, a log, a row of
+  // planters, a line of bollards and every barrier=yes (159,000 ways worldwide) stood in the level as
+  // a steel rail (found while drawing up the tag library, 2026-11-15). Nothing is better than the wrong thing.
+  return null;
 }
 
 /**
