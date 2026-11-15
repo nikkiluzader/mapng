@@ -6,7 +6,9 @@
  * Bump OVERPASS_QUERY_VERSION whenever the query changes: it is part of the
  * Worker's cache key, so stale answers to an old query are never served.
  */
-export const OVERPASS_QUERY_VERSION = 5;   // 2: traffic_calming nodes; 3: food, drink and lodging nodes; 4: railways; 5: disused, preserved and abandoned lines
+import { tagObjectNodeTags } from './tagModels.js';
+
+export const OVERPASS_QUERY_VERSION = 6;   // 2: traffic_calming nodes; 3: food, drink and lodging nodes; 4: railways; 5: disused, preserved and abandoned lines; 6: bus stops, post boxes, picnic tables, flagpoles, recycling, information boards
 
 // Public Overpass mirrors (volunteer-run; any of them may be down).
 export const OVERPASS_ENDPOINTS = [
@@ -97,6 +99,8 @@ export const OSM_FILTER = {
     ...GATE_BARRIERS.map((v) => ['barrier', v]),
     // what a building is used for, mapped as a point inside it (beamngBuildings: its look)
     ...BUSINESS_NODES,
+    // the mapped points a picked model is placed at (data/model-picks.json objects: services/tagModels.js)
+    ...tagObjectNodeTags(),
   ],
 };
 

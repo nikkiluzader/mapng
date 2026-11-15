@@ -869,13 +869,13 @@
    "count": 415000,
    "group": "furniture",
    "item": "postBoxes",
-   "status": "planned",
-   "fetched": false,
+   "status": "built",
+   "fetched": true,
    "builds": "A post box on the sidewalk",
    "assets": [
-    {"shape":"/levels/west_coast_usa/art/shapes/objects/postbox_blue.dae","region":"north-america","usedToday":false,"is":"A blue street collection box (American)","size":[0.6,0.6,1.6],"seen":"2026-11-15"},
+    {"shape":"/levels/west_coast_usa/art/shapes/objects/postbox_blue.dae","region":"north-america","usedToday":true,"is":"A blue street collection box (American)","size":[0.6,0.6,1.6],"seen":"2026-11-15","pick":1},
     {"shape":"/levels/italy/art/shapes/buildings/italy_clutter_mailbox.dae","region":"europe","usedToday":false,"is":"A small red post box, wall or post mounted (Italian)","size":[0.5,0.3,0.7],"seen":"2026-11-15","maybe":true},
-    {"shape":"/levels/italy/art/shapes/buildings/italy_clutter_mailboxstand.dae","region":"europe","usedToday":false},
+    {"shape":"/levels/italy/art/shapes/buildings/italy_clutter_mailboxstand.dae","region":"europe","usedToday":true,"pick":1},
     {"shape":"/levels/east_coast_usa/art/shapes/clutter/clutter_city_post.dae","region":"north-america","usedToday":false,"is":"Blue US mail collection box","from":"catalogue"}
    ],
    "properties": {
@@ -888,7 +888,8 @@
      "used": false
     }
    },
-   "note": "Whether s_postbox and italy_clutter_mailbox are public post boxes or private house mailboxes is unchecked"
+   "note": "Whether s_postbox and italy_clutter_mailbox are public post boxes or private house mailboxes is unchecked",
+   "code": "services/tagModels.js (data/model-picks.json)"
   },
   "amenity=recycling": {
    "what": "Recycling containers or a recycling centre",
@@ -899,13 +900,13 @@
    "count": 595000,
    "group": "furniture",
    "item": "bins",
-   "status": "planned",
-   "fetched": false,
+   "status": "built",
+   "fetched": true,
    "fetchedNote": "Areas are fetched; nodes (most of them) are not",
    "builds": "A row of recycling containers",
    "assets": [
-    {"shape":"/levels/italy/art/shapes/buildings/italy_clutter_sorting_bin.dae","region":"europe","usedToday":false},
-    {"shape":"/levels/Utah/art/shapes/buildings/ut_recycle_bin.dae","region":"north-america","usedToday":false},
+    {"shape":"/levels/italy/art/shapes/buildings/italy_clutter_sorting_bin.dae","region":"europe","usedToday":true,"pick":1},
+    {"shape":"/levels/Utah/art/shapes/buildings/ut_recycle_bin.dae","region":"north-america","usedToday":true,"pick":1},
     {"shape":"/levels/johnson_valley/art/shapes/misc/s_recyclebin_brown.dae","region":"north-america","usedToday":false},
     {"shape":"/levels/Utah/art/shapes/buildings/ut_recycle_bin_b.dae","region":"north-america","usedToday":false,"is":"Bear-proof metal bin cabinet, North America","from":"catalogue"}
    ],
@@ -919,7 +920,8 @@
      "used": false
     }
    },
-   "note": "Listed under Bins in buildContent.js, but nothing is built"
+   "note": "Listed under Bins in buildContent.js, but nothing is built",
+   "code": "services/tagModels.js (data/model-picks.json)"
   },
   "amenity=restaurant": {
    "what": "A restaurant",
@@ -3349,27 +3351,27 @@
    "count": 4220000,
    "group": "furniture",
    "item": "busStops",
-   "status": "planned",
-   "fetched": false,
+   "status": "built",
+   "fetched": true,
    "builds": "A shelter or a sign pole at the stop, facing the road",
    "assets": [
-    {"shape":"/levels/west_coast_usa/art/shapes/buildings/busstop_wca.dae","region":"north-america","setting":"city","usedToday":false,"is":"A small bus shelter","size":[1.4,4.1,3.1],"seen":"2026-11-15"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/busstop_wca.dae","region":"north-america","setting":"city","usedToday":true,"is":"A small bus shelter","size":[1.4,4.1,3.1],"seen":"2026-11-15","pick":1},
     {"shape":"/levels/east_coast_usa/art/shapes/buildings/busstop_eca.dae","region":"north-america","setting":"rural","usedToday":false},
-    {"shape":"/levels/italy/art/shapes/buildings/italy_city_busstop.dae","region":"europe","setting":"city","usedToday":false,"is":"A bus shelter with an advertising panel","size":[6.1,2.6,3.8],"seen":"2026-11-15"},
+    {"shape":"/levels/italy/art/shapes/buildings/italy_city_busstop.dae","region":"europe","setting":"city","usedToday":true,"is":"A bus shelter with an advertising panel","size":[6.1,2.6,3.8],"seen":"2026-11-15","pick":1},
     {"shape":"/levels/Utah/art/shapes/buildings/busstop_utah.dae","region":"north-america","setting":"desert","usedToday":false},
+    {"shape":"/art/shapes/objects/s_busstop_jri.dae","region":"any","usedToday":true,"is":"Small hut-style bus shelter","pick":1},
+    {"shape":"/art/shapes/objects/s_sign_busstop.dae","region":"any","usedToday":true,"is":"Bus stop sign pole","pick":1},
+    {"shape":"/levels/west_coast_usa/art/shapes/objects/busstop.dae","region":"north-america","usedToday":true,"is":"Glass bus shelter with bench","pick":1},
     {"shape":"/art/shapes/objects/s_busstop_ecu.dae","region":"any","usedToday":false,"is":"Glass bus shelter, curved roof","from":"catalogue"},
     {"shape":"/art/shapes/objects/s_busstop_it.dae","region":"any","usedToday":false,"is":"Green glass bus shelter, European","from":"catalogue"},
-    {"shape":"/art/shapes/objects/s_busstop_jri.dae","region":"any","usedToday":false,"is":"Small hut-style bus shelter","from":"catalogue"},
     {"shape":"/art/shapes/objects/s_busstop_utah.dae","region":"any","usedToday":false,"is":"Red-roofed bus shelter with seats","from":"catalogue"},
     {"shape":"/art/shapes/objects/s_busstop_wcu_01.dae","region":"any","usedToday":false,"is":"Open red-roofed bus shelter, one back panel","from":"catalogue"},
     {"shape":"/art/shapes/objects/s_busstop_wcu_02.dae","region":"any","usedToday":false,"is":"Open red-roofed bus shelter, one back panel","from":"catalogue"},
     {"shape":"/art/shapes/objects/s_busstop_wcu_04.dae","region":"any","usedToday":false,"is":"Bus stop timetable post","from":"catalogue"},
     {"shape":"/art/shapes/objects/s_busstop_wcu.dae","region":"any","usedToday":false,"is":"Red-roofed bus shelter with seats","from":"catalogue"},
-    {"shape":"/art/shapes/objects/s_sign_busstop.dae","region":"any","usedToday":false,"is":"Bus stop sign pole","from":"catalogue"},
     {"shape":"/levels/Utah/art/shapes/buildings/ut_busstop_old_sign.dae","region":"north-america","usedToday":false,"is":"Old round bus stop sign on pole","from":"catalogue"},
     {"shape":"/levels/Utah/art/shapes/buildings/ut_busstop_old.dae","region":"north-america","usedToday":false,"is":"Rustic wooden bus shelter","from":"catalogue"},
-    {"shape":"/levels/west_coast_usa/art/shapes/buildings/bussign.dae","region":"north-america","usedToday":false,"is":"Bus stop sign pole","from":"catalogue"},
-    {"shape":"/levels/west_coast_usa/art/shapes/objects/busstop.dae","region":"north-america","usedToday":false,"is":"Glass bus shelter with bench","from":"catalogue"}
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/bussign.dae","region":"north-america","usedToday":false,"is":"Bus stop sign pole","from":"catalogue"}
    ],
    "fallback": "Sign pole only (s_sign_busstop in shared art)",
    "properties": {
@@ -3389,7 +3391,8 @@
      "effect": "yes: a lamp at the stop",
      "used": false
     }
-   }
+   },
+   "code": "services/tagModels.js (data/model-picks.json)"
   },
   "highway=busway": {
    "what": "A road for buses only",
@@ -5588,13 +5591,13 @@
    "count": 510000,
    "group": "furniture",
    "item": "benches",
-   "status": "planned",
-   "fetched": false,
+   "status": "built",
+   "fetched": true,
    "builds": "A picnic table with benches",
    "assets": [
-    {"shape":"/levels/Utah/art/shapes/buildings/ut_picnic_table_a.dae","region":"north-america","setting":"rural","usedToday":false,"is":"A picnic table with benches","size":[2,1.4,0.9],"seen":"2026-11-15"},
+    {"shape":"/levels/Utah/art/shapes/buildings/ut_picnic_table_a.dae","region":"north-america","setting":"rural","usedToday":true,"is":"A picnic table with benches","size":[2,1.4,0.9],"seen":"2026-11-15","pick":1},
     {"shape":"/levels/Utah/art/shapes/buildings/ut_picnic_table_b.dae","region":"north-america","setting":"rural","usedToday":false},
-    {"shape":"/levels/italy/art/shapes/buildings/italy_clutter_pwood_table.dae","region":"europe","usedToday":false},
+    {"shape":"/levels/italy/art/shapes/buildings/italy_clutter_pwood_table.dae","region":"europe","usedToday":true,"pick":1},
     {"shape":"/levels/italy/art/shapes/buildings/italy_clutter_chesstable.dae","region":"europe","usedToday":false,"is":"Stone chess table with two seats, park furniture","from":"catalogue"},
     {"shape":"/levels/Utah/art/shapes/buildings/ut_BBQ_roof_a.dae","region":"north-america","usedToday":false,"is":"Roofed picnic shelter with table on a slab","from":"catalogue"}
    ],
@@ -5608,7 +5611,8 @@
      "used": false
     }
    },
-   "note": "Already listed under Benches in buildContent.js, but never fetched or built"
+   "note": "Already listed under Benches in buildContent.js, but never fetched or built",
+   "code": "services/tagModels.js (data/model-picks.json)"
   },
   "leisure=pitch": {
    "what": "A sports field or court",
@@ -5944,14 +5948,14 @@
     "node"
    ],
    "count": 213000,
-   "group": "landmarks",
+   "group": "furniture",
    "item": "flagpoles",
-   "status": "planned",
-   "fetched": false,
+   "status": "built",
+   "fetched": true,
    "builds": "A flagpole with a flag",
    "assets": [
     {"shape":"/levels/west_coast_usa/art/shapes/objects/flag_usa_anim.dae","region":"north-america","usedToday":false,"maybe":true},
-    {"shape":"/levels/Utah/art/shapes/buildings/flag_pole.dae","region":"north-america","usedToday":false},
+    {"shape":"/levels/Utah/art/shapes/buildings/flag_pole.dae","region":"north-america","usedToday":true,"pick":1},
     {"shape":"/levels/italy/art/shapes/buildings/italy_airport_flag.dae","region":"europe","usedToday":false},
     {"shape":"/levels/hirochi_raceway/art/shapes/objects/flag_hirochi.dae","region":"any","usedToday":false}
    ],
@@ -5969,7 +5973,8 @@
      "used": false
     }
    },
-   "note": "Only a US flag (and brand flags) ship; other countries would need a generated flag texture"
+   "note": "Only a US flag (and brand flags) ship; other countries would need a generated flag texture",
+   "code": "services/tagModels.js (data/model-picks.json)"
   },
   "man_made=fuel_pump": {
    "what": "A fuel pump",
@@ -8885,12 +8890,12 @@
    "count": 1540000,
    "group": "furniture",
    "item": "infoBoards",
-   "status": "planned",
-   "fetched": false,
+   "status": "built",
+   "fetched": true,
    "builds": "A board on posts or a guidepost",
    "assets": [
     {"shape":"/levels/Utah/art/shapes/clutter/ut_sign_tourism_map.dae","region":"north-america","usedToday":false},
-    {"shape":"/levels/Utah/art/shapes/clutter/ut_sign_tourism_1.dae","region":"north-america","usedToday":false},
+    {"shape":"/levels/Utah/art/shapes/clutter/ut_sign_tourism_1.dae","region":"north-america","usedToday":true,"pick":1},
     {"shape":"/levels/Utah/art/shapes/buildings/ranger_station_sign.dae","region":"north-america","usedToday":false,"maybe":true},
     {"shape":"/levels/Utah/art/shapes/buildings/ut_base_camp.dae","region":"north-america","usedToday":false,"is":"Flat-roofed camp building with deck, complete","from":"catalogue"},
     {"shape":"/levels/Utah/art/shapes/clutter/ut_sign_tourism_2.dae","region":"north-america","usedToday":false,"is":"Lectern information board on metal legs, text mentions Utah","from":"catalogue"},
@@ -8909,7 +8914,8 @@
      "used": false
     }
    },
-   "note": "The Utah tourism signs carry in-game texts"
+   "note": "The Utah tourism signs carry in-game texts",
+   "code": "services/tagModels.js (data/model-picks.json)"
   },
   "tourism=picnic_site": {
    "what": "A picnic site",

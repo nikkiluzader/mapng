@@ -1,9 +1,197 @@
 {
- "about": "The models MapNG places for an OSM tag, chosen from data/game-model-catalogue.json: per tag, per region of the world (any, north-america, europe, tropical), in order of preference; the first is the usual one, the rest are variety. And what is known of a model beyond the catalogue's own record: yaw, the degrees added to the direction it should face so its front looks that way (a bench's seat towards the road), and seen, the day it was looked at in the running game. scripts/tag-library/from-catalogue.mjs checks this file against the catalogue and writes data/tag-models.json, which the export reads (services/tagModels.js).",
+ "about": "The models MapNG places for an OSM tag, chosen from data/game-model-catalogue.json: per tag, per region of the world (any, north-america, europe, tropical), in order of preference; the first is the usual one, the rest are variety. A pick's key is the tag, or the tag and a variant after # (highway=bus_stop#shelter: the model for a stop with a shelter). And what is known of a model beyond the catalogue's own record: yaw, the degrees added to the direction it should face so its front looks that way (a bench's seat towards the road), and seen, the day it was looked at in the running game. scripts/tag-library/from-catalogue.mjs checks this file against the catalogue and writes data/tag-models.json, which the export reads (services/tagModels.js). objects: the mapped points the export places a picked model at, each a rule: tag (the OSM tag of the point), when / unless (other tags it must or must not have, a list of values each), pick (the key in picks), face (road: its front to the nearest road; along: its long side along the road; none), item (the What to build switch it belongs to), cap (the most placed in one level).",
  "models": {
-  "/levels/east_coast_usa/art/shapes/clutter/clutter_city_bench_wood.dae": { "yaw": -90, "note": "the seat's front is the model's +Y" }
+  "/levels/east_coast_usa/art/shapes/clutter/clutter_city_bench_wood.dae": {
+   "yaw": -90,
+   "note": "the seat's front is the model's +Y"
+  },
+  "/levels/west_coast_usa/art/shapes/objects/busstop.dae": {
+   "yaw": 0,
+   "note": "the open side is the model's +X (seen 2026-11-15, four sides photographed)"
+  },
+  "/levels/west_coast_usa/art/shapes/buildings/busstop_wca.dae": {
+   "yaw": 0,
+   "note": "the open side is the model's +X"
+  },
+  "/levels/italy/art/shapes/buildings/italy_city_busstop.dae": {
+   "yaw": 90,
+   "note": "the open side is the model's -Y"
+  },
+  "/art/shapes/objects/s_busstop_jri.dae": {
+   "yaw": 180,
+   "note": "the open side is the model's -X"
+  },
+  "/art/shapes/objects/s_sign_busstop.dae": {
+   "yaw": 180,
+   "note": "the timetable is on +X: it faces away from the road, to the footway"
+  },
+  "/levels/west_coast_usa/art/shapes/objects/postbox_blue.dae": {
+   "yaw": 0,
+   "note": "the door is on +X"
+  },
+  "/levels/italy/art/shapes/buildings/italy_clutter_mailboxstand.dae": {
+   "yaw": 90,
+   "note": "the slot is on -Y"
+  },
+  "/levels/Utah/art/shapes/buildings/ut_picnic_table_a.dae": {
+   "yaw": 90,
+   "note": "long along X: laid along the road"
+  },
+  "/levels/italy/art/shapes/buildings/italy_clutter_pwood_table.dae": {
+   "yaw": 90,
+   "note": "long along X: laid along the road"
+  },
+  "/levels/italy/art/shapes/buildings/italy_clutter_sorting_bin.dae": {
+   "yaw": 90,
+   "note": "the wheels are on +Y: the front is -Y"
+  },
+  "/levels/Utah/art/shapes/buildings/ut_recycle_bin.dae": {
+   "yaw": 90,
+   "note": "the labelled doors are on -Y"
+  },
+  "/levels/Utah/art/shapes/clutter/ut_sign_tourism_1.dae": {
+   "yaw": 90,
+   "note": "read from -Y"
+  }
  },
  "picks": {
-  "amenity=bench": { "any": ["/levels/east_coast_usa/art/shapes/clutter/clutter_city_bench_wood.dae"] }
+  "amenity=bench": {
+   "any": [
+    "/levels/east_coast_usa/art/shapes/clutter/clutter_city_bench_wood.dae"
+   ]
+  },
+  "highway=bus_stop#shelter": {
+   "any": [
+    "/levels/west_coast_usa/art/shapes/objects/busstop.dae"
+   ],
+   "north-america": [
+    "/levels/west_coast_usa/art/shapes/buildings/busstop_wca.dae",
+    "/levels/west_coast_usa/art/shapes/objects/busstop.dae"
+   ],
+   "europe": [
+    "/levels/italy/art/shapes/buildings/italy_city_busstop.dae"
+   ],
+   "tropical": [
+    "/art/shapes/objects/s_busstop_jri.dae"
+   ]
+  },
+  "highway=bus_stop": {
+   "any": [
+    "/art/shapes/objects/s_sign_busstop.dae"
+   ]
+  },
+  "amenity=post_box": {
+   "any": [
+    "/levels/italy/art/shapes/buildings/italy_clutter_mailboxstand.dae"
+   ],
+   "north-america": [
+    "/levels/west_coast_usa/art/shapes/objects/postbox_blue.dae"
+   ]
+  },
+  "leisure=picnic_table": {
+   "any": [
+    "/levels/Utah/art/shapes/buildings/ut_picnic_table_a.dae"
+   ],
+   "europe": [
+    "/levels/italy/art/shapes/buildings/italy_clutter_pwood_table.dae"
+   ]
+  },
+  "man_made=flagpole": {
+   "any": [
+    "/levels/Utah/art/shapes/buildings/flag_pole.dae"
+   ]
+  },
+  "amenity=recycling": {
+   "any": [
+    "/levels/italy/art/shapes/buildings/italy_clutter_sorting_bin.dae"
+   ],
+   "north-america": [
+    "/levels/Utah/art/shapes/buildings/ut_recycle_bin.dae"
+   ]
+  },
+  "tourism=information": {
+   "north-america": [
+    "/levels/Utah/art/shapes/clutter/ut_sign_tourism_1.dae"
+   ]
+  }
+ },
+ "objects": {
+  "busShelter": {
+   "tag": "highway=bus_stop",
+   "when": {
+    "shelter": [
+     "yes"
+    ]
+   },
+   "pick": "highway=bus_stop#shelter",
+   "face": "road",
+   "item": "busStops",
+   "cap": 2000,
+   "beside": 1.6
+  },
+  "busStopSign": {
+   "tag": "highway=bus_stop",
+   "unless": {
+    "shelter": [
+     "yes"
+    ]
+   },
+   "pick": "highway=bus_stop",
+   "face": "road",
+   "item": "busStops",
+   "cap": 4000,
+   "beside": 0.8
+  },
+  "postBox": {
+   "tag": "amenity=post_box",
+   "pick": "amenity=post_box",
+   "face": "road",
+   "item": "postBoxes",
+   "cap": 2000,
+   "beside": 0.8
+  },
+  "picnicTable": {
+   "tag": "leisure=picnic_table",
+   "pick": "leisure=picnic_table",
+   "face": "road",
+   "item": "benches",
+   "cap": 3000,
+   "beside": 1.5
+  },
+  "flagpole": {
+   "tag": "man_made=flagpole",
+   "pick": "man_made=flagpole",
+   "face": "none",
+   "item": "flagpoles",
+   "cap": 2000,
+   "beside": 0.8
+  },
+  "recyclingBin": {
+   "tag": "amenity=recycling",
+   "unless": {
+    "recycling_type": [
+     "centre"
+    ]
+   },
+   "pick": "amenity=recycling",
+   "face": "road",
+   "item": "bins",
+   "cap": 3000,
+   "beside": 0.9
+  },
+  "infoBoard": {
+   "tag": "tourism=information",
+   "when": {
+    "information": [
+     "board",
+     "map"
+    ]
+   },
+   "pick": "tourism=information",
+   "face": "road",
+   "item": "infoBoards",
+   "cap": 2000,
+   "beside": 1.0
+  }
  }
 }

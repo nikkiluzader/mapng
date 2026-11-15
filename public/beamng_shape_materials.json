@@ -7686,6 +7686,110 @@
     }
   },
   "tag_models": {
+    "architraves": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/trim/concrete/architraves_trim/t_architraves_ao.data.png",
+          "baseColorMap": "/assets/materials/trim/concrete/architraves_trim/t_architraves_b.color.png",
+          "detailAoMapStrength": 0,
+          "detailBaseColorMapStrength": 0.200000003,
+          "detailNormalMap": "/assets/materials/breakup/t_detail_concrete_02/t_detail_concrete_02_nm.normal.png",
+          "detailNormalMapStrength": 0.5,
+          "detailScale": [
+            3,
+            6
+          ],
+          "normalMap": "/assets/materials/trim/concrete/architraves_trim/t_architraves_nm.normal.png",
+          "pixelSpecular": true,
+          "roughnessMap": "/assets/materials/trim/concrete/architraves_trim/t_architraves_r.data.png",
+          "vertColor": true
+        },
+        {
+          "detailAoMapStrength": null,
+          "detailBaseColorMapStrength": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "pixelSpecular": null,
+          "vertColor": null
+        },
+        {
+          "detailAoMapStrength": null,
+          "detailBaseColorMapStrength": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "pixelSpecular": null,
+          "vertColor": null
+        },
+        {
+          "detailAoMapStrength": null,
+          "detailBaseColorMapStrength": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "pixelSpecular": null,
+          "vertColor": null
+        }
+      ],
+      "alphaRef": 0,
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "mapTo": "architraves",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "name": "architraves",
+      "persistentId": "85c40c54-00d4-4657-9247-1c9af47b18ab",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
+    "busstop": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/atlas/busstop/busstop_d.dds",
+          "normalMap": "/assets/materials/atlas/busstop/busstop_n.dds",
+          "pixelSpecular": true,
+          "reflectivityMap": "/assets/materials/atlas/busstop/busstop_r.dds",
+          "roughnessFactor": 0.607767701,
+          "specularMap": "/assets/materials/atlas/busstop/busstop_s.dds",
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {},
+        {},
+        {}
+      ],
+      "alphaRef": 64,
+      "alphaTest": true,
+      "annotation": "OBSTACLES",
+      "class": "Material",
+      "cubemap": "global_cubemap_metalblurred",
+      "mapTo": "busstop",
+      "name": "busstop",
+      "persistentId": "583e1976-98e2-4cb3-8e90-f326e0519fda",
+      "translucentBlendOp": "None"
+    },
+    "busstop_windows": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/atlas/busstop/busstop_d.dds",
+          "normalMap": "/assets/materials/atlas/busstop/busstop_n.dds",
+          "pixelSpecular": true,
+          "reflectivityMap": "/assets/materials/atlas/busstop/busstop_r.dds",
+          "roughnessFactor": 0.607767701,
+          "specularMap": "/assets/materials/atlas/busstop/busstop_s.dds",
+          "useAnisotropic": true
+        },
+        {},
+        {},
+        {}
+      ],
+      "alphaRef": 64,
+      "class": "Material",
+      "cubemap": "global_cubemap_metalblurred",
+      "mapTo": "busstop_windows",
+      "name": "busstop_windows",
+      "persistentId": "62f96886-67ca-4c63-943d-fb9e23240c73",
+      "translucent": true,
+      "translucentZWrite": true
+    },
     "eca_bld_cleanmetal": {
       "Stages": [
         {
@@ -7735,6 +7839,54 @@
       "persistentId": "f74c972d-e96b-4e13-9f3f-524f25dc4813",
       "translucentBlendOp": "None"
     },
+    "eca_bld_metaltrim": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/trim/metal/eca_bld_metaltrim/eca_bld_metal_trim_d.dds",
+          "detailMap": "/assets/materials/trim/metal/eca_bld_metaltrim/eca_grungewood_b.dds",
+          "detailScale": [
+            0.200000003,
+            0.200000003
+          ],
+          "normalMap": "/assets/materials/trim/metal/eca_bld_metaltrim/eca_bld_metal_trim_n.dds",
+          "pixelSpecular": true,
+          "reflectivityMap": "/assets/materials/trim/metal/eca_bld_metaltrim/eca_bld_metal_trim_r.dds",
+          "specularMap": "/assets/materials/trim/metal/eca_bld_metaltrim/eca_bld_metal_trim_s.dds",
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {
+          "detailScale": null,
+          "pixelSpecular": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "detailScale": null,
+          "pixelSpecular": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "detailScale": null,
+          "pixelSpecular": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        }
+      ],
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "dynamicCubemap": true,
+      "groundType": "METAL",
+      "mapTo": "eca_bld_metaltrim",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "materialTag2": "east_coast_usa",
+      "name": "eca_bld_metaltrim",
+      "persistentId": "7ef7b0b0-2102-4ebb-a86b-0f6ee1d5e54c",
+      "specularStrength0": "0.588235",
+      "translucentBlendOp": "None"
+    },
     "eca_bld_wood": {
       "Stages": [
         {
@@ -7760,6 +7912,684 @@
       "persistentId": "3b7d34ad-4b02-4c3f-8fb9-26ff0c34cb70",
       "translucentBlendOp": "None"
     },
+    "eca_genericsigns": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/billboard_label/eca_genericsigns/t_eca_genericsigns_ao.data.png",
+          "baseColorMap": "/assets/materials/billboard_label/eca_genericsigns/t_eca_genericsigns_b.color.png",
+          "normalMap": "/assets/materials/billboard_label/eca_genericsigns/t_eca_genericsigns_nm.normal.png",
+          "opacityMap": "/assets/materials/billboard_label/eca_genericsigns/t_eca_genericsigns_o.data.png",
+          "roughnessMap": "/assets/materials/billboard_label/eca_genericsigns/t_eca_genericsigns_r.data.png",
+          "specular": [
+            0.988234997,
+            0.988234997,
+            0.988234997,
+            1
+          ],
+          "vertColor": true
+        },
+        {
+          "specular": null,
+          "vertColor": true
+        },
+        {
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "specular": null,
+          "vertColor": null
+        }
+      ],
+      "alphaRef": 60,
+      "alphaTest": true,
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "doubleSided": true,
+      "groundType": "METAL",
+      "mapTo": "eca_genericsigns",
+      "materialTag0": "beamng",
+      "materialTag1": "east_coast_usa",
+      "name": "eca_genericsigns",
+      "persistentId": "5580c6d9-520d-4aad-9a9e-fdb8916a3ad6",
+      "specularStrength0": "0.784314",
+      "translucentZWrite": true,
+      "version": 1.5
+    },
+    "ind_concrete": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/tileable/concrete/ind_concrete/t_ind_concrete_ao.data.png",
+          "ambientOcclusionMapUseUV": null,
+          "baseColorFactor": [
+            0.992156923,
+            0.992156923,
+            0.992156923,
+            1
+          ],
+          "baseColorMap": "/assets/materials/tileable/concrete/ind_concrete/t_ind_concrete_b.color.png",
+          "detailScale": [
+            0.150000006,
+            0.150000006
+          ],
+          "diffuseMapUseUV": null,
+          "normalMap": "/assets/materials/tileable/concrete/ind_concrete/t_ind_concrete_nm.normal.png",
+          "opacityMapUseUV": null,
+          "roughnessMap": "/assets/materials/tileable/concrete/ind_concrete/t_ind_concrete_r.data.png",
+          "roughnessMapUseUV": null,
+          "specular": [
+            0.996078014,
+            0.996078014,
+            0.996078014,
+            1
+          ],
+          "vertColor": true
+        },
+        {
+          "ambientOcclusionMapUseUV": 1,
+          "baseColorFactor": null,
+          "baseColorMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_b.color.png",
+          "detailScale": null,
+          "diffuseMapUseUV": 1,
+          "opacityMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_o.data.png",
+          "opacityMapUseUV": 1,
+          "roughnessMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_r.data.png",
+          "roughnessMapUseUV": 1,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "ambientOcclusionMapUseUV": null,
+          "baseColorFactor": null,
+          "detailScale": null,
+          "diffuseMapUseUV": null,
+          "opacityMapUseUV": null,
+          "roughnessMapUseUV": null,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "ambientOcclusionMapUseUV": null,
+          "baseColorFactor": null,
+          "detailScale": null,
+          "diffuseMapUseUV": null,
+          "opacityMapUseUV": null,
+          "roughnessMapUseUV": null,
+          "specular": null,
+          "vertColor": null
+        }
+      ],
+      "activeLayers": 2,
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "groundType": "ASPHALT_OLD",
+      "mapTo": "ind_concrete",
+      "materialTag0": "beamng",
+      "materialTag1": "beamng",
+      "materialTag2": "Industrial",
+      "materialTag3": "vegetation",
+      "materialTag4": "east_coast_usa",
+      "name": "ind_concrete",
+      "persistentId": "2ecf1b1b-a360-4423-ac8c-a511f1decfca",
+      "specularStrength0": "0.3",
+      "specularStrength1": "0.2",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
+    "ind_wood_trim": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/trim/wood/ind_wood_trim/t_ind_wood_trim_ao.data.png",
+          "baseColorFactor": [
+            0.992156923,
+            0.992156923,
+            0.992156923,
+            1
+          ],
+          "baseColorMap": "/assets/materials/trim/wood/ind_wood_trim/t_ind_wood_trim_b.color.png",
+          "detailScale": [
+            0.150000006,
+            0.150000006
+          ],
+          "normalMap": "/assets/materials/trim/wood/ind_wood_trim/t_ind_wood_trim_nm.normal.png",
+          "roughnessMap": "/assets/materials/trim/wood/ind_wood_trim/t_ind_wood_trim_r.data.png",
+          "specular": [
+            0.996078014,
+            0.996078014,
+            0.996078014,
+            1
+          ],
+          "vertColor": true
+        },
+        {
+          "baseColorFactor": null,
+          "detailScale": null,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "baseColorFactor": null,
+          "detailScale": null,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "baseColorFactor": null,
+          "detailScale": null,
+          "specular": null,
+          "vertColor": null
+        }
+      ],
+      "annotation": "NATURE",
+      "class": "Material",
+      "doubleSided": true,
+      "groundType": "ASPHALT_OLD",
+      "mapTo": "ind_wood_trim",
+      "materialTag0": "beamng",
+      "materialTag1": "beamng",
+      "materialTag2": "Industrial",
+      "materialTag3": "vegetation",
+      "materialTag4": "east_coast_usa",
+      "name": "ind_wood_trim",
+      "persistentId": "573ec0d9-a2e2-4109-a820-71bba1ef417e",
+      "specularStrength0": "0.3",
+      "specularStrength1": "0.2",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
+    "industrial": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/baked_props/t_industrial/t_industrial_ao.data.png",
+          "baseColorMap": "/assets/materials/baked_props/t_industrial/t_industrial_b.color.png",
+          "metallicFactor": 0.600000024,
+          "metallicMap": "/assets/materials/baked_props/t_industrial/t_industrial_m.data.png",
+          "normalMap": "/assets/materials/baked_props/t_industrial/t_industrial_nm.normal.png",
+          "opacityMap": "/assets/materials/baked_props/t_industrial/t_industrial_o.data.png",
+          "pixelSpecular": true,
+          "roughnessMap": "/assets/materials/baked_props/t_industrial/t_industrial_r.data.png",
+          "vertColor": true
+        },
+        {
+          "metallicFactor": null,
+          "pixelSpecular": null,
+          "vertColor": null
+        },
+        {
+          "metallicFactor": null,
+          "pixelSpecular": null,
+          "vertColor": null
+        },
+        {
+          "metallicFactor": null,
+          "pixelSpecular": null,
+          "vertColor": null
+        }
+      ],
+      "alphaRef": 127,
+      "alphaTest": true,
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "doubleSided": true,
+      "dynamicCubemap": true,
+      "groundType": "METAL",
+      "invertBackFaceNormals": true,
+      "mapTo": "industrial",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "name": "industrial",
+      "persistentId": "16b8fab9-d948-47a6-bd21-a30afbff6ca3",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
+    "industrial_trim": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/trim/metal/industrial_trim/t_trim_industrial_ao.data.dds",
+          "baseColorMap": "/assets/materials/trim/metal/industrial_trim/t_trim_industrial_b.color.png",
+          "metallicFactor": 0.800000012,
+          "metallicMap": "/assets/materials/trim/metal/industrial_trim/t_trim_industrial_m.data.png",
+          "normalMap": "/assets/materials/trim/metal/industrial_trim/t_trim_industrial_nm.normal.png",
+          "opacityMap": "/assets/materials/trim/metal/industrial_trim/t_trim_industrial_o.data.png",
+          "pixelSpecular": true,
+          "roughnessFactor": 0.607767701,
+          "roughnessMap": "/assets/materials/trim/metal/industrial_trim/t_trim_industrial_r.data.png",
+          "vertColor": true
+        },
+        {
+          "metallicFactor": null,
+          "pixelSpecular": null,
+          "roughnessFactor": null,
+          "vertColor": null
+        },
+        {
+          "metallicFactor": null,
+          "pixelSpecular": null,
+          "roughnessFactor": null,
+          "vertColor": null
+        },
+        {
+          "metallicFactor": null,
+          "pixelSpecular": null,
+          "roughnessFactor": null,
+          "vertColor": null
+        }
+      ],
+      "alphaRef": 127,
+      "alphaTest": true,
+      "annotation": "OBSTACLES",
+      "class": "Material",
+      "doubleSided": true,
+      "dynamicCubemap": true,
+      "groundType": "METAL",
+      "invertBackFaceNormals": true,
+      "mapTo": "industrial_trim",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "name": "industrial_trim",
+      "persistentId": "727db393-b9f7-4fd6-83ef-40fb3264e131",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
+    "italy_bld_ind_windows": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/trim/plastic/italy_bld_ind_windows/Italy_bld_ind_windows_d.dds",
+          "detailNormalMapStrength": 0.5,
+          "detailScale": [
+            8,
+            8
+          ],
+          "diffuseColor": [
+            0.996078014,
+            0.996078014,
+            0.996078014,
+            0.867999971
+          ],
+          "normalMap": "/assets/materials/trim/plastic/italy_bld_ind_windows/Italy_bld_ind_windows_n.dds",
+          "reflectivityMap": "/assets/materials/trim/plastic/italy_bld_ind_windows/Italy_bld_ind_windows_r.dds",
+          "roughnessFactor": 0.690170348,
+          "specular": [
+            0.996078014,
+            0.996078014,
+            0.996078014,
+            1
+          ],
+          "specularMap": "/assets/materials/trim/plastic/italy_bld_ind_windows/Italy_bld_ind_windows_s.dds",
+          "vertColor": true
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "vertColor": null
+        }
+      ],
+      "alphaRef": 197,
+      "alphaTest": true,
+      "class": "Material",
+      "dynamicCubemap": true,
+      "groundType": "PLASTIC",
+      "mapTo": "Italy_bld_ind_windows",
+      "materialTag0": "beamng",
+      "materialTag1": "italy",
+      "name": "italy_bld_ind_windows",
+      "persistentId": "18209761-a1b1-42ea-8047-f65f67e56056",
+      "specularStrength0": "0.490196"
+    },
+    "italy_bld_metal": {
+      "Stages": [
+        {
+          "baseColorFactor": [
+            0.996078014,
+            0.996078014,
+            0.996078014,
+            0.074000001
+          ],
+          "baseColorMap": "/assets/materials/tileable/metal/italy_bld_metal/t_italy_bld_metal_b.color.png",
+          "detailNormalMapStrength": 0.5,
+          "detailScale": [
+            1,
+            1
+          ],
+          "metallicFactor": 0.200000003,
+          "normalMap": "/assets/materials/tileable/metal/italy_bld_metal/t_italy_bld_metal_nm.normal.png",
+          "roughnessMap": "/assets/materials/tileable/metal/italy_bld_metal/t_italy_bld_metal_r.data.png",
+          "specular": [
+            0.996078014,
+            0.996078014,
+            0.996078014,
+            1
+          ],
+          "vertColor": true
+        },
+        {
+          "baseColorFactor": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "metallicFactor": null,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "baseColorFactor": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "metallicFactor": null,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "baseColorFactor": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "metallicFactor": null,
+          "specular": null,
+          "vertColor": null
+        }
+      ],
+      "alphaRef": 0,
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "doubleSided": true,
+      "dynamicCubemap": true,
+      "groundType": "METAL",
+      "mapTo": "italy_bld_metal",
+      "materialTag0": "beamng",
+      "materialTag1": "italy",
+      "name": "italy_bld_metal",
+      "persistentId": "6919d035-1fff-49a6-a29d-d31038008aa0",
+      "specularStrength0": "0.490196",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
+    "italy_curb_concrete": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/trim/concrete/italy_curb_concrete/italy_curb_concrete_d.dds",
+          "detailScale": [
+            6,
+            6
+          ],
+          "normalMap": "/assets/materials/trim/concrete/italy_curb_concrete/italy_curb_concrete_n.dds",
+          "specularMap": "/assets/materials/trim/concrete/italy_curb_concrete/italy_curb_concrete_s.dds",
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {},
+        {},
+        {}
+      ],
+      "annotation": "SIDEWALK",
+      "class": "Material",
+      "groundType": "ASPHALT_OLD",
+      "mapTo": "italy_curb_concrete",
+      "materialTag0": "beamng",
+      "materialTag1": "italy",
+      "name": "italy_curb_concrete",
+      "persistentId": "e2ef0c7a-3e38-4689-962c-cf8a8de05200",
+      "translucentBlendOp": "None"
+    },
+    "italy_guardrails": {
+      "Stages": [
+        {
+          "baseColorMap": "/assets/materials/trim/metal/m_italy_guardrails/t_italy_guardrails_b.color.png",
+          "detailScale": [
+            6,
+            6
+          ],
+          "metallicFactor": 0.75,
+          "metallicMap": "/assets/materials/trim/metal/m_italy_guardrails/t_italy_guardrails_m.data.png",
+          "normalMap": "/assets/materials/trim/metal/m_italy_guardrails/t_italy_guardrails_nm.normal.png",
+          "roughnessMap": "/assets/materials/trim/metal/m_italy_guardrails/t_italy_guardrails_r.data.png",
+          "vertColor": true
+        },
+        {
+          "detailScale": null,
+          "metallicFactor": null,
+          "vertColor": true
+        },
+        {
+          "detailScale": null,
+          "metallicFactor": null,
+          "vertColor": null
+        },
+        {
+          "detailScale": null,
+          "metallicFactor": null,
+          "vertColor": null
+        }
+      ],
+      "annotation": "GUARD_RAIL",
+      "class": "Material",
+      "dynamicCubemap": true,
+      "groundType": "METAL",
+      "mapTo": "italy_guardrails",
+      "materialTag0": "beamng",
+      "materialTag1": "italy",
+      "name": "italy_guardrails",
+      "persistentId": "c11fd14b-8569-4389-8faa-502379c8dbab",
+      "specularStrength0": "0.490196",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
+    "italy_plastic": {
+      "Stages": [
+        {
+          "baseColorFactor": [
+            1,
+            0.999989986,
+            0.999989986,
+            1
+          ],
+          "baseColorMap": "/assets/materials/tileable/plastic/italy_plastic/t_italy_plastic_b.color.png",
+          "detailNormalMapStrength": 0.5,
+          "detailScale": [
+            0.200000003,
+            0.200000003
+          ],
+          "instanceDiffuse": true,
+          "normalMap": "/assets/materials/tileable/plastic/italy_plastic/t_italy_plastic_nm.normal.png",
+          "pixelSpecular": true,
+          "roughnessMap": "/assets/materials/tileable/plastic/italy_plastic/t_italy_plastic_r.data.png",
+          "specular": [
+            0.382995993,
+            0.382991999,
+            0.382991999,
+            1
+          ],
+          "vertColor": true
+        },
+        {
+          "baseColorFactor": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "instanceDiffuse": null,
+          "pixelSpecular": null,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "baseColorFactor": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "instanceDiffuse": null,
+          "pixelSpecular": null,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "baseColorFactor": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "instanceDiffuse": null,
+          "pixelSpecular": null,
+          "specular": null,
+          "vertColor": null
+        }
+      ],
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "groundType": "PLASTIC",
+      "mapTo": "italy_plastic",
+      "materialTag0": "beamng",
+      "materialTag1": "italy",
+      "name": "italy_plastic",
+      "persistentId": "b99d83b8-4e4d-489d-a81c-fcd610d76b40",
+      "specularStrength0": "0.490196",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
+    "italy_plastic_trim": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/trim/plastic/italy_plastic_trim/italy_plastic_trim_d.dds",
+          "detailNormalMapStrength": 0.5,
+          "detailScale": [
+            0.200000003,
+            0.200000003
+          ],
+          "instanceDiffuse": true,
+          "normalMap": "/assets/materials/trim/plastic/italy_plastic_trim/italy_plastic_trim_n.dds",
+          "roughnessFactor": 0.690170288,
+          "specular": [
+            0.996078014,
+            0.996078014,
+            0.996078014,
+            1
+          ],
+          "specularMap": "/assets/materials/trim/plastic/italy_plastic_trim/italy_plastic_trim_s.dds",
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "instanceDiffuse": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "instanceDiffuse": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "instanceDiffuse": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        }
+      ],
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "groundType": "SOFT_COLLISION_GENERAL",
+      "mapTo": "italy_plastic_trim",
+      "materialTag0": "beamng",
+      "materialTag1": "italy",
+      "name": "italy_plastic_trim",
+      "persistentId": "4c6a614f-7f1b-4ca8-b129-4a53f00f0974",
+      "specularStrength0": "0.490196",
+      "translucentBlendOp": "None"
+    },
+    "italy_road_signs": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/signage/italy_road_signs/italy_road_signs.dds",
+          "detailNormalMapStrength": 0.5,
+          "detailScale": [
+            80,
+            80
+          ],
+          "diffuseColor": [
+            0.996078014,
+            0.996078014,
+            0.996078014,
+            0.867999971
+          ],
+          "roughnessFactor": 0.638332963,
+          "specular": [
+            0.996078014,
+            0.996078014,
+            0.996078014,
+            1
+          ],
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        }
+      ],
+      "alphaRef": 100,
+      "alphaTest": true,
+      "annotation": "TRAFFIC_SIGNS",
+      "castShadows": false,
+      "class": "Material",
+      "groundType": "METAL",
+      "mapTo": "italy_road_signs",
+      "materialTag0": "beamng",
+      "materialTag1": "italy",
+      "materialTag2": "east_coast_usa",
+      "name": "italy_road_signs",
+      "persistentId": "5a028931-65f2-4d6a-b378-62b56f89de67",
+      "specularColor0": "0.1 0.1 0.1 0.1",
+      "specularStrength0": "0.490196",
+      "translucent": true,
+      "translucentRecvShadows": true,
+      "translucentZWrite": true
+    },
     "lod_vertcol": {
       "Stages": [
         {
@@ -7783,6 +8613,578 @@
       "name": "lod_vertcol",
       "persistentId": "3122f280-003f-419e-ba18-ba85683d01ed",
       "translucentBlendOp": "None"
+    },
+    "m_billboardsigns_dealers": {
+      "Stages": [
+        {
+          "baseColorMap": "/assets/materials/atlas/m_billboardsigns_dealers/t_billboardsigns_dealers_b.color.png",
+          "opacityMap": "/assets/materials/atlas/m_billboardsigns_dealers/t_billboardsigns_dealers_o.data.png",
+          "vertColor": true
+        },
+        {
+          "vertColor": null
+        },
+        {
+          "vertColor": null
+        },
+        {
+          "vertColor": null
+        }
+      ],
+      "alphaRef": 128,
+      "alphaTest": true,
+      "annotation": "OBSTACLES",
+      "class": "Material",
+      "doubleSided": true,
+      "invertBackFaceNormals": true,
+      "mapTo": "m_billboardsigns_dealers",
+      "name": "m_billboardsigns_dealers",
+      "persistentId": "8da9f0e3-2e03-4c56-92b9-b7fad479facf",
+      "version": 1.5
+    },
+    "m_bus_routes_jri": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/billboard_label/m_bus_routes_jri/t_bus_routes_jri_d.color.png",
+          "vertColor": true
+        },
+        {
+          "vertColor": null
+        },
+        {
+          "vertColor": null
+        },
+        {
+          "vertColor": null
+        }
+      ],
+      "class": "Material",
+      "mapTo": "m_bus_routes_jri",
+      "name": "m_bus_routes_jri"
+    },
+    "m_plastic_01": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/tileable/plastic/m_plastic_01/t_plastic_01_ao.data.png",
+          "baseColorMap": "/assets/materials/tileable/plastic/m_plastic_01/t_plastic_01_b.color.png",
+          "normalMap": "/assets/materials/tileable/plastic/m_plastic_01/t_plastic_01_nm.normal.png",
+          "roughnessFactor": 0.223000005,
+          "roughnessMap": "/assets/materials/tileable/plastic/m_plastic_01/t_plastic_01_r.data.png",
+          "vertColor": true
+        },
+        {
+          "roughnessFactor": null,
+          "vertColor": null
+        },
+        {
+          "roughnessFactor": null,
+          "vertColor": null
+        },
+        {
+          "roughnessFactor": null,
+          "vertColor": null
+        }
+      ],
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "doubleSided": true,
+      "groundType": "PLASTIC",
+      "invertBackFaceNormals": true,
+      "mapTo": "m_plastic_01",
+      "name": "m_plastic_01",
+      "persistentId": "d3692c15-36ad-4eed-959d-e698491c355d",
+      "version": 1.5
+    },
+    "m_plastic_trim": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/trim/plastic/m_plastic_trim/t_plastic_trim_01_ao.data.png",
+          "baseColorMap": "/assets/materials/trim/plastic/m_plastic_trim/t_plastic_trim_01_b.color.png",
+          "diffuseMapUseUV": null,
+          "normalMap": "/assets/materials/trim/plastic/m_plastic_trim/t_plastic_trim_01_nm.normal.png",
+          "opacityMap": "/assets/materials/trim/plastic/m_plastic_trim/t_plastic_trim_01_o.data.png",
+          "opacityMapUseUV": null,
+          "pixelSpecular": true,
+          "roughnessMap": "/assets/materials/trim/plastic/m_plastic_trim/t_plastic_trim_01_r.data.png",
+          "roughnessMapUseUV": null,
+          "vertColor": true
+        },
+        {
+          "baseColorMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_b.color.png",
+          "diffuseMapUseUV": 1,
+          "opacityMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_o.data.png",
+          "opacityMapUseUV": 1,
+          "pixelSpecular": null,
+          "roughnessMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_r.data.png",
+          "roughnessMapUseUV": 1,
+          "vertColor": null
+        },
+        {
+          "diffuseMapUseUV": null,
+          "opacityMapUseUV": null,
+          "pixelSpecular": null,
+          "roughnessMapUseUV": null,
+          "vertColor": null
+        },
+        {
+          "diffuseMapUseUV": null,
+          "opacityMapUseUV": null,
+          "pixelSpecular": null,
+          "roughnessMapUseUV": null,
+          "vertColor": null
+        }
+      ],
+      "activeLayers": 2,
+      "alphaRef": 70,
+      "alphaTest": true,
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "mapTo": "m_plastic_trim",
+      "name": "m_plastic_trim",
+      "persistentId": "58af4fda-ddc7-45c0-9fd1-1cd95ff9a327",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
+    "m_sign_busstop": {
+      "Stages": [
+        {
+          "baseColorMap": "/assets/materials/signage/m_sign_busstop/t_sign_busstop_b.color.png",
+          "opacityMap": "/assets/materials/signage/m_sign_busstop/t_sign_busstop_o.data.png"
+        },
+        {},
+        {},
+        {}
+      ],
+      "alphaTest": true,
+      "class": "Material",
+      "mapTo": "m_sign_busstop",
+      "name": "m_sign_busstop",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
+    "m_wall_damage_trim_01": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/trim/concrete/m_wall_damage_trim_01/t_wall_damage_trim_01_ao.data.png",
+          "baseColorMap": "/assets/materials/trim/concrete/m_wall_damage_trim_01/t_wall_damage_trim_01_b.color.png",
+          "normalMap": "/assets/materials/trim/concrete/m_wall_damage_trim_01/t_wall_damage_trim_01_nm.normal.png",
+          "opacityMap": "/assets/materials/trim/concrete/m_wall_damage_trim_01/t_wall_damage_trim_01_o.data.png",
+          "roughnessMap": "/assets/materials/trim/concrete/m_wall_damage_trim_01/t_wall_damage_trim_01_r.data.png",
+          "vertColor": true
+        },
+        {
+          "vertColor": null
+        },
+        {
+          "vertColor": null
+        },
+        {
+          "vertColor": null
+        }
+      ],
+      "alphaRef": 0,
+      "alphaTest": true,
+      "class": "Material",
+      "mapTo": "m_wall_damage_trim_01",
+      "name": "m_wall_damage_trim_01",
+      "persistentId": "f4076ee9-f13c-4fc3-8fdf-b8fcc6423f7d",
+      "translucent": true,
+      "translucentZWrite": true,
+      "version": 1.5
+    },
+    "moderncorrugated_tin": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/tileable/metal/moderncorrugated_tin/eca_bld_moderncorrugated_tin_d.dds",
+          "normalMap": "/assets/materials/tileable/metal/moderncorrugated_tin/eca_bld_moderncorrugated_tin_n.dds",
+          "specularMap": "/assets/materials/tileable/metal/moderncorrugated_tin/eca_bld_moderncorrugated_tin_s.dds",
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "useAnisotropic": null,
+          "vertColor": null
+        }
+      ],
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "groundType": "METAL",
+      "mapTo": "moderncorrugated_tin",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "materialTag2": "east_coast_usa",
+      "name": "moderncorrugated_tin",
+      "persistentId": "09198305-ba95-4017-b1f0-f0a079fff073",
+      "specularStrength0": "0.490196",
+      "translucentBlendOp": "None"
+    },
+    "si_metal_roof": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/tileable/metal/m_si_metal_roof/t_si_metal_roof_ao.data.png",
+          "baseColorFactor": [
+            0.988235354,
+            0.988235354,
+            0.988235354,
+            1
+          ],
+          "baseColorMap": "/assets/materials/tileable/metal/m_si_metal_roof/t_si_metal_roof_b.color.png",
+          "diffuseMapUseUV": null,
+          "metallicFactor": 1,
+          "metallicMap": "/assets/materials/tileable/metal/m_si_metal_roof/t_si_metal_roof_m.data.png",
+          "normalMap": "/assets/materials/tileable/metal/m_si_metal_roof/t_si_metal_roof_nm.normal.png",
+          "opacityMapUseUV": null,
+          "overlayMap": "/assets/materials/breakup/utah_breakup/utah_breakup_texture.dds",
+          "pixelSpecular": true,
+          "roughnessMap": "/assets/materials/tileable/metal/m_si_metal_roof/t_si_metal_roof_r.data.png",
+          "roughnessMapUseUV": null,
+          "vertColor": true
+        },
+        {
+          "baseColorFactor": null,
+          "baseColorMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_b.color.png",
+          "diffuseMapUseUV": 1,
+          "metallicFactor": null,
+          "opacityMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_o.data.png",
+          "opacityMapUseUV": 1,
+          "pixelSpecular": null,
+          "roughnessMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_r.data.png",
+          "roughnessMapUseUV": 1,
+          "vertColor": null
+        },
+        {
+          "baseColorFactor": null,
+          "diffuseMapUseUV": null,
+          "metallicFactor": null,
+          "opacityMapUseUV": null,
+          "pixelSpecular": null,
+          "roughnessMapUseUV": null,
+          "vertColor": null
+        },
+        {
+          "baseColorFactor": null,
+          "diffuseMapUseUV": null,
+          "metallicFactor": null,
+          "opacityMapUseUV": null,
+          "pixelSpecular": null,
+          "roughnessMapUseUV": null,
+          "vertColor": null
+        }
+      ],
+      "activeLayers": 2,
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "dynamicCubemap": true,
+      "groundType": "METAL",
+      "mapTo": "si_metal_roof",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "materialTag2": "Industrial",
+      "name": "si_metal_roof",
+      "persistentId": "3c3b2bd8-2391-4688-b07e-0d414bcbd1da",
+      "specularColor0": "0.1 0.1 0.1 0.1",
+      "specularStrength0": "0.05",
+      "specularStrength1": "0.2",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
+    "stone_cladding": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/tileable/stone/stone_cladding/stone_cladding_d.dds",
+          "detailNormalMap": "/assets/materials/breakup/stone_cladding/detail_strata_n.dds",
+          "detailScale": [
+            4,
+            4
+          ],
+          "normalMap": "/assets/materials/tileable/stone/stone_cladding/stone_cladding_n.dds",
+          "overlayMap": "/assets/materials/breakup/utah_breakup/utah_breakup_texture.dds",
+          "specularMap": "/assets/materials/tileable/stone/stone_cladding/stone_cladding_s.dds",
+          "specularPower": 1,
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {},
+        {},
+        {}
+      ],
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "groundType": "ROCK",
+      "mapTo": "stone_cladding",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "materialTag2": "utah",
+      "name": "stone_cladding",
+      "persistentId": "031440a9-dd6f-47f2-a2d0-747fb9abe2f0",
+      "translucentBlendOp": "None"
+    },
+    "ut_bld_metal_clean": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/tileable/metal/ut_bld_metal_clean/t_ut_bld_metal_clean_ao.data.png",
+          "baseColorMap": "/assets/materials/tileable/metal/ut_bld_metal_clean/t_ut_bld_metal_clean_b.color.png",
+          "metallicFactor": 0.800000012,
+          "metallicMap": "/assets/materials/tileable/metal/ut_bld_metal_clean/t_ut_bld_metal_clean_m.data.png",
+          "normalMap": "/assets/materials/tileable/metal/ut_bld_metal_clean/t_ut_bld_metal_clean_nm.normal.png",
+          "roughnessMap": "/assets/materials/tileable/metal/ut_bld_metal_clean/t_ut_bld_metal_clean_r.data.png",
+          "vertColor": true
+        },
+        {
+          "metallicFactor": null,
+          "vertColor": null
+        },
+        {
+          "metallicFactor": null,
+          "vertColor": null
+        },
+        {
+          "metallicFactor": null,
+          "vertColor": null
+        }
+      ],
+      "annotation": "OBSTACLES",
+      "class": "Material",
+      "dynamicCubemap": true,
+      "groundType": "METAL",
+      "mapTo": "ut_bld_metal_clean",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "materialTag2": "utah",
+      "name": "ut_bld_metal_clean",
+      "persistentId": "0020c3da-ab62-4a56-98c8-90774c5b6230",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
+    "ut_bld_trim_wood": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/trim/wood/ut_bld_trim_wood/ut_trim_wood_d.color.png",
+          "normalMap": "/assets/materials/trim/wood/ut_bld_trim_wood/ut_trim_wood_nm.normal.png",
+          "overlayMap": "/assets/materials/breakup/utah_breakup/utah_breakup_texture.dds",
+          "specularMap": "/assets/materials/trim/wood/ut_bld_trim_wood/ut_trim_wood_s.color.png",
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {},
+        {},
+        {}
+      ],
+      "class": "Material",
+      "doubleSided": true,
+      "groundType": "WOOD",
+      "mapTo": "ut_bld_trim_wood",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "materialTag2": "utah",
+      "name": "ut_bld_trim_wood",
+      "order_simset": 1044938028,
+      "persistentId": "359a8350-9b21-4abf-9092-247827ba9279",
+      "translucentBlendOp": "None"
+    },
+    "ut_bld_wood_decals": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/atlas/ut_bld_wood_decals/ut_wood_decals_d.dds",
+          "normalMap": "/assets/materials/atlas/ut_bld_wood_decals/ut_wood_decals_n.dds",
+          "reflectivityMap": "/assets/materials/atlas/ut_bld_wood_decals/ut_wood_decals_r.dds",
+          "specularMap": "/assets/materials/atlas/ut_bld_wood_decals/ut_wood_decals_s.dds",
+          "specularPower": 1,
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {},
+        {},
+        {}
+      ],
+      "alphaRef": 80,
+      "alphaTest": true,
+      "class": "Material",
+      "dynamicCubemap": true,
+      "groundType": "WOOD",
+      "mapTo": "ut_bld_wood_decals",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "materialTag2": "utah",
+      "name": "ut_bld_wood_decals",
+      "persistentId": "1756d1db-0ed1-482a-b202-2bb8f68edf3f"
+    },
+    "ut_bld_wood_new": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/tileable/wood/ut_bld_wood_new/t_ut_bld_wood_new_ao.data.png",
+          "baseColorMap": "/assets/materials/tileable/wood/ut_bld_wood_new/t_ut_bld_wood_new_b.color.png",
+          "normalMap": "/assets/materials/tileable/wood/ut_bld_wood_new/t_ut_bld_wood_new_nm.normal.png",
+          "roughnessMap": "/assets/materials/tileable/wood/ut_bld_wood_new/t_ut_bld_wood_new_r.data.png",
+          "vertColor": true
+        },
+        {
+          "vertColor": null
+        },
+        {
+          "vertColor": null
+        },
+        {
+          "vertColor": null
+        }
+      ],
+      "annotation": "OBSTACLES",
+      "class": "Material",
+      "groundType": "WOOD",
+      "mapTo": "ut_bld_wood_new",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "materialTag2": "utah",
+      "name": "ut_bld_wood_new",
+      "persistentId": "859d6297-efb7-4364-aa55-1fdcd4c92c32",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
+    "ut_metal_trim": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/trim/metal/ut_metal_trim/t_metal_trim_ao.data.png",
+          "baseColorMap": "/assets/materials/trim/metal/ut_metal_trim/t_metal_trim_b.color.png",
+          "metallicFactor": 0.800000012,
+          "metallicMap": "/assets/materials/trim/metal/ut_metal_trim/t_metal_trim_m.data.png",
+          "normalMap": "/assets/materials/trim/metal/ut_metal_trim/t_metal_trim_nm.normal.png",
+          "roughnessMap": "/assets/materials/trim/metal/ut_metal_trim/t_metal_trim_r.data.png",
+          "vertColor": true
+        },
+        {
+          "metallicFactor": null,
+          "vertColor": null
+        },
+        {
+          "metallicFactor": null,
+          "vertColor": null
+        },
+        {
+          "metallicFactor": null,
+          "vertColor": null
+        }
+      ],
+      "annotation": "GUARD_RAIL",
+      "class": "Material",
+      "dynamicCubemap": true,
+      "groundType": "METAL",
+      "mapTo": "ut_metal_trim",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "materialTag2": "utah",
+      "name": "ut_metal_trim",
+      "persistentId": "23e33e13-be8b-46d7-9042-880eb6aef428",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
+    "ut_plastic_trim": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/trim/plastic/ut_plastic_trim/ut_plastic_trim_d.color.png",
+          "normalMap": "/assets/materials/trim/plastic/ut_plastic_trim/ut_plastic_trim_nm.normal.png",
+          "overlayMap": "/assets/materials/breakup/utah_breakup/utah_breakup_texture.dds",
+          "specularMap": "/assets/materials/trim/plastic/ut_plastic_trim/ut_plastic_trim_s.color.png",
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {},
+        {},
+        {}
+      ],
+      "class": "Material",
+      "groundType": "PLASTIC",
+      "mapTo": "ut_plastic_trim",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "materialTag2": "utah",
+      "name": "ut_plastic_trim",
+      "order_simset": -1125201513,
+      "persistentId": "9144b2ae-bdc5-4f50-bbea-ece11426f744",
+      "translucentBlendOp": "None"
+    },
+    "ut_signs": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/billboard_label/ut_signs/ut_signs.dds",
+          "diffuseColor": [
+            1,
+            0.9999899864196776,
+            0.9999899864196776,
+            1
+          ],
+          "specularMap": "/assets/materials/tileable/concrete/utah_ind_concrete/Concrete-01_s.dds",
+          "specularPower": 1,
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {},
+        {},
+        {}
+      ],
+      "class": "Material",
+      "groundType": "PLASTIC",
+      "mapTo": "ut_signs",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "materialTag2": "utah",
+      "name": "ut_signs",
+      "persistentId": "94f82c4f-730d-4bcf-b0a2-6896d4031f78",
+      "translucentBlendOp": "None"
+    },
+    "walls_transparent": {
+      "Stages": [
+        {
+          "baseColorMap": "/assets/materials/trim/tile/walls_transparent/t_walls_transparent_b.color.png",
+          "metallicFactor": 0.800000012,
+          "metallicMap": "/assets/materials/trim/tile/walls_transparent/t_walls_transparent_m.data.png",
+          "normalMap": "/assets/materials/trim/tile/walls_transparent/t_walls_transparent_nm.normal.png",
+          "opacityFactor": 0.699999988,
+          "pixelSpecular": true,
+          "roughnessFactor": 0.100000001,
+          "vertColor": true
+        },
+        {
+          "metallicFactor": null,
+          "opacityFactor": null,
+          "pixelSpecular": null,
+          "roughnessFactor": null,
+          "vertColor": null
+        },
+        {
+          "metallicFactor": null,
+          "opacityFactor": null,
+          "pixelSpecular": null,
+          "roughnessFactor": null,
+          "vertColor": null
+        },
+        {
+          "metallicFactor": null,
+          "opacityFactor": null,
+          "pixelSpecular": null,
+          "roughnessFactor": null,
+          "vertColor": null
+        }
+      ],
+      "alphaRef": 127,
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "cubemap": "cubemap_wca_city_reflection",
+      "mapTo": "walls_transparent",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "name": "walls_transparent",
+      "persistentId": "29265fa6-1a99-4983-9607-7aef556448a4",
+      "translucent": true,
+      "translucentRecvShadows": true,
+      "version": 1.5
     }
   },
   "tree_library": {

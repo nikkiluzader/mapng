@@ -21,6 +21,363 @@
      ]
     }
    ]
+  },
+  "highway=bus_stop#shelter": {
+   "any": [
+    {
+     "shape": "/levels/west_coast_usa/art/shapes/objects/busstop.dae",
+     "yaw": 0,
+     "size": [
+      1.58,
+      3.52,
+      3.73
+     ],
+     "box": [
+      -0.79,
+      -1.76,
+      -0.46,
+      0.79,
+      1.76,
+      3.27
+     ]
+    }
+   ],
+   "north-america": [
+    {
+     "shape": "/levels/west_coast_usa/art/shapes/buildings/busstop_wca.dae",
+     "yaw": 0,
+     "size": [
+      1.43,
+      4.15,
+      3.14
+     ],
+     "box": [
+      -0.71,
+      -2.06,
+      -0.54,
+      0.71,
+      2.08,
+      2.6
+     ]
+    },
+    {
+     "shape": "/levels/west_coast_usa/art/shapes/objects/busstop.dae",
+     "yaw": 0,
+     "size": [
+      1.58,
+      3.52,
+      3.73
+     ],
+     "box": [
+      -0.79,
+      -1.76,
+      -0.46,
+      0.79,
+      1.76,
+      3.27
+     ]
+    }
+   ],
+   "europe": [
+    {
+     "shape": "/levels/italy/art/shapes/buildings/italy_city_busstop.dae",
+     "yaw": 90,
+     "size": [
+      6.1,
+      2.61,
+      3.79
+     ],
+     "box": [
+      -3.05,
+      -1.58,
+      -0.25,
+      3.05,
+      1.03,
+      3.54
+     ]
+    }
+   ],
+   "tropical": [
+    {
+     "shape": "/art/shapes/objects/s_busstop_jri.dae",
+     "yaw": 180,
+     "size": [
+      2.14,
+      3.08,
+      2.99
+     ],
+     "box": [
+      -1.22,
+      -1.55,
+      -0.2,
+      0.92,
+      1.53,
+      2.79
+     ]
+    }
+   ]
+  },
+  "highway=bus_stop": {
+   "any": [
+    {
+     "shape": "/art/shapes/objects/s_sign_busstop.dae",
+     "yaw": 180,
+     "size": [
+      0.56,
+      0.37,
+      3.95
+     ],
+     "box": [
+      -0.08,
+      -0.18,
+      -0.34,
+      0.48,
+      0.19,
+      3.6
+     ]
+    }
+   ]
+  },
+  "amenity=post_box": {
+   "any": [
+    {
+     "shape": "/levels/italy/art/shapes/buildings/italy_clutter_mailboxstand.dae",
+     "yaw": 90,
+     "size": [
+      0.66,
+      0.29,
+      1.6
+     ],
+     "box": [
+      -0.33,
+      -0.16,
+      0,
+      0.33,
+      0.14,
+      1.6
+     ]
+    }
+   ],
+   "north-america": [
+    {
+     "shape": "/levels/west_coast_usa/art/shapes/objects/postbox_blue.dae",
+     "yaw": 0,
+     "size": [
+      0.58,
+      0.64,
+      1.62
+     ],
+     "box": [
+      -0.33,
+      -0.32,
+      -0.09,
+      0.25,
+      0.32,
+      1.53
+     ]
+    }
+   ]
+  },
+  "leisure=picnic_table": {
+   "any": [
+    {
+     "shape": "/levels/Utah/art/shapes/buildings/ut_picnic_table_a.dae",
+     "yaw": 90,
+     "size": [
+      2,
+      1.43,
+      0.86
+     ],
+     "box": [
+      -1,
+      -0.71,
+      0,
+      1,
+      0.71,
+      0.86
+     ]
+    }
+   ],
+   "europe": [
+    {
+     "shape": "/levels/italy/art/shapes/buildings/italy_clutter_pwood_table.dae",
+     "yaw": 90,
+     "size": [
+      1.8,
+      1.34,
+      0.72
+     ],
+     "box": [
+      -0.9,
+      -0.67,
+      0,
+      0.9,
+      0.67,
+      0.72
+     ]
+    }
+   ]
+  },
+  "man_made=flagpole": {
+   "any": [
+    {
+     "shape": "/levels/Utah/art/shapes/buildings/flag_pole.dae",
+     "yaw": 0,
+     "size": [
+      0.5,
+      0.5,
+      10.84
+     ],
+     "box": [
+      -0.25,
+      -0.25,
+      0.03,
+      0.25,
+      0.25,
+      10.87
+     ]
+    }
+   ]
+  },
+  "amenity=recycling": {
+   "any": [
+    {
+     "shape": "/levels/italy/art/shapes/buildings/italy_clutter_sorting_bin.dae",
+     "yaw": 90,
+     "size": [
+      0.56,
+      0.62,
+      0.97
+     ],
+     "box": [
+      -0.28,
+      -0.29,
+      0,
+      0.28,
+      0.33,
+      0.98
+     ]
+    }
+   ],
+   "north-america": [
+    {
+     "shape": "/levels/Utah/art/shapes/buildings/ut_recycle_bin.dae",
+     "yaw": 90,
+     "size": [
+      1.62,
+      0.78,
+      1.48
+     ],
+     "box": [
+      -0.81,
+      -0.38,
+      0,
+      0.81,
+      0.39,
+      1.48
+     ]
+    }
+   ]
+  },
+  "tourism=information": {
+   "north-america": [
+    {
+     "shape": "/levels/Utah/art/shapes/clutter/ut_sign_tourism_1.dae",
+     "yaw": 90,
+     "size": [
+      1.15,
+      0.43,
+      1.57
+     ],
+     "box": [
+      -0.57,
+      -0.21,
+      -0.37,
+      0.57,
+      0.22,
+      1.2
+     ]
+    }
+   ]
+  }
+ },
+ "objects": {
+  "busShelter": {
+   "tag": "highway=bus_stop",
+   "when": {
+    "shelter": [
+     "yes"
+    ]
+   },
+   "pick": "highway=bus_stop#shelter",
+   "face": "road",
+   "item": "busStops",
+   "cap": 2000,
+   "beside": 1.6
+  },
+  "busStopSign": {
+   "tag": "highway=bus_stop",
+   "unless": {
+    "shelter": [
+     "yes"
+    ]
+   },
+   "pick": "highway=bus_stop",
+   "face": "road",
+   "item": "busStops",
+   "cap": 4000,
+   "beside": 0.8
+  },
+  "postBox": {
+   "tag": "amenity=post_box",
+   "pick": "amenity=post_box",
+   "face": "road",
+   "item": "postBoxes",
+   "cap": 2000,
+   "beside": 0.8
+  },
+  "picnicTable": {
+   "tag": "leisure=picnic_table",
+   "pick": "leisure=picnic_table",
+   "face": "road",
+   "item": "benches",
+   "cap": 3000,
+   "beside": 1.5
+  },
+  "flagpole": {
+   "tag": "man_made=flagpole",
+   "pick": "man_made=flagpole",
+   "face": "none",
+   "item": "flagpoles",
+   "cap": 2000,
+   "beside": 0.8
+  },
+  "recyclingBin": {
+   "tag": "amenity=recycling",
+   "unless": {
+    "recycling_type": [
+     "centre"
+    ]
+   },
+   "pick": "amenity=recycling",
+   "face": "road",
+   "item": "bins",
+   "cap": 3000,
+   "beside": 0.9
+  },
+  "infoBoard": {
+   "tag": "tourism=information",
+   "when": {
+    "information": [
+     "board",
+     "map"
+    ]
+   },
+   "pick": "tourism=information",
+   "face": "road",
+   "item": "infoBoards",
+   "cap": 2000,
+   "beside": 1
   }
  }
 }

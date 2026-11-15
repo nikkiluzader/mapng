@@ -6,6 +6,7 @@ import {
 import { fetchOsmFromManifest, fetchOsmFromTiles, getOsmTileManifest, planTileSources } from "./osmTiles.js";
 import { isRacingTrackLine } from "./roadWidth.js";
 import { isGateBarrier } from "./gates.js";
+import { isTagObjectNode } from "./tagModels.js";
 import {
   OVERTURE_ATTRIBUTION, OVERTURE_RELEASE, fetchOsmFromOverture, fetchOvertureBuildingRecords, mergeOvertureBuildings,
 } from "./overtureTiles.js";
@@ -356,6 +357,12 @@ export const parseOverpassResponse = (data, bounds) => {
           // fountains and drinking posts (services/fountains.js)
           rawFeatures.push({
             id: el.id.toString(), type: "fountain",
+            geometry: [{ lat: el.lat, lng: el.lon }], tags: el.tags,
+          });
+        } else if (isTagObjectNode(el.tags)) {
+          // a bus stop, post box, picnic table ...: a model picked for its tag stands there (services/tagModels.js)
+          rawFeatures.push({
+            id: el.id.toString(), type: "tag_object",
             geometry: [{ lat: el.lat, lng: el.lon }], tags: el.tags,
           });
         } else if (el.tags.amenity === "fuel" || el.tags.amenity === "charging_station") {

@@ -101,23 +101,37 @@ lib.about = 'Every OpenStreetMap tag MapNG cares about, what it builds for it, a
 // data/tag-models.json: what the export reads (services/tagModels.js). Small: only the tags with a pick, each
 // model with what a placer needs (its yaw, size and anchor box).
 const tagModels = {};
-for (const [tag, byRegion] of Object.entries(picks.picks)) {
+for (const e of Object.values(lib.tags)) for (const a of e.assets) delete a.pick;
+for (const [key, byRegion] of Object.entries(picks.picks)) {
+  const tag = key.split('#')[0];   // (a variant of the tag's object after #: a bus stop with a shelter)
   if (!lib.tags[tag]) throw new Error(`model-picks.json: ${tag} is not in the tag library`);
-  tagModels[tag] = {};
+  tagModels[key] = {};
   for (const [region, shapes] of Object.entries(byRegion)) {
     if (!lib.regions.includes(region)) throw new Error(`model-picks.json: ${tag}: no region ${region}`);
-    tagModels[tag][region] = shapes.map((shape) => {
+    tagModels[key][region] = shapes.map((shape) => {
       const r = inCatalogue.get(shape);
       if (!r || r.mark !== 'use') throw new Error(`model-picks.json: ${tag}: ${shape} is not a model marked use in the catalogue`);
       if (!r.tags.includes(tag) && !lib.tags[tag].assets.some((a) => a.shape === shape && a.usedToday)) throw new Error(`model-picks.json: ${tag}: ${shape} does not carry the tag`);
       return { shape, yaw: r.yaw ?? 0, size: r.size, box: r.box };
     });
   }
-  if (!tagModels[tag].any?.length) throw new Error(`model-picks.json: ${tag} needs a pick for "any" (what is placed where no region's own is chosen)`);
-  // (the library says which of a tag's models are the picks, first choice first)
-  for (const a of lib.tags[tag].assets) { delete a.pick; const at = Object.values(byRegion).map((s) => s.indexOf(a.shape)).filter((i) => i >= 0); if (at.length) a.pick = Math.min(...at) + 1; }
+  // (the library says which of a tag's models are the picks, first choice first; no pick for "any": nothing is
+  // placed outside the regions named, a board whose text is one country's)
+  for (const a of lib.tags[tag].assets) { const at = Object.values(byRegion).map((s) => s.indexOf(a.shape)).filter((i) => i >= 0); if (at.length) a.pick = Math.min(a.pick ?? 99, Math.min(...at) + 1); }
 }
-fs.writeFileSync('data/tag-models.json', JSON.stringify({ about: 'Made by scripts/tag-library/from-catalogue.mjs from data/model-picks.json: the models the export places per OSM tag and region. yaw: degrees added to the direction a model should face. Read by services/tagModels.js.', tags: tagModels }, null, 1) + '\n');
+// The mapped points a picked model is placed at.
+const ITEMS = new Set(JSON.parse(JSON.stringify((await import('../../services/buildContent.js')).CONTENT_GROUPS)).flatMap((g) => g.items.map((i) => i.id)));
+for (const [id, o] of Object.entries(picks.objects || {})) {
+  if (!tagModels[o.pick]) throw new Error(`model-picks.json: object ${id}: no pick ${o.pick}`);
+  if (o.pick.split('#')[0] !== o.tag) throw new Error(`model-picks.json: object ${id}: its pick is for another tag`);
+  if (!['road', 'none'].includes(o.face)) throw new Error(`model-picks.json: object ${id}: face ${o.face}`);
+  if (!ITEMS.has(o.item)) throw new Error(`model-picks.json: object ${id}: no What to build item ${o.item}`);  // (the library's entry says so: fetched, built, by what)
+  const e = lib.tags[o.tag]; e.fetched = true; if (e.status === 'planned') e.status = 'built';
+  e.code = 'services/tagModels.js (data/model-picks.json)'; e.item = o.item; e.group = 'furniture';
+}
+// (a picked model is one the export places)
+for (const [key, byRegion] of Object.entries(picks.picks)) for (const a of lib.tags[key.split('#')[0]].assets) if (Object.values(byRegion).flat().includes(a.shape)) { a.usedToday = true; delete a.from; delete a.maybe; }
+fs.writeFileSync('data/tag-models.json', JSON.stringify({ about: 'Made by scripts/tag-library/from-catalogue.mjs from data/model-picks.json: the models the export places per OSM tag and region. yaw: degrees added to the direction a model should face. Read by services/tagModels.js.', tags: tagModels, objects: picks.objects || {} }, null, 1) + '\n');
 
 // Written with one model per line, so the files stay readable and their diffs small.
 const oneLine = (key) => (k, v) => (k === key && Array.isArray(v) ? v.map((x) => `\u0001${JSON.stringify(x)}\u0001`) : v);

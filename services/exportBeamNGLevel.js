@@ -55,7 +55,7 @@ import { parallelMap, parallelThreads } from './parallel.js';
 import { measureStructures, roadLinesFromDecals } from './structures/metrics.js';
 import { buildStructureGraph } from './structures/graph.js';
 import { findCrossings } from './structures/crossings.js';
-import { tagModel } from './tagModels.js';
+import { tagModel, tagObjectFor, standTagObject } from './tagModels.js';
 import { solveProfilesSteps, gradeLimit } from './structures/profileSolve.js';
 import { appendAll, keepInPlace } from './keepInPlace.js';
 import { classifyStructures } from './structures/structureRules.js';
@@ -8053,6 +8053,7 @@ function buildDetailedReportSections(d) {
   lines.push(`- Barriers / fences: ${(d.barrierObjects || []).length}`);
   listCounts(countBy(d.barrierObjects || [], shapeName), 15);
   lines.push(`- Lamps, benches and other furniture: ${(d.streetFurnitureObjects || []).length}`);
+  { const c = d.streetFurnitureObjects?.tagObjectCounts || {}; lines.push(`- Mapped objects placed from the model picks (bus stops with and without a shelter, post boxes, picnic tables, flagpoles, recycling bins, information boards): ${Object.keys(c).length ? Object.entries(c).map(([k, v]) => `${v} ${k}`).join(', ') : 'none mapped here'}`); }
   listCounts(countBy(d.streetFurnitureObjects || [], shapeName), 15);
   lines.push(`- Fuel / charging station objects: ${(d.fuelStationObjects || []).length}`);
   if (d.barrierObjects?.gateStats?.length) lines.push(`- Open gates and openings: ${d.barrierObjects.gateStats.map(([k, v]) => `${v} ${k}`).join(', ')}`);
@@ -9891,6 +9892,38 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
     const off = at.half + DECK_LAMP_PARAPET_OFF_M;
     addLamp(at.x + ((lamp.x - at.x) / d) * off, at.y + ((lamp.y - at.y) / d) * off, lamp.facing, `bridge_lamp_${i}`, lampFor(lamp.highway), at.z + DECK_LAMP_PARAPET_H_M);
   }
+
+  // Mapped objects with a picked model: bus stops, post boxes, picnic tables, flagpoles, recycling bins,
+  // information boards (data/model-picks.json; services/tagModels.js). Each by its road, clear of the lanes.
+  const tagObjectCounts = {};
+  const tagFeatures = (terrainData.osmFeatures || []).filter((f) => f.type === 'tag_object' && f.geometry?.length === 1);
+  for (let i = 0; i < tagFeatures.length; i++) {
+    const f = tagFeatures[i]; const rule = tagObjectFor(f.tags);
+    if (!rule || (tagObjectCounts[rule.id] || 0) >= (rule.cap ?? 2000)) continue;
+    const pt = f.geometry[0];
+    if (!Number.isFinite(pt?.lat) || !Number.isFinite(pt?.lng)) continue;
+    const model = tagModel(rule.pick, biome, i);
+    if (!model) continue;   // (no model for this region: a board whose text is another country's)
+    const world = geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0);
+    const stand = standTagObject(rule, world[0], world[1], findNearestRoad(world[0], world[1], roads, MAX_ROAD_SEARCH_M), f.tags, i);
+    // (on a pier or deck: left out, as benches are; in the water: nowhere; under a deck that would cut through it: no)
+    if (deckAt(stand.x, stand.y) !== null) continue;
+    const z = getTerrainHeightAtWorldXY(stand.x, stand.y, terrainData, squareSize);
+    if (z < seaZ || underDeck(stand.x, stand.y, z, z + (model.size?.[2] ?? 3) + 0.5)) continue;
+    objects.push({
+      __parent: 'street_furniture',
+      class: 'TSStatic',
+      name: `${rule.id}_${i}`,
+      persistentId: generatePersistentId(),
+      position: [roundTo(stand.x, 3), roundTo(stand.y, 3), roundTo(z, 3)],
+      rotationMatrix: rotationMatrixFromYaw(stand.facing + model.yawOffset),
+      shapeName: model.shapeFile,
+      useInstanceRenderData: true,
+    });
+    tagObjectCounts[rule.id] = (tagObjectCounts[rule.id] || 0) + 1;
+  }
+  if (Object.keys(tagObjectCounts).length) console.log(`[BeamNG Export] Mapped objects from the model picks: ${Object.entries(tagObjectCounts).map(([k, v]) => `${v} ${k}`).join(', ')}`);
+  objects.tagObjectCounts = tagObjectCounts;
 
   // Benches along major town streets (streetProps.js), facing the road.
   for (let i = 0; i < (props?.benches.length ?? 0) && benchCount < caps.benches; i++) {

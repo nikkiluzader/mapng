@@ -63,6 +63,11 @@ export const CONTENT_GROUPS = [
     { id: 'benches', tags: ['amenity=bench', 'leisure=picnic_table'] },
     { id: 'bins', tags: ['amenity=waste_basket', 'amenity=waste_disposal', 'amenity=recycling'] },
     { id: 'hydrants', tags: ['emergency=fire_hydrant'] },
+    // (placed from the model picks, data/model-picks.json: services/tagModels.js)
+    { id: 'busStops', tags: ['highway=bus_stop'] },
+    { id: 'postBoxes', tags: ['amenity=post_box'] },
+    { id: 'flagpoles', tags: ['man_made=flagpole'] },
+    { id: 'infoBoards', tags: ['tourism=information'] },
     { id: 'fountains', tags: ['amenity=fountain', 'amenity=drinking_water'] },
     { id: 'fences', tags: ['barrier=fence', 'barrier=wall', 'barrier=retaining_wall', 'barrier=hedge', 'barrier=city_wall'] },
     { id: 'gates', tags: ['barrier=gate', 'barrier=lift_gate', 'barrier=swing_gate', 'barrier=sliding_gate', 'barrier=bollard', 'barrier=jersey_barrier', 'barrier=guard_rail', 'barrier=chain'] },

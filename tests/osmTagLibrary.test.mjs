@@ -117,24 +117,55 @@ test('every catalogue model marked use is listed under each of its tags the libr
 });
 
 // data/tag-models.json: what the export reads, made from the picks (data/model-picks.json).
-test('the models picked per tag are catalogue models marked use, with a pick for anywhere', async () => {
+test('the models picked per tag are catalogue models marked use', async () => {
   const picked = JSON.parse(fs.readFileSync(new URL('data/tag-models.json', root), 'utf8')).tags;
   const picks = JSON.parse(fs.readFileSync(new URL('data/model-picks.json', root), 'utf8')).picks;
   assert.deepEqual(Object.keys(picked).sort(), Object.keys(picks).sort(), 'run node scripts/tag-library/from-catalogue.mjs');
-  for (const [tag, byRegion] of Object.entries(picked)) {
+  for (const [key, byRegion] of Object.entries(picked)) {
+    const tag = key.split('#')[0];   // (a variant of the tag's object after #)
     assert.ok(tags[tag], `${tag} is in the library`);
-    assert.ok(byRegion.any?.length, `${tag}: a model for anywhere`);
+    assert.ok(Object.values(byRegion).some((m) => m.length), `${key}: a model somewhere`);
     for (const [region, models] of Object.entries(byRegion)) {
       assert.ok(lib.regions.includes(region), `${tag}: region ${region}`);
-      assert.deepEqual(models.map((m) => m.shape), picks[tag][region], `${tag} ${region}: run node scripts/tag-library/from-catalogue.mjs`);
+      assert.deepEqual(models.map((m) => m.shape), picks[key][region], `${key} ${region}: run node scripts/tag-library/from-catalogue.mjs`);
       for (const m of models) { assert.equal(inCat.get(m.shape)?.mark, 'use', `${tag}: ${m.shape}`); assert.ok(Number.isFinite(m.yaw) && m.size?.length === 3 && m.box?.length === 6, `${tag}: ${m.shape} yaw, size, box`); }
     }
   }
   const { tagModel, tagModelsFor, regionOfBiome } = await import('../services/tagModels.js');
   assert.equal(regionOfBiome('italy'), 'europe'); assert.equal(regionOfBiome('nowhere'), 'any');
+  // (the export hands the regional look itself)
+  const { BEAMNG_BIOMES } = await import('../services/beamngBiomeCatalog.js');
+  assert.equal(regionOfBiome(BEAMNG_BIOMES.find((b) => b.id === 'west_coast_usa')), 'north-america');
+  for (const b of BEAMNG_BIOMES) assert.ok(lib.regions.includes(regionOfBiome(b)), b.id);
   const bench = tagModel('amenity=bench', 'italy');
   assert.ok(bench.shapeFile.endsWith('.dae') && Number.isFinite(bench.yawOffset));
   // (the same n, the same model; a tag with no pick, none)
   assert.equal(tagModel('amenity=bench', 'utah', 7).shapeFile, tagModel('amenity=bench', 'utah', 7).shapeFile);
   assert.equal(tagModel('amenity=nothing_picked', 'utah'), null); assert.deepEqual(tagModelsFor('amenity=nothing_picked', 'utah'), []);
+});
+
+test('a mapped point falls under one object rule, and stands beside its road facing it', async () => {
+  const { tagObjectFor, standTagObject, tagObjectNodeTags, isTagObjectNode, tagModel } = await import('../services/tagModels.js');
+  assert.equal(tagObjectFor({ highway: 'bus_stop', shelter: 'yes' }).id, 'busShelter');
+  assert.equal(tagObjectFor({ highway: 'bus_stop' }).id, 'busStopSign');
+  assert.equal(tagObjectFor({ highway: 'bus_stop', shelter: 'no' }).id, 'busStopSign');
+  assert.equal(tagObjectFor({ tourism: 'information', information: 'board' }).id, 'infoBoard');
+  assert.equal(tagObjectFor({ tourism: 'information', information: 'office' }), null);
+  assert.equal(tagObjectFor({ amenity: 'recycling', recycling_type: 'centre' }), null);
+  assert.equal(tagObjectFor({ amenity: 'bench' }), null);
+  assert.ok(isTagObjectNode({ tourism: 'information' }) && !isTagObjectNode({ amenity: 'cafe' }));
+  // every object's tag is asked for, and its pick has a model somewhere
+  for (const [k, v] of tagObjectNodeTags()) assert.ok(OSM_FILTER.nodeTags.some(([a, b]) => a === k && b === v), `${k}=${v} is fetched`);
+  assert.ok(tagModel('highway=bus_stop#shelter', 'italy').shapeFile.includes('italy_city_busstop'));
+  assert.equal(tagModel('tourism=information', 'italy'), null, 'a board whose text is another country\'s is not placed');
+  // a stop mapped on the road's centre line: moved out beside the lanes, its front to the road
+  const rule = tagObjectFor({ highway: 'bus_stop', shelter: 'yes' });
+  const onRoad = standTagObject(rule, 10, 1, { cx: 10, cy: 0, dist: 1, halfWidth: 3.5 }, {}, 0);
+  assert.ok(Math.abs(onRoad.x - 10) < 1e-9 && Math.abs(onRoad.y - (3.5 + rule.beside)) < 1e-9, `stands at ${onRoad.x}, ${onRoad.y}`);
+  assert.ok(Math.abs(onRoad.facing - -Math.PI / 2) < 1e-9, 'faces the road');
+  // one mapped well clear of the road stays where it is; a direction tag wins
+  const clear = standTagObject(rule, 10, 12, { cx: 10, cy: 0, dist: 12, halfWidth: 3.5 }, { direction: '90' }, 0);
+  assert.ok(clear.y === 12 && Math.abs(clear.facing) < 1e-9);
+  // no road near: placed, turned the same way every time
+  assert.equal(standTagObject(rule, 0, 0, null, {}, 5).facing, standTagObject(rule, 0, 0, null, {}, 5).facing);
 });
