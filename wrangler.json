@@ -3,7 +3,7 @@
   "name": "mapng",
   "main": "worker/index.js",
   "compatibility_date": "2026-05-28",
-  "preview_urls": true,
+  "preview_urls": false,
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS"
@@ -47,7 +47,33 @@
         "ACCESS_TEAM_DOMAIN": "mapng.cloudflareaccess.com",
         "ACCESS_AUD": "",
         "CF_ZONE_ID": "7aa5952a2427445baca40d6bacdd1c8a"
-      }
+      },
+      "ratelimits": [
+        {
+          "name": "RL_WRITE",
+          "namespace_id": "2001",
+          "simple": {
+            "limit": 20,
+            "period": 60
+          }
+        },
+        {
+          "name": "RL_READ",
+          "namespace_id": "2002",
+          "simple": {
+            "limit": 120,
+            "period": 60
+          }
+        },
+        {
+          "name": "RL_TILES",
+          "namespace_id": "2003",
+          "simple": {
+            "limit": 3000,
+            "period": 60
+          }
+        }
+      ]
     }
   },
   "r2_buckets": [
@@ -82,5 +108,31 @@
     "ACCESS_TEAM_DOMAIN": "mapng.cloudflareaccess.com",
     "ACCESS_AUD": "5359051fcf74668b7e46d70d09334891e51ef49aa403309b4d0a7f5e738708ea",
     "CF_ZONE_ID": "7aa5952a2427445baca40d6bacdd1c8a"
-  }
+  },
+  "ratelimits": [
+    {
+      "name": "RL_WRITE",
+      "namespace_id": "1001",
+      "simple": {
+        "limit": 20,
+        "period": 60
+      }
+    },
+    {
+      "name": "RL_READ",
+      "namespace_id": "1002",
+      "simple": {
+        "limit": 120,
+        "period": 60
+      }
+    },
+    {
+      "name": "RL_TILES",
+      "namespace_id": "1003",
+      "simple": {
+        "limit": 3000,
+        "period": 60
+      }
+    }
+  ]
 }

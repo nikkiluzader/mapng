@@ -4,6 +4,8 @@
 // share/ (no public access; a lifecycle rule also deletes them after a day).
 // No keys are ever in a config; nothing ties a code to the sender.
 
+import { DAILY, overBudget, overRate } from './limits.js';
+
 const PREFIX = 'share/';
 const TTL_MS = 24 * 3600 * 1000;
 const MAX_CODE_CHARS = 16 * 1024;
@@ -54,7 +56,7 @@ export async function handleShareCodes(request, env, url, json) {
   if (sub === '' || sub === '/') {
     if (request.method !== 'POST') return json({ error: 'Method Not Allowed' }, 405);
     if (Number(request.headers.get('Content-Length') || 0) > MAX_CODE_CHARS + 512) return json({ error: 'Config too large' }, 413);
-    if (await limited(request)) return json({ error: 'Too many configs sent; try again later' }, 429);
+    if (await limited(request) || await overRate(env, 'RL_WRITE', request, 'share') || await overBudget(env, 'shareCodes', DAILY.shareCodes)) return json({ error: 'Too many configs sent; try again later' }, 429);
     let body;
     try { body = JSON.parse(await request.text()); } catch { return json({ error: 'Bad request' }, 400); }
     const code = typeof body?.code === 'string' ? body.code.trim() : '';
@@ -68,7 +70,7 @@ export async function handleShareCodes(request, env, url, json) {
 
   if (request.method !== 'GET') return json({ error: 'Method Not Allowed' }, 405);
   // (codes are short so they can be read out loud; guessing them is slowed to a crawl instead)
-  if (await limitedReads(request)) return json({ error: 'Too many tries; try again later' }, 429, noStore);
+  if (await limitedReads(request) || await overRate(env, 'RL_READ', request, 'share')) return json({ error: 'Too many tries; try again later' }, 429, noStore);
   let asked = '';
   try { asked = decodeURIComponent(sub.slice(1)); } catch { return json({ error: 'Not a send code' }, 404, noStore); }
   const id = normalizeShareId(asked);

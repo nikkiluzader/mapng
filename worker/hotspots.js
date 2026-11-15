@@ -5,6 +5,7 @@
 // them is stored; the short per-address limit below lives in memory only.
 import { HOTSPOT_PLATFORMS, isHotspotCell } from '../services/exportHotspots.js';
 import { USAGE_FIELDS, validUsage } from '../services/usageStats.js';
+import { DAILY, overBudget, overRate } from './limits.js';
 
 const LIMIT_PER_HOUR = 30;   // reports one address may make in an hour
 // New squares in a day, from everyone together. Far above real use (a few hundred squares in
@@ -28,6 +29,10 @@ export class ExportHotspots {
     this.sql.exec(`CREATE TABLE IF NOT EXISTS usage (
       name TEXT NOT NULL, value TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (name, value))`);
+    // a day's totals for the limits in worker/limits.js (kept two days)
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS budgets (
+      day TEXT NOT NULL, name TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (day, name))`);
     this.recent = new Map();   // address hash -> { hour, count }
     this.recentUsage = new Map();
   }
@@ -91,8 +96,23 @@ export class ExportHotspots {
     return 'ok';
   }
 
+  /** Take `n` from today's total for `name` unless it is used up: true when taken. */
+  takeBudget(name, max, n = 1) {
+    if (typeof name !== 'string' || !/^[A-Za-z]{1,40}$/.test(name) || !(max > 0) || !(n > 0)) return false;
+    const day = new Date().toISOString().slice(0, 10);
+    const used = this.sql.exec('SELECT count FROM budgets WHERE day = ? AND name = ?', day, name).toArray()[0]?.count || 0;
+    if (used >= max) return false;
+    this.sql.exec('INSERT INTO budgets (day, name, count) VALUES (?, ?, ?) ON CONFLICT (day, name) DO UPDATE SET count = count + ?', day, name, n, n);
+    if (!used) this.sql.exec('DELETE FROM budgets WHERE day < ?', new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10));
+    return true;
+  }
+
   async fetch(request) {
     const { pathname } = new URL(request.url);
+    if (pathname === '/budget') {
+      const { name, max, n } = await request.json();
+      return Response.json({ ok: this.takeBudget(name, Number(max), Number(n) || 1) });
+    }
     if (pathname === '/usage-report') {
       const { settings, sender } = await request.json();
       return Response.json({ result: await this.reportUsage(settings, sender) });
@@ -158,6 +178,7 @@ export async function handleHotspots(request, env, ctx, json) {
   const cache = caches.default;
   const key = new Request(new URL('/api/hotspots', request.url).toString(), { method: 'GET' });
   if (request.method === 'POST') {
+    if (await overRate(env, 'RL_WRITE', request, 'hotspots')) return json({ error: 'Too many reports' }, 429);
     const body = await smallJson(request);
     if (!body) return json({ error: 'Bad request' }, 400);
     const { result } = await (await stub.fetch('https://hotspots/report', {
@@ -188,8 +209,10 @@ export async function handleUsage(request, env, ctx, json) {
   const cache = caches.default;
   const key = new Request(new URL('/api/usage', request.url).toString(), { method: 'GET' });
   if (request.method === 'POST') {
+    if (await overRate(env, 'RL_WRITE', request, 'usage')) return json({ error: 'Too many reports' }, 429);
     const body = await smallJson(request);
     if (!body) return json({ error: 'Bad request' }, 400);
+    if (await overBudget(env, 'usage', DAILY.usage)) return json({ error: 'Too many reports' }, 429);
     const { result } = await (await stub.fetch('https://hotspots/usage-report', {
       method: 'POST',
       body: JSON.stringify({ settings: body?.settings, sender: await senderHash(request) }),

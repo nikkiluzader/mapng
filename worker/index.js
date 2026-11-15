@@ -34,6 +34,7 @@ import { handleHotspots, handleUsage } from './hotspots.js';
 import { handleCrashReports } from './crashReports.js';
 import { handleAdmin } from './admin.js';
 import { handlePublicStats } from './publicStats.js';
+import { overRate } from './limits.js';
 import { handleShareCodes } from './shareCodes.js';
 import { handleMapterhornTiles } from './mapterhornCache.js';
 import { handleTerrariumTiles } from './terrariumRelay.js';
@@ -90,7 +91,7 @@ const jsonResponse = (body, status, extraHeaders = {}) => new Response(JSON.stri
  * snapped outward to a grid so nearby selections share a cache entry, and the
  * client clips the answer to its exact bounds.
  */
-async function handleOsm(request, url, ctx) {
+async function handleOsm(request, url, ctx, env) {
   if (request.method !== 'GET') return new Response('Method Not Allowed', { status: 405 });
 
   const parts = String(url.searchParams.get('bbox') || '').split(',').map(Number);
@@ -108,6 +109,8 @@ async function handleOsm(request, url, ctx) {
     hit.headers.set('x-mapng-osm-cache', 'HIT');
     return hit;
   }
+  // (a fresh area is a heavy question to the public map servers, asked in MapNG's name)
+  if (await overRate(env, 'RL_READ', request, 'osm')) return jsonResponse({ error: 'Too many requests' }, 429, { 'Retry-After': '60' });
 
   const query = buildOverpassQuery(snapped);
   const mirrors = [...OVERPASS_ENDPOINTS].sort(() => Math.random() - 0.5).slice(0, OSM_MAX_MIRRORS);
@@ -281,7 +284,7 @@ const app = {
     }
 
     if (url.pathname === '/api/osm') {
-      return handleOsm(request, url, ctx);
+      return handleOsm(request, url, ctx, env);
     }
 
     if (url.pathname === '/api/share' || url.pathname.startsWith('/api/share/')) {
@@ -386,6 +389,8 @@ const app = {
         }
       }
 
+      // (what is not already kept here is asked of someone else's server, in MapNG's name: per sender, so many a minute)
+      if (await overRate(env, 'RL_READ', request, stripPrefix)) return jsonResponse({ error: 'Too many requests' }, 429, { 'Retry-After': '60' });
       try {
         const upstream = await fetch(upstreamUrl, {
           method: 'GET',

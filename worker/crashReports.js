@@ -5,6 +5,7 @@
 // the developer when the CRASH_MAIL send_email binding is configured; read
 // back only with the CRASH_ADMIN_TOKEN secret (public/crash-reports.html).
 import { countReport } from './publicStats.js';
+import { DAILY, overBudget, overRate } from './limits.js';
 
 const PREFIX = 'crash-reports/';
 const MAX_BODY_BYTES = 12 * 1024 * 1024;      // a report with its log and crash dump
@@ -180,6 +181,7 @@ export async function handleCrashReports(request, env, ctx, url, json) {
     if (request.method !== 'POST') return json({ error: 'Method Not Allowed' }, 405);
     const length = Number(request.headers.get('Content-Length') || 0);
     if (length > MAX_BODY_BYTES) return json({ error: 'Report too large' }, 413);
+    if (await overRate(env, 'RL_WRITE', request, 'crash')) return json({ error: 'Too many reports' }, 429);
     const hour = Math.floor(Date.now() / 3600000);
     const sender = await senderHash(request);
     const seen = recent.get(sender);
@@ -200,6 +202,8 @@ export async function handleCrashReports(request, env, ctx, url, json) {
     const today = receivedAt.slice(0, 10);
     const counts = await readCounts(env, today);
     if (counts.reports >= REPORTS_PER_DAY) return json({ error: 'Too many reports today. Please try again tomorrow, or write on Discord.' }, 429);
+    // (and counted where two at once cannot both take the last place of the day)
+    if (await overBudget(env, 'reports', DAILY.reports)) return json({ error: 'Too many reports today. Please try again tomorrow, or write on Discord.' }, 429);
     counts.reports += 1;
     await writeCounts(env, today, counts);
     // (day / time-id: listing newest first is a key sort)
