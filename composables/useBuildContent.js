@@ -8,7 +8,7 @@
 // rows) are mapng_beamNGExcludeTags. Basic mode shows only the presets
 // (mapng_beamNGBasicPreset, Everything by default). Rules: services/buildContent.js.
 import { ref, computed, watch } from 'vue';
-import { CONTENT_IDS, CONTENT_PRESETS, PRESET_IDS, presetOf, sanitizeContentOff, sanitizeExcludeTags, contentExportOptions } from '../services/buildContent.js';
+import { CONTENT_IDS, CONTENT_PRESETS, PRESET_IDS, presetOf, sanitizeContentOff, sanitizeExcludeTags, contentExportOptions, DEFAULT_OFF_IDS } from '../services/buildContent.js';
 
 const read = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
 const write = (key, value) => { try { localStorage.setItem(key, value); } catch { /* private mode */ } };
@@ -30,8 +30,17 @@ const OFF_KEY = 'mapng_beamNGContentOff';
 // features in the off list. The old key is still written (off when neither rivers nor lakes
 // are built: share codes and older versions read it) and, read as off, switches both off.
 const WATER_KEY = 'mapng_beamNGIncludeWater';
+// (a feature that is off unless switched on, DEFAULT_OFF_IDS: put into the stored list once, the first
+// time this version runs, and never again, so switching it on stays on)
+const DEFAULTS_KEY = 'mapng_beamNGContentDefaultsOff';
 const readOff = () => {
-  const list = readList(OFF_KEY);
+  let list = readList(OFF_KEY);
+  const seen = readList(DEFAULTS_KEY); const known = Array.isArray(seen) ? seen : [];
+  const fresh = DEFAULT_OFF_IDS.filter((id) => !known.includes(id));
+  if (fresh.length) {
+    list = [...(Array.isArray(list) ? list : []), ...fresh];
+    write(OFF_KEY, JSON.stringify([...new Set(list)])); write(DEFAULTS_KEY, JSON.stringify([...known, ...fresh]));
+  }
   return sanitizeContentOff(read(WATER_KEY) === 'false' ? [...(Array.isArray(list) ? list : []), 'rivers', 'lakes'] : list);
 };
 const TAGS_KEY = 'mapng_beamNGExcludeTags';

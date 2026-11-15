@@ -99,11 +99,17 @@ const BY_ID = new Map(CONTENT_ITEMS.map((it) => [it.id, it]));
 export const ROAD_CLASS_IDS = ['motorways', 'mainRoads', 'streets', 'serviceRoads', 'tracks'];
 
 const keepOnly = (ids) => CONTENT_IDS.filter((id) => !ids.includes(id));
+/**
+ * Off unless switched on: an abandoned line's rails are mostly gone and its old alignment runs across
+ * streets since paved over (on a Pittsburgh test area the abandoned lines cut ten level crossings into
+ * streets; the disused ones none). The row is there for the places where the track still lies.
+ */
+export const DEFAULT_OFF_IDS = ['railwaysAbandoned'];
 /** Quick select: what each preset switches off. */
 export const CONTENT_PRESETS = {
-  all: [],
-  clean: ['benches', 'bins', 'hydrants', 'poles', 'parkedCars', 'calming', 'gates'],
-  roads: keepOnly(['roadSurfaces', ...ROAD_CLASS_IDS, 'markings', 'crosswalks', 'signals', 'signs', 'lamps', 'calming', 'bridges', 'tunnels', 'dams', 'railways', 'railwaysDisused', 'railwaysAbandoned']),
+  all: [...DEFAULT_OFF_IDS],
+  clean: ['benches', 'bins', 'hydrants', 'poles', 'parkedCars', 'calming', 'gates', ...DEFAULT_OFF_IDS],
+  roads: keepOnly(['roadSurfaces', ...ROAD_CLASS_IDS, 'markings', 'crosswalks', 'signals', 'signs', 'lamps', 'calming', 'bridges', 'tunnels', 'dams', 'railways', 'railwaysDisused']),
   scenery: keepOnly(['trees', 'groundCover', 'rocks', 'rivers', 'lakes', 'sea']),
 };
 export const PRESET_IDS = Object.keys(CONTENT_PRESETS);

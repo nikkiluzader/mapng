@@ -26,9 +26,9 @@ const lifecycleKind = (tags, state) => {
   const kind = RAIL_KIND_SET.has(was) ? was : 'rail';
   return state === 'abandoned' && (kind === 'tram' || kind === 'subway') ? null : kind;
 };
-// (the old way of saying it, on a line still tagged railway=rail: disused=yes and abandoned=yes
-// are built as the line they are on; these mean there is no track)
-const LIFECYCLE_FLAGS = ['razed', 'demolished', 'construction', 'proposed'];
+// (the old way of saying it, on a line still tagged railway=rail: disused=yes is built as the line
+// it is on; these mean there is no track, or, for abandoned=yes, most likely none)
+const LIFECYCLE_FLAGS = ['abandoned', 'razed', 'demolished', 'construction', 'proposed'];
 /** 'disused' | 'abandoned' | 'preserved' for such a line, or null for one in use (What to build's rows). */
 export function railStateOf(tags = {}) {
   const v = String(tags.railway ?? '').toLowerCase();

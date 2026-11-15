@@ -31,6 +31,7 @@ test('railKindOf: lines in use and closed lines in; lines never or no longer the
   assert.equal(railKindOf({ railway: 'proposed' }), null);
   assert.equal(railStateOf({ railway: 'disused' }), 'disused');
   assert.equal(railStateOf({ railway: 'rail', abandoned: 'yes' }), 'abandoned');
+  assert.equal(railKindOf({ railway: 'rail', abandoned: 'yes' }), null);
   assert.equal(railStateOf({ railway: 'rail' }), null);
   assert.equal(railKindOf({ railway: 'construction', construction: 'rail' }), null);
   assert.equal(railKindOf({ railway: 'rail', disused: 'yes' }), 'rail');
@@ -150,4 +151,13 @@ test('What to build: disused and abandoned lines have rows of their own, and swi
   const choice = contentExportOptions ? contentExportOptions(['railwaysAbandoned'], []) : null;
   const tags = choice?.excludeTags || ['railway=abandoned'];
   assert.deepEqual(filterOsmByTags(feats, tags).features.map((f) => f.id), ['a', 'b']);
+});
+
+test('abandoned lines are off unless switched on: in every quick-select preset, and for the test export', async () => {
+  const { CONTENT_PRESETS, DEFAULT_OFF_IDS, presetOf } = await import('../services/buildContent.js');
+  assert.deepEqual(DEFAULT_OFF_IDS, ['railwaysAbandoned']);
+  for (const [name, off] of Object.entries(CONTENT_PRESETS)) assert.ok(off.includes('railwaysAbandoned'), name);
+  assert.ok(!CONTENT_PRESETS.all.includes('railwaysDisused') && !CONTENT_PRESETS.roads.includes('railwaysDisused'));
+  assert.equal(presetOf(['railwaysAbandoned']), 'all');
+  assert.equal(presetOf([]), 'custom');     // (everything and the abandoned lines too: a choice of one's own)
 });
