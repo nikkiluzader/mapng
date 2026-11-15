@@ -8002,9 +8002,9 @@
    "count": 1190000,
    "group": "furniture",
    "item": "poles",
-   "status": "partial",
+   "status": "built",
    "fetched": true,
-   "builds": "Nothing today: fetched and typed as a power line, then dropped; planned: towers and wires",
+   "builds": "Lattice towers at the line's vertices with its conductors and earth wire between them (a line under 100 kV: poles, as a minor line)",
    "assets": [
     {"shape":"/levels/west_coast_usa/art/shapes/objects/pylon.dae","region":"north-america","usedToday":false,"is":"A lattice transmission tower for high-voltage lines","size":[7.8,8.6,35.8],"seen":"2026-11-15"}
    ],
@@ -8023,7 +8023,7 @@
      "used": false
     }
    },
-   "code": "services/exportBeamNGLevel.js",
+   "code": "services/streetProps.js (POLE_TYPES.tower, isTowerLine)",
    "note": "What the two \"pylon\" meshes are (lattice tower or something else) is not determined"
   },
   "power=minor_line": {
@@ -8188,11 +8188,11 @@
    "count": 18680000,
    "group": "furniture",
    "item": "poles",
-   "status": "planned",
+   "status": "built",
    "fetched": false,
-   "builds": "A lattice tower under the line",
+   "builds": "A lattice tower, at each vertex of its power=line",
    "assets": [
-    {"shape":"/levels/west_coast_usa/art/shapes/objects/pylon.dae","region":"north-america","usedToday":false,"is":"A lattice transmission tower for high-voltage lines","size":[7.8,8.6,35.8],"seen":"2026-11-15"}
+    {"shape":"/levels/west_coast_usa/art/shapes/objects/pylon.dae","region":"north-america","usedToday":true,"is":"A lattice transmission tower for high-voltage lines","size":[7.8,8.6,35.8],"seen":"2026-11-15"}
    ],
    "generated": "A lattice tower mesh if the native pylon does not fit",
    "properties": {
@@ -8213,7 +8213,8 @@
      "used": false
     }
    },
-   "note": "Listed under Poles in buildContent.js but not fetched. 18.7 M nodes: the most numerous unbuilt point feature"
+   "note": "The tower's own node is not fetched: a tower stands at every vertex of a power=line way, which is where OSM maps them",
+   "code": "services/streetProps.js (POLE_TYPES.tower, isTowerLine)"
   },
   "power=transformer": {
    "what": "A transformer",

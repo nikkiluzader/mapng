@@ -867,6 +867,14 @@
     "note": "Ornate cast-iron lamppost for European streetscapes (8.3 m, 2.9 m arm)"
    },
    "ship": true
+  },
+  "PROP_SHAPES.towerLattice": {
+   "tag": "power=tower",
+   "shape": "/levels/west_coast_usa/art/shapes/objects/pylon.dae",
+   "ship": true,
+   "facts": {
+    "note": "a high-voltage lattice tower, 29.9 m over its origin, legs 5.9 m below it; cross-arms along Y (streetProps.js POLE_TYPES.tower has its wire fittings)"
+   }
   }
  }
 }

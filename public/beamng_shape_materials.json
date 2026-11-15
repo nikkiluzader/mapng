@@ -6014,6 +6014,70 @@
     }
   },
   "tag_models": {
+    "Italy_bld_ind_windows": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/trim/plastic/italy_bld_ind_windows/Italy_bld_ind_windows_d.dds",
+          "detailNormalMapStrength": 0.5,
+          "detailScale": [
+            8,
+            8
+          ],
+          "diffuseColor": [
+            0.996078014,
+            0.996078014,
+            0.996078014,
+            0.867999971
+          ],
+          "normalMap": "/assets/materials/trim/plastic/italy_bld_ind_windows/Italy_bld_ind_windows_n.dds",
+          "reflectivityMap": "/assets/materials/trim/plastic/italy_bld_ind_windows/Italy_bld_ind_windows_r.dds",
+          "roughnessFactor": 0.690170348,
+          "specular": [
+            0.996078014,
+            0.996078014,
+            0.996078014,
+            1
+          ],
+          "specularMap": "/assets/materials/trim/plastic/italy_bld_ind_windows/Italy_bld_ind_windows_s.dds",
+          "vertColor": true
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "vertColor": null
+        }
+      ],
+      "alphaRef": 197,
+      "alphaTest": true,
+      "class": "Material",
+      "dynamicCubemap": true,
+      "groundType": "PLASTIC",
+      "mapTo": "Italy_bld_ind_windows",
+      "materialTag0": "beamng",
+      "materialTag1": "italy",
+      "name": "italy_bld_ind_windows",
+      "persistentId": "18209761-a1b1-42ea-8047-f65f67e56056",
+      "specularStrength0": "0.490196"
+    },
     "architraves": {
       "Stages": [
         {
@@ -6518,70 +6582,6 @@
       "persistentId": "727db393-b9f7-4fd6-83ef-40fb3264e131",
       "translucentBlendOp": "None",
       "version": 1.5
-    },
-    "italy_bld_ind_windows": {
-      "Stages": [
-        {
-          "colorMap": "/assets/materials/trim/plastic/italy_bld_ind_windows/Italy_bld_ind_windows_d.dds",
-          "detailNormalMapStrength": 0.5,
-          "detailScale": [
-            8,
-            8
-          ],
-          "diffuseColor": [
-            0.996078014,
-            0.996078014,
-            0.996078014,
-            0.867999971
-          ],
-          "normalMap": "/assets/materials/trim/plastic/italy_bld_ind_windows/Italy_bld_ind_windows_n.dds",
-          "reflectivityMap": "/assets/materials/trim/plastic/italy_bld_ind_windows/Italy_bld_ind_windows_r.dds",
-          "roughnessFactor": 0.690170348,
-          "specular": [
-            0.996078014,
-            0.996078014,
-            0.996078014,
-            1
-          ],
-          "specularMap": "/assets/materials/trim/plastic/italy_bld_ind_windows/Italy_bld_ind_windows_s.dds",
-          "vertColor": true
-        },
-        {
-          "detailNormalMapStrength": null,
-          "detailScale": null,
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "specular": null,
-          "vertColor": null
-        },
-        {
-          "detailNormalMapStrength": null,
-          "detailScale": null,
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "specular": null,
-          "vertColor": null
-        },
-        {
-          "detailNormalMapStrength": null,
-          "detailScale": null,
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "specular": null,
-          "vertColor": null
-        }
-      ],
-      "alphaRef": 197,
-      "alphaTest": true,
-      "class": "Material",
-      "dynamicCubemap": true,
-      "groundType": "PLASTIC",
-      "mapTo": "Italy_bld_ind_windows",
-      "materialTag0": "beamng",
-      "materialTag1": "italy",
-      "name": "italy_bld_ind_windows",
-      "persistentId": "18209761-a1b1-42ea-8047-f65f67e56056",
-      "specularStrength0": "0.490196"
     },
     "italy_bld_metal": {
       "Stages": [

@@ -8043,7 +8043,7 @@ function buildDetailedReportSections(d) {
   lines.push(`- Divided-road medians: ${medianRuns.length} island run(s), ${formatNumber(medianM / 1000, 2)} km of curb, on ${new Set(medianRuns.map((r) => r.owner)).size} carriageway(s)`);
   const sp = d.streetProps || {};
   const mp = d.mappedStreetProps || {};
-  lines.push(`- Street props placed: ${(sp.hydrants || []).length} hydrants, ${(sp.bins || []).length} bins, ${(sp.benches || []).length} benches, ${(sp.poles || []).length} utility poles, ${(sp.wires || []).length} power line spans`);
+  lines.push(`- Street props placed: ${(sp.hydrants || []).length} hydrants, ${(sp.bins || []).length} bins, ${(sp.benches || []).length} benches, ${(sp.poles || []).length} utility poles (${(sp.poles || []).filter((p) => p.type === 'tower').length} of them lattice towers on high-voltage lines), ${(sp.wires || []).length} power line spans`);
   if (sp.countryPoles === false) lines.push('- Utility poles: only the ones OpenStreetMap maps. Pole lines along country roads are added where they are the norm (North America, Japan, Australia, New Zealand), not here.');
   lines.push(`- Mapped in OSM: ${(mp.hydrants || []).length} hydrants, ${(mp.bins || []).length} bins`);
   const sig = d.signalData || {};
@@ -9652,8 +9652,8 @@ const lampLink = (lightName) => ({ child: lightName, instanceColor: [0, 0, 0, 1]
 /**
  * Mapped street props in world space for placeStreetProps: hydrants, bins,
  * benches ([x, y]), standalone poles ([x, y, z]) and low-voltage power lines
- * ([[x, y, z]...]). High-voltage lines (power=line) are left out: their
- * lattice towers have no stock model, and a wooden pole would carry them.
+ * ([[x, y, z]...]). High-voltage lines (power=line) stand on lattice towers, one at every
+ * vertex of the line.
  */
 function collectMappedStreetProps(terrainData, squareSize) {
   const out = { hydrants: [], bins: [], benches: [], poles: [], powerLines: [] };
@@ -9661,12 +9661,35 @@ function collectMappedStreetProps(terrainData, squareSize) {
     const [x, y] = geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0);
     return [x, y, getTerrainHeightAtWorldXY(x, y, terrainData, squareSize)];
   };
+  // building and water outlines, by their boxes: where a line's vertex is no place for a tower
+  const solids = (terrainData.osmFeatures || []).filter((f) => (f.type === 'building' || f.type === 'water') && Array.isArray(f.geometry) && f.geometry.length >= 4)
+    .map((f) => {
+      let s = 90; let n = -90; let w = 180; let e = -180; for (const p of f.geometry) { s = Math.min(s, p.lat); n = Math.max(n, p.lat); w = Math.min(w, p.lng); e = Math.max(e, p.lng); }
+      // (a building's height as mapped, or by its storeys, else a hall's 9 m)
+      const t = f.tags || {}; const h = Number.parseFloat(t.height); const levels = Number.parseFloat(t['building:levels']);
+      return { g: f.geometry, s, n, w, e, on: f.type === 'water' ? 'water' : Number.isFinite(h) && h > 2 ? h : Number.isFinite(levels) && levels > 0 ? levels * 3.2 : 9 };
+    });
+  const onBuildingOrWater = (p) => {
+    for (const r of solids) {
+      if (p.lat < r.s || p.lat > r.n || p.lng < r.w || p.lng > r.e) continue;
+      let inside = false;
+      for (let i = 0, j = r.g.length - 1; i < r.g.length; j = i++) {
+        const a = r.g[i]; const b = r.g[j];
+        if ((a.lat > p.lat) !== (b.lat > p.lat) && p.lng < ((b.lng - a.lng) * (p.lat - a.lat)) / (b.lat - a.lat) + a.lng) inside = !inside;
+      }
+      if (inside) return r.on;
+    }
+    return false;
+  };
   for (const f of terrainData.osmFeatures || []) {
     const tags = f.tags || {};
     if (f.type === 'power_line') {
-      if (tags.power === 'minor_line' && Array.isArray(f.geometry) && f.geometry.length > 1) {
+      // (minor lines on poles, high-voltage lines on lattice towers: streetProps.js isTowerLine)
+      if ((tags.power === 'minor_line' || tags.power === 'line') && Array.isArray(f.geometry) && f.geometry.length > 1) {
         // (its tags along: a line's material / height picks its poles)
-        out.powerLines.push(Object.assign(f.geometry.map(toWorld), { tags, id: f.id }));
+        // (a vertex on water: nothing stands there. On a building, a line leaving a powerhouse or a substation hall:
+        // no tower inside it, the wires run to its roof; `blocked` is 'water' or the roof's height over the ground)
+        out.powerLines.push(Object.assign(f.geometry.map(toWorld), { tags, id: f.id, blocked: f.geometry.map((p) => onBuildingOrWater(p)) }));
       }
       continue;
     }

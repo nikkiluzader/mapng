@@ -86,7 +86,8 @@ test('utility poles: the region\'s own, a steel or concrete one where mapped so,
   assert.equal(choosePoleType({ lat: 29.9, lon: -81.3, tags: { material: 'concrete' } }), 'steel');
   assert.equal(choosePoleType({ lat: 29.9, lon: -81.3, tags: { height: '8' } }), 'wood_short');
   assert.equal(choosePoleType({ lat: 29.9, lon: -81.3, tags: { height: '11' } }), 'wood_wide');
-  for (const t of Object.values(POLE_TYPES)) assert.ok(t.wires.length >= 1 && t.wires.every(([, , z]) => z <= t.top), 'fittings on the pole');
+  // (the roof anchor is no pole: where a tower line's wires come down to a building's roof)
+  for (const t of Object.values(POLE_TYPES)) if (t.shape) assert.ok(t.wires.length >= 1 && t.wires.every(([, , z]) => z <= t.top), 'fittings on the pole');
 });
 
 test('poles run along a street through its junctions, wired across them', () => {
@@ -140,4 +141,43 @@ test('pole lines along country roads: added where they are the norm, mapped ones
   const there = placeStreetProps({ carriageways: [lane], countryPoles: false, mapped: { poles: [mappedPole] } });
   assert.equal(there.poles.length, 1, 'only the mapped pole');
   assert.equal(there.wires.length, 0);
+});
+
+test('a high-voltage line stands on lattice towers, its seven wires from tower to tower', async () => {
+  const { isTowerLine } = await import('../services/streetProps.js');
+  assert.ok(isTowerLine({ power: 'line' }) && isTowerLine({ power: 'line', voltage: '110000' }) && isTowerLine({ power: 'line', voltage: '20000;220000' }));
+  // (a distribution line mapped as power=line, and a minor line: poles)
+  assert.ok(!isTowerLine({ power: 'line', voltage: '20000' }) && !isTowerLine({ power: 'line', voltage: '69000' }) && !isTowerLine({ power: 'minor_line' }));
+  // a line running east, a tower every 300 m, a bend at the third
+  const line = Object.assign([[0, 0, 10], [300, 0, 12], [600, 0, 8], [800, 200, 8]], { tags: { power: 'line', voltage: '220000' }, id: 'hv' });
+  const { poles, wires } = placeStreetProps({ carriageways: [], runs: [], mapped: { powerLines: [line] }, heightAt: () => 0, countryPoles: false });
+  assert.equal(poles.length, 4); assert.ok(poles.every((p) => p.type === 'tower' && !p.lamp));
+  const T = POLE_TYPES.tower;
+  assert.equal(wires.length, 3 * T.wires.length, 'every span carried, though far longer than a pole\'s');
+  // on a straight run the tower's own x lies along the line: its cross-arms (local y) across it
+  const yaw = poles[0].yaw + T.yawOffset;
+  assert.ok(Math.abs(Math.cos(yaw) - 1) < 1e-9, `the tower's x along the line (yaw ${yaw})`);
+  // the outer conductors leave 4.1 m either side of the line, the earth wire from the peak; they sag between
+  const first = wires.slice(0, T.wires.length);
+  assert.ok(Math.abs(Math.abs(first[0][0][1]) - 4.1) < 1e-6 && Math.abs(first[6][0][1]) < 1e-6 && Math.abs(first[6][0][2] - (10 + 29.9)) < 1e-6);
+  const mid = first[0][Math.floor(first[0].length / 2)];
+  assert.ok(mid[2] < 10 + 15.7 - 4 && mid[2] > 10 + 15.7 - 9, `the lowest conductor sags to ${mid[2].toFixed(1)} m at mid-span`);
+  // a pole line still stops at a pole's reach
+  const far = wireLines([{ x: 0, y: 0, z: 0, yaw: 0, type: 'wood_short' }, { x: 300, y: 0, z: 0, yaw: 0, type: 'wood_short' }]);
+  assert.equal(far.length, 0);
+});
+
+test('a tower line leaving a building: no tower inside it, the wires run to its roof; nothing stands on water', () => {
+  // four vertices: on a 20 m powerhouse, two on open ground, one on water
+  const line = Object.assign([[0, 0, 5], [200, 0, 40], [450, 0, 40], [700, 0, 0]], { tags: { power: 'line' }, id: 'x', blocked: [20, false, false, 'water'] });
+  const { poles, wires } = placeStreetProps({ carriageways: [], runs: [], mapped: { powerLines: [line] }, heightAt: () => 0, countryPoles: false });
+  assert.equal(poles.length, 2, 'towers on the open ground only'); assert.ok(poles.every((p) => p.type === 'tower'));
+  const n = POLE_TYPES.tower.wires.length;
+  assert.equal(wires.length, 2 * n, 'the roof to the first tower, and tower to tower; none out over the water');
+  // the first span starts just over the roof (ground 5 m + 20 m of building)
+  assert.ok(wires.slice(0, n).every((w) => Math.abs(w[0][2] - (5 + 20 + 1.2)) < 1e-6));
+  // a pole line's vertex on a building: no pole, and no wire to it
+  const minor = Object.assign([[0, 0, 0], [40, 0, 0], [80, 0, 0]], { tags: { power: 'minor_line' }, id: 'm', blocked: [9, false, false] });
+  const low = placeStreetProps({ carriageways: [], runs: [], mapped: { powerLines: [minor] }, heightAt: () => 0, countryPoles: false });
+  assert.equal(low.poles.length, 2); assert.equal(low.wires.length, POLE_TYPES[low.poles[0].type].wires.length);
 });

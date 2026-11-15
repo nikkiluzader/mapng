@@ -56,6 +56,14 @@ export const POLE_TYPES = {
   wood_tall: { shape: 'poleWoodTall', top: 13.5, wires: [[0, 0.75, 13.3], [0, 0.75, 12.57], [0, 0.75, 11.85]], yawOffset: Math.PI / 2, lampZ: 9.5 },
   // a steel mast, brackets stepping down one side (Johnson Valley)
   steel: { shape: 'poleSteel', top: 8.1, wires: [[0.25, 0.2, 6.7], [0.25, 0.2, 6.35], [0.25, 0.2, 6.0]], lampZ: 5.2 },
+  // a high-voltage lattice tower (West Coast USA's pylon, 29.9 m; its legs run 5.9 m below its origin, for a
+  // slope): three cross-arms along local y, a conductor from the foot of the insulator at each end (measured
+  // from the model: 4.1 m out, at 15.7, 20.45 and 25.2 m) and the earth wire from its peak. Its line runs along
+  // local x. Spans of hundreds of metres, sagging more than a street's wires.
+  // where a tower line leaves a building's roof (a powerhouse, a substation hall): no model, the seven wires
+  // brought down to a row across the line just over the roof
+  roof_anchor: { shape: null, top: 0, wires: [[0, -4.1, 1.2], [0, 4.1, 1.2], [0, -2.7, 1.2], [0, 2.7, 1.2], [0, -1.3, 1.2], [0, 1.3, 1.2], [0, 0, 1.2]], yawOffset: -Math.PI / 2, maxSpan: 600, sag: 0.022 },
+  tower: { shape: 'towerLattice', top: 29.9, wires: [[0, -4.1, 15.7], [0, 4.1, 15.7], [0, -4.1, 20.45], [0, 4.1, 20.45], [0, -4.1, 25.2], [0, 4.1, 25.2], [0, 0, 29.9]], yawOffset: -Math.PI / 2, maxSpan: 600, sag: 0.022 },
 };
 // [type, weight] by region
 const POLE_SETS = {
@@ -64,6 +72,16 @@ const POLE_SETS = {
   world: [['wood_short', 0.6], ['steel', 0.4]],
 };
 const STEEL_MATERIALS = new Set(['steel', 'metal', 'concrete', 'reinforced_concrete', 'iron']);
+
+/**
+ * Whether a mapped line is carried on lattice towers: power=line (OSM's high-voltage lines), unless its voltage
+ * says it is under 100 kV (distribution and sub-transmission at 33 to 69 kV), which runs on poles.
+ */
+export function isTowerLine(tags = {}) {
+  if (tags.power !== 'line') return false;
+  const volts = String(tags.voltage || '').split(/[;,/]/).map((v) => Number.parseFloat(v)).filter(Number.isFinite);
+  return !volts.length || Math.max(...volts) >= 100000;
+}
 
 /**
  * The pole type for a run (or a lone pole): its tags first (a steel or
@@ -245,7 +263,10 @@ export function wireLines(poles) {
     const a = poles[i];
     const b = poles[i + 1];
     const span = Math.hypot(b.x - a.x, b.y - a.y);
-    if (span < WIRE_MIN_SPAN_M || span > WIRE_MAX_SPAN_M) continue;
+    const ta = POLE_TYPES[a.type] || POLE_TYPES.wood_wide;
+    // (a tower's span is hundreds of metres; a pole's is not)
+    if (span < WIRE_MIN_SPAN_M || span > (ta.maxSpan ?? WIRE_MAX_SPAN_M)) continue;
+    const sag = ta.sag ?? WIRE_SAG;
     const segs = Math.max(2, Math.ceil(span / 12));
     // (one type along a run: fitting k of one pole to fitting k of the next)
     const fits = (POLE_TYPES[a.type] || POLE_TYPES.wood_wide).wires;
@@ -256,7 +277,7 @@ export function wireLines(poles) {
       const line = [];
       for (let s = 0; s <= segs; s++) {
         const t = s / segs;
-        line.push([ax + (bx - ax) * t, ay + (by - ay) * t, az + (bz - az) * t - 4 * WIRE_SAG * span * t * (1 - t)]);
+        line.push([ax + (bx - ax) * t, ay + (by - ay) * t, az + (bz - az) * t - 4 * sag * span * t * (1 - t)]);
       }
       out.push(line);
     }
@@ -438,13 +459,20 @@ export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, he
   const nearMappedLine = lineIndex(mapped.powerLines || []);
   // Mapped low-voltage lines: a pole at every vertex, cross-arm across the line.
   for (const line of mapped.powerLines || []) {
-    const run = [];
-    const type = choosePoleType({ lat, lon, tags: line.tags || {}, seed: `line:${line.id ?? line[0]?.join(',')}` });
+    // (a high-voltage line: a lattice tower at every vertex, as OSM maps them)
+    const type = isTowerLine(line.tags) ? 'tower' : choosePoleType({ lat, lon, tags: line.tags || {}, seed: `line:${line.id ?? line[0]?.join(',')}` });
+    let run = [];
     for (let i = 0; i < line.length && poles.length < maxPoles; i++) {
+      // (a vertex on a building or on water, or where a deck is in the way: nothing stands there, and the wires
+      // stop at the towers either side)
       const a = line[Math.max(0, i - 1)];
       const b = line[Math.min(line.length - 1, i + 1)];
       const along = Math.atan2(b[1] - a[1], b[0] - a[0]);
       const [x, y, z] = line[i];
+      const on = line.blocked?.[i];
+      // (a tower line's vertex on a building: the wires go to its roof, no tower inside it)
+      if (type === 'tower' && Number.isFinite(on)) { run.push({ x, y, z: (z ?? heightAt(x, y)) + on, yaw: along + Math.PI / 2, lamp: false, type: 'roof_anchor' }); continue; }
+      if (on || isBlocked(x, y, z ?? heightAt(x, y), (z ?? heightAt(x, y)) + POLE_TYPES[type].top)) { wires.push(...wireLines(run)); run = []; continue; }
       const pole = { x, y, z: z ?? heightAt(x, y), yaw: along + Math.PI / 2, lamp: false, type };
       poles.push(pole);
       run.push(pole);
