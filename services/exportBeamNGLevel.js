@@ -6075,6 +6075,8 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     });
     // (fine elevation: ground roads follow the slope the survey measured along them, structures/profileSolve.js)
     structureGraph.fineGround = !terrainData?.coarseElevation;
+    // (Every road follows the lidar survey: main roads and motorways too, not only tertiary roads and smaller)
+    structureGraph.followSurvey = opts.roadsFollowSurvey === true;
     // (bridges / tunnels switched off: those roads are plain roads)
     if (!includeBridges) for (const e of structureGraph.edges) e.bridge = false;
     if (!includeTunnels) for (const e of structureGraph.edges) e.tunnel = false;
@@ -8221,6 +8223,7 @@ function buildBeamNGExportReport({
     ...(sanitizeTreeModelsOff(options?.treeModelsOff).length ? [`- Tree models left out (Fine-tuning): ${sanitizeTreeModelsOff(options.treeModelsOff).join(', ')}`] : []),
     `- Include rocks: ${formatBool(options?.includeRocks)}`,
     `- Street parking assumed where none is mapped: ${formatBool(options?.assumeParking === true)}`,
+    `- Roads follow the lidar survey's slope: ${originalTerrainData?.coarseElevation ? 'no (coarse elevation here: class grades)' : options?.roadsFollowSurvey === true ? 'every road, 35% at most' : 'tertiary roads and smaller, 35% at most; main roads keep their class grade'}`,
     `- View distance: ${viewDistanceChoice(options?.viewDistance) === 'auto' ? 'auto (the map\'s width, 4 km at least, 16 km at most)' : `${viewDistanceChoice(options?.viewDistance)} m`} (LevelInfo visibleDistance)`,
     `- Road surfaces: ${options?.roadSurface === 'hero' ? 'Hero Roads (experimental): built by a script when the level loads, over MapNG\'s decal roads (hidden under them, kept for traffic); editable in the World Editor > Hero Road, rebuilt from MapNG\'s roads at each load' : options?.roadSurface === 'mesh' ? 'Mesh Roads (experimental): a MeshRoad deck saved in the level under each paved road on the ground, MapNG\'s decal roads drawn on it (and kept for traffic)' : 'decal roads'}`,
     `- Include sidewalks: ${formatBool(options?.includeSidewalks !== false)}${options?.includeSidewalks !== false ? ` (${options?.sidewalkStyle === 'decal' ? 'as decals: flat strips on the ground, no curbs' : `as meshes: raised slabs with curbs, ${Math.round((CURB_HEIGHTS_M[options?.curbHeight] ?? CURB_HEIGHTS_M.standard) * 100)} cm high`})` : ''}`,
@@ -12687,7 +12690,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const sourceHeightMap = exportTerrainData.heightMap;
 
   const decalRoads = includeRoads
-    ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_, { raisedFootways: includeSidewalks, sidewalkStrips, junctionMouths: options.junctionMouths, structureSolver: options.structureSolver, includeBridges, includeTunnels, includeDams: includeBuildings && options.includeDams !== false, includeRailways: options.includeRailways !== false, shaping: shapingOptions, lidar: lidar?.grid ? lidar : null, rawAt: rawAtWorld })
+    ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_, { raisedFootways: includeSidewalks, sidewalkStrips, junctionMouths: options.junctionMouths, roadsFollowSurvey: options.roadsFollowSurvey === true, structureSolver: options.structureSolver, includeBridges, includeTunnels, includeDams: includeBuildings && options.includeDams !== false, includeRailways: options.includeRailways !== false, shaping: shapingOptions, lidar: lidar?.grid ? lidar : null, rawAt: rawAtWorld })
     : [];
   // Bridges: decks for the bridge roads; nothing ground-bound (sidewalks,
   // props, lamps) is built along them, nothing tall stands up into them.

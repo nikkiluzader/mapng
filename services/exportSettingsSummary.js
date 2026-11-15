@@ -40,6 +40,8 @@ export function summarizeExportSettings(opts = {}, ctx = {}) {
     toggle('safeCaps', !!opts.safeCaps),
     // (only when switched off: town streets without the assumed parking lanes)
     ...(opts.assumeParking === true ? [toggle('assumeParking', true)] : []),
+    // (only when switched on: main roads and motorways at the lidar survey's slope too)
+    ...(opts.roadsFollowSurvey === true ? [toggle('followSurvey', true)] : []),
     // (only when chosen: sidewalks as flat decals instead of raised meshes)
     ...(opts.sidewalkStyle === 'decal' ? [toggle('decalSidewalks', true)] : []),
     ...(opts.sidewalkStyle !== 'decal' && ['low', 'flush'].includes(opts.curbHeight) ? [row('curbHeight', { t: `curbHeight_${opts.curbHeight}` }, false)] : []),

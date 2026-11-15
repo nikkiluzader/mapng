@@ -377,3 +377,19 @@ test('profile: a street beside a bridge does not follow the wall a bare-earth su
   for (let i = 0; i + 1 < n; i++) steepest = Math.max(steepest, Math.abs(z[0][i + 1] - z[0][i]) / 4);
   assert.ok(steepest <= 0.26, `the street runs at ${(steepest * 100).toFixed(0)}% at most (its class, not the wall's 58%)`);
 });
+
+test('profile: with "Every road follows the lidar survey" a main road follows the measured slope too', async () => {
+  const { solveProfiles } = await import('../services/structures/profileSolve.js');
+  const x = [0]; const g = [100];
+  for (const [len, grade] of [[60, 0.02], [80, 0.22], [60, 0.08], [80, 0.22], [60, 0.08], [80, 0.22], [60, 0.02]]) for (let d = 4; d <= len; d += 4) { x.push(x.at(-1) + 4); g.push(g.at(-1) - 4 * grade); }
+  const off = (highway, followSurvey) => {
+    const e = { x: Float64Array.from(x), y: new Float64Array(x.length), s: Float64Array.from(x), g: Float64Array.from(g), from: 'A', to: 'B', highway, layer: 0, half: 3.5, bridge: false, tunnel: false };
+    const nodes = new Map([['A', { edges: [{ edge: 0, end: 0 }] }], ['B', { edges: [{ edge: 0, end: 1 }] }]]);
+    const { z } = solveProfiles({ edges: [e], nodes, pins: [], fineGround: true, followSurvey, crossings: { crossings: [], water: [] } });
+    return Math.max(...Array.from(e.s, (_, i) => Math.abs(z[0][i] - e.g[i])));
+  };
+  for (const highway of ['secondary', 'primary', 'motorway']) {
+    assert.ok(off(highway, true) < 1.2, `${highway}, switched on: ${off(highway, true).toFixed(2)} m off its ground`);
+    assert.ok(off(highway, false) > off(highway, true) + 1, `${highway}, off: ${off(highway, false).toFixed(2)} m (its class grade)`);
+  }
+});

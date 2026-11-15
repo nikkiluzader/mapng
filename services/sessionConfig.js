@@ -26,6 +26,7 @@ export const EXPORT_FIELDS = [
   ['curbHeight', 'mapng_beamNGCurbHeight', ['standard', 'low', 'flush'], 'standard'],   // (raised sidewalks' height: beamngSidewalks.js CURB_HEIGHTS_M)
   ['roadSurface', 'mapng_beamNGRoadSurface', ['decal', 'mesh', 'hero'], 'decal'],   // (experimental: mesh, meshRoads.js; hero, heroRoadsLua.js)
   ['decalSidewalks', 'mapng_beamNGDecalSidewalks', 'bool', false],   // (on: sidewalks as flat decals, exportBeamNGLevel.js sidewalkStyle)
+  ['followSurvey', 'mapng_beamNGFollowSurvey', 'bool', false],   // (on: every road at the lidar survey's slope, structures/profileSolve.js)
   ['assumeParking', 'mapng_beamNGAssumeParking', 'bool', false],   // (on: a parking lane each side of town streets with no parking tags, services/roadWidth.js)
   ['bridges', 'mapng_beamNGIncludeBridges', 'bool', true],
   ['tunnels', 'mapng_beamNGIncludeTunnels', 'bool', true],
@@ -53,7 +54,7 @@ const LIST_KINDS = { contentList: sanitizeContentOff, tagList: sanitizeExcludeTa
 /** Whether a field holds a list (stored as JSON; not counted in the settings stats). */
 export const isListField = ([, , kind]) => Object.hasOwn(LIST_KINDS, kind);
 // (not counted in the settings stats: public/data.html lists every counted setting)
-const NOT_COUNTED = new Set(['fallbackSource', 'contentOff', 'excludeTags', 'basicPreset', 'viewDistance', 'assumeParking', 'decalSidewalks', 'curbHeight']);
+const NOT_COUNTED = new Set(['fallbackSource', 'contentOff', 'excludeTags', 'basicPreset', 'viewDistance', 'assumeParking', 'followSurvey', 'decalSidewalks', 'curbHeight']);
 export const isCountedField = (field) => !NOT_COUNTED.has(field[0]) && !isListField(field);
 
 /** Data-part settings kept outside the run configuration: [name, key, kind, default]. */
@@ -276,7 +277,7 @@ export function sanitizeSessionConfig(config) {
 
 // (the fields of a config that have a row of their own in the dialog; the rest are counted)
 const OTHER_TOP_FIELDS = ['zoom', 'gapFillSource', 'fallbackSource', 'elevationUnitOverride', 'overtureBuildings', 'workflow'];
-const DESCRIBED_EXPORT_FIELDS = new Set(['baseTexture', 'buildings', 'water', 'trees', 'rocks', 'roads', 'basicPreset', 'contentOff', 'excludeTags', 'forestDensity', 'assumeParking', 'decalSidewalks', 'curbHeight', 'viewDistance', 'bridges', 'tunnels', 'measuredBridgeHeights', 'terrainEdits', 'shapeRoads', 'shapeBridges', 'shapeOverpasses', 'shapeTunnels', 'shapeExtras', 'shapeDetail', 'backdrop', 'safeCaps', 'roadSurface']);
+const DESCRIBED_EXPORT_FIELDS = new Set(['baseTexture', 'buildings', 'water', 'trees', 'rocks', 'roads', 'basicPreset', 'contentOff', 'excludeTags', 'forestDensity', 'assumeParking', 'followSurvey', 'decalSidewalks', 'curbHeight', 'viewDistance', 'bridges', 'tunnels', 'measuredBridgeHeights', 'terrainEdits', 'shapeRoads', 'shapeBridges', 'shapeOverpasses', 'shapeTunnels', 'shapeExtras', 'shapeDetail', 'backdrop', 'safeCaps', 'roadSurface']);
 
 /**
  * Rows [{ section, label, value, warn? }] describing a config, with label and
@@ -330,6 +331,7 @@ export function describeSessionConfig(config, { hasGpxzKey = false } = {}) {
     if (advanced && tagList.length) add('export', 'config.excludeTags', { value: tagList.slice(0, 6).join(', ') + (tagList.length > 6 ? ` +${tagList.length - 6}` : '') });
     if (advanced && e.trees !== false && e.forestDensity && e.forestDensity !== 'normal') add('export', 'config.forestDensity', { valueKey: `exportPanel.ui.forestDensity_${e.forestDensity}` });
     if (advanced && e.assumeParking === true) add('export', 'config.assumeParking', { valueKey: 'config.on' });
+    if (advanced && e.followSurvey === true) add('export', 'config.followSurvey', { valueKey: 'config.on' });
     if (advanced && e.decalSidewalks === true) add('export', 'config.decalSidewalks', { valueKey: 'config.on' });
     if (advanced && e.decalSidewalks !== true && e.curbHeight && e.curbHeight !== 'standard') add('export', 'config.curbHeight', { valueKey: `exportPanel.ui.curbHeight_${e.curbHeight}` });
     if (advanced && e.viewDistance && String(e.viewDistance) !== 'auto') add('export', 'config.viewDistance', { value: `${Number(e.viewDistance) / 1000} km` });

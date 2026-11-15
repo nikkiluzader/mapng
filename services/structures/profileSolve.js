@@ -150,7 +150,7 @@ function tautProfile(Z, L, U, idx, s, freeA = false, freeB = false, G = null) {
 // keeps its slope; a short hollow or spike in the elevation data, steeper
 // than the slope around it, is bridged by fill or cut). A deck or tunnel
 // does not follow the ground: its class limit only.
-function allowedRise(e, structure = !!(e.bridge || e.tunnel), fine = false, structureAt = null) {
+function allowedRise(e, structure = !!(e.bridge || e.tunnel), fine = false, structureAt = null, everyClass = false) {
   const lim = gradeLimit(e.highway);
   const n = e.s.length; const out = new Float64Array(Math.max(0, n - 1));
   const g = (i) => (Number.isFinite(e.g[i]) ? e.g[i] : 0);
@@ -158,7 +158,8 @@ function allowedRise(e, structure = !!(e.bridge || e.tunnel), fine = false, stru
   const slope = (p, q, need) => { const span = e.s[q] - e.s[p]; return span >= need ? Math.abs(g(q) - g(p)) / span : 0; };
   const rail = railKindOfClass(e.highway);
   const ceiling = (GRADE_CEILING[e.highway] ?? RAIL_GRADE_CEILING[rail] ?? GRADE_CEILING_DEFAULT) * 0.97;   // (a margin under the checks)
-  const follows = fine && !rail && !NEVER_FOLLOWS.has(e.highway);
+  // (everyClass: the export's "Every road follows the lidar survey", main roads and motorways too)
+  const follows = fine && !rail && (everyClass || !NEVER_FOLLOWS.has(e.highway));
   let a = 0; let b = 0; let a2 = 0; let b2 = 0; let a3 = 0; let b3 = 0;
   for (let i = 0; i + 1 < n; i++) {
     const ds = e.s[i + 1] - e.s[i];
@@ -268,7 +269,7 @@ export function* solveProfilesSteps(graph) {
   });
   // (a plain deck between held approaches, terrain shaping off, may ramp
   // this much steeper than its class: it must rise within its own length)
-  const stepRise = edges.map((e, k) => (graph.noCut?.[k] ? allowedRise(e, asStructure(e), !!graph.fineGround, structureEnds(graph, k)).map((r) => r * RAW_DECK_RAMP_FACTOR) : allowedRise(e, asStructure(e), !!graph.fineGround, structureEnds(graph, k))));
+  const stepRise = edges.map((e, k) => (graph.noCut?.[k] ? allowedRise(e, asStructure(e), !!graph.fineGround, structureEnds(graph, k), !!graph.followSurvey).map((r) => r * RAW_DECK_RAMP_FACTOR) : allowedRise(e, asStructure(e), !!graph.fineGround, structureEnds(graph, k), !!graph.followSurvey)));
   // neighbours: along each edge (with the step's allowed rise) and between
   // the ends meeting at a node (no rise)
   const nbr = Array.from({ length: N }, () => []);
@@ -982,7 +983,7 @@ export function profileResidual(graph, z) {
     crossing = Math.max(crossing, c.sep - (zu - zd));
   }
   edges.forEach((e, k) => {
-    const rise = allowedRise(e, asStructure(e), !!graph.fineGround, structureEnds(graph, k));
+    const rise = allowedRise(e, asStructure(e), !!graph.fineGround, structureEnds(graph, k), !!graph.followSurvey);
     for (let i = 0; i + 1 < e.s.length; i++) {
       const moved = Math.abs(z[k][i] - e.g[i]) > 0.05 || Math.abs(z[k][i + 1] - e.g[i + 1]) > 0.05;
       if (!(asStructure(e) || moved)) continue;
