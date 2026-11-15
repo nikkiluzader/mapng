@@ -181,3 +181,28 @@ test('a tower line leaving a building: no tower inside it, the wires run to its 
   const low = placeStreetProps({ carriageways: [], runs: [], mapped: { powerLines: [minor] }, heightAt: () => 0, countryPoles: false });
   assert.equal(low.poles.length, 2); assert.equal(low.wires.length, POLE_TYPES[low.poles[0].type].wires.length);
 });
+
+test('towers mapped on their own stand turned across the way to their neighbour, with no wires; a deck beside one keeps it off', () => {
+  // three towers in a row running north, mapped with no line through them, and one already on a mapped line
+  const lone = [[0, 0, 0], [0, 300, 0], [0, 600, 0]].map((p, i) => Object.assign(p, { tower: true, id: `t${i}`, tags: { power: 'tower' } }));
+  const line = Object.assign([[1000, 0, 0], [1300, 0, 0]], { tags: { power: 'line' }, id: 'l' });
+  const onLine = Object.assign([1300, 2, 0], { tower: true, id: 'dup', tags: { power: 'tower' } });
+  const { poles, wires } = placeStreetProps({ carriageways: [], runs: [], mapped: { poles: [...lone, onLine], powerLines: [line] }, heightAt: () => 0, countryPoles: false });
+  const own = poles.filter((p) => p.x === 0);
+  assert.equal(own.length, 3); assert.ok(own.every((p) => p.type === 'tower'));
+  assert.equal(poles.length, 5, 'the tower on the mapped line is not stood twice');
+  assert.equal(wires.length, POLE_TYPES.tower.wires.length, 'wires on the mapped line only');
+  // the tower's own x (yaw + offset) along the row: north
+  const a = own[0].yaw + POLE_TYPES.tower.yawOffset;
+  assert.ok(Math.abs(Math.sin(a) - 1) < 1e-9, `along the row (${a})`);
+  // a deck (1 m half-width) 4.5 m from a tower's centre: its 7.8 m base would stand in it, so no tower there
+  const hit = placeStreetProps({ carriageways: [], runs: [], mapped: { poles: [Object.assign([0, 0, 0], { tower: true, id: 'b', tags: {} })] }, heightAt: () => 0, countryPoles: false,
+    isBlocked: (x, y, z, zTop, margin = 1) => Math.abs(x - 4.5) <= 1 + margin && z < 8 && zTop > 8 });
+  assert.equal(hit.poles.length, 0);
+});
+
+test('a pole, unlike a tower, still stands beside that deck: the margin is the tower\'s base alone', () => {
+  const r = placeStreetProps({ carriageways: [], runs: [], mapped: { poles: [Object.assign([0, 0, 0], { id: 'p', tags: {} })] }, heightAt: () => 0, countryPoles: false,
+    isBlocked: (x, y, z, zTop, margin = 1) => Math.abs(x - 4.5) <= 1 + margin && z < 4 && zTop > 4 });
+  assert.equal(r.poles.length, 1);
+});

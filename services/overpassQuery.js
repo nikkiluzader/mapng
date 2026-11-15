@@ -8,7 +8,7 @@
  */
 import { tagObjectNodeTags } from './tagModels.js';
 
-export const OVERPASS_QUERY_VERSION = 6;   // 2: traffic_calming nodes; 3: food, drink and lodging nodes; 4: railways; 5: disused, preserved and abandoned lines; 6: bus stops, post boxes, picnic tables, flagpoles, recycling, information boards
+export const OVERPASS_QUERY_VERSION = 7;   // 2: traffic_calming nodes; 3: food, drink and lodging nodes; 4: railways; 5: disused, preserved and abandoned lines; 6: bus stops, post boxes, picnic tables, flagpoles, recycling, information boards; 7: power towers mapped on their own
 
 // Public Overpass mirrors (volunteer-run; any of them may be down).
 export const OVERPASS_ENDPOINTS = [
@@ -93,7 +93,7 @@ export const OSM_FILTER = {
     ['amenity', 'fuel'], ['amenity', 'charging_station'], ['man_made', 'fuel_pump'],
     ['highway', 'traffic_signals'], ['highway', 'stop'], ['highway', 'give_way'],
     ['highway', 'street_lamp'], ['barrier', 'bollard'], ['amenity', 'bench'],
-    ['emergency', 'fire_hydrant'], ['amenity', 'waste_basket'], ['power', 'pole'],
+    ['emergency', 'fire_hydrant'], ['amenity', 'waste_basket'], ['power', 'pole'], ['power', 'tower'],
     ['traffic_calming', 'bump'], ['traffic_calming', 'hump'], ['traffic_calming', 'table'], ['traffic_calming', 'cushion'],
     ['amenity', 'fountain'], ['amenity', 'drinking_water'],
     ...GATE_BARRIERS.map((v) => ['barrier', v]),

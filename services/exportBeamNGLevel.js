@@ -9712,6 +9712,9 @@ function collectMappedStreetProps(terrainData, squareSize) {
     else if (tags.amenity === 'waste_basket') out.bins.push(p);
     else if (tags.amenity === 'bench') out.benches.push(p);
     else if (tags.power === 'pole') out.poles.push(Object.assign(p, { tags, id: f.id }));
+    // (a tower mapped with no line through it: one stands, nothing on a building or water. A tower on a mapped line
+    // is that line's vertex and stands there already)
+    else if (tags.power === 'tower' && !onBuildingOrWater(f.geometry[0])) out.poles.push(Object.assign(p, { tags, id: f.id, tower: true }));
   }
   return out;
 }
@@ -12846,7 +12849,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // in a tube, a headwall or a cutting's walls (the hill over it is free).
   const tunnelList = decalRoads.tunnels?.tunnels || [];
   const groundCarriageways = (decalRoads.carriageways || []).filter((cw) => !cw.bridge && !cw.tunnel);
-  const underDeck = (x, y, z, zTop) => (bridgeDecks.length > 0 && hitsDeck(bridgeDecks, x, y, z, zTop))
+  const underDeck = (x, y, z, zTop, margin) => (bridgeDecks.length > 0 && hitsDeck(bridgeDecks, x, y, z, zTop, margin))
     || (tunnelList.length > 0 && hitsTunnel(tunnelList, x, y, z, zTop));
   // the spawn on a drawn road, not on the OSM line 3 m over the terrain (the
   // road nearest the centre was Zion's tunnel: the car dropped onto the cliff

@@ -8189,8 +8189,8 @@
    "group": "furniture",
    "item": "poles",
    "status": "built",
-   "fetched": false,
-   "builds": "A lattice tower, at each vertex of its power=line",
+   "fetched": true,
+   "builds": "A lattice tower at each vertex of its power=line, and where a tower is mapped with no line through it (turned toward its nearest neighbour, no wires)",
    "assets": [
     {"shape":"/levels/west_coast_usa/art/shapes/objects/pylon.dae","region":"north-america","usedToday":true,"is":"A lattice transmission tower for high-voltage lines","size":[7.8,8.6,35.8],"seen":"2026-11-15"}
    ],
@@ -8213,7 +8213,7 @@
      "used": false
     }
    },
-   "note": "The tower's own node is not fetched: a tower stands at every vertex of a power=line way, which is where OSM maps them",
+   "note": "A tower on a mapped line stands at that line's vertex; a tower mapped on its own is fetched since query version 7 and stands where it is. None stands on a building or water, or with its base in a bridge deck.",
    "code": "services/streetProps.js (POLE_TYPES.tower, isTowerLine)"
   },
   "power=transformer": {

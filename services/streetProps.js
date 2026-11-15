@@ -63,7 +63,7 @@ export const POLE_TYPES = {
   // where a tower line leaves a building's roof (a powerhouse, a substation hall): no model, the seven wires
   // brought down to a row across the line just over the roof
   roof_anchor: { shape: null, top: 0, wires: [[0, -4.1, 1.2], [0, 4.1, 1.2], [0, -2.7, 1.2], [0, 2.7, 1.2], [0, -1.3, 1.2], [0, 1.3, 1.2], [0, 0, 1.2]], yawOffset: -Math.PI / 2, maxSpan: 600, sag: 0.022 },
-  tower: { shape: 'towerLattice', top: 29.9, wires: [[0, -4.1, 15.7], [0, 4.1, 15.7], [0, -4.1, 20.45], [0, 4.1, 20.45], [0, -4.1, 25.2], [0, 4.1, 25.2], [0, 0, 29.9]], yawOffset: -Math.PI / 2, maxSpan: 600, sag: 0.022 },
+  tower: { shape: 'towerLattice', top: 29.9, base: 4, wires: [[0, -4.1, 15.7], [0, 4.1, 15.7], [0, -4.1, 20.45], [0, 4.1, 20.45], [0, -4.1, 25.2], [0, 4.1, 25.2], [0, 0, 29.9]], yawOffset: -Math.PI / 2, maxSpan: 600, sag: 0.022 },
 };
 // [type, weight] by region
 const POLE_SETS = {
@@ -400,7 +400,7 @@ export function buildChains(carriageways) {
  *   heightAt(x, y): terrain height
  *   townPoles: wooden poles with cobra-head lamps along unlit town streets (North America)
  *   countryPoles: pole lines added along country roads (roadsidePolesRegion; mapped ones always)
- *   isBlocked(x, y, z, zTop): no pole there (under a bridge deck)
+ *   isBlocked(x, y, z, zTop, margin?): no pole there (under a bridge deck; margin: how far round the point, a tower's base)
  *   lat, lon: the export's place (the region's poles, choosePoleType)
  * Returns { hydrants, bins, benches: [{ x, y, z, yaw }], poles: [{ x, y, z, yaw, lamp, type }], wires }.
  */
@@ -472,7 +472,10 @@ export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, he
       const on = line.blocked?.[i];
       // (a tower line's vertex on a building: the wires go to its roof, no tower inside it)
       if (type === 'tower' && Number.isFinite(on)) { run.push({ x, y, z: (z ?? heightAt(x, y)) + on, yaw: along + Math.PI / 2, lamp: false, type: 'roof_anchor' }); continue; }
-      if (on || isBlocked(x, y, z ?? heightAt(x, y), (z ?? heightAt(x, y)) + POLE_TYPES[type].top)) { wires.push(...wireLines(run)); run = []; continue; }
+      // (a tower's 7.8 m base clear of any deck, from a little under its foot to its peak: at the Hoover Dam two towers
+      // mapped beside a road bridge stood through its deck, the check made at their centre alone)
+      const base = POLE_TYPES[type].base || 0; const gz = z ?? heightAt(x, y);
+      if (on || isBlocked(x, y, gz - (base ? 2 : 0), gz + POLE_TYPES[type].top, base || undefined)) { wires.push(...wireLines(run)); run = []; continue; }
       const pole = { x, y, z: z ?? heightAt(x, y), yaw: along + Math.PI / 2, lamp: false, type };
       poles.push(pole);
       run.push(pole);
@@ -481,12 +484,22 @@ export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, he
   }
   const poleTaken = new Taken();
   for (const p of poles) poleTaken.add(p.x, p.y);
+  // (towers mapped on their own, with no line drawn through them: each turned across the way to its nearest
+  // neighbour tower, the way a line between them would run; no wires, there being no line to say where they go)
+  const lone = (mapped.poles || []).filter((mp) => mp.tower);
+  const towerPoints = [...lone, ...poles.filter((p) => p.type === 'tower').map((p) => [p.x, p.y])];
+  const towerYaw = (x, y) => {
+    let best = null; let bd = 1200;
+    for (const q of towerPoints) { const d = Math.hypot(q[0] - x, q[1] - y); if (d > 1 && d < bd) { bd = d; best = q; } }
+    return best ? Math.atan2(best[1] - y, best[0] - x) + Math.PI / 2 : 0;
+  };
   for (const mp of mapped.poles || []) {
     const [x, y, z] = mp;
-    if (poleTaken.near(x, y, 1.5) || poles.length >= maxPoles) continue;
-    const type = choosePoleType({ lat, lon, tags: mp.tags || {}, seed: `pole:${mp.id ?? `${x},${y}`}` });
-    if (isBlocked(x, y, z ?? heightAt(x, y), (z ?? heightAt(x, y)) + POLE_TYPES[type].top)) continue;
-    poles.push({ x, y, z: z ?? heightAt(x, y), yaw: 0, lamp: false, type });
+    if (poleTaken.near(x, y, mp.tower ? 8 : 1.5) || poles.length >= maxPoles) continue;
+    const type = mp.tower ? 'tower' : choosePoleType({ lat, lon, tags: mp.tags || {}, seed: `pole:${mp.id ?? `${x},${y}`}` });
+    const gz = z ?? heightAt(x, y); const base = POLE_TYPES[type].base || 0;
+    if (isBlocked(x, y, gz - (base ? 2 : 0), gz + POLE_TYPES[type].top, base || undefined)) continue;
+    poles.push({ x, y, z: gz, yaw: mp.tower ? towerYaw(x, y) : 0, lamp: false, type });
     poleTaken.add(x, y);
   }
 

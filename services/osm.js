@@ -345,7 +345,7 @@ export const parseOverpassResponse = (data, bounds) => {
           el.tags.amenity === "bench" ||
           el.tags.emergency === "fire_hydrant" ||
           el.tags.amenity === "waste_basket" ||
-          el.tags.power === "pole" ||
+          el.tags.power === "pole" || el.tags.power === "tower" ||
           el.tags.traffic_sign ||
           el.tags.highway === "give_way"
         ) {
