@@ -14,6 +14,7 @@
 // Pure geometry: returns plans the exporter turns into objects.
 
 import { GATE_BARRIERS } from './overpassQuery.js';
+import { partsOf } from './tagModels.js';
 
 const TILE_GATES = new Set(GATE_BARRIERS);
 const WALK_ONLY = new Set(['wicket_gate', 'kissing_gate', 'stile', 'turnstile', 'full-height_turnstile', 'bump_gate']);
@@ -34,14 +35,8 @@ const NO_ROAD_DRIVE_W_M = 4;  // a gate OSM opens to cars, no road mapped throug
 const SAME_GATE_M = 3;
 const OPEN_ANGLE = (98 * Math.PI) / 180;   // swung back a little past square
 
-export const GATE_SHAPES = {
-  farm: { shapeName: '/levels/hirochi_raceway/art/shapes/objects/farm_gate_metal1.dae', length: 3.67, origin: 'middle', z: 0 },
-  wood: { shapeName: '/levels/hirochi_raceway/art/shapes/objects/farm_gate_wood1.dae', length: 1.58, origin: 'end', z: 0 },
-  mesh: { shapeName: '/levels/Industrial/art/shapes/buildings/ind_mesh_fence_gate_3m.dae', length: 3, origin: 'end', z: 1.23 },
-  sliding: { shapeName: '/levels/Industrial/art/shapes/buildings/metal_gate.dae', length: 10.5, origin: 'far', z: 0.14 },
-  boom: { shapeName: '/levels/italy/art/shapes/buildings/italy_bld_boomgate_4.5m.dae', z: 0.31 },
-  boomLong: { shapeName: '/levels/italy/art/shapes/buildings/italy_bld_boomgate_6.5m.dae', z: 0.31 },
-};
+// (the gate models, their lengths and where their origins sit: data/model-picks.json parts)
+export const GATE_SHAPES = Object.fromEntries(Object.entries(partsOf('GATE_SHAPES')).map(([k, { shapeFile, ...rest }]) => [k, { shapeName: shapeFile, ...rest }]));
 
 const num = (v) => { const n = Number.parseFloat(v); return Number.isFinite(n) && n > 0 ? n : null; };
 

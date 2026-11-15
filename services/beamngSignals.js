@@ -5,6 +5,7 @@ import {
   splitApproachesByAxis,
 } from './signalApproaches.js';
 import { SIGNAL_MAST, SIGNAL_POLE } from './beamngPropLibrary.js';
+import { part } from './tagModels.js';
 
 const ROAD_SKIP = new Set([
   'footway', 'path', 'pedestrian', 'steps', 'cycleway',
@@ -934,7 +935,7 @@ function buildSignalArtifacts(terrainData, squareSize) {
 // head centre 3.0 m above the post base (73 of its heads). The head's lenses
 // face its local +X. A head lights up when it carries `signalInstance` and
 // `dynamic` (core/trafficSignals.lua), so heads link to their instance.
-export const SIGNAL_HEAD_SHAPE = '/art/shapes/objects/trafficlight_overhead1.dae';
+export const SIGNAL_HEAD_SHAPE = part('SIGNAL_HEAD').shapeFile;
 export const SIGNAL_POLE_SHAPE = SIGNAL_POLE.shapeFile;
 const HEAD_HEIGHT_M = 3.0;
 const HEAD_FORWARD_M = 0.15;

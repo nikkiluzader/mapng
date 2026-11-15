@@ -379,5 +379,494 @@
    "cap": 2000,
    "beside": 1
   }
+ },
+ "parts": {
+  "PROP_ITEMS.mapng_prop_hydrant": {
+   "tag": "emergency=fire_hydrant",
+   "shape": "/levels/west_coast_usa/art/shapes/objects/hydrant1.dae",
+   "facts": {
+    "name": "mapng_prop_hydrant",
+    "internalName": "mapng_prop_hydrant",
+    "class": "TSForestItemData",
+    "annotation": "OBSTACLES",
+    "radius": 0.2
+   },
+   "ship": true
+  },
+  "PROP_ITEMS.mapng_prop_bin_round": {
+   "tag": "amenity=waste_basket",
+   "shape": "/art/shapes/garage_and_dealership/Clutter/clutter_city_bin_round.dae",
+   "facts": {
+    "name": "mapng_prop_bin_round",
+    "internalName": "mapng_prop_bin_round",
+    "class": "TSForestItemData",
+    "annotation": "OBSTACLES",
+    "radius": 0.3
+   },
+   "ship": true
+  },
+  "PROP_ITEMS.mapng_prop_bin_wcusa": {
+   "tag": "amenity=waste_basket",
+   "shape": "/levels/west_coast_usa/art/shapes/objects/garbage_bin_a.dae",
+   "facts": {
+    "name": "mapng_prop_bin_wcusa",
+    "internalName": "mapng_prop_bin_wcusa",
+    "class": "TSForestItemData",
+    "annotation": "OBSTACLES",
+    "radius": 0.3
+   },
+   "ship": true
+  },
+  "PROP_SHAPES.poleWoodWide": {
+   "tag": "power=pole",
+   "shape": "/levels/automation_test_track/art/shapes/objects/powerpole.dae",
+   "ship": true
+  },
+  "PROP_SHAPES.poleWoodTown": {
+   "tag": "power=minor_line",
+   "shape": "/levels/east_coast_usa/art/shapes/buildings/electrical_pole.dae",
+   "ship": true
+  },
+  "PROP_SHAPES.poleWoodShort": {
+   "tag": "power=pole",
+   "shape": "/levels/johnson_valley/art/shapes/power_lines/electric_pole_02.dae",
+   "ship": true
+  },
+  "PROP_SHAPES.poleWoodArm": {
+   "tag": "power=minor_line",
+   "shape": "/levels/johnson_valley/art/shapes/power_lines/electric_pole_01.dae",
+   "ship": true
+  },
+  "PROP_SHAPES.poleWoodTall": {
+   "tag": "power=pole",
+   "shape": "/levels/west_coast_usa/art/shapes/objects/powerpole4.dae",
+   "ship": true
+  },
+  "PROP_SHAPES.poleSteel": {
+   "tag": "power=pole",
+   "shape": "/levels/johnson_valley/art/shapes/power_lines/metal_pole.dae",
+   "ship": true
+  },
+  "PROP_SHAPES.poleLamp": {
+   "tag": "highway=street_lamp",
+   "shape": "/levels/east_coast_usa/art/shapes/buildings/electrical_pole_lamp.dae",
+   "ship": true
+  },
+  "PROP_SHAPES.signPost": {
+   "tag": "untagged:fencePosts",
+   "shape": "/levels/west_coast_usa/art/shapes/objects/pole_fence2.dae",
+   "ship": true
+  },
+  "PROP_SHAPES.hedge": {
+   "tag": "barrier=hedge",
+   "shape": "/levels/italy/art/shapes/trees/trees_italy/cypress_hedge_3m.dae",
+   "ship": true
+  },
+  "PROP_SHAPES.hotelSign": {
+   "tag": "building=hotel",
+   "shape": "/levels/italy/art/shapes/buildings/italy_billboard_hotel_big.dae",
+   "facts": {
+    "yawOffset": -1.5707963267948966
+   },
+   "ship": true
+  },
+  "PROP_SHAPES.flagWall": {
+   "tag": "untagged:flag",
+   "shape": "/levels/east_coast_usa/art/shapes/buildings/eca_flag_usa.dae",
+   "facts": {
+    "yawOffset": 3.141592653589793
+   },
+   "ship": true
+  },
+  "PROP_SHAPES.cafeSign": {
+   "tag": "amenity=cafe",
+   "shape": "/levels/east_coast_usa/art/shapes/buildings/eca_comsign_cafe.dae",
+   "facts": {
+    "yawOffset": -1.5707963267948966,
+    "scale": 1.6
+   },
+   "ship": true
+  },
+  "PROP_SHAPES.frontSteps": {
+   "tag": "building=house",
+   "shape": "/assets/meshes/architecture/modular/architectural_elements/stairs_platforms/R_HS_A_ST_01_130X60.dae",
+   "ship": true
+  },
+  "PROP_SHAPES.courtFence": {
+   "tag": "barrier=fence",
+   "shape": "/levels/hirochi_raceway/art/shapes/objects/fence_pedestrian.dae",
+   "facts": {
+    "yawOffset": 1.5707963267948966
+   },
+   "ship": true
+  },
+  "PROP_SHAPES.dragTree": {
+   "tag": "highway=raceway",
+   "shape": "/levels/gridmap_v2/art/shapes/grid/s_gm_dragstrip_tree.dae",
+   "ship": true
+  },
+  "PROP_SHAPES.raceTyreWall": {
+   "tag": "highway=raceway",
+   "shape": "/levels/automation_test_track/art/shapes/objects/tirewall.dae",
+   "ship": true
+  },
+  "PROP_SHAPES.raceConcreteWall": {
+   "tag": "highway=raceway",
+   "shape": "/levels/automation_test_track/art/shapes/objects/barrierfence_concrete.dae",
+   "ship": true
+  },
+  "PROP_SHAPES.boatMotorSmall": {
+   "tag": "leisure=marina",
+   "shape": "/levels/italy/art/shapes/buildings/italy_boat_small_a.DAE",
+   "ship": true
+  },
+  "PROP_SHAPES.boatSailB": {
+   "tag": "leisure=marina",
+   "shape": "/levels/italy/art/shapes/buildings/italy_boat_small_b.DAE",
+   "ship": true
+  },
+  "PROP_SHAPES.boatSailC": {
+   "tag": "leisure=marina",
+   "shape": "/levels/italy/art/shapes/buildings/italy_boat_small_c.DAE",
+   "ship": true
+  },
+  "PROP_SHAPES.boatSailD": {
+   "tag": "leisure=marina",
+   "shape": "/levels/italy/art/shapes/buildings/italy_boat_small_d.DAE",
+   "ship": true
+  },
+  "PROP_SHAPES.boatSailE": {
+   "tag": "leisure=marina",
+   "shape": "/levels/italy/art/shapes/buildings/italy_boat_small_e.DAE",
+   "ship": true
+  },
+  "PROP_SHAPES.boatMotorBig": {
+   "tag": "leisure=marina",
+   "shape": "/levels/italy/art/shapes/buildings/italy_boat_big_b.DAE",
+   "ship": true
+  },
+  "PROP_SHAPES.boatBigA": {
+   "tag": "leisure=marina",
+   "shape": "/levels/italy/art/shapes/buildings/italy_boat_big_a.DAE",
+   "ship": true
+  },
+  "PROP_SHAPES.boatBigC": {
+   "tag": "leisure=marina",
+   "shape": "/levels/italy/art/shapes/buildings/italy_boat_big_c.DAE",
+   "ship": true
+  },
+  "PROP_SHAPES.boatBigD": {
+   "tag": "leisure=marina",
+   "shape": "/levels/italy/art/shapes/buildings/italy_boat_big_d.DAE",
+   "ship": true
+  },
+  "PROP_SHAPES.waterTank": {
+   "tag": "man_made=storage_tank",
+   "shape": "/levels/johnson_valley/art/shapes/building/s_watertank.dae",
+   "ship": true
+  },
+  "STREET_LIGHT_SHAPES.arterial": {
+   "tag": "highway=street_lamp",
+   "shape": "/levels/west_coast_usa/art/shapes/objects/pole_light_single.dae",
+   "facts": {
+    "lightHeight": 12.5,
+    "lightForward": 5.3,
+    "radius": 24
+   },
+   "ship": true
+  },
+  "STREET_LIGHT_SHAPES.street": {
+   "tag": "highway=street_lamp",
+   "shape": "/art/shapes/garage_and_dealership/Clutter/eca_lamppost.dae",
+   "facts": {
+    "lightHeight": 7.8,
+    "lightForward": 2.7,
+    "radius": 15
+   },
+   "ship": true
+  },
+  "STREET_LIGHT_SHAPES.path": {
+   "tag": "highway=street_lamp",
+   "shape": "/art/shapes/objects/lamp1.dae",
+   "facts": {
+    "lightHeight": 6.4,
+    "lightForward": 0.8,
+    "radius": 12
+   },
+   "ship": true
+  },
+  "CALMING_SHAPES.bumpModule": {
+   "tag": "traffic_calming=bump",
+   "shape": "/levels/driver_training/art/shapes/objects/speedbump1.dae",
+   "ship": true
+  },
+  "CALMING_SHAPES.bumpCapStart": {
+   "tag": "traffic_calming=bump",
+   "shape": "/levels/driver_training/art/shapes/objects/speedbump2.dae",
+   "ship": true
+  },
+  "CALMING_SHAPES.bumpCapEnd": {
+   "tag": "traffic_calming=bump",
+   "shape": "/levels/driver_training/art/shapes/objects/speedbump3.dae",
+   "ship": true
+  },
+  "CALMING_SHAPES.hump": {
+   "tag": "traffic_calming=hump",
+   "shape": "/levels/gridmap_v2/art/shapes/grid/s_gm_suspension_sbump_4x4_b.dae",
+   "ship": true
+  },
+  "CALMING_SHAPES.table": {
+   "tag": "traffic_calming=table",
+   "shape": "/levels/gridmap_v2/art/shapes/grid/s_gm_suspension_sbump_4x4_c.dae",
+   "ship": true
+  },
+  "BOLLARD_SHAPES.steel": {
+   "tag": "barrier=bollard",
+   "shape": "/art/shapes/objects/bollard_yellow.dae",
+   "ship": true
+  },
+  "BOLLARD_SHAPES.concrete": {
+   "tag": "barrier=bollard",
+   "shape": "/levels/east_coast_usa/art/shapes/clutter/clutter_city_bollard_concrete.dae",
+   "ship": true
+  },
+  "BARRIER_SHAPES.stoneWall": {
+   "tag": "barrier=city_wall",
+   "shape": "/levels/italy/art/shapes/buildings/italy_wall_stone.dae",
+   "ship": true
+  },
+  "BARRIER_SHAPES.concreteWall": {
+   "tag": "barrier=retaining_wall",
+   "shape": "/levels/italy/art/shapes/buildings/italy_wall_concrete.dae",
+   "ship": true
+  },
+  "BARRIER_SHAPES.dryStoneWall": {
+   "tag": "barrier=wall",
+   "shape": "/levels/italy/art/shapes/buildings/italy_rock_wall_a_low.dae",
+   "ship": true
+  },
+  "BARRIER_SHAPES.brickWall": {
+   "tag": "barrier=wall",
+   "shape": "/levels/west_coast_usa/art/shapes/objects/wall_brick1.dae",
+   "ship": true
+  },
+  "BARRIER_SHAPES.railing": {
+   "tag": "barrier=chain",
+   "shape": "/levels/small_island/art/shapes/buildings/si_harbour_railing.DAE",
+   "ship": true
+  },
+  "US_SIGN_SHAPES.speed5": {
+   "tag": "maxspeed=*",
+   "shape": "/levels/west_coast_usa/art/shapes/objects/sign_speed5.dae",
+   "facts": {
+    "post": "signPost",
+    "plateZ": 1.4
+   },
+   "ship": true
+  },
+  "US_SIGN_SHAPES.speed25": {
+   "tag": "maxspeed=*",
+   "shape": "/levels/west_coast_usa/art/shapes/objects/sign_speed25.dae",
+   "facts": {
+    "post": "signPost",
+    "plateZ": 1.4
+   },
+   "ship": true
+  },
+  "US_SIGN_SHAPES.speed30": {
+   "tag": "maxspeed=*",
+   "shape": "/levels/Utah/art/shapes/ut_roadsigns/ut_30_speed_limit.DAE",
+   "ship": true
+  },
+  "US_SIGN_SHAPES.speed60": {
+   "tag": "maxspeed=*",
+   "shape": "/levels/Utah/art/shapes/ut_roadsigns/ut_60_speed_limit.DAE",
+   "ship": true
+  },
+  "US_SIGN_SHAPES.speed70": {
+   "tag": "maxspeed=*",
+   "shape": "/levels/Utah/art/shapes/ut_roadsigns/ut_70_speed_limit.DAE",
+   "ship": true
+  },
+  "US_SIGN_SHAPES.speed80": {
+   "tag": "maxspeed=*",
+   "shape": "/levels/Utah/art/shapes/ut_roadsigns/ut_80_speed_limit.DAE",
+   "ship": true
+  },
+  "US_SIGN_SHAPES.curveLeft": {
+   "tag": "untagged:curveWarningSigns",
+   "shape": "/levels/Utah/art/shapes/ut_roadsigns/ut_curve_left.DAE",
+   "ship": true
+  },
+  "US_SIGN_SHAPES.curveRight": {
+   "tag": "untagged:curveWarningSigns",
+   "shape": "/levels/Utah/art/shapes/ut_roadsigns/ut_curve_right.DAE",
+   "ship": true
+  },
+  "US_SIGN_SHAPES.reverseCurveLeft": {
+   "tag": "untagged:curveWarningSigns",
+   "shape": "/levels/Utah/art/shapes/ut_roadsigns/ut_reverse_curve_left.DAE",
+   "ship": true
+  },
+  "US_SIGN_SHAPES.reverseCurveRight": {
+   "tag": "untagged:curveWarningSigns",
+   "shape": "/levels/Utah/art/shapes/ut_roadsigns/ut_reverse_curve_right.DAE",
+   "ship": true
+  },
+  "US_SIGN_SHAPES.windingLeft": {
+   "tag": "untagged:curveWarningSigns",
+   "shape": "/levels/Utah/art/shapes/ut_roadsigns/ut_winding_road_left.DAE",
+   "ship": true
+  },
+  "US_SIGN_SHAPES.windingRight": {
+   "tag": "untagged:curveWarningSigns",
+   "shape": "/levels/Utah/art/shapes/ut_roadsigns/ut_winding_road_right.DAE",
+   "ship": true
+  },
+  "US_SIGN_SHAPES.chevronLeft": {
+   "tag": "untagged:curveWarningSigns",
+   "shape": "/levels/Utah/art/shapes/ut_roadsigns/ut_chevron_left.DAE",
+   "ship": true
+  },
+  "US_SIGN_SHAPES.chevronRight": {
+   "tag": "untagged:curveWarningSigns",
+   "shape": "/levels/Utah/art/shapes/ut_roadsigns/ut_chevron_right.DAE",
+   "ship": true
+  },
+  "SIGNAL_MAST": {
+   "tag": "crossing=traffic_signals",
+   "shape": "/levels/west_coast_usa/art/shapes/objects/pole_light_signal1.dae",
+   "facts": {
+    "armZ": 7.75,
+    "armFrom": 3.5,
+    "armTo": 7.2,
+    "headZ": 7.2,
+    "lightHeight": 12.5,
+    "lightForward": 5.4,
+    "radius": 24
+   },
+   "ship": true
+  },
+  "SIGNAL_POLE": {
+   "tag": "highway=traffic_signals",
+   "shape": "/levels/west_coast_usa/art/shapes/objects/pole_traffic1.dae",
+   "ship": true
+  },
+  "CARPORT_SHAPE": {
+   "tag": "building=carport",
+   "shape": "/levels/italy/art/shapes/buildings/dealerships/Italy_dealership_carport.dae",
+   "ship": true
+  },
+  "GATE_SHAPES.farm": {
+   "tag": "barrier=gate",
+   "shape": "/levels/hirochi_raceway/art/shapes/objects/farm_gate_metal1.dae",
+   "facts": {
+    "length": 3.67,
+    "origin": "middle",
+    "z": 0
+   }
+  },
+  "GATE_SHAPES.wood": {
+   "tag": "barrier=gate",
+   "shape": "/levels/hirochi_raceway/art/shapes/objects/farm_gate_wood1.dae",
+   "facts": {
+    "length": 1.58,
+    "origin": "end",
+    "z": 0
+   }
+  },
+  "GATE_SHAPES.mesh": {
+   "tag": "barrier=gate",
+   "shape": "/levels/Industrial/art/shapes/buildings/ind_mesh_fence_gate_3m.dae",
+   "facts": {
+    "length": 3,
+    "origin": "end",
+    "z": 1.23
+   }
+  },
+  "GATE_SHAPES.sliding": {
+   "tag": "barrier=sliding_gate",
+   "shape": "/levels/Industrial/art/shapes/buildings/metal_gate.dae",
+   "facts": {
+    "length": 10.5,
+    "origin": "far",
+    "z": 0.14
+   }
+  },
+  "GATE_SHAPES.boom": {
+   "tag": "barrier=lift_gate",
+   "shape": "/levels/italy/art/shapes/buildings/italy_bld_boomgate_4.5m.dae",
+   "facts": {
+    "z": 0.31
+   }
+  },
+  "GATE_SHAPES.boomLong": {
+   "tag": "barrier=lift_gate",
+   "shape": "/levels/italy/art/shapes/buildings/italy_bld_boomgate_6.5m.dae",
+   "facts": {
+    "z": 0.31
+   }
+  },
+  "NATIVE_BARRIER.guardrail": {
+   "tag": "barrier=ditch",
+   "shape": "/levels/west_coast_usa/art/shapes/objects/guardrail1.dae"
+  },
+  "NATIVE_BARRIER.guardrailPost": {
+   "tag": "barrier=guard_rail",
+   "shape": "/levels/west_coast_usa/art/shapes/objects/guardrailpost.dae"
+  },
+  "NATIVE_BARRIER.guardrailEnd": {
+   "tag": "barrier=guard_rail",
+   "shape": "/levels/west_coast_usa/art/shapes/objects/guardrail_end.dae"
+  },
+  "NATIVE_BARRIER.jersey": {
+   "tag": "barrier=jersey_barrier",
+   "shape": "/levels/west_coast_usa/art/shapes/objects/jerseybarrier_3m.dae"
+  },
+  "NATIVE_BARRIER.pedestrianFence": {
+   "tag": "barrier=fence",
+   "shape": "/levels/hirochi_raceway/art/shapes/objects/fence_pedestrian.dae"
+  },
+  "HUMP_SIGN.americas": {
+   "tag": "traffic_calming=hump",
+   "shape": "/levels/east_coast_usa/art/shapes/signs_usa/sign_bump.dae"
+  },
+  "HUMP_SIGN.white": {
+   "tag": "traffic_calming=hump",
+   "shape": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_humps.dae"
+  },
+  "SPORTS_LIGHT_POLE": {
+   "tag": "highway=raceway",
+   "shape": "/levels/driver_training/art/shapes/buildings/hr_stadium_lights.dae"
+  },
+  "TUNNEL_LIGHT": {
+   "tag": "tunnel=*",
+   "shape": "/levels/west_coast_usa/art/shapes/objects/ceiling_light_tunnel.dae"
+  },
+  "SIGNAL_HEAD": {
+   "tag": "crossing=traffic_signals",
+   "shape": "/art/shapes/objects/trafficlight_overhead1.dae"
+  },
+  "LOOK_LAMP": {
+   "tag": "highway=street_lamp",
+   "shape": "/art/shapes/objects/lamp1.dae",
+   "facts": {
+    "lightHeight": 6.4,
+    "lightForward": 0.8,
+    "yawOffset": 0
+   },
+   "ship": true
+  },
+  "LOOK_LAMP_EUROPE": {
+   "tag": "highway=street_lamp",
+   "shape": "/levels/east_coast_usa/art/shapes/buildings/eca_lamppost.dae",
+   "facts": {
+    "lightHeight": 7.6,
+    "lightForward": 2.4,
+    "yawOffset": 0,
+    "note": "Ornate cast-iron lamppost for European streetscapes (8.3 m, 2.9 m arm)"
+   },
+   "ship": true
+  }
  }
 }

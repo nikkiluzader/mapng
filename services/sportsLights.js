@@ -18,10 +18,11 @@
 // Pure geometry: returns plans the exporter turns into objects.
 
 import { frameAt } from './waterCover.js';
+import { part } from './tagModels.js';
 import { inRing } from './fountains.js';
 import { homePlate, seatRows } from './sportsFields.js';
 
-export const POLE_SHAPE = '/levels/driver_training/art/shapes/buildings/hr_stadium_lights.dae';
+export const POLE_SHAPE = part('SPORTS_LIGHT_POLE').shapeFile;
 export const POLE_SHAPE_HEIGHT_M = 30.36;
 
 // height (m), side poles per long side, setback from the outline (m), brightness (cd)

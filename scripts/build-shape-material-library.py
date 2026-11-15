@@ -184,7 +184,10 @@ def main():
     tag_models = os.path.join(REPO, "data/tag-models.json")
     if os.path.exists(tag_models):
         picked = json.load(open(tag_models, encoding="utf-8"))["tags"]
+        doc = json.load(open(tag_models, encoding="utf-8"))
         sets["tag_models"] = sorted({m["shape"] for by_region in picked.values() for models in by_region.values() for m in models})
+        # the parts the code builds with by name, the ones whose materials are sent (ship): the old prop library's set
+        sets["prop_library"] = sorted({p["shape"] for p in doc.get("parts", {}).values() if p.get("ship")})
     out = {}
     problems = []
     for set_id, daes in sets.items():

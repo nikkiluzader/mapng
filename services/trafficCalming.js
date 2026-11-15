@@ -18,11 +18,9 @@
 // Pure: callers pass world-space roads and lookups.
 
 import { CALMING_SHAPES } from './beamngPropLibrary.js';
+import { part } from './tagModels.js';
 
-export const HUMP_SIGN_SHAPES = {
-  americas: '/levels/east_coast_usa/art/shapes/signs_usa/sign_bump.dae',
-  white: '/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_humps.dae',
-};
+export const HUMP_SIGN_SHAPES = { americas: part('HUMP_SIGN.americas').shapeFile, white: part('HUMP_SIGN.white').shapeFile };
 export const CALMING_KINDS = new Set(['bump', 'hump', 'table', 'cushion']);
 
 const BUMP_MODULE_W = 1.0;       // speedbump1 across the road

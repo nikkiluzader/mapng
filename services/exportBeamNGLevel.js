@@ -55,7 +55,7 @@ import { parallelMap, parallelThreads } from './parallel.js';
 import { measureStructures, roadLinesFromDecals } from './structures/metrics.js';
 import { buildStructureGraph } from './structures/graph.js';
 import { findCrossings } from './structures/crossings.js';
-import { tagModel, tagObjectFor, standTagObject } from './tagModels.js';
+import { tagModel, tagObjectFor, standTagObject, part } from './tagModels.js';
 import { solveProfilesSteps, gradeLimit } from './structures/profileSolve.js';
 import { appendAll, keepInPlace } from './keepInPlace.js';
 import { classifyStructures } from './structures/structureRules.js';
@@ -8584,9 +8584,9 @@ const BARRIER_MAX_PITCH = Math.PI / 5;
 
 const NATIVE_BARRIER_ASSETS = {
   guardrail: {
-    shapeName: '/levels/west_coast_usa/art/shapes/objects/guardrail1.dae',
-    postShapeName: '/levels/west_coast_usa/art/shapes/objects/guardrailpost.dae',
-    endShapeName: '/levels/west_coast_usa/art/shapes/objects/guardrail_end.dae',
+    shapeName: part('NATIVE_BARRIER.guardrail').shapeFile,
+    postShapeName: part('NATIVE_BARRIER.guardrailPost').shapeFile,
+    endShapeName: part('NATIVE_BARRIER.guardrailEnd').shapeFile,
     // the rail runs along its local X, 2.4 m (West Coast USA lays them so,
     // 1.97 m apart: at +90° every panel stood across the road)
     segmentLength: 2,
@@ -8599,7 +8599,7 @@ const NATIVE_BARRIER_ASSETS = {
     yawOffset: 0,
   },
   concrete: {
-    shapeName: '/levels/west_coast_usa/art/shapes/objects/jerseybarrier_3m.dae',
+    shapeName: part('NATIVE_BARRIER.jersey').shapeFile,
     segmentLength: 3,
     meshLength: 3,
     zOffset: 0.05,
@@ -8621,7 +8621,7 @@ const NATIVE_BARRIER_ASSETS = {
     // textures (unlike west_coast screenfence1.dae, which hardcodes a missing
     // catchfence_d.dds). Its `chainlink` material resolves from BeamNG's global
     // library + /assets/, so nothing extra needs bundling.
-    shapeName: '/levels/hirochi_raceway/art/shapes/objects/fence_pedestrian.dae',
+    shapeName: part('NATIVE_BARRIER.pedestrianFence').shapeFile,
     // Mesh runs along its local Y axis, like guardrail/jersey which use +90°
     // here and orient correctly, so match that. min Z ≈ -1.7. It runs 2.16 m
     // from a post at its origin along +Y (+90° turns +Y against the run):
@@ -13841,7 +13841,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         __parent: 'Barriers', class: 'TSStatic', name: `median_barrier_${i}_${k}`, persistentId: generatePersistentId(),
         position: [roundTo((ax + bx) / 2, 3), roundTo((ay + by) / 2, 3), roundTo((az + bz) / 2 + 0.05, 3)],
         rotationMatrix: rotationMatrixFromYaw(Math.atan2(by - ay, bx - ax) + Math.PI / 2),
-        shapeName: '/levels/west_coast_usa/art/shapes/objects/jerseybarrier_3m.dae', useInstanceRenderData: true,
+        shapeName: part('NATIVE_BARRIER.jersey').shapeFile, useInstanceRenderData: true,
       });
     }
   }

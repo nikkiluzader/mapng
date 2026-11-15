@@ -33,7 +33,7 @@ export function tagModel(tag, biome, n = 0) {
 }
 
 /** Every model any tag may place: the set whose materials ship with an export. */
-export const allTagModelShapes = () => [...new Set(Object.values(data.tags).flatMap((byRegion) => Object.values(byRegion).flat()).map((m) => m.shape))];
+export const allTagModelShapes = () => [...new Set([...Object.values(data.tags).flatMap((byRegion) => Object.values(byRegion).flat()).map((m) => m.shape), ...Object.values(data.parts || {}).map((p) => p.shape)])];
 
 // ---- mapped points a picked model is placed at (the rules in data/model-picks.json "objects") ----
 
@@ -82,4 +82,23 @@ export function standTagObject(rule, x, y, road, tags = {}, n = 0) {
   // (nothing to face: every one its own way, the same each time)
   if (facing === null) facing = rule.face === 'none' ? 0 : ((n * 2.399963) % (2 * Math.PI));
   return { x: px, y: py, facing };
+}
+
+// ---- the models the code builds with by name (data/model-picks.json "parts") ----
+
+/**
+ * A part: { shapeFile, ...facts } for a role name
+ * ("STREET_LIGHT_SHAPES.arterial"). A fresh object each call. Throws for a role nobody defined: a typo, not data.
+ */
+export function part(role) {
+  const p = data.parts?.[role];
+  if (!p) throw new Error(`no model part "${role}" in data/tag-models.json (data/model-picks.json parts)`);
+  return { shapeFile: p.shape, ...(p.facts || {}) };
+}
+
+/** Every part of a table, by its key: partsOf('BOLLARD_SHAPES') -> { steel: {...}, concrete: {...} }. */
+export function partsOf(table) {
+  const out = {};
+  for (const role of Object.keys(data.parts || {})) if (role.startsWith(`${table}.`)) out[role.slice(table.length + 1)] = part(role);
+  return out;
 }

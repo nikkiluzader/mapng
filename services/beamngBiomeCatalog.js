@@ -1,4 +1,5 @@
 import { TREE_ITEMS } from './beamngTreeLibrary.js';
+import { part } from './tagModels.js';
 import { PROP_ITEMS } from './beamngPropLibrary.js';
 
 const DEFAULT_TERRAIN_CANDIDATES = {
@@ -175,13 +176,7 @@ const ASSET_SETS = {
       // OSM highway=street_lamp / amenity=bench → native TSStatics.
       // Lamp yaw points local +X (arm) at the nearest road; light offsets
       // match the vanilla wcusa lamp↔nightLight PointLight pairings.
-      lamp: {
-        // Ornate cast-iron lamppost for European streetscapes (8.3 m, 2.9 m arm).
-        shapeFile: '/levels/east_coast_usa/art/shapes/buildings/eca_lamppost.dae',
-        lightHeight: 7.6,
-        lightForward: 2.4,
-        yawOffset: 0,
-      },
+      lamp: part('LOOK_LAMP_EUROPE'),
     },
     managedItemTemplates: {
       cypress_tree: {
@@ -381,12 +376,7 @@ const ASSET_SETS = {
       // OSM highway=street_lamp / amenity=bench → native TSStatics.
       // Lamp yaw points local +X (arm) at the nearest road; light offsets
       // match the vanilla wcusa lamp↔nightLight PointLight pairings.
-      lamp: {
-        shapeFile: '/art/shapes/objects/lamp1.dae',
-        lightHeight: 6.4,
-        lightForward: 0.8,
-        yawOffset: 0,
-      },
+      lamp: part('LOOK_LAMP'),
     },
     managedItemTemplates: {
       Juniper_tree_01: {
@@ -455,12 +445,7 @@ const ASSET_SETS = {
       // OSM highway=street_lamp / amenity=bench → native TSStatics.
       // Lamp yaw points local +X (arm) at the nearest road; light offsets
       // match the vanilla wcusa lamp↔nightLight PointLight pairings.
-      lamp: {
-        shapeFile: '/art/shapes/objects/lamp1.dae',
-        lightHeight: 6.4,
-        lightForward: 0.8,
-        yawOffset: 0,
-      },
+      lamp: part('LOOK_LAMP'),
     },
     managedItemTemplates: {
       Juniper_tree_01: {
@@ -505,12 +490,7 @@ const ASSET_SETS = {
       // OSM highway=street_lamp / amenity=bench → native TSStatics.
       // Lamp yaw points local +X (arm) at the nearest road; light offsets
       // match the vanilla wcusa lamp↔nightLight PointLight pairings.
-      lamp: {
-        shapeFile: '/art/shapes/objects/lamp1.dae',
-        lightHeight: 6.4,
-        lightForward: 0.8,
-        yawOffset: 0,
-      },
+      lamp: part('LOOK_LAMP'),
     },
     managedItemTemplates: {
       tree_aspen_small_a: {
@@ -577,12 +557,7 @@ const ASSET_SETS = {
       // OSM highway=street_lamp / amenity=bench → native TSStatics.
       // Lamp yaw points local +X (arm) at the nearest road; light offsets
       // match the vanilla wcusa lamp↔nightLight PointLight pairings.
-      lamp: {
-        shapeFile: '/art/shapes/objects/lamp1.dae',
-        lightHeight: 6.4,
-        lightForward: 0.8,
-        yawOffset: 0,
-      },
+      lamp: part('LOOK_LAMP'),
     },
     managedItemTemplates: {
       deserttree_bush_medium: {
@@ -633,12 +608,7 @@ const ASSET_SETS = {
       // OSM highway=street_lamp / amenity=bench → native TSStatics.
       // Lamp yaw points local +X (arm) at the nearest road; light offsets
       // match the vanilla wcusa lamp↔nightLight PointLight pairings.
-      lamp: {
-        shapeFile: '/art/shapes/objects/lamp1.dae',
-        lightHeight: 6.4,
-        lightForward: 0.8,
-        yawOffset: 0,
-      },
+      lamp: part('LOOK_LAMP'),
     },
     managedItemTemplates: {
       deserttree_bush_medium: {
@@ -697,12 +667,7 @@ const ASSET_SETS = {
       // OSM highway=street_lamp / amenity=bench → native TSStatics.
       // Lamp yaw points local +X (arm) at the nearest road; light offsets
       // match the vanilla wcusa lamp↔nightLight PointLight pairings.
-      lamp: {
-        shapeFile: '/art/shapes/objects/lamp1.dae',
-        lightHeight: 6.4,
-        lightForward: 0.8,
-        yawOffset: 0,
-      },
+      lamp: part('LOOK_LAMP'),
     },
     managedItemTemplates: {
       palm_medium: {
@@ -759,12 +724,7 @@ const ASSET_SETS = {
       // OSM highway=street_lamp / amenity=bench → native TSStatics.
       // Lamp yaw points local +X (arm) at the nearest road; light offsets
       // match the vanilla wcusa lamp↔nightLight PointLight pairings.
-      lamp: {
-        shapeFile: '/art/shapes/objects/lamp1.dae',
-        lightHeight: 6.4,
-        lightForward: 0.8,
-        yawOffset: 0,
-      },
+      lamp: part('LOOK_LAMP'),
     },
     managedItemTemplates: {
       cork_oak_bush_large: {
@@ -803,12 +763,7 @@ const ASSET_SETS = {
       // OSM highway=street_lamp / amenity=bench → native TSStatics.
       // Lamp yaw points local +X (arm) at the nearest road; light offsets
       // match the vanilla wcusa lamp↔nightLight PointLight pairings.
-      lamp: {
-        shapeFile: '/art/shapes/objects/lamp1.dae',
-        lightHeight: 6.4,
-        lightForward: 0.8,
-        yawOffset: 0,
-      },
+      lamp: part('LOOK_LAMP'),
     },
     managedItemTemplates: {
       cork_oak_large_1: {
@@ -862,12 +817,7 @@ const ASSET_SETS = {
       // OSM highway=street_lamp / amenity=bench → native TSStatics.
       // Lamp yaw points local +X (arm) at the nearest road; light offsets
       // match the vanilla wcusa lamp↔nightLight PointLight pairings.
-      lamp: {
-        shapeFile: '/art/shapes/objects/lamp1.dae',
-        lightHeight: 6.4,
-        lightForward: 0.8,
-        yawOffset: 0,
-      },
+      lamp: part('LOOK_LAMP'),
     },
     managedItemTemplates: {
       cork_oak_bush_large: {
@@ -896,13 +846,7 @@ const ASSET_SETS = {
       // OSM highway=street_lamp / amenity=bench → native TSStatics.
       // Lamp yaw points local +X (arm) at the nearest road; light offsets
       // match the vanilla wcusa lamp↔nightLight PointLight pairings.
-      lamp: {
-        // Ornate cast-iron lamppost for European streetscapes (8.3 m, 2.9 m arm).
-        shapeFile: '/levels/east_coast_usa/art/shapes/buildings/eca_lamppost.dae',
-        lightHeight: 7.6,
-        lightForward: 2.4,
-        yawOffset: 0,
-      },
+      lamp: part('LOOK_LAMP_EUROPE'),
     },
     managedItemTemplates: {
       cypress_tree: {

@@ -16,6 +16,7 @@
 // Pure: callers pass world-space geometry and ground lookups.
 
 import * as THREE from 'three';
+import { part } from './tagModels.js';
 import { resample } from './beamngBridges.js';
 
 export const STEP_M = 2;               // m between profile stations
@@ -142,7 +143,7 @@ const APPROACH_ROOF_STEP_M = 1.5;      // the near fit this far over the far roa
 export const LIGHT_SPACING_M = 8;
 export const LIGHT_THRESHOLD_SPACING_M = 4;
 const THRESHOLD_M = 30;
-export const TUNNEL_LIGHT_SHAPE = '/levels/west_coast_usa/art/shapes/objects/ceiling_light_tunnel.dae';
+export const TUNNEL_LIGHT_SHAPE = part('TUNNEL_LIGHT').shapeFile;
 const ZONE_CHUNK_M = 40;
 export const TUNNEL_AMBIENCE = 'Level_Tunnel_Closed_Dynamic';
 

@@ -66,7 +66,7 @@ const catalogue = {
 // The tag library's model lists.
 // (a model the code names stays listed even where it is not marked as placed today: the test asks for it)
 const code = fs.readdirSync('services').filter((f) => f.endsWith('.js')).map((f) => fs.readFileSync(`services/${f}`, 'utf8')).join('\n').toLowerCase();
-const picked = new Set(Object.values(picks.picks).flatMap((byRegion) => Object.values(byRegion).flat()).map((s) => s.toLowerCase()));
+const picked = new Set([...Object.values(picks.picks).flatMap((byRegion) => Object.values(byRegion).flat()), ...Object.values(picks.parts || {}).map((p) => p.shape)].map((s) => s.toLowerCase()));
 const namedInCode = (shape) => picked.has(shape.toLowerCase()) || code.includes(shape.toLowerCase()) || code.includes(shape.toLowerCase().replace(/^\//, ''));
 const verdictOf = new Map(models.map((m) => [m.path, m]));
 let removed = 0; let noted = 0; let added = 0; let keptCurated = 0;
@@ -129,9 +129,19 @@ for (const [id, o] of Object.entries(picks.objects || {})) {
   const e = lib.tags[o.tag]; e.fetched = true; if (e.status === 'planned') e.status = 'built';
   e.code = 'services/tagModels.js (data/model-picks.json)'; e.item = o.item; e.group = 'furniture';
 }
+// The models the code builds with by name: each exists in the game, and the library lists it under its tag as used.
+const everyModel = new Map(models.map((m) => [m.path.toLowerCase(), m]));   // (by lower case: the code spells a few as the game's files do, .DAE)
+for (const [role, p] of Object.entries(picks.parts || {})) {
+  if (!everyModel.has(p.shape.toLowerCase()) && !JSON.parse(fs.readFileSync(`${REFS}/game-models.json`, 'utf8')).some((m) => m.path.toLowerCase() === p.shape.toLowerCase())) throw new Error(`model-picks.json: part ${role}: ${p.shape} is not a model of the game`);
+  const untagged = p.tag?.startsWith('untagged:'); const e = untagged ? lib.untagged?.[p.tag.slice(9)] : lib.tags[p.tag];
+  if (!e) throw new Error(`model-picks.json: part ${role}: ${p.tag} is not in the tag library`);
+  const a = e.assets.find((x) => x.shape.toLowerCase() === p.shape.toLowerCase());
+  if (a) { a.usedToday = true; delete a.from; delete a.maybe; } else e.assets.push({ shape: everyModel.get(p.shape.toLowerCase())?.path || p.shape, region: REGION[everyModel.get(p.shape.toLowerCase())?.level] || 'any', usedToday: true });
+  picked.add(p.shape.toLowerCase());
+}
 // (a picked model is one the export places)
 for (const [key, byRegion] of Object.entries(picks.picks)) for (const a of lib.tags[key.split('#')[0]].assets) if (Object.values(byRegion).flat().includes(a.shape)) { a.usedToday = true; delete a.from; delete a.maybe; }
-fs.writeFileSync('data/tag-models.json', JSON.stringify({ about: 'Made by scripts/tag-library/from-catalogue.mjs from data/model-picks.json: the models the export places per OSM tag and region. yaw: degrees added to the direction a model should face. Read by services/tagModels.js.', tags: tagModels, objects: picks.objects || {} }, null, 1) + '\n');
+fs.writeFileSync('data/tag-models.json', JSON.stringify({ about: 'Made by scripts/tag-library/from-catalogue.mjs from data/model-picks.json: the models the export places per OSM tag and region. yaw: degrees added to the direction a model should face. Read by services/tagModels.js.', tags: tagModels, objects: picks.objects || {}, parts: picks.parts || {} }, null, 1) + '\n');
 
 // Written with one model per line, so the files stay readable and their diffs small.
 const oneLine = (key) => (k, v) => (k === key && Array.isArray(v) ? v.map((x) => `\u0001${JSON.stringify(x)}\u0001`) : v);
