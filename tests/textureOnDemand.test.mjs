@@ -2,12 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ensureTexture, hasTexture, texturesToGenerate, textureKindOf } from '../services/textureOnDemand.js';
 
-test('Generate paints only the chosen ground texture', () => {
-  assert.deepEqual(texturesToGenerate('game'), { generateOSMTextureAsset: false, generateHybridTextureAsset: false, generateGameTextureAsset: true });
-  assert.deepEqual(texturesToGenerate('osm'), { generateOSMTextureAsset: true, generateHybridTextureAsset: false, generateGameTextureAsset: false });
-  // (the touched-up texture starts from the hybrid; the satellite picture and "none" need no painting)
-  assert.equal(texturesToGenerate('painted').generateHybridTextureAsset, true);
-  for (const none of ['satellite', 'none', undefined]) assert.deepEqual(Object.values(texturesToGenerate(none)), [false, false, false]);
+test('Generate paints all three textures, whatever ground texture was chosen last', () => {
+  for (const choice of ['game', 'osm', 'hybrid', 'painted', 'satellite', 'none', undefined]) {
+    assert.deepEqual(texturesToGenerate(choice), { generateOSMTextureAsset: true, generateHybridTextureAsset: true, generateGameTextureAsset: true });
+  }
   assert.equal(textureKindOf('painted'), 'hybrid'); assert.equal(textureKindOf('satellite'), null);
 });
 

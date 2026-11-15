@@ -975,7 +975,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         raw,
         useMapterhorn: normalizedSource === 'mapterhorn',
         ...generationEdits,
-        // (only the ground texture chosen is painted now; another when it is first wanted: services/textureOnDemand.js)
+        // (all three textures, every time: services/textureOnDemand.js)
         ...texturesToGenerate(baseTexture.value),
         // (a plain copy: it goes to a worker / the desktop app)
         ...(store.backgroundActive ? { backgroundMask: JSON.parse(JSON.stringify(store.backgroundMask)) } : {}),

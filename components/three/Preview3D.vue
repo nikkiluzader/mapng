@@ -196,9 +196,9 @@
           </button>
           <button
             @click="pickTexture('osm')"
-            :disabled="!terrainData.osmTextureUrl"
+            :disabled="!canShowTexture('osm')"
             :title="
-              !terrainData.osmTextureUrl
+              !canShowTexture('osm')
                 ? t('preview.noOsmData')
                 : t('preview.showOsmLayer')
             "
@@ -206,7 +206,7 @@
               'flex-1 min-w-[3.75rem] px-2 text-xs py-1.5 rounded transition-colors',
               textureType === 'osm'
                 ? 'bg-brand text-white shadow-sm font-medium'
-                : !terrainData.osmTextureUrl
+                : !canShowTexture('osm')
                   ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700',
             ]"
@@ -215,9 +215,9 @@
           </button>
           <button
             @click="pickTexture('hybrid')"
-            :disabled="!terrainData.hybridTextureUrl"
+            :disabled="!canShowTexture('hybrid')"
             :title="
-              !terrainData.hybridTextureUrl
+              !canShowTexture('hybrid')
                 ? t('preview.noHybridData')
                 : t('preview.showHybridLayer')
             "
@@ -225,7 +225,7 @@
               'flex-1 min-w-[3.75rem] px-2 text-xs py-1.5 rounded transition-colors',
               textureType === 'hybrid'
                 ? 'bg-brand text-white shadow-sm font-medium'
-                : !terrainData.hybridTextureUrl
+                : !canShowTexture('hybrid')
                   ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700',
             ]"
@@ -234,9 +234,9 @@
           </button>
           <button
             @click="pickTexture('game')"
-            :disabled="!terrainData.gameTextureUrl && !terrainData.gameTextureCanvas"
+            :disabled="!canShowTexture('game')"
             :title="
-              !terrainData.gameTextureUrl && !terrainData.gameTextureCanvas
+              !canShowTexture('game')
                 ? t('preview.noGameData')
                 : t('preview.showGameLayer')
             "
@@ -244,7 +244,7 @@
               'flex-1 min-w-[3.75rem] px-2 text-xs py-1.5 rounded transition-colors',
               textureType === 'game'
                 ? 'bg-brand text-white shadow-sm font-medium'
-                : !terrainData.gameTextureUrl && !terrainData.gameTextureCanvas
+                : !canShowTexture('game')
                   ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700',
             ]"
@@ -408,6 +408,7 @@
 </template>
 
 <script setup>
+import { hasTexture } from '../../services/textureOnDemand.js';
 import { ref, computed, reactive, watch, onErrorCaptured } from "vue";
 import { useBaseTexture } from '../../composables/useBaseTexture.js';
 import { useI18n } from 'vue-i18n';
@@ -634,6 +635,10 @@ const isDesktopApp = !!desktopApp;
 // (the terrain view and the contour lines: one choice with the 2D preview, composables/useTerrainView.js)
 const contourStep = computed(() => contourInterval((Number(props.terrainData?.maxHeight) || 0) - (Number(props.terrainData?.minHeight) || 0)));
 // (only a click changes the shared choice; a fallback shown here does not)
+// A painted texture can be shown when the terrain has it, or has the map data to paint it from: Generate
+// paints only the one chosen as the ground texture, and any other is painted when it is first picked
+// (services/textureOnDemand.js; the picked one is what the app then prepares). Greyed out only with no map data.
+const canShowTexture = (kind) => hasTexture(props.terrainData, kind) || (props.terrainData?.osmFeatures?.length > 0);
 const pickTexture = (value) => { textureType.value = value; setBaseTexture(value); };
 watch(sharedBaseTexture, (value) => { const next = previewTextureFor(value); if (next !== textureType.value) textureType.value = next; });
 watch(() => props.terrainData, () => { textureType.value = previewTextureFor(sharedBaseTexture.value); });

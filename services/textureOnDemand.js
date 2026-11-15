@@ -1,8 +1,7 @@
 // Textures made when they are first wanted.
 //
-// Generate used to paint all three (the OSM, the hybrid and the game texture) for every map, a third to a half
-// of an 8 km Generate, though a level uses one and most people never download the others. It now paints only
-// the one chosen as the ground texture (what the previews show and the level gets). Any other is painted here
+// Generate paints all three (the OSM, the hybrid and the game texture) for every map. A terrain that still
+// lacks one (made by an older version, a batch tile, a level opened for Modify) gets it painted here
 // the first time something asks for it: the level export with another ground texture, a 2D asset's download, a
 // 3D model's texture, a preview's texture picker. Nothing is downloaded for it: the map data and the satellite
 // picture came with the Generate.
@@ -20,10 +19,15 @@ export function hasTexture(terrainData, kind) {
   return !!(terrainData[`${k}TextureCanvas`] || terrainData[`${k}TextureBlob`] || terrainData[`${k}TextureUrl`]);
 }
 
-/** Generate's three switches for a ground-texture choice: only the chosen one is painted. */
-export function texturesToGenerate(choice) {
-  const k = textureKindOf(choice);
-  return { generateOSMTextureAsset: k === 'osm', generateHybridTextureAsset: k === 'hybrid', generateGameTextureAsset: k === 'game' };
+/**
+ * Generate's three switches: all three textures are painted, every time, whatever ground texture is
+ * chosen. (For 0.3.1 only the chosen one was painted, to save a third of a large Generate. But the
+ * choice is made after Generate, in the previews and the export panel, so the one kept from last time
+ * decided what a new map got: with "satellite" kept, no game texture at all, and the previews offered
+ * none. The developer's rule since 2026-11-15: Generate always makes all of them.)
+ */
+export function texturesToGenerate() {
+  return { generateOSMTextureAsset: true, generateHybridTextureAsset: true, generateGameTextureAsset: true };
 }
 
 const running = new WeakMap();   // terrainData -> Map kind -> Promise

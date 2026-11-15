@@ -138,11 +138,14 @@ const textureOptions = computed(() => {
     { id: 'hybrid', label: t('exportPanel.satelliteHybrid') },
     { id: 'satellite', label: t('exportPanel.satellite') },
     { id: 'osm', label: t('exportPanel.osm') },
-  ].filter((o) => !!urlOf(o.id)).concat([{ id: 'none', label: t('exportPanel.none') }]);
+  // (a painted texture is offered when the terrain has it or has the map data to paint it from: Generate paints
+  // only the chosen ground texture, and any other is painted when it is first picked, services/textureOnDemand.js)
+  ].filter((o) => !!urlOf(o.id) || (o.id !== 'satellite' && hasFeatures.value)).concat([{ id: 'none', label: t('exportPanel.none') }]);
 });
 // (shared with the export panel and the 3D preview; 'painted' shows the texture it was painted on)
 const texture = computed({
   get: () => {
+    void store.texturesMade;   // (a texture picked before it was painted: shown once it is)
     const want = baseTexture.value === 'painted' ? (td()?.paintedTextureSource || 'hybrid') : baseTexture.value;
     if (want === 'none' || urlOf(want)) return want;
     return textureOptions.value[0]?.id || 'none';
