@@ -33,6 +33,26 @@ const insideAny = (file, roots) => {
   const full = path.resolve(file);
   return roots.filter(Boolean).some((root) => { const r = path.resolve(root); return full === r || full.startsWith(r + path.sep); });
 };
+// What the app's page may load and run. The page holds the bridge to this process, so a script that
+// got into it (out of map data, a pasted config, a server's answer) could ask for files and jobs.
+// With this policy the page runs only the app's own script files: no script written into the page,
+// none from another site, no plug-ins. Pictures and data may come from any https address (map
+// tiles, elevation, the user's own Overpass server). The one script named by its hash is the
+// quality report page's (services/sourceQuality.js REPORT_SCRIPT), which opens in a window of its own.
+export const APP_CONTENT_POLICY = [
+  "default-src 'self'",
+  "script-src 'self' 'wasm-unsafe-eval' 'sha256-9fg9IAi7LexDVzZ/P9bA7RyNdArj3xePT862wy1NKsI='",
+  "worker-src 'self' blob:",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "connect-src 'self' https: data: blob:",
+  "font-src 'self' data:",
+  "media-src 'self' data: blob:",
+  "frame-src 'self' blob:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'none'",
+].join('; ');
 // A file name the page may write into its job's folder: plain, and never the job's own description
 // (Windows reads "JOB.JSON", "job.json." and "job.json::$DATA" as that same file).
 const JOB_FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,119}$/;
@@ -148,7 +168,12 @@ function servePage() {
     if (!file.startsWith(DIST + path.sep) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
       file = path.join(DIST, 'index.html');
     }
-    return net.fetch(pathToFileURL(file).toString());
+    const served = await net.fetch(pathToFileURL(file).toString());
+    // (the app's own page comes with its content policy: APP_CONTENT_POLICY, above)
+    if (path.basename(file) !== 'index.html') return served;
+    const headers = new Headers(served.headers);
+    headers.set('Content-Security-Policy', APP_CONTENT_POLICY);
+    return new Response(served.body, { status: served.status, headers });
   });
 }
 

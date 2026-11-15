@@ -275,9 +275,48 @@ const KRON86_PATH_RE = /^\/wss\/service\/PZGIK\/[A-Za-z0-9_./-]{1,300}$/;
 const KRON86_OPENDATA_PATH_RE = /^\/[A-Za-z0-9_./-]{1,400}\.(asc|zip|xyz|txt|tif|tiff)$/i;
 const GPXZ_PATH_RE = /^\/v1\/elevation\/(point|points|hires-raster)$/;
 
+// (the quality report page's own script, by its hash: services/sourceQuality.js REPORT_SCRIPT)
+const REPORT_SCRIPT_HASH = "'sha256-9fg9IAi7LexDVzZ/P9bA7RyNdArj3xePT862wy1NKsI='";
+/**
+ * What the app's page may load and run. Only the app's own script files run: no script written into
+ * the page (out of map data, a pasted config, a server's answer), none from another site, no
+ * plug-ins. Pictures and data may come from any https address (map tiles, elevation, a user's own
+ * Overpass server). The nonce is for the one script that is written into the page on its way out:
+ * Cloudflare's own bot check, which takes the nonce from this header. It is new for every answer.
+ */
+export function appContentPolicy(nonce) {
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'wasm-unsafe-eval' 'nonce-${nonce}' ${REPORT_SCRIPT_HASH} https://static.cloudflareinsights.com`,
+    "worker-src 'self' blob:",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https:",
+    "connect-src 'self' https: data: blob:",
+    "font-src 'self' data:",
+    "media-src 'self' data: blob:",
+    "frame-src 'self' blob:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join('; ');
+}
+/** The app's page with its content policy (wrangler.json sends "/" and "/index.html" here first). */
+async function appPage(request, env) {
+  const page = await env.ASSETS.fetch(request);
+  try {
+    if (!String(page.headers.get('Content-Type') || '').includes('text/html')) return page;
+    const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
+    const headers = new Headers(page.headers);
+    headers.set('Content-Security-Policy', appContentPolicy(nonce));
+    return new Response(page.body, { status: page.status, statusText: page.statusText, headers });
+  } catch { return page; }
+}
+
 const app = {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    if (url.pathname === '/' || url.pathname === '/index.html') return appPage(request, env);
 
     if (/^\/updates\/?(latest\/?)?$/.test(url.pathname)) {
       return new Response(null, { status: 302, headers: { Location: `/updates/${LATEST_UPDATE}/`, 'Cache-Control': 'no-cache' } });

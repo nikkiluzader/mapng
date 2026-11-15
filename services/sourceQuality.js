@@ -500,6 +500,31 @@ function flawMap(src, sideM) {
   return `<svg class="map" viewBox="0 0 ${sideM} ${sideM}" role="img" aria-label="${esc(src.label)}: hillshade with the flaws found marked">${img}${marks}</svg>`;
 }
 
+// The report page's own script, the same in every report: hovering a graph, the Show switches, a picture
+// enlarged. Kept apart so that the app's content policy can name exactly this script as allowed
+// (its hash: public/_headers and desktop/main.js; tests/contentPolicy.test.mjs keeps them in step).
+export const REPORT_SCRIPT = `
+for (const el of document.querySelectorAll('.chart')) {
+  const d = JSON.parse(el.querySelector('script').textContent); const svg = el.querySelector('svg'); const tip = el.querySelector('.tip'); const cross = el.querySelector('.cross');
+  const move = (ev) => {
+    const r = svg.getBoundingClientRect(); const vx = ((ev.clientX - r.left) / r.width) * d.width;
+    if (vx < d.L || vx > d.width - d.R) { tip.hidden = true; cross.setAttribute('visibility', 'hidden'); return; }
+    const x = d.x0 + ((vx - d.L) / (d.width - d.L - d.R)) * (d.x1 - d.x0);
+    const rows = d.series.filter((s) => !document.body.classList.contains('hide-' + s.key)).map((s) => { let b = null; for (const p of s.pts) if (!b || Math.abs(p[0] - x) < Math.abs(b[0] - x)) b = p; return b ? s.label + ': ' + b[1].toFixed(2) + ' m' : ''; }).filter(Boolean);
+    tip.innerHTML = '<b>' + x.toFixed(1) + ' m</b><br>' + rows.join('<br>'); tip.hidden = false;
+    tip.style.left = Math.min(r.width - 170, Math.max(8, ev.clientX - r.left + 12)) + 'px';
+    cross.setAttribute('x1', vx); cross.setAttribute('x2', vx); cross.setAttribute('visibility', 'visible');
+  };
+  svg.addEventListener('pointermove', move); svg.addEventListener('pointerleave', () => { tip.hidden = true; cross.setAttribute('visibility', 'hidden'); });
+}
+// the Show switches: a source unticked is hidden everywhere below
+for (const box of document.querySelectorAll('[data-toggle]')) box.addEventListener('change', () => document.body.classList.toggle('hide-' + box.dataset.toggle, !box.checked));
+// a picture or a graph, clicked: shown as large as the window (again, or Escape: back)
+const unzoom = () => { for (const z of document.querySelectorAll('.zoomed')) z.classList.remove('zoomed'); };
+for (const svg of document.querySelectorAll('svg.map, .chart svg')) svg.addEventListener('click', () => { const host = svg.closest('figure, .chart'); const was = host.classList.contains('zoomed'); unzoom(); if (!was) host.classList.add('zoomed'); });
+document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') unzoom(); });
+`;
+
 /**
  * The report page (one self-contained HTML string).
  * result from compareSources; meta { center, sideM, appVersion, generatedAt, roadCount, osmSource }.
@@ -622,25 +647,5 @@ ${lineChart(long.series, { xLabel: 'metres along the road', yLabel: 'height, m',
 <p class="muted">Every drivable road in the square (bridges and tunnels left out) is walked in 2 m steps on each source's heights, resampled to 1 m. <b>Road bench</b>: where the ground falls more than 8 % across the road (read on the finest source, so every source is asked at the same places), the widest strip within 6 m of the mapped line that stays level (25 cm, plus 3 % crossfall) is found; a strip 3 to 16 m wide counts as a bench. <b>Level across</b>: the height difference 2.5 m either side of the line, as a slope; 2 % or less scores 100, 20 % scores 0. <b>Smooth along</b>: what is left of the centre line's heights after a 12 m moving average, as its usual size (a robust spread, so one wall or seam does not decide it); 1 cm scores 100, 12 cm scores 0. <b>Detail</b>: the source's own resolution on a log scale, 1 m scores 100, 30 m scores 0. The total is the weighted mean of the parts that could be measured. The map data's position is taken as true: where a mapped road is drawn a few metres off, a real bench is missed on every source alike.</p></details>
 <footer>Map data © OpenStreetMap contributors${meta.osmSource ? ` (${esc(meta.osmSource)})` : ''}. Elevation: global 30 m from AWS Terrain Tiles (Mapzen, with its sources); lidar from Mapterhorn and its open-data sources (mapterhorn.com/attribution); GPXZ where shown. This page holds no script from elsewhere and loads nothing.</footer>
 </main>
-<script>
-for (const el of document.querySelectorAll('.chart')) {
-  const d = JSON.parse(el.querySelector('script').textContent); const svg = el.querySelector('svg'); const tip = el.querySelector('.tip'); const cross = el.querySelector('.cross');
-  const move = (ev) => {
-    const r = svg.getBoundingClientRect(); const vx = ((ev.clientX - r.left) / r.width) * d.width;
-    if (vx < d.L || vx > d.width - d.R) { tip.hidden = true; cross.setAttribute('visibility', 'hidden'); return; }
-    const x = d.x0 + ((vx - d.L) / (d.width - d.L - d.R)) * (d.x1 - d.x0);
-    const rows = d.series.filter((s) => !document.body.classList.contains('hide-' + s.key)).map((s) => { let b = null; for (const p of s.pts) if (!b || Math.abs(p[0] - x) < Math.abs(b[0] - x)) b = p; return b ? s.label + ': ' + b[1].toFixed(2) + ' m' : ''; }).filter(Boolean);
-    tip.innerHTML = '<b>' + x.toFixed(1) + ' m</b><br>' + rows.join('<br>'); tip.hidden = false;
-    tip.style.left = Math.min(r.width - 170, Math.max(8, ev.clientX - r.left + 12)) + 'px';
-    cross.setAttribute('x1', vx); cross.setAttribute('x2', vx); cross.setAttribute('visibility', 'visible');
-  };
-  svg.addEventListener('pointermove', move); svg.addEventListener('pointerleave', () => { tip.hidden = true; cross.setAttribute('visibility', 'hidden'); });
-}
-// the Show switches: a source unticked is hidden everywhere below
-for (const box of document.querySelectorAll('[data-toggle]')) box.addEventListener('change', () => document.body.classList.toggle('hide-' + box.dataset.toggle, !box.checked));
-// a picture or a graph, clicked: shown as large as the window (again, or Escape: back)
-const unzoom = () => { for (const z of document.querySelectorAll('.zoomed')) z.classList.remove('zoomed'); };
-for (const svg of document.querySelectorAll('svg.map, .chart svg')) svg.addEventListener('click', () => { const host = svg.closest('figure, .chart'); const was = host.classList.contains('zoomed'); unzoom(); if (!was) host.classList.add('zoomed'); });
-document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') unzoom(); });
-</script></body></html>`;
+<script>${REPORT_SCRIPT}</script></body></html>`;
 }
