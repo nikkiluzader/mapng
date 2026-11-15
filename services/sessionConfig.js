@@ -229,10 +229,53 @@ export async function parseSessionText(text) {
   if (!config || typeof config !== 'object') throw new Error('not a config');
   const hasArea = config.center && Number.isFinite(Number(config.center.lat)) && Number.isFinite(Number(config.center.lng));
   if (!hasArea && !config.export) throw new Error('not a config');
-  return withoutSecrets(config);
+  return sanitizeSessionConfig(withoutSecrets(config));
+}
+
+// ---- a config from someone else: only values the app itself could have made ----
+
+const ELEVATION_UNITS = ['auto', 'meters', 'feet', 'us_survey_feet'];
+const MAX_MASK_CHARS = 2 * 1024 * 1024;
+const MAX_MASK_ITEMS = 20000;
+/**
+ * The config with out-of-range values removed or brought into range (a new object). A code is
+ * text anyone can write: a place off the Earth, a scale of a million metres a pixel or a
+ * background drawing of a million strokes would otherwise be applied, and saved, as given.
+ */
+export function sanitizeSessionConfig(config) {
+  const c = { ...config };
+  if (c.center != null) {
+    const lat = Number(c.center?.lat); const lng = Number(c.center?.lng);
+    if (Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 85.06 && Math.abs(lng) <= 180) c.center = { ...c.center, lat, lng };
+    else delete c.center;
+  }
+  if (c.processingMetersPerPixel != null) {
+    const mpp = Number(c.processingMetersPerPixel);
+    if (Number.isFinite(mpp) && mpp > 0) c.processingMetersPerPixel = Math.min(64, Math.max(0.1, mpp));
+    else delete c.processingMetersPerPixel;
+  }
+  if (c.zoom != null) {
+    const zoom = Number(c.zoom);
+    if (Number.isFinite(zoom)) c.zoom = Math.min(22, Math.max(1, zoom)); else delete c.zoom;
+  }
+  if (c.elevationUnitOverride != null && !ELEVATION_UNITS.includes(c.elevationUnitOverride)) delete c.elevationUnitOverride;
+  if (c.backgroundMask != null) {
+    const m = c.backgroundMask;
+    let ok = m && typeof m === 'object' && !Array.isArray(m);
+    if (ok) {
+      for (const k of ['lines', 'shade', 'unshade', 'roads', 'paint', 'raw']) if (m[k] != null && (!Array.isArray(m[k]) || m[k].length > MAX_MASK_ITEMS)) ok = false;
+      try { if (ok && JSON.stringify(m).length > MAX_MASK_CHARS) ok = false; } catch { ok = false; }
+    }
+    if (!ok) delete c.backgroundMask;
+  }
+  return c;
 }
 
 // ---- what a config would change, for the confirm dialog ------------------
+
+// (the fields of a config that have a row of their own in the dialog; the rest are counted)
+const OTHER_TOP_FIELDS = ['zoom', 'gapFillSource', 'elevationUnitOverride', 'overtureBuildings', 'workflow'];
+const DESCRIBED_EXPORT_FIELDS = new Set(['baseTexture', 'buildings', 'water', 'trees', 'rocks', 'roads', 'basicPreset', 'contentOff', 'excludeTags', 'forestDensity', 'assumeParking', 'decalSidewalks', 'curbHeight', 'viewDistance', 'bridges', 'tunnels', 'measuredBridgeHeights', 'terrainEdits', 'shapeRoads', 'shapeBridges', 'shapeOverpasses', 'shapeTunnels', 'shapeExtras', 'shapeDetail', 'backdrop', 'safeCaps', 'roadSurface']);
 
 /**
  * Rows [{ section, label, value, warn? }] describing a config, with label and
@@ -257,6 +300,8 @@ export function describeSessionConfig(config, { hasGpxzKey = false } = {}) {
   if (typeof c.includeOSM === 'boolean') add('data', 'config.osm', { valueKey: c.includeOSM ? 'config.on' : 'config.off' });
   if (typeof c.rawTerrain === 'boolean') add('data', 'config.rawTerrain', { valueKey: c.rawTerrain ? 'config.on' : 'config.off' });
   if (typeof c.advancedMode === 'boolean') add('data', 'config.advancedMode', { valueKey: c.advancedMode ? 'config.on' : 'config.off' });
+  // (downloads extra satellite tiles at Generate: said when a config switches it on)
+  if (c.measureRoadWidths === true) add('data', 'controlPanel.measureRoadWidths', { valueKey: 'config.on' });
   if (usableMask(c.backgroundMask)) {
     const m = c.backgroundMask;
     add('data', 'config.backgroundAreas', { valueKey: 'config.backgroundAreasValue', params: { lines: (m.lines || []).length, areas: (m.shade || []).length, roads: (m.roads || []).length, strokes: (m.paint || []).length + (m.raw || []).length } });
@@ -298,26 +343,35 @@ export function describeSessionConfig(config, { hasGpxzKey = false } = {}) {
         : { valueKey: `config.edits_${e.terrainEdits}` });
     }
     if (e.backdrop) add('export', 'config.backdrop', { valueKey: e.backdrop === 'off' ? 'config.off' : `config.source_${e.backdrop}` });
-    // (shown like the panel's "Build everything" box, the opposite of safe caps)
-    if (advanced && typeof e.safeCaps === 'boolean') add('export', 'config.buildEverything', { valueKey: e.safeCaps ? 'config.off' : 'config.on' });
+    // (shown like the panel's "Build everything" box, the opposite of safe caps; with the limits
+    // off it is always said, whatever the mode: that is the setting that can run a computer out of memory)
+    if ((advanced && typeof e.safeCaps === 'boolean') || e.safeCaps === false) add('export', 'config.buildEverything', { valueKey: e.safeCaps ? 'config.off' : 'config.on' });
+    // (the experimental road surfaces: always said)
+    if (e.roadSurface && e.roadSurface !== 'decal') add('export', 'config.roadSurface', { valueKey: `exportPanel.ui.roadSurface_${['mesh', 'hero'].includes(e.roadSurface) ? e.roadSurface : 'decal'}` });
   }
+  // Everything else the config sets and no row above names: said as a count, so nothing is applied unseen.
+  const others = [...OTHER_TOP_FIELDS.filter((k) => c[k] !== undefined), ...(e && typeof e === 'object' ? Object.keys(e).filter((k) => !DESCRIBED_EXPORT_FIELDS.has(k)) : [])];
+  if (others.length) add(e ? 'export' : 'data', 'config.otherSettings', { valueKey: 'config.otherSettingsValue', params: { n: others.length } });
   return rows;
 }
 
 // ---- short send codes (mapng.com /api/share: worker/shareCodes.js) --------------
 
 const SHARE_CHARS = 'ABCDEFGHJKMNPQRSTVWXYZ23456789';
-/** "k7f-29q", "K7F29Q" or a "mapng.com/#K7F-29Q" link → "K7F29Q", or null. */
+const SHARE_ID_RE = /(?:^|#)([A-Za-z0-9]{4}-?[A-Za-z0-9]{4}|[A-Za-z0-9]{3}-?[A-Za-z0-9]{3})$/;
+/** Whether a page address's "#…" part is a send code and nothing else. */
+export const isShareHash = (hash) => /^#(?:[A-Za-z0-9]{4}-?[A-Za-z0-9]{4}|[A-Za-z0-9]{3}-?[A-Za-z0-9]{3})$/.test(String(hash || ''));
+/** "k7f2-9qxm", "K7F29QXM" or a "mapng.com/#K7F2-9QXM" link → "K7F29QXM" (an old six-character code too), or null. */
 export function shareIdFrom(text) {
   const t = String(text || '').trim();
-  const m = /(?:^|#)([A-Za-z0-9]{3}-?[A-Za-z0-9]{3})$/.exec(t);
+  const m = SHARE_ID_RE.exec(t);
   if (!m) return null;
   const id = m[1].toUpperCase().replace('-', '');
   return [...id].every((c) => SHARE_CHARS.includes(c)) ? id : null;
 }
 export const shareLink = (id) => `https://mapng.com/#${id}`;
 
-/** Store a code for 24 hours: { id: "K7F-29Q", expiresAt }, or throws with the server's reason. */
+/** Store a code for 24 hours: { id: "K7F2-9QXM", expiresAt }, or throws with the server's reason. */
 export async function sendSessionCode(code, fetchImpl = globalThis.fetch) {
   const r = await fetchImpl('/api/share', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code }) });
   const d = await r.json().catch(() => ({}));

@@ -19,7 +19,7 @@ test('a sent config comes back by its code, with or without the dash, until it e
   const env = { OSM_TILES: fakeBucket() };
   const r = await send(env, 'mapng:1:abcDEF_-');
   const { id } = await r.json();
-  assert.match(id, /^[A-Z0-9]{3}-[A-Z0-9]{3}$/);
+  assert.match(id, /^[A-Z0-9]{4}-[A-Z0-9]{4}$/);
   for (const form of [id, id.replace('-', ''), id.toLowerCase()]) {
     const got = await (await call(env, `/api/share/${form}`)).json();
     assert.equal(got.code, 'mapng:1:abcDEF_-');
@@ -42,6 +42,8 @@ test('only MapNG configs are kept; too many sends are refused', async () => {
 
 test('send codes are read loosely', () => {
   assert.equal(normalizeShareId(' k7f-29q '), 'K7F29Q');
+  assert.equal(normalizeShareId(' k7f2-9qxm '), 'K7F29QXM');
+  assert.equal(normalizeShareId('K7F2-9QX'), null);
   assert.equal(normalizeShareId('K7F-29'), null);
   assert.equal(normalizeShareId('O0I1LU'), null);            // letters left out to avoid mix-ups
 });

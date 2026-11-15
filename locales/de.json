@@ -1493,7 +1493,7 @@
     "edits_none": "Keine",
     "backdrop": "Umgebung",
     "send": "Code holen",
-    "codePlaceholder": "z. B. K7F-29Q, ein Link oder ein mapng:1:-Code",
+    "codePlaceholder": "z. B. K7F2-9QXM, ein Link oder ein mapng:1:-Code",
     "open": "Öffnen",
     "copyCode": "Code kopieren",
     "copyLink": "Link kopieren",
@@ -1531,7 +1531,10 @@
     "decalSidewalks": "Gehwege als Decals",
     "curbHeight": "Bordsteinhöhe",
     "curbHeight_low": "Niedrig (8 cm)",
-    "curbHeight_flush": "Bündig (3 cm)"
+    "curbHeight_flush": "Bündig (3 cm)",
+    "roadSurface": "Straßenbelag",
+    "otherSettings": "Weitere Einstellungen",
+    "otherSettingsValue": "{n} weitere, unter „Feinabstimmung“"
   },
   "usage": {
     "askTitle": "Teilen, welche Einstellungen du nutzt?",

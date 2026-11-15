@@ -1493,7 +1493,7 @@
     "edits_none": "Нет",
     "backdrop": "Окружение",
     "send": "Получить код",
-    "codePlaceholder": "напр. K7F-29Q, ссылка или код mapng:1:",
+    "codePlaceholder": "напр. K7F2-9QXM, ссылка или код mapng:1:",
     "open": "Открыть",
     "copyCode": "Копировать код",
     "copyLink": "Копировать ссылку",
@@ -1531,7 +1531,10 @@
     "decalSidewalks": "Тротуары как декали",
     "curbHeight": "Высота бордюра",
     "curbHeight_low": "Низкая (8 см)",
-    "curbHeight_flush": "Вровень (3 см)"
+    "curbHeight_flush": "Вровень (3 см)",
+    "roadSurface": "Покрытие дорог",
+    "otherSettings": "Другие настройки",
+    "otherSettingsValue": "ещё {n}, во вкладке «Тонкая настройка»"
   },
   "usage": {
     "askTitle": "Делиться тем, какие настройки вы используете?",

@@ -1498,7 +1498,7 @@
     "edits_none": "None",
     "backdrop": "Surroundings",
     "send": "Get a code",
-    "codePlaceholder": "e.g. K7F-29Q, a link, or a mapng:1: code",
+    "codePlaceholder": "e.g. K7F2-9QXM, a link, or a mapng:1: code",
     "open": "Open",
     "copyCode": "Copy code",
     "copyLink": "Copy link",
@@ -1536,7 +1536,10 @@
     "decalSidewalks": "Sidewalks as decals",
     "curbHeight": "Curb height",
     "curbHeight_low": "Low (8 cm)",
-    "curbHeight_flush": "Flush (3 cm)"
+    "curbHeight_flush": "Flush (3 cm)",
+    "roadSurface": "Road surface",
+    "otherSettings": "Other settings",
+    "otherSettingsValue": "{n} more, under Fine-tuning"
   },
   "usage": {
     "askTitle": "Share which settings you use?",

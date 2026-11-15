@@ -1493,7 +1493,7 @@
     "edits_none": "Ninguno",
     "backdrop": "Alrededores",
     "send": "Obtener código",
-    "codePlaceholder": "p. ej. K7F-29Q, un enlace o un código mapng:1:",
+    "codePlaceholder": "p. ej. K7F2-9QXM, un enlace o un código mapng:1:",
     "open": "Abrir",
     "copyCode": "Copiar código",
     "copyLink": "Copiar enlace",
@@ -1531,7 +1531,10 @@
     "decalSidewalks": "Aceras como calcomanías",
     "curbHeight": "Altura del bordillo",
     "curbHeight_low": "Bajo (8 cm)",
-    "curbHeight_flush": "A ras (3 cm)"
+    "curbHeight_flush": "A ras (3 cm)",
+    "roadSurface": "Superficie de las carreteras",
+    "otherSettings": "Otros ajustes",
+    "otherSettingsValue": "{n} más, en «Ajuste fino»"
   },
   "usage": {
     "askTitle": "¿Compartir qué ajustes usas?",

@@ -1493,7 +1493,7 @@
     "edits_none": "Brak",
     "backdrop": "Otoczenie",
     "send": "Pobierz kod",
-    "codePlaceholder": "np. K7F-29Q, link lub kod mapng:1:",
+    "codePlaceholder": "np. K7F2-9QXM, link lub kod mapng:1:",
     "open": "Otwórz",
     "copyCode": "Kopiuj kod",
     "copyLink": "Kopiuj link",
@@ -1531,7 +1531,10 @@
     "decalSidewalks": "Chodniki jako decale",
     "curbHeight": "Wysokość krawężnika",
     "curbHeight_low": "Niska (8 cm)",
-    "curbHeight_flush": "Na równo (3 cm)"
+    "curbHeight_flush": "Na równo (3 cm)",
+    "roadSurface": "Nawierzchnia dróg",
+    "otherSettings": "Inne ustawienia",
+    "otherSettingsValue": "jeszcze {n}, w zakładce „Dostrajanie”"
   },
   "usage": {
     "askTitle": "Udostępniać, jakich ustawień używasz?",

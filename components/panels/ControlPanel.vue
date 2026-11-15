@@ -441,7 +441,7 @@ import RasterMetaCard from '../controls/RasterMetaCard.vue';
 import { checkUSGSStatus, probeGPXZLimits } from '../../services/terrain';
 import { downloadJsonFile } from '../../services/traceability';
 import { buildRunConfiguration as buildRunConfigurationBase } from '../../services/runConfiguration';
-import { applyStoredSettings, usableMask, buildSessionConfig, describeSessionConfig, encodeSessionCode, encodeSessionCodeWithin, configPoints, fetchSharedCode, looksLikeSessionCode, parseSessionText, sendSessionCode, shareIdFrom, shareLink } from '../../services/sessionConfig.js';
+import { isShareHash, applyStoredSettings, usableMask, buildSessionConfig, describeSessionConfig, encodeSessionCode, encodeSessionCodeWithin, configPoints, fetchSharedCode, looksLikeSessionCode, parseSessionText, sendSessionCode, shareIdFrom, shareLink } from '../../services/sessionConfig.js';
 import { setBaseTexture } from '../../composables/useBaseTexture.js';
 import SessionConfigDialog from '../modals/SessionConfigDialog.vue';
 import ShareDialog from '../modals/ShareDialog.vue';
@@ -934,9 +934,9 @@ const onWindowPaste = (event) => {
 onMounted(() => {
   window.addEventListener('paste', onWindowPaste);
   setSessionConfigSource(currentSessionConfig);
-  // a mapng.com/#K7F-29Q link: open the sent config's preview
+  // a mapng.com/#K7F2-9QXM link: open the sent config's preview
   const linked = shareIdFrom(window.location.hash);
-  if (linked && /^#[A-Za-z0-9]{3}-?[A-Za-z0-9]{3}$/.test(window.location.hash)) {
+  if (linked && isShareHash(window.location.hash)) {
     history.replaceState(null, '', window.location.pathname + window.location.search);
     openShareCode(linked);
   }

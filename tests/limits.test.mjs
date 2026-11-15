@@ -67,3 +67,34 @@ test("the user's own Overpass server and user:password parts are never written d
   assert.equal(shownUrl('/api/osm?bbox=1,2,3,4', custom), '/api/osm?bbox=1,2,3,4');
   assert.equal(scrubText('fetch failed https://me:hunter2@host.example/x and key=abc123', '/home/someone'), 'fetch failed https://host.example/x and key=[hidden]');
 });
+
+// ---- a config from someone else ----
+import { describeSessionConfig, sanitizeSessionConfig, shareIdFrom, isShareHash } from '../services/sessionConfig.js';
+
+test('a pasted config is brought into range before it is shown or applied', () => {
+  const c = sanitizeSessionConfig({ center: { lat: 999, lng: 5 }, processingMetersPerPixel: 1e9, zoom: 400, elevationUnitOverride: 'furlongs', backgroundMask: { version: 1, bounds: {}, paint: new Array(50000).fill(0) }, resolution: 4096 });
+  assert.deepEqual(c, { processingMetersPerPixel: 64, zoom: 22, resolution: 4096 });
+  const fine = { center: { lat: 29.89, lng: -81.31 }, processingMetersPerPixel: 2, elevationUnitOverride: 'feet', backgroundMask: { version: 1, bounds: {}, lines: [[1, 2]] } };
+  assert.deepEqual(sanitizeSessionConfig(fine), fine);
+  assert.equal(sanitizeSessionConfig({ processingMetersPerPixel: -3 }).processingMetersPerPixel, undefined);
+});
+
+test('the confirm dialog names the risky settings in any mode and counts the rest', () => {
+  const rows = describeSessionConfig({ advancedMode: false, measureRoadWidths: true, zoom: 14, overtureBuildings: false, export: { baseTexture: 'game', safeCaps: false, roadSurface: 'hero', seaLevelOffset: 3, treeKindsOff: ['oak'], shapeTerrain: true } });
+  const by = Object.fromEntries(rows.map((r) => [r.label, r]));
+  assert.equal(by['config.buildEverything'].valueKey, 'config.on');
+  assert.equal(by['config.roadSurface'].valueKey, 'exportPanel.ui.roadSurface_hero');
+  assert.equal(by['controlPanel.measureRoadWidths'].valueKey, 'config.on');
+  assert.equal(by['config.otherSettings'].params.n, 5);      // zoom, overtureBuildings, seaLevelOffset, treeKindsOff, shapeTerrain
+  assert.equal(describeSessionConfig({ center: { lat: 1, lng: 2 }, export: { baseTexture: 'osm' } }).some((r) => r.label === 'config.otherSettings'), false);
+});
+
+test('send codes: eight characters, old six-character ones still read', () => {
+  assert.equal(shareIdFrom('k7f2-9qxm'), 'K7F29QXM');
+  assert.equal(shareIdFrom('https://mapng.com/#K7F2-9QXM'), 'K7F29QXM');
+  assert.equal(shareIdFrom('K7F-29Q'), 'K7F29Q');
+  assert.equal(shareIdFrom('K7F2-9Q'), null);
+  assert.equal(isShareHash('#K7F2-9QXM'), true);
+  assert.equal(isShareHash('#K7F-29Q'), true);
+  assert.equal(isShareHash('#section-one'), false);
+});

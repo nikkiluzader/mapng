@@ -13,13 +13,23 @@ const LIMIT_PER_HOUR = 30;                    // per address, this isolate's mem
 const ID_CHARS = 'ABCDEFGHJKMNPQRSTVWXYZ23456789';
 const recent = new Map();
 
-const newId = () => [...crypto.getRandomValues(new Uint8Array(6))].map((b) => ID_CHARS[b % ID_CHARS.length]).join('');
-/** "k7f-29q" / "K7F29Q" → "K7F29Q", or null. */
+// Eight characters (656 thousand million codes): short enough to read out, far too many to find one by
+// trying. Codes were six until 2026-11 (729 million); those still open until they expire.
+const ID_LENGTH = 8;
+export const newId = () => {
+  let id = '';
+  while (id.length < ID_LENGTH) {
+    // (a byte past the last whole run of the alphabet is thrown again: every character equally likely)
+    for (const b of crypto.getRandomValues(new Uint8Array(16))) if (b < 240 && id.length < ID_LENGTH) id += ID_CHARS[b % ID_CHARS.length];
+  }
+  return id;
+};
+/** "k7f2-9qxm" / "K7F29QXM" → "K7F29QXM" (or an old six-character code), or null. */
 export const normalizeShareId = (text) => {
   const id = String(text || '').toUpperCase().replace(/[\s-]/g, '');
-  return new RegExp(`^[${ID_CHARS}]{6}$`).test(id) ? id : null;
+  return new RegExp(`^(?:[${ID_CHARS}]{6}|[${ID_CHARS}]{8})$`).test(id) ? id : null;
 };
-export const formatShareId = (id) => `${id.slice(0, 3)}-${id.slice(3)}`;
+export const formatShareId = (id) => `${id.slice(0, id.length / 2)}-${id.slice(id.length / 2)}`;
 
 const READS_PER_HOUR = 60;      // tries at opening a code, per address (the same in-memory note as for sending)
 const recentReads = new Map();
@@ -70,7 +80,7 @@ export async function handleShareCodes(request, env, url, json) {
 
   if (request.method !== 'GET') return json({ error: 'Method Not Allowed' }, 405);
   // (codes are short so they can be read out loud; guessing them is slowed to a crawl instead)
-  if (await limitedReads(request) || await overRate(env, 'RL_READ', request, 'share')) return json({ error: 'Too many tries; try again later' }, 429, noStore);
+  if (await limitedReads(request) || await overRate(env, 'RL_WRITE', request, 'share-read')) return json({ error: 'Too many tries; try again later' }, 429, noStore);
   let asked = '';
   try { asked = decodeURIComponent(sub.slice(1)); } catch { return json({ error: 'Not a send code' }, 404, noStore); }
   const id = normalizeShareId(asked);
