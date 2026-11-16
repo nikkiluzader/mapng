@@ -75,6 +75,9 @@ export const CONTENT_GROUPS = [
     { id: 'statues', tags: ['historic=memorial', 'tourism=artwork'] },
     { id: 'masts', tags: ['man_made=mast', 'man_made=tower'] },
     { id: 'oilWells', tags: ['man_made=petroleum_well'] },
+    { id: 'windTurbines', tags: ['generator:source=wind'] },
+    { id: 'solarFarms', tags: ['generator:source=solar'] },
+    { id: 'substations', tags: ['power=substation'] },
     { id: 'fountains', tags: ['amenity=fountain', 'amenity=drinking_water'] },
     { id: 'fences', tags: ['barrier=fence', 'barrier=wall', 'barrier=retaining_wall', 'barrier=hedge', 'barrier=city_wall'] },
     { id: 'gates', tags: ['barrier=gate', 'barrier=lift_gate', 'barrier=swing_gate', 'barrier=sliding_gate', 'barrier=bollard', 'barrier=jersey_barrier', 'barrier=guard_rail', 'barrier=chain'] },
@@ -88,6 +91,7 @@ export const CONTENT_GROUPS = [
     { id: 'trees', option: { includeTrees: false } },
     { id: 'groundCover' },
     { id: 'rocks', option: { includeRocks: false } },
+    { id: 'vineyards', tags: ['landuse=vineyard'] },
   ] },
   { id: 'water', items: [
     // (by kind, waterKindOf below: a region's lakes may be mapped well and its streams not)

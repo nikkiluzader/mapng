@@ -29,7 +29,7 @@ export function tagModel(tag, biome, n = 0) {
   const list = tagModelsFor(tag, biome);
   if (!list.length) return null;
   const m = list[((Math.trunc(n) % list.length) + list.length) % list.length];
-  return { shapeFile: m.shape, yawOffset: ((m.yaw || 0) * Math.PI) / 180, size: m.size, box: m.box, scale: m.scale || 1 };
+  return { shapeFile: m.shape, yawOffset: ((m.yaw || 0) * Math.PI) / 180, size: m.size, box: m.box, scale: m.scale || 1, lift: m.lift || 0 };
 }
 
 /** Every model any tag may place: the set whose materials ship with an export. */

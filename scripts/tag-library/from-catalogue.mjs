@@ -129,7 +129,10 @@ for (const [key, byRegion] of Object.entries(picks.picks)) {
       if (!r.tags.includes(tag) && !lib.tags[tag].assets.some((a) => a.shape === shape && a.usedToday)) throw new Error(`model-picks.json: ${tag}: ${shape} does not carry the tag`);
       // (a pick's model may be set smaller or larger in data/model-picks.json models: { scale }; its size and box with it)
       const s = Number(picks.models?.[shape]?.scale) > 0 ? Number(picks.models[shape].scale) : 1;
-      return s === 1 ? { shape, yaw: r.yaw ?? 0, size: r.size, box: r.box } : { shape, yaw: r.yaw ?? 0, scale: s, size: r.size.map((v) => +(v * s).toFixed(3)), box: r.box?.map((v) => +(v * s).toFixed(3)) };
+      // (and lifted: a model whose origin stands above its foot, a wind turbine's 25 m up its tower)
+      const lift = Number(picks.models?.[shape]?.lift) || 0;
+      const base = s === 1 ? { shape, yaw: r.yaw ?? 0, size: r.size, box: r.box } : { shape, yaw: r.yaw ?? 0, scale: s, size: r.size.map((v) => +(v * s).toFixed(3)), box: r.box?.map((v) => +(v * s).toFixed(3)) };
+      return lift ? { ...base, lift } : base;
     });
   }
   // (the library says which of a tag's models are the picks, first choice first; no pick for "any": nothing is

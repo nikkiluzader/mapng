@@ -56,6 +56,10 @@
   "/levels/jungle_rock_island/art/shapes/buildings/jri_observatory_statue.dae": {
    "scale": 0.45,
    "note": "an armillary sphere 6 m across on its base: set at 45% (about 2.7 m) as a city sculpture, a sidewalk being no place for the full one"
+  },
+  "/levels/driver_training/art/shapes/objects/turbine.dae": {
+   "lift": 25,
+   "note": "its origin is at 25 m up the tower (box from -25 to 72 m): raised by that, its foot on the ground; its rotor 52.4 m across, its hub 72 m up: a mapped turbine's rotor:diameter or height sets its size, else the gap to its nearest neighbour"
   }
  },
  "picks": {
@@ -199,6 +203,11 @@
    "any": [
     "/levels/italy/art/shapes/buildings/italy_castle_statue.dae",
     "/levels/jungle_rock_island/art/shapes/buildings/jri_observatory_statue.dae"
+   ]
+  },
+  "power=generator#wind": {
+   "any": [
+    "/levels/driver_training/art/shapes/objects/turbine.dae"
    ]
   }
  },
@@ -497,6 +506,34 @@
    "cap": 2000,
    "beside": 0.9,
    "offBuildings": true
+  },
+  "windTurbine": {
+   "tag": "power=generator",
+   "when": {
+    "generator:source": [
+     "wind"
+    ]
+   },
+   "unless": {
+    "location": [
+     "roof",
+     "rooftop"
+    ],
+    "generator:place": [
+     "roof"
+    ]
+   },
+   "pick": "power=generator#wind",
+   "face": "none",
+   "item": "windTurbines",
+   "cap": 400,
+   "beside": 25,
+   "offBuildings": true,
+   "fit": {
+    "rotor": 52.4,
+    "hub": 72,
+    "min": 0.35
+   }
   }
  },
  "parts": {
@@ -994,6 +1031,87 @@
    "facts": {
     "note": "a high-voltage lattice tower, 29.9 m over its origin, legs 5.9 m below it; cross-arms along Y (streetProps.js POLE_TYPES.tower has its wire fittings)"
    }
+  },
+  "PROP_ITEMS.mapng_prop_vine_row": {
+   "tag": "landuse=vineyard",
+   "shape": "/levels/italy/art/shapes/trees/trees_italy/grape_vine.dae",
+   "facts": {
+    "name": "mapng_prop_vine_row",
+    "internalName": "mapng_prop_vine_row",
+    "class": "TSForestItemData",
+    "annotation": "NATURE",
+    "radius": 0.5,
+    "length": 5.64
+   },
+   "ship": true
+  },
+  "PROP_ITEMS.mapng_prop_solar_row": {
+   "tag": "power=generator",
+   "shape": "/levels/west_coast_usa/art/shapes/objects/solarpanel.dae",
+   "facts": {
+    "name": "mapng_prop_solar_row",
+    "internalName": "mapng_prop_solar_row",
+    "class": "TSForestItemData",
+    "annotation": "OBSTACLES",
+    "radius": 2,
+    "length": 16
+   },
+   "ship": true
+  },
+  "SUBSTATION.transformer": {
+   "tag": "power=substation",
+   "shape": "/levels/west_coast_usa/art/shapes/objects/substation_transformer.dae",
+   "facts": {
+    "size": [
+     6.35,
+     7.49
+    ]
+   },
+   "ship": true
+  },
+  "SUBSTATION.support": {
+   "tag": "power=substation",
+   "shape": "/levels/west_coast_usa/art/shapes/objects/substation_support.dae",
+   "facts": {
+    "size": [
+     3.7,
+     0.56
+    ]
+   },
+   "ship": true
+  },
+  "SUBSTATION.breaker": {
+   "tag": "power=substation",
+   "shape": "/levels/west_coast_usa/art/shapes/objects/substation_circuitbreaker.dae",
+   "facts": {
+    "size": [
+     11.87,
+     17.51
+    ]
+   },
+   "ship": true
+  },
+  "SUBSTATION.lightning": {
+   "tag": "power=substation",
+   "shape": "/levels/west_coast_usa/art/shapes/objects/substation_lightning.dae",
+   "facts": {
+    "size": [
+     2.14,
+     1.89
+    ]
+   },
+   "ship": true
+  },
+  "SUBSTATION.small": {
+   "tag": "power=substation",
+   "shape": "/levels/west_coast_usa/art/shapes/buildings/transformer_ground.dae",
+   "facts": {
+    "size": [
+     4.1,
+     2.54
+    ]
+   },
+   "ship": true
   }
  }
 }

@@ -5424,15 +5424,15 @@
    "count": 882000,
    "group": "green",
    "item": "groundPaint",
-   "status": "partial",
+   "status": "built",
    "fetched": true,
-   "builds": "Grass paint today; planned: rows of vines",
+   "builds": "Vine rows along the field's longest side, 2.6 m apart, as forest items (and the grass paint under them)",
    "assets": [
-    {"shape":"/levels/italy/art/shapes/trees/trees_italy/grape_vine.dae","region":"europe","usedToday":false},
+    {"shape":"/levels/italy/art/shapes/trees/trees_italy/grape_vine.dae","region":"europe","usedToday":true},
     {"shape":"/levels/italy/art/shapes/trees/trees_italy/grape_vine_group.dae","region":"europe","usedToday":false}
    ],
    "generated": "Terrain material (paint); no object",
-   "code": "services/osmTerrainMaterials.js",
+   "code": "services/areaRows.js, services/exportBeamNGLevel.js",
    "note": "Native vine rows exist in Italy and are not used"
   },
   "leisure=bleachers": {
@@ -8044,16 +8044,16 @@
     "area"
    ],
    "count": 6850000,
-   "group": "industry",
-   "item": "generators",
-   "status": "planned",
+   "group": "furniture",
+   "item": "windTurbines",
+   "status": "built",
    "fetched": true,
    "fetchedNote": "Areas are fetched; nodes (every wind turbine) are not",
-   "builds": "By source: a wind turbine, a field of solar panels; rooftop panels left out",
+   "builds": "A wind turbine at a mapped wind generator; a solar field's panel rows east-west, facing the equator; rooftop panels left to their building",
    "assets": [
-    {"shape":"/levels/driver_training/art/shapes/objects/turbine.dae","region":"any","usedToday":false},
+    {"shape":"/levels/driver_training/art/shapes/objects/turbine.dae","region":"any","usedToday":true,"pick":1},
     {"shape":"/levels/driver_training/art/shapes/objects/turbine_tower.dae","region":"any","usedToday":false,"is":"A wind turbine tower (the blades are separate models)","size":[3.7,7.6,130],"seen":"2026-11-15","maybe":true},
-    {"shape":"/levels/west_coast_usa/art/shapes/objects/solarpanel.dae","region":"north-america","usedToday":false},
+    {"shape":"/levels/west_coast_usa/art/shapes/objects/solarpanel.dae","region":"north-america","usedToday":true},
     {"shape":"/levels/small_island/art/shapes/buildings/si_res_solar_panels.dae","region":"tropical","usedToday":false},
     {"shape":"/levels/driver_training/art/shapes/objects/solarpanel.dae","region":"any","usedToday":false,"is":"Ground-mount solar panel row, 16 m","from":"catalogue"},
     {"shape":"/levels/small_island/art/shapes/buildings/si_res_solar_panel_tall.dae","region":"tropical","usedToday":false,"is":"Small solar panel on lattice mast with cabinet","from":"catalogue"}
@@ -8082,7 +8082,8 @@
      "code": "services/beamngCarports.js"
     }
    },
-   "note": "92% are solar. generator:source is read only to spot solar carports. Whether the turbine blades model turns is unchecked"
+   "note": "92% are solar. generator:source is read only to spot solar carports. Whether the turbine blades model turns is unchecked",
+   "code": "services/tagModels.js (data/model-picks.json)"
   },
   "power=line": {
    "what": "A high-voltage overhead line",
@@ -8239,20 +8240,20 @@
    "count": 895000,
    "group": "industry",
    "item": "substations",
-   "status": "planned",
+   "status": "built",
    "fetched": true,
    "fetchedNote": "Areas are fetched (a colour in the OSM-style texture only); nodes are not",
-   "builds": "Gravel ground, a fence, transformers and busbar frames",
+   "builds": "Transformers and busbar supports in rows across the yard, lightning masts by its size; a small yard one ground transformer",
    "assets": [
-    {"shape":"/levels/west_coast_usa/art/shapes/objects/substation_transformer.dae","region":"north-america","setting":"industrial","usedToday":false},
+    {"shape":"/levels/west_coast_usa/art/shapes/objects/substation_transformer.dae","region":"north-america","setting":"industrial","usedToday":true},
     {"shape":"/levels/west_coast_usa/art/shapes/objects/substation_truss.dae","region":"north-america","setting":"industrial","usedToday":false},
-    {"shape":"/levels/west_coast_usa/art/shapes/objects/substation_circuitbreaker.dae","region":"north-america","setting":"industrial","usedToday":false},
-    {"shape":"/levels/west_coast_usa/art/shapes/buildings/transformer_ground.dae","region":"north-america","usedToday":false},
+    {"shape":"/levels/west_coast_usa/art/shapes/objects/substation_circuitbreaker.dae","region":"north-america","setting":"industrial","usedToday":true},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/transformer_ground.dae","region":"north-america","usedToday":true},
+    {"shape":"/levels/west_coast_usa/art/shapes/objects/substation_lightning.dae","region":"north-america","usedToday":true,"is":"Tall lightning mast; dresses a substation yard"},
+    {"shape":"/levels/west_coast_usa/art/shapes/objects/substation_support.dae","region":"north-america","usedToday":true,"is":"Busbar support with insulators; dresses a substation yard"},
     {"shape":"/levels/italy/art/shapes/buildings/italy_airport_electrical_cabinet.dae","region":"europe","usedToday":false,"is":"Small electrical kiosk building with antenna","from":"catalogue"},
     {"shape":"/levels/jungle_rock_island/art/shapes/buildings/tankfarm/ind_control_shed.dae","region":"tropical","usedToday":false,"is":"Small concrete utility hut with cabinets","from":"catalogue"},
-    {"shape":"/levels/west_coast_usa/art/shapes/buildings/shack_electrical.dae","region":"north-america","usedToday":false,"is":"Brick electrical hut on legs with platform","from":"catalogue"},
-    {"shape":"/levels/west_coast_usa/art/shapes/objects/substation_lightning.dae","region":"north-america","usedToday":false,"is":"Tall lightning mast; dresses a substation yard","from":"catalogue"},
-    {"shape":"/levels/west_coast_usa/art/shapes/objects/substation_support.dae","region":"north-america","usedToday":false,"is":"Busbar support with insulators; dresses a substation yard","from":"catalogue"}
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/shack_electrical.dae","region":"north-america","usedToday":false,"is":"Brick electrical hut on legs with platform","from":"catalogue"}
    ],
    "generated": "Gravel paint and a fence round the outline",
    "properties": {
@@ -8268,7 +8269,8 @@
      "effect": "indoor / underground: nothing outside",
      "used": false
     }
-   }
+   },
+   "code": "services/exportBeamNGLevel.js (data/model-picks.json parts SUBSTATION)"
   },
   "power=tower": {
    "what": "A high-voltage lattice tower",

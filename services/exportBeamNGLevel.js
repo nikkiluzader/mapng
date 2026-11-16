@@ -56,6 +56,7 @@ import { measureStructures, roadLinesFromDecals } from './structures/metrics.js'
 import { buildStructureGraph } from './structures/graph.js';
 import { findCrossings } from './structures/crossings.js';
 import { tagModel, tagObjectFor, standTagObject, part } from './tagModels.js';
+import { fillRows, rowDirection } from './areaRows.js';
 import { solveProfilesSteps, gradeLimit } from './structures/profileSolve.js';
 import { appendAll, keepInPlace } from './keepInPlace.js';
 import { classifyStructures } from './structures/structureRules.js';
@@ -9779,7 +9780,9 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
     && Array.isArray(feature.geometry)
     && feature.geometry.length === 1
   )) ?? [];
-  if (features.length === 0 && carriageways.length === 0 && !props?.poles.length) return [];
+  // (nothing to place: no furniture, no streets, no poles, and no mapped objects either. A wind farm's turbines stand
+  // where only service tracks run: they were never looked at)
+  if (features.length === 0 && carriageways.length === 0 && !props?.poles.length && !(terrainData.osmFeatures || []).some((f) => f.type === 'tag_object')) return [];
 
   const roads = projectDrivableRoads(terrainData, squareSize);
   const MAX_ROAD_SEARCH_M = 30;
@@ -9990,9 +9993,23 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
     if (!rule || (tagObjectCounts[rule.id] || 0) >= (rule.cap ?? 2000)) continue;
     const pt = f.geometry[0];
     if (!Number.isFinite(pt?.lat) || !Number.isFinite(pt?.lng)) continue;
-    const model = tagModel(rule.pick, biome, i);
+    let model = tagModel(rule.pick, biome, i);
     if (!model) continue;   // (no model for this region: a board whose text is another country's)
     const world = geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0);
+    // (sized to the one mapped: a wind turbine by its rotor:diameter or height, else to the gap to its nearest
+    // neighbour, rotors never through each other. Tehachapi's old turbines stand 35 m apart, the model's rotor is 52)
+    let fitScale = 1;
+    if (rule.fit) {
+      const rd = Number.parseFloat(f.tags['rotor:diameter']); const h = Number.parseFloat(f.tags.height);
+      if (rd > 0) fitScale = rd / rule.fit.rotor; else if (h > 0) fitScale = h / rule.fit.hub;
+      else {
+        let nd = Infinity;
+        for (const g of tagFeatures) { if (g === f || tagObjectFor(g.tags) !== rule) continue; const q = g.geometry[0]; const dx = (q.lng - pt.lng) * 111320 * Math.cos((pt.lat * Math.PI) / 180); const dy = (q.lat - pt.lat) * 110574; const dd = Math.hypot(dx, dy); if (dd < nd) nd = dd; }
+        if (Number.isFinite(nd)) fitScale = Math.min(1, (nd * 0.9) / rule.fit.rotor);
+      }
+      fitScale = Math.max(rule.fit.min ?? 0.35, Math.min(1.6, fitScale));
+      if (fitScale !== 1) model = { ...model, scale: (model.scale || 1) * fitScale, lift: (model.lift || 0) * fitScale, size: model.size?.map((v) => v * fitScale), box: model.box?.map((v) => v * fitScale) };
+    }
     // (a mast on a roof, toilets or bike stands mapped inside a building: they are part of it, not stood in it)
     if (rule.offBuildings && insideBuilding(world[0], world[1])) { tagObjectSkipped.inBuilding = (tagObjectSkipped.inBuilding || 0) + 1; continue; }
     const stand = standTagObject(rule, world[0], world[1], findNearestRoad(world[0], world[1], roads, MAX_ROAD_SEARCH_M), f.tags, i);
@@ -10037,7 +10054,7 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
       class: 'TSStatic',
       name: `${rule.id}_${i}`,
       persistentId: generatePersistentId(),
-      position: [roundTo(stand.x, 3), roundTo(stand.y, 3), roundTo(z, 3)],
+      position: [roundTo(stand.x, 3), roundTo(stand.y, 3), roundTo(z + (model.lift || 0), 3)],
       rotationMatrix: rotationMatrixFromYaw(stand.facing + model.yawOffset),
       ...(model.scale && model.scale !== 1 ? { scale: [model.scale, model.scale, model.scale] } : {}),
       shapeName: model.shapeFile,
@@ -14235,6 +14252,79 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     ...(decalRoads.tunnels?.tunnels || []).filter((t) => t.kind === 'gallery')
       .map((t) => ({ points: t.line.map((p) => [p.x, p.y]), half: galleryRoofHalf(t) })),
   ]);
+  // Rows filling mapped areas (services/areaRows.js), as forest items: a vineyard's vine rows along its longest
+  // side; a solar farm's panel rows east-west, their faces to the equator. Kept off roads and decks with the trees
+  // below. A solar area on a roof (mapped so, or lying inside a building's outline) is the building's, not a field.
+  {
+    const toW = (p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0);
+    const feats = exportTerrainData.osmFeatures || [];
+    const bRings = feats.filter((f) => f.type === 'building' && f.geometry?.length > 2).map((f) => f.geometry.map(toW));
+    const inRing = (x, y, r) => { let k = false; for (let a = 0, b = r.length - 1; a < r.length; b = a++) if (((r[a][1] > y) !== (r[b][1] > y)) && (x < ((r[b][0] - r[a][0]) * (y - r[a][1])) / (r[b][1] - r[a][1]) + r[a][0])) k = !k; return k; };
+    const closed = (g) => g?.length > 3 && g[0].lat === g[g.length - 1].lat && g[0].lng === g[g.length - 1].lng;
+    const rowsCounts = { vine: 0, solar: 0, fields: 0 };
+    const addRows = (type, pieces, lift = 0) => {
+      if (!pieces.length) return;
+      if (!forestPlacements.has(type)) forestPlacements.set(type, []);
+      const list = forestPlacements.get(type);
+      for (const pc of pieces) {
+        if (list.length >= caps.forestPerType) break;
+        const z = getTerrainHeightAtWorldXY(pc.x, pc.y, exportTerrainData, squareSize);
+        list.push({ ctxid: 0, pos: [roundTo(pc.x, 3), roundTo(pc.y, 3), roundTo(z + lift, 3)], rotationMatrix: rotationMatrixFromYaw(pc.yaw), scale: 1, type });
+      }
+    };
+    for (const f of feats) {
+      const tg = f.tags || {};
+      if (!closed(f.geometry)) continue;
+      const vine = tg.landuse === 'vineyard' && built('vineyards');
+      const solar = tg.power === 'generator' && tg['generator:source'] === 'solar' && built('solarFarms')
+        && !['roof', 'rooftop'].includes(tg.location) && tg['generator:place'] !== 'roof';
+      if (!vine && !solar) continue;
+      const ring = f.geometry.map(toW); const holes = (f.holes || []).map((h) => h.map(toW));
+      const cx = ring.reduce((s, q) => s + q[0], 0) / ring.length; const cy = ring.reduce((s, q) => s + q[1], 0) / ring.length;
+      if (solar && bRings.some((r) => inRing(cx, cy, r))) continue;
+      rowsCounts.fields += 1;
+      if (vine) {
+        const pieces = fillRows(ring, { holes, length: part('PROP_ITEMS.mapng_prop_vine_row').length, pitch: 3, margin: 1.5, cap: caps.forestPerType });
+        addRows('mapng_prop_vine_row', pieces); rowsCounts.vine += pieces.length;
+      } else {
+        // (the panels' working face is the model's +y: turned to the south in the north, to the north in the south)
+        const yaw = center.lat >= 0 ? Math.PI : 0;
+        const pieces = fillRows(ring, { holes, length: part('PROP_ITEMS.mapng_prop_solar_row').length, pitch: 7, margin: 2, angle: 0, cap: caps.forestPerType }).map((pc) => ({ ...pc, yaw }));
+        addRows('mapng_prop_solar_row', pieces); rowsCounts.solar += pieces.length;
+      }
+    }
+    if (rowsCounts.fields) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Rows in mapped fields: ${rowsCounts.vine} vine row piece(s), ${rowsCounts.solar} solar panel row(s), in ${rowsCounts.fields} field(s).`);
+    forestPlacements.fieldRows = rowsCounts;
+
+    // A substation's yard (power=substation): its transformers and busbar supports in rows along the yard, a lightning
+    // mast at every 2,500 m², a small yard a single ground transformer. TSStatics, a few per yard.
+    if (built('substations')) {
+      const parts = { tr: part('SUBSTATION.transformer'), sup: part('SUBSTATION.support'), lm: part('SUBSTATION.lightning'), small: part('SUBSTATION.small') };
+      let yards = 0; let pieces = 0;
+      const ringArea = (r) => { let s = 0; for (let a = 0, b = r.length - 1; a < r.length; b = a++) s += (r[b][0] + r[a][0]) * (r[b][1] - r[a][1]); return Math.abs(s) / 2; };
+      for (const f of feats) {
+        const tg = f.tags || {};
+        if (tg.power !== 'substation' || !closed(f.geometry) || tg.location === 'indoor' || tg.substation === 'minor_distribution' && tg.building) continue;
+        const ring = f.geometry.map(toW); const A = ringArea(ring);
+        const cx = ring.reduce((s, q) => s + q[0], 0) / ring.length; const cy = ring.reduce((s, q) => s + q[1], 0) / ring.length;
+        if (bRings.some((r) => inRing(cx, cy, r))) continue;   // (a substation in a building: the building)
+        const place = (pp, x, y, yaw, k) => {
+          const z = getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize);
+          if (bgAtWorld(x, y) || bRings.some((r) => inRing(x, y, r))) return;
+          streetFurnitureObjects.push({ __parent: 'street_furniture', class: 'TSStatic', name: `substation_${yards}_${k}`, persistentId: generatePersistentId(), position: [roundTo(x, 3), roundTo(y, 3), roundTo(z, 3)], rotationMatrix: rotationMatrixFromYaw(yaw), shapeName: pp.shapeFile, useInstanceRenderData: true });
+          pieces += 1;
+        };
+        yards += 1;
+        if (A < 300) { if (inRing(cx, cy, ring)) place(parts.small, cx, cy, rowDirection(ring), 0); continue; }
+        const rows = fillRows(ring, { length: 9, pitch: 13, margin: 4, cap: 160 });
+        rows.forEach((pc, k) => place(k % 6 === 0 ? parts.tr : parts.sup, pc.x, pc.y, pc.yaw + (k % 6 === 0 ? 0 : Math.PI / 2), k));
+        const masts = Math.floor(A / 2500);
+        for (let m = 0; m < masts && m < rows.length; m++) { const pc = rows[Math.floor(((m + 0.5) * rows.length) / Math.max(1, masts))]; if (pc) place(parts.lm, pc.x + 3, pc.y + 3, 0, `m${m}`); }
+      }
+      if (yards) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Substations: ${yards} yard(s), ${pieces} piece(s) of switchgear.`);
+      streetFurnitureObjects.substations = { yards, pieces };
+    }
+  }
   let vegetationCleared = 0;
   for (const [type, list] of forestPlacements) {
     const margin = (treeItemHeight(type) ?? 10) < 4 ? VEGETATION_CLEAR_LOW_M : VEGETATION_CLEAR_TREE_M;

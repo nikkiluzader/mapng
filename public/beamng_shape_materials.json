@@ -3055,6 +3055,61 @@
       "name": "SOFT_COLLISION_GENERAL",
       "persistentId": "395e88fc-6f2b-4624-88fa-fb4b0f8a4163"
     },
+    "balustrades": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/trim/metal/t_balustrades_trim_01/t_balustrades_trim_01_ao.data.png",
+          "baseColorMap": "/assets/materials/trim/metal/t_balustrades_trim_01/t_balustrades_trim_01_b.color.png",
+          "detailMap": "/assets/materials/trim/concrete/tunnel/t_tunnel_detail_b.data.png",
+          "detailNormalMapStrength": 0.5,
+          "detailRoughnessMapStrength": 0.5,
+          "detailScale": [
+            1,
+            8
+          ],
+          "normalMap": "/assets/materials/trim/metal/t_balustrades_trim_01/t_balustrades_trim_01_nm.normal.png",
+          "opacityMap": "/assets/materials/trim/metal/t_balustrades_trim_01/t_balustrades_trim_01_o.data.png",
+          "pixelSpecular": true,
+          "roughnessDetailMap": "/assets/materials/tileable/metal/italy_bld_metal/t_italy_bld_metal_r.data.png",
+          "roughnessMap": "/assets/materials/trim/metal/t_balustrades_trim_01/t_balustrades_trim_01_r.data.png",
+          "vertColor": true
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailRoughnessMapStrength": null,
+          "detailScale": null,
+          "pixelSpecular": null,
+          "vertColor": null
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailRoughnessMapStrength": null,
+          "detailScale": null,
+          "pixelSpecular": null,
+          "vertColor": null
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailRoughnessMapStrength": null,
+          "detailScale": null,
+          "pixelSpecular": null,
+          "vertColor": null
+        }
+      ],
+      "alphaRef": 110,
+      "alphaTest": true,
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "doubleSided": true,
+      "invertBackFaceNormals": true,
+      "mapTo": "balustrades",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "name": "balustrades",
+      "persistentId": "c021e7f6-496d-4bec-aca0-1a6e18a0a88c",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
     "barrierfence1": {
       "Stages": [
         {
@@ -3314,6 +3369,103 @@
       "name": "concrete_plain",
       "persistentId": "0affa924-0c54-48c6-b635-e529d390a043",
       "translucent": true,
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
+    "construction": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/atlas/construction/t_construction_ao.data.png",
+          "baseColorMap": "/assets/materials/atlas/construction/t_construction_b.color.png",
+          "emissiveFactor": [
+            1,
+            1,
+            1
+          ],
+          "emissiveIntensityNits": 3000,
+          "emissiveMap": "/assets/materials/atlas/construction/t_construction_e.color.png",
+          "instanceEmissive": true,
+          "normalMap": "/assets/materials/atlas/construction/t_construction_nm.normal.png",
+          "opacityMap": "/assets/materials/atlas/construction/t_construction_o.data.png",
+          "pixelSpecular": true,
+          "roughnessMap": "/assets/materials/atlas/construction/t_construction_r.data.png",
+          "vertColor": true
+        },
+        {
+          "emissiveFactor": null,
+          "emissiveIntensityNits": null,
+          "instanceEmissive": null,
+          "pixelSpecular": null,
+          "vertColor": null
+        },
+        {
+          "emissiveFactor": null,
+          "emissiveIntensityNits": null,
+          "instanceEmissive": null,
+          "pixelSpecular": null,
+          "vertColor": null
+        },
+        {
+          "emissiveFactor": null,
+          "emissiveIntensityNits": null,
+          "instanceEmissive": null,
+          "pixelSpecular": null,
+          "vertColor": null
+        }
+      ],
+      "alphaRef": 75,
+      "alphaTest": true,
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "doubleSided": true,
+      "invertBackFaceNormals": true,
+      "mapTo": "construction",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "name": "construction",
+      "persistentId": "c022e7f7-496d-3bec-aca0-1a6e19a0a77d",
+      "translucentBlendOp": "None",
+      "translucentZWrite": true,
+      "version": 1.5
+    },
+    "corrugation": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/tileable/metal/corrugation/t_corrugation_ao.data.png",
+          "baseColorMap": "/assets/materials/tileable/metal/corrugation/t_corrugation_b.color.png",
+          "metallicFactor": 0.600000024,
+          "metallicMap": "/assets/materials/tileable/metal/corrugation/t_corrugation_m.data.png",
+          "normalMap": "/assets/materials/tileable/metal/corrugation/t_corrugation_nm.normal.png",
+          "pixelSpecular": true,
+          "roughnessMap": "/assets/materials/tileable/metal/corrugation/t_corrugation_r.data.png",
+          "vertColor": true
+        },
+        {
+          "metallicFactor": null,
+          "pixelSpecular": null,
+          "vertColor": null
+        },
+        {
+          "metallicFactor": null,
+          "pixelSpecular": null,
+          "vertColor": null
+        },
+        {
+          "metallicFactor": null,
+          "pixelSpecular": null,
+          "vertColor": null
+        }
+      ],
+      "alphaRef": 0,
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "dynamicCubemap": true,
+      "groundType": "METAL",
+      "mapTo": "corrugation",
+      "materialTag0": "beamng",
+      "materialTag1": "vehicle",
+      "name": "corrugation",
+      "persistentId": "6dfb06bb-d086-48d2-a999-06aa669dc625",
       "translucentBlendOp": "None",
       "version": 1.5
     },
@@ -3596,6 +3748,42 @@
       "materialTag1": "garbage",
       "name": "garbage",
       "persistentId": "d9779e7d-b4ea-4d74-9148-6dc5522fda31",
+      "version": 1.5
+    },
+    "grape": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/foliage/climber/t_grape/t_grape_vine_ao.data.png",
+          "baseColorMap": "/assets/materials/foliage/climber/t_grape/t_grape_vine_b.color.png",
+          "normalMap": "/assets/materials/foliage/climber/t_grape/t_grape_vine_nm.normal.png",
+          "opacityMap": "/assets/materials/foliage/climber/t_grape/t_grape_vine_o.data.png",
+          "pixelSpecular": true,
+          "roughnessMap": "/assets/materials/foliage/climber/t_grape/t_grape_vine_r.data.png"
+        },
+        {
+          "pixelSpecular": null
+        },
+        {
+          "pixelSpecular": null
+        },
+        {
+          "pixelSpecular": null
+        }
+      ],
+      "alphaRef": 90,
+      "alphaTest": true,
+      "annotation": "NATURE",
+      "class": "Material",
+      "doubleSided": true,
+      "invertBackFaceNormals": true,
+      "mapTo": "grape",
+      "materialTag0": "beamng",
+      "materialTag1": "vegetation",
+      "materialTag2": "Natural",
+      "name": "grape",
+      "persistentId": "1b343bde-9f79-4ace-bf07-8d72cc05963b",
+      "subSurface": true,
+      "subSurfaceIntensity": 1,
       "version": 1.5
     },
     "guardrail": {
@@ -5112,46 +5300,31 @@
     "metal_plates": {
       "Stages": [
         {
-          "ambientOcclusionMap": "/assets/materials/tileable/metal/metal_plates/t_metal_plates_ao.data.png",
-          "baseColorMap": "/assets/materials/tileable/metal/metal_plates/t_metal_plates_b.color.png",
-          "metallicFactor": 0.800000012,
-          "metallicMap": "/assets/materials/tileable/metal/metal_plates/t_metal_plates_m.data.png",
-          "normalMap": "/assets/materials/tileable/metal/metal_plates/t_metal_plates_nm.normal.png",
+          "colorMap": "/assets/materials/baked_props/metal_plates/metal_plates_d.dds",
+          "normalMap": "/assets/materials/baked_props/metal_plates/metal_plates_n.dds",
           "pixelSpecular": true,
-          "roughnessMap": "/assets/materials/tileable/metal/metal_plates/t_metal_plates_r.data.png",
+          "reflectivityMap": "/assets/materials/baked_props/metal_plates/metal_plates_r.dds",
+          "specularMap": "/assets/materials/baked_props/metal_plates/metal_plates_s.dds",
+          "specularPower": 32,
+          "useAnisotropic": true,
           "vertColor": true
         },
-        {
-          "metallicFactor": null,
-          "pixelSpecular": null,
-          "vertColor": null
-        },
-        {
-          "metallicFactor": null,
-          "pixelSpecular": null,
-          "vertColor": null
-        },
-        {
-          "metallicFactor": null,
-          "pixelSpecular": null,
-          "vertColor": null
-        }
+        {},
+        {},
+        {}
       ],
       "alphaRef": 64,
       "alphaTest": true,
-      "annotation": "BUILDINGS",
+      "annotation": "GUARD_RAIL",
       "class": "Material",
-      "doubleSided": true,
-      "dynamicCubemap": true,
+      "cubemap": "global_cubemap_metalblurred",
       "groundType": "METAL",
-      "invertBackFaceNormals": true,
       "mapTo": "metal_plates",
       "materialTag0": "beamng",
       "materialTag1": "vehicle",
       "name": "metal_plates",
       "persistentId": "02ca2eb3-3a34-4ccb-b894-084a27b88b8d",
-      "translucentBlendOp": "None",
-      "version": 1.5
+      "translucentBlendOp": "None"
     },
     "moderncorrugated_tin": {
       "Stages": [
@@ -5220,6 +5393,46 @@
       "name": "oldwood",
       "persistentId": "e3ba417a-f051-4a27-addd-76be60946aa7",
       "translucentBlendOp": "None",
+      "version": 1.5
+    },
+    "olive_trunk": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/tree/olive/olive_trunk/t_olive_trunk_ao.data.png",
+          "baseColorMap": "/assets/materials/tree/olive/olive_trunk/t_olive_trunk_b.color.png",
+          "detailMap": "/assets/materials/tree/tropical/tro_tree_1_trunk/t_tropical_bark_variation_1_detail.data.png",
+          "detailNormalMap": "/assets/materials/tree/tropical/tro_tree_1_trunk/t_tro_bark_01_detail_nm.normal.png",
+          "detailNormalMapStrength": 2,
+          "detailScale": [
+            3,
+            3
+          ],
+          "normalMap": "/assets/materials/tree/olive/olive_trunk/t_olive_trunk_nm.normal.png",
+          "roughnessMap": "/assets/materials/tree/olive/olive_trunk/t_olive_trunk_r.data.png"
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailScale": null
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailScale": null
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailScale": null
+        }
+      ],
+      "alphaRef": 85,
+      "annotation": "NATURE",
+      "class": "Material",
+      "groundType": "WOOD",
+      "mapTo": "olive_trunk",
+      "materialTag0": "beamng",
+      "materialTag1": "vegetation",
+      "materialTag2": "Natural",
+      "name": "olive_trunk",
+      "persistentId": "107e77e9-250a-4837-bf1d-df00789e43e7",
       "version": 1.5
     },
     "poles_fences": {
@@ -5394,6 +5607,40 @@
       "specularStrength0": "0.05",
       "specularStrength1": "0.2",
       "translucentBlendOp": "None"
+    },
+    "solarpanel": {
+      "Stages": [
+        {
+          "baseColorMap": "/assets/materials/tileable/tile/solar_panel/t_solarpanel_b.color.png",
+          "metallicFactor": 0.649999976,
+          "metallicMap": "/assets/materials/tileable/tile/solar_panel/t_solarpanel_m.data.png",
+          "pixelSpecular": true,
+          "roughnessMap": "/assets/materials/tileable/tile/solar_panel/t_solarpanel_r.data.png"
+        },
+        {
+          "metallicFactor": null,
+          "pixelSpecular": null
+        },
+        {
+          "metallicFactor": null,
+          "pixelSpecular": null
+        },
+        {
+          "metallicFactor": null,
+          "pixelSpecular": null
+        }
+      ],
+      "alphaRef": 0,
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "dynamicCubemap": true,
+      "mapTo": "solarpanel",
+      "materialTag0": "beamng",
+      "materialTag1": "vehicle",
+      "name": "solar_panel",
+      "persistentId": "7cecf1b7-b3a0-41cb-9570-2e5cebec0bd2",
+      "translucentBlendOp": "None",
+      "version": 1.5
     },
     "speedbump": {
       "Stages": [
@@ -8475,6 +8722,38 @@
       "materialTag1": "vehicle",
       "name": "toilet",
       "persistentId": "d681af19-eae0-4eed-9a47-6180d0e3fba1",
+      "translucentBlendOp": "None"
+    },
+    "turbine": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/tileable/metal/speedbump/diamondplate_d.dds",
+          "detailScale": [
+            4,
+            0.5
+          ],
+          "pixelSpecular": true,
+          "reflectivityMap": "/assets/materials/tileable/metal/speedbump/diamondplate_r.dds",
+          "specularMap": "/assets/materials/tileable/metal/speedbump/diamondplate_s.dds",
+          "specularPower": 32,
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {},
+        {},
+        {}
+      ],
+      "alphaRef": 64,
+      "alphaTest": true,
+      "class": "Material",
+      "cubemap": "global_cubemap_metalblurred",
+      "groundType": "METAL",
+      "mapTo": "turbine",
+      "materialTag0": "beamng",
+      "materialTag1": "vehicle",
+      "name": "turbine",
+      "persistentId": "947f24a6-74f8-4d5e-b366-41875b61b9be",
+      "translucent": true,
       "translucentBlendOp": "None"
     },
     "ut_bld_concrete": {

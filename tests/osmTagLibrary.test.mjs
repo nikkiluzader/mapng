@@ -9,7 +9,9 @@ const root = new URL('../', import.meta.url);
 const lib = JSON.parse(fs.readFileSync(new URL('data/osm-tag-library.json', root), 'utf8'));
 const tags = lib.tags;
 const known = new Set([...Object.keys(tags), ...Object.values(tags).flatMap((t) => t.also || [])]);
-const covered = (k, v) => known.has(`${k}=${v}`) || known.has(`${k}=*`) || (v === '*' && [...known].some((t) => t.startsWith(`${k}=`)));
+// (or a property an entry describes: generator:source on power=generator, as the tag library's generator counts it)
+const propertyKeys = new Set(Object.values(tags).flatMap((e) => Object.keys(e.properties || {})));
+const covered = (k, v) => known.has(`${k}=${v}`) || known.has(`${k}=*`) || (v === '*' && [...known].some((t) => t.startsWith(`${k}=`))) || propertyKeys.has(k);
 const sources = fs.readdirSync(new URL('services/', root)).filter((f) => f.endsWith('.js')).map((f) => [f, fs.readFileSync(new URL(`services/${f}`, root), 'utf8')]);
 const MODEL_RE = /['"`](\/?(?:levels|art|assets)\/[A-Za-z0-9_./ -]+\.c?dae)['"`]/gi;
 const norm = (p) => (p.startsWith('/') ? p : `/${p}`).toLowerCase().replace(/\.cdae$/, '.dae');
