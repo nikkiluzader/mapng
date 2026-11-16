@@ -1,6 +1,6 @@
 # MapNG open items
 
-Written 2026-11-14, brought up to date 2026-11-15. The working order of open work, most important first, and the test list for Mesh Roads.
+Written 2026-11-14, brought up to date 2026-11-16. The working order of open work, most important first, and the test list for Mesh Roads.
 The long backlog with every request and its history is kept outside the repo; this is the short list to work from.
 
 Rule for all road, junction, terrain and structure work: **draw it first.** A top view and long sections of the
@@ -9,14 +9,18 @@ alone have misled this work more than once. Tools are listed at the end.
 
 ## State of the branches
 
-As of 2026-11-15, evening:
+As of 2026-11-16, evening:
 
-- `main` (7823057) and published 0.3.2 / test build 0.3.3-dev.3: lattice towers on high-voltage lines with roof
-  anchors, problem reports that never carry a key, plain reasons for two export failures.
-- `dev` since then, not on main and not in a test build: power towers mapped on their own, a tower's whole base
-  kept clear of bridge decks, no track on rail trails, `disused=tram` built as tram, survey-following roads
-  finding their ground again after a structure, every catalogue tag in the tag library, and the asset organiser
-  showing which way each model faces (the organiser lives outside the repo).
+- `main` and `dev` are at the same commit (099f24f). Published: 0.3.2 as the latest release; 0.3.3-dev.5 as the
+  latest test build.
+- In 0.3.3-dev.5 since dev.4: mapped traffic signs, billboards, water towers, storage tanks, picnic sites,
+  concrete blocks, utility poles and plain monuments; wing walls along raised bridge approaches; bridge towers left
+  to the bridge; piers over the water on fine surveys; a waterway no longer measured across the river it joins
+  (city blocks beside a big river were dug to the water); tidal water surveyed at two levels drawn as one
+  surface; buildings a raised deck runs over held under it; benches looking over the water they stand by.
+- On `main` and `dev` but in no test build yet: benches on a pedestrian street look at their street.
+- The sweep has two areas BeamNG developers exported (dev_szczyrk, dev_pilchowice) besides tychonas; every area
+  one of them exports is added.
 
 ## This week's list (2026-11-15)
 
@@ -173,8 +177,7 @@ the source comparison in the desktop app: looked at by the project owner, 2026-1
 
 ## 3. Release steps waiting on a go-ahead
 
-1. Push `dev` to `main` after a clean sweep.
-2. The next desktop test build (0.3.3-dev.4) once this week's list is through.
+1. The next desktop test build (0.3.3-dev.6) with the next batch of fixes.
 
 ## 4. Optimization pass (asked for, one item done)
 
