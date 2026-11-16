@@ -144,7 +144,7 @@ const localeShort = computed(() => (String(locale.value).startsWith('zh') ? '中
 const footerLinks = computed(() => [
   { key: 'discord', icon: MessageCircle, label: t('sidebar.discord'), href: 'https://discord.gg/j6ZvcF8rgk' },
   { key: 'github', icon: Github, label: t('sidebar.github'), href: 'https://github.com/nikkiluzader/mapng' },
-  { key: 'contact', icon: Mail, label: t('sidebar.contact'), href: 'mailto:nikkiluzader@gmail.com' },
+  { key: 'contact', icon: Mail, label: t('sidebar.contact'), href: 'https://github.com/nikkiluzader/mapng/issues/new' },
   ...(desktopApp ? [] : [{ key: 'desktop', icon: Download, label: t('sidebar.desktopApp'), title: t('sidebar.desktopAppTooltip'), href: DESKTOP_DOWNLOAD_URL }]),
   { key: 'data', icon: Database, label: t('sidebar.yourData'), href: desktopApp ? 'https://mapng.com/data.html' : '/data.html' },
   // (the public counts: where people build, which settings, what goes wrong: public/stats.html)
