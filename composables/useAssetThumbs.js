@@ -22,7 +22,7 @@ export function modelsByItem(data) {
       const have = list.find((x) => x.shape === a.shape);
       // (uses: each tag the model stands for, and whether an export places it for that tag today)
       if (have) { have.used = have.used || !!a.used; have.uses.push({ tag: t.tag, used: !!a.used, region: a.region || 'any' }); continue; }
-      list.push({ shape: a.shape, name: m.name, thumb: m.thumb, used: !!a.used, is: a.is || '', tag: t.tag, uses: [{ tag: t.tag, used: !!a.used, region: a.region || 'any' }] });
+      list.push({ shape: a.shape, name: m.name, thumb: m.thumb, used: !!a.used, is: a.is || '', tag: t.tag, level: m.level || '', size: m.size || null, kind: m.kind || '', uses: [{ tag: t.tag, used: !!a.used, region: a.region || 'any' }] });
     }
   }
   for (const list of Object.values(out)) list.sort((p, q) => Number(q.used) - Number(p.used));

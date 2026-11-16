@@ -68,8 +68,10 @@
               <div v-if="itemModels[it.id]?.length && modelsOpen[it.id]" class="ml-2 mb-1.5 pl-2 border-l border-gray-200 dark:border-gray-600" data-testid="item-model-strip">
                 <ul class="flex flex-wrap gap-1.5">
                   <li v-for="m in itemModels[it.id].slice(0, MODEL_STRIP_MAX)" :key="m.shape" class="w-[72px]">
+                    <!-- (the whole photo beside the pointer, on hover or keyboard focus: modelPeek below) -->
                     <img
-                      :src="thumbUrl(m)" :alt="m.is || m.name" :title="`${m.name}${m.is ? ': ' + m.is : ''} (${m.tag})`" loading="lazy" decoding="async" width="72" height="54"
+                      :src="thumbUrl(m)" :alt="m.is || m.name" loading="lazy" decoding="async" width="72" height="54" tabindex="0"
+                      @mouseenter="peekAt(m, $event)" @mouseleave="modelPeek = null" @focus="peekAt(m, $event)" @blur="modelPeek = null"
                       class="w-[72px] h-[54px] object-cover rounded border bg-gray-200 dark:bg-gray-700"
                       :class="m.used ? 'border-brand' : 'border-gray-200 dark:border-gray-600 opacity-80'"
                     />
@@ -265,6 +267,23 @@
     </template>
 
     <p v-if="advanced" class="text-micro text-gray-500 dark:text-gray-400">{{ footer }}</p>
+    <Teleport to="body">
+      <div
+        v-if="modelPeek" data-testid="model-peek" role="tooltip"
+        class="fixed z-[2000] pointer-events-none rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-xl p-2"
+        :style="{ left: modelPeek.left + 'px', top: modelPeek.top + 'px', width: PEEK_PX + 16 + 'px' }"
+      >
+        <img :src="thumbUrl(modelPeek.m)" :alt="modelPeek.m.is || modelPeek.m.name" :width="PEEK_PX" :height="PEEK_PX" class="block rounded bg-gray-200 dark:bg-gray-700" :style="{ width: PEEK_PX + 'px', height: PEEK_PX + 'px' }" />
+        <div class="mt-1.5 text-xs font-semibold text-gray-900 dark:text-gray-100 break-all">{{ modelPeek.m.name }}</div>
+        <div v-if="modelPeek.m.is" class="text-caption leading-snug text-gray-600 dark:text-gray-300">{{ modelPeek.m.is }}</div>
+        <dl class="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-caption leading-snug">
+          <template v-for="row in peekRows(modelPeek.m)" :key="row[0]">
+            <dt class="text-gray-500 dark:text-gray-400">{{ row[0] }}</dt>
+            <dd class="text-gray-800 dark:text-gray-100 break-all" :class="row[2] ? 'font-mono text-micro' : ''">{{ row[1] }}</dd>
+          </template>
+        </dl>
+      </div>
+    </Teleport>
   </SettingCard>
 </template>
 
@@ -274,7 +293,7 @@ import { useAssetThumbs, modelsInUse, tagsPresent } from '../../composables/useA
 import { resolveRegionalBiome } from '../../services/beamngRegion.js';
 import { regionOfBiome } from '../../services/tagModels.js';
 import { WIDTH_SOURCE_TAG } from '../../services/satRoadWidth.js';
-import { computed, reactive, toRaw } from 'vue';
+import { computed, reactive, ref, toRaw } from 'vue';
 import { treeTable, treeModelLabel, sampleElevations } from '../../services/treeTable.js';
 import { TREE_KIND_IDS } from '../../services/beamngTrees.js';
 import { useI18n } from 'vue-i18n';
@@ -374,6 +393,33 @@ const tagsOpen = reactive({});
 // (the models behind an item, with photos, where the site serves them)
 const modelsOpen = reactive({});
 const MODEL_STRIP_MAX = 12;
+// The whole photo (512 px, as stored) in a card beside the small one: to its right where there is room (over the
+// map), else to its left; kept inside the window.
+const PEEK_PX = 512;
+const modelPeek = ref(null);
+// (the card's rows: [label, value, monospace]; only what the model has)
+const REGION_KEYS = { any: 'build.modelRegion_any', 'north-america': 'build.modelRegion_northAmerica', europe: 'build.modelRegion_europe', tropical: 'build.modelRegion_tropical' };
+const peekRows = (m) => {
+  const uses = (m.uses || []).filter((u) => u.used); const all = uses.length ? uses : (m.uses || []);
+  const regions = [...new Set(all.map((u) => u.region || 'any'))].map((r) => (REGION_KEYS[r] ? t(REGION_KEYS[r]) : r)).join(', ');
+  return [
+    [t('build.modelTags'), [...new Set(all.map((u) => u.tag))].join(', '), true],
+    regions && [t('build.modelRegion'), regions],
+    m.size && [t('build.modelSize'), `${m.size.map((v) => Number(v).toFixed(v < 10 ? 1 : 0)).join(' × ')} m`],
+    m.kind && [t('build.modelKind'), m.kind],
+    m.level && [t('build.modelFrom'), m.level],
+    [t('build.modelFile'), m.shape, true],
+  ].filter(Boolean);
+};
+const peekAt = (m, e) => {
+  const r = e.currentTarget.getBoundingClientRect(); const w = PEEK_PX + 16; const h = PEEK_PX + 190;
+  const size = Math.min(PEEK_PX, window.innerWidth - 32);
+  // (past the whole row of small photos, so the row stays in view while the pointer moves along it)
+  const row = e.currentTarget.closest('ul')?.getBoundingClientRect();
+  let left = Math.max(r.right, row?.right ?? 0) + 12; if (left + w > window.innerWidth - 8) left = Math.max(8, r.left - w - 12);
+  const top = Math.max(8, Math.min(window.innerHeight - h - 8, r.top + r.height / 2 - h / 2));
+  modelPeek.value = size < PEEK_PX ? null : { m, left, top };
+};
 const { assetModels, thumbUrl } = useAssetThumbs();
 // (only what this area's export can place: a model placed today, for a tag the map data here holds. Every candidate
 // for every tag is on the review page)
