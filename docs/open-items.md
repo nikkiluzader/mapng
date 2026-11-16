@@ -42,15 +42,20 @@ Found on the way:
 - On 30 m elevation, Bologna's Piazza Maggiore is a 20 m hill (the coarse data's buildings) and its paved plaza a
   flat slab: the slab hangs over the low side and the grass hill stands over it on the other. Not fixed.
 
-## Left for later (do these last, after the asset gaps' batch 2)
+## Left for later: done 2026-11-16
 
-- Concrete blocks (`barrier=block`): mapped on a road on purpose; needs the barrier code, not the object placer
-  (which moves objects off roads). As lines they are built as fences today.
-- Utility poles (`man_made=utility_pole`): belong with the poles and wires (services/streetProps.js).
-- Monuments of MapNG's own (obelisk, stele, plain stone): the game has two monument models only (an owl on a
-  pedestal, an armillary sphere); `memorial=stone|obelisk|stele` places nothing yet.
-- Trams and light rail running in a street: the tram-rail decal reads as broken brown patches across the lane
-  (Portland, seen 2026-11-16).
+- Concrete blocks: a block point stands as the game's one-metre cube (off roads drawn for traffic, as bollards);
+  lines were concrete barriers already.
+- Utility poles: fetched and stood as poles.
+- Monuments: obelisks, steles and memorial stones built as plain concrete meshes (services/monuments.js).
+- Street trams: the decal now blends over the road (West Coast USA's road_tramline settings, 4 m repeat).
+- Also: the groove a footway crossing cut across a road at both its edges (15-20 cm, now about 5 cm); a footway
+  climbing beside a bridge deck no longer builds a 6 m earth wall under itself (Jacksonville); billboards, water
+  towers, picnic sites and storage tanks from the model picks; mapped traffic signs (batch 2's last part).
+
+Still open from the Jacksonville check (default settings): a ramp's embankment running on under another deck
+with half a metre between them (b010, the ground 41 cm into its girders); underwater pits under two river
+bridges (not seen, below the water).
 
 ## 1. Mesh Roads and junction heights (in progress)
 
