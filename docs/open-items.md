@@ -57,6 +57,22 @@ Still open from the Jacksonville check (default settings): a ramp's embankment r
 with half a metre between them (b010, the ground 41 cm into its girders); underwater pits under two river
 bridges (not seen, below the water).
 
+## Sawtooth at bridge approaches (2026-11-16, partly done)
+
+Seen in the 20-place check at quays and deck ends (worst in Copenhagen; also Utrecht, Hamburg, Seattle, Norfolk).
+What it is, from sections of the built terrain:
+
+- Near a deck's end the terrain gives a road's fill steep sides on purpose ("stands behind wingwalls"), and no
+  wall was built: a bare 2 to 5 m drop in two squares, toothed wherever it runs off the grid's axes. **Done:** wing
+  walls (services/structures/wingWalls.js), within 15 m of a deck's end. Checked in game in Copenhagen and Utrecht.
+- **Open:** the same teeth along a raised approach further than 15 m from its deck, and the trenches left between
+  the raised carriageways of one approach (road, cycle tracks: each raised alone, the ground between left low).
+  Ideas: carry the walls on while the road stands over the ground and has no room for a slope; fill a gap
+  narrower than about 6 m between two raised strips to the lower of the two.
+- Not the cause, but fixed on the way: on a fine survey the sea floor stopped at the land cover's 10 m cells and
+  left the water beside the quay at the surface. And some lidar is stepped at quays in the source itself
+  (Copenhagen: six squares sideways every two rows).
+
 ## 1. Mesh Roads and junction heights (in progress)
 
 Done 2026-11-13/14, from in-game profiles (every paved road walked at an even 0.5 m) and drawings of the worst
