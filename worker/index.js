@@ -56,7 +56,8 @@ const KRON86_OPENDATA_ORIGIN = 'https://opendata.geoportal.gov.pl';
 const OSM_CACHE_TTL_S = 7 * 24 * 3600;
 const OSM_MIRROR_TIMEOUT_MS = 30000;
 const OSM_MAX_MIRRORS = 3;
-const OSM_USER_AGENT = 'mapng/1.0 (+https://mapng.com; contact: nikkiluzader@gmail.com)';
+// (the site is the contact: no personal address in requests to other services)
+const OSM_USER_AGENT = 'mapng/1.0 (+https://mapng.com; contact: https://github.com/nikkiluzader/mapng/issues)';
 
 const NOMINATIM_CACHE_TTL_S = 7 * 24 * 3600;
 const NOMINATIM_ROUND = 3;      // a reverse lookup's position, decimals of a degree (about 100 m)
@@ -452,7 +453,7 @@ const app = {
               : {}),
             ...(isNominatimOrigin
               ? {
-                  'User-Agent': 'mapng/1.0 (+https://mapng.com; contact: nikkiluzader@gmail.com)',
+                  'User-Agent': OSM_USER_AGENT,
                   'Referer': requestOrigin,
                 }
               : {}),
