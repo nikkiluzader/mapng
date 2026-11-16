@@ -59,6 +59,7 @@ import { tagModel, tagObjectFor, standTagObject, part } from './tagModels.js';
 import { fillRows, rowDirection } from './areaRows.js';
 import { buildPlatformMeshes } from './platforms.js';
 import { leaveBridgeBuildings } from './bridgeBuildings.js';
+import { buildingsUnderDecks } from './buildingsUnderDecks.js';
 import { wingWallRuns, buildWingWallMesh } from './structures/wingWalls.js';
 import { buildMonumentMeshes, monumentKind, monumentHeight } from './monuments.js';
 import { solveProfilesSteps, gradeLimit } from './structures/profileSolve.js';
@@ -1224,7 +1225,7 @@ function buildLevelRailways(sg, terrainData, squareSize, levelName) {
     });
   // (the track bed's lines, for what keeps off it: trees, bushes, rocks)
   // (and each point's solved height: a platform beside the track stands over it, platforms.js)
-  const lines = sg.edges.map((e, k) => (e.rail ? { points: Array.from(e.s, (_, i) => [e.x[i], e.y[i]]), half: e.half + 1, z: sg.profile?.z?.[k] ? Array.from(sg.profile.z[k]) : null } : null)).filter(Boolean);
+  const lines = sg.edges.map((e, k) => (e.rail ? { points: Array.from(e.s, (_, i) => [e.x[i], e.y[i]]), half: e.half + 1, bridge: !!e.bridge, z: sg.profile?.z?.[k] ? Array.from(sg.profile.z[k]) : null } : null)).filter(Boolean);
   return {
     tiles: track.tiles, daes, decals, lines,
     stats: { ...railwayStats(sg, segs), ...track.stats, crossings: (sg.railCrossings || []).length + (sg.railUnjoined || []).length, streetTramKm: Math.round(streetTramM / 10) / 100, streetTramLines: street.length, levelName },
@@ -13084,6 +13085,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         heightAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
         roads: riverRoads(),
       });
+      // (a test hook, as __MAPNG_STRUCT_DEBUG: the planned rivers)
+      if (typeof globalThis.__MAPNG_RIVER_DEBUG === 'function') globalThis.__MAPNG_RIVER_DEBUG(riverPlan);
     } catch (err) {
       console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Rivers not planned: ${err?.message || err}`);
     }
@@ -13185,7 +13188,27 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
   }) : [];
   if (portalBuildings.length) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Buildings over tunnel portals: ${portalBuildings.length}, raised onto the portals (${portalBuildings.map((pb) => `${pb.f.id} on ${pb.tunnel}`).join(', ')}).`);
-  const liftedBuildings = bridgeTowerHouses || portalBuildings.length ? new Map([...(bridgeTowerHouses || []), ...portalBuildings.map((pb) => [pb.f, { ...pb.f, tags: portalBuildingTags(pb) }])]) : null;
+  // buildings a raised deck runs over (a viaduct's arches, a station under its tracks): held under the deck
+  // (buildingsUnderDecks.js). Not the ones already raised onto a deck or a portal.
+  const UNDER_DECK_DEPTH_M = 2.2;   // (a road deck's slab and girders, as beamngBridges.js)
+  let underDeckBuildings = null;
+  if (includeBuildings !== false && (bridgeDecks.length || railways?.lines?.some((l) => l.bridge))) {
+    try {
+      const overhead = [
+        ...bridgeDecks.flatMap((d) => (d.parts || []).filter((p) => p.xy?.length > 1 && p.z?.length === p.xy.length).map((p) => ({ xy: p.xy, z: Array.from(p.z, (z) => z - (p.depth ?? UNDER_DECK_DEPTH_M)) }))),
+        ...(railways?.lines || []).filter((l) => l.bridge && l.z?.length === l.points.length).map((l) => ({ xy: l.points, z: l.z.map((z) => z - RAIL_DEPTH_M - 1) })),   // (the rail's top: its bed, then the deck's slab)
+      ];
+      const taken = new Set([...(bridgeTowerHouses || []).map(([f]) => f), ...portalBuildings.map((pb) => pb.f)]);
+      const res = buildingsUnderDecks((exportTerrainData.osmFeatures || []).filter((f) => f?.type === 'building' && !taken.has(f)), overhead, {
+        toXY: (p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0),
+        groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
+      });
+      if (res.replace.size) { underDeckBuildings = res.replace; console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Buildings under raised decks: ${res.capped} held under the deck, ${res.left} with no room left out.`); }
+    } catch (err) {
+      console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Buildings under decks not checked: ${err?.message || err}`);
+    }
+  }
+  const liftedBuildings = bridgeTowerHouses || portalBuildings.length || underDeckBuildings ? new Map([...(underDeckBuildings || []), ...(bridgeTowerHouses || []), ...portalBuildings.map((pb) => [pb.f, { ...pb.f, tags: portalBuildingTags(pb) }])]) : null;
   for (const t of bridgeTowers) (t.deck.towers ||= []).push(t);
   if (bridgeTowers.length) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Bridge tower houses: ${bridgeTowers.length} (${bridgeTowers.filter((t) => t.pier).length} on piers of their own).`);
   linkCrossings(bridgeDecks, { roads: groundCarriageways.map((cw) => ({ xy: cw.nodes, half: cw.half })) });

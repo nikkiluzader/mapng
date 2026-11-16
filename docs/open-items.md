@@ -157,6 +157,12 @@ Open, by how often it was measured:
 
 1. "Extremely heavy" card, the Mapterhorn base tile and the new size selector looked at in the running app.
 2. The new 3D model rows (Area, Tiles, Point spacing) in all seven languages.
+3. The two sweep areas BeamNG developers exported (dev_szczyrk, dev_pilchowice, added 2026-11-16) have baselines
+   recorded as they are, not looked at in game: the dam area shows ground through a deck at 3 places and 5 spikes
+   on the coarse survey with Ready to drive, and 4 spikes on the fine one.
+
+(Wing walls looked at in game in six places (Copenhagen, Utrecht, Dallas, Hamburg, Seattle, London), Tower Bridge
+with its towers left to the bridge, and the desktop app's Generate and export on this code: 2026-11-16.)
 
 (Poland's sheet joins and reservoirs in game, the quality report on a dense city, Barcelona with shaping off and
 the source comparison in the desktop app: looked at by the project owner, 2026-11-15.)
