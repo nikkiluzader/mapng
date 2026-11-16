@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { wingWallRuns, wingWallTriangles, deckDistances, WING_FILL_M } from '../services/structures/wingWalls.js';
+import { wingWallRuns, wingWallTriangles, deckDistances, deckDistancesThrough, WING_FILL_M } from '../services/structures/wingWalls.js';
 
 // a straight road along +x, 60 m on the ground then 40 m of deck; the road 4 m over the ground beside it
 const graph = (zRoad = 4) => {
@@ -24,14 +24,24 @@ test('walls run both sides within the wing length where the road stands over the
   assert.equal(runs.length, 2);
   for (const r of runs) {
     const xs = r.stations.map((q) => q.x);
-    assert.ok(Math.min(...xs) > 60 - WING_FILL_M - 2.01 && Math.max(...xs) < 60, `stations ${Math.min(...xs)}..${Math.max(...xs)}`);
+    // (the test's fill has vertical sides all along: walled the whole way, and never on the deck)
+    assert.ok(Math.min(...xs) === 0 && Math.max(...xs) < 60, `stations ${Math.min(...xs)}..${Math.max(...xs)}`);
     assert.ok(r.stations.every((q) => q.foot < 0 && q.outer > q.inner + 2));
   }
+  // a 1 in 2 slope beside the road instead of a step: walls at the wing only (15 m), none further out
+  const slope = (x, y) => Math.max(0, 4 - Math.max(0, Math.abs(y) - 5) / 2);
+  for (const r of wingWallRuns(graph(), { groundAt: slope })) assert.ok(Math.min(...r.stations.map((q) => q.x)) > 60 - WING_FILL_M - 2.01);
   // a road at the ground's own height: no wall
   assert.equal(wingWallRuns(graph(0.3), { groundAt: () => 0 }).length, 0);
   // another road's pavement right beside it: the block stops short, or is left out
   const tight = wingWallRuns(graph(), { groundAt: ground, onOtherRoad: (x, y) => y > 5.2 });
-  assert.equal(tight.filter((r) => r.side === 1).length, 0);
+  // (a lower street right against the shoulder: a thin wall on the shoulder's edge, with its parapet)
+  const thin = tight.find((r) => r.side === 1);
+  assert.ok(thin && thin.stations.every((q) => q.outer < 5.5 && q.outer - q.inner >= 0.3 - 1e-9 && q.inner >= 4 && q.parapet > 0), 'a thin wall beside the lower street');
+  // (the other carriageway of the same road at the same height, a 3 m trench between: filled to its pavement, no parapet)
+  const dual = (x, y) => (Math.abs(y) <= 5.01 || (y > 8 && y < 18) ? 4 : 0);
+  const median = wingWallRuns(graph(), { groundAt: dual, onOtherRoad: (x, y) => y > 8.5 && y < 17.5 }).find((r) => r.side === 1);
+  assert.ok(median && median.stations.every((q) => q.parapet === 0 && q.outer < 8.7 && q.outer > 7.5), 'a block to the other pavement, no parapet');
   assert.equal(tight.filter((r) => r.side === -1).length, 1);
 });
 
@@ -53,4 +63,20 @@ test('every face of a wall points out of it', () => {
       assert.ok(n[0] * m[0] + n[1] * m[1] + n[2] * m[2] > 0, `side ${run.side}: a face looks into the wall`);
     }
   }
+});
+
+test('the distance to a deck carries on through a junction to the next edge of the road', () => {
+  // edge 0: 6 m of road then the deck; edge 1: the street on from edge 0's start, 100 m
+  const g = {
+    edges: [
+      { s: [0, 3, 6, 9, 12], x: Float64Array.from([0, 3, 6, 9, 12]), y: new Float64Array(5), half: 3, from: 1, to: 2 },
+      { s: [0, 50, 100], x: Float64Array.from([0, -50, -100]), y: new Float64Array(3), half: 3, from: 1, to: 3 },
+    ],
+    profile: { z: [new Float64Array(5), new Float64Array(3)] },
+    classes: { segments: [{ edge: 0, i0: 2, i1: 4, kind: 'deck' }] },
+  };
+  assert.equal(deckDistances(g).toDeck[1][1], Infinity);
+  const through = deckDistancesThrough(g, 120).toDeck;
+  assert.equal(through[0][0], 6); assert.equal(through[1][0], 6); assert.equal(through[1][1], 56); assert.equal(through[1][2], 106);
+  assert.equal(deckDistancesThrough(g, 60).toDeck[1][2], Infinity);
 });

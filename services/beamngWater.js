@@ -1245,7 +1245,7 @@ export function fillRemnants(heightMap, width, height, lowered, { rounds = 2, ke
 const SEA_SURFACE_BAND_M = 0.3;
 const SEABED_DEPTH_M = 2;
 const SEABED_RAMP_CELLS = 3;
-const SEA_FLAT_M = 0.05;       // a fine survey's water is flat: a neighbour within this is the same water
+const SEA_FLAT_M = 0.03;       // a fine survey's water is flat: a point within this of the water's own level is the same water
 const SEA_SPREAD_M = 15;       // the lowering is carried this far past the land cover's water cells
 const SEA_SHOAL_MAX_M = 6;     // in water joined to the sea, ground up to this far over it is still the sea's floor
 const COAST_REACH_M = 150;          // a cell is judged by a mapped coastline this near
@@ -1423,17 +1423,22 @@ export function lowerSeabed(grid, landCover, seaZ, { coarse = false, keep = null
     // (steps along the grid's axes: a diagonal run takes 1.4 steps a square)
     const maxSteps = Math.max(1, Math.round((SEA_SPREAD_M * 1.5) / sq));
     const shallow = seaZ - SEABED_DEPTH_M / SEABED_RAMP_CELLS + minHeight;
-    let frontier = [];
-    for (const idx of edits.keys()) if (heightMap[idx] - minHeight <= top) frontier.push(idx);
+    // (each point carries the level of the water it was reached from: a neighbour is the same water only at that
+    // level. Compared with its neighbour alone, the lowering crept step by step over low ground that falls away
+    // gently from a canal, and Amsterdam's streets stood over the lowered ground. Ground kept for a road or its
+    // quay is never taken)
+    let frontier = []; const level = new Map();
+    for (const idx of edits.keys()) if (heightMap[idx] - minHeight <= top) { frontier.push(idx); level.set(idx, heightMap[idx]); }
     for (let step = 0; step < maxSteps && frontier.length; step++) {
       const next = [];
       for (const idx of frontier) {
-        const r = Math.floor(idx / width); const c = idx - r * width; const z0 = heightMap[idx];
+        const r = Math.floor(idx / width); const c = idx - r * width; const z0 = level.get(idx);
         for (const k of [c > 0 ? idx - 1 : -1, c < width - 1 ? idx + 1 : -1, r > 0 ? idx - width : -1, r < height - 1 ? idx + width : -1]) {
           if (k < 0 || edits.has(k)) continue;
           const zk = heightMap[k];
           if (zk - minHeight > top || Math.abs(zk - z0) > SEA_FLAT_M) continue;
-          if (shallow < zk) { edits.set(k, shallow); next.push(k); }
+          if (keep && worldSize > 0) { const rk = Math.floor(k / width); const ck = k - rk * width; if (keep(((ck / width) - 0.5) * worldSize, (0.5 - (rk + 1) / height) * worldSize)) continue; }
+          if (shallow < zk) { edits.set(k, shallow); level.set(k, z0); next.push(k); }
         }
       }
       frontier = next;

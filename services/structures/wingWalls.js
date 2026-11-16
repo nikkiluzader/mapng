@@ -5,18 +5,24 @@
 // in two terrain squares, shows as a row of teeth wherever it runs off the grid's axes; between the raised
 // carriageways of one approach the ground is left as trenches. The walls are built here: along each side of a
 // road within WING_FILL_M of a deck's end where the road stands WALL_MIN_DROP_M or more over the ground beside
-// its fill, a concrete block from the road's shoulder out over the steep strip, its top at the road's height,
+// its fill (and on along the approach, to APPROACH_M, where that side is still steep or a trench to another
+// carriageway), a concrete block from the road's shoulder out over the steep strip, its top at the road's height,
 // a parapet on its outer edge, its outer face down into the ground. Nothing here knows about any place.
 
 import * as THREE from 'three';
 
 export const WING_FILL_M = 15;          // a road's fill this near a deck's end has walled sides, not slopes
 const WALL_MIN_DROP_M = 0.8;            // the road this far over the ground beside its fill: a wall
+const APPROACH_M = 120;                 // further along the approach a wall stands only where the side is steep ...
+const STEEP_DROP_M = 1.2;               // ... this much of drop ...
+const STEEP_WITHIN_M = 1.5;             // ... within this of the shoulder's edge (a 1 in 2 slope drops 0.75 m there)
 const WALL_IN_M = 0.3;                  // the block starts this far inside the shoulder's edge
 const WALL_PAST_M = 0.3;                // ... and ends this far past the steep strip
 const WALL_TOP_M = 0.03;                // its top over the road's height
 const WALL_FOOT_M = 0.6;                // its faces go this far into the ground
-const WALL_MIN_W_M = 0.6;               // narrower than this (another road beside it): none
+const WALL_THIN_M = 0.3;                // against another road's pavement the wall is this thin, on the shoulder's edge
+const MEDIAN_GAP_M = 1.5;                // a gap this wide between the block and another road's pavement is filled too
+const MEDIAN_LEVEL_M = 0.5;             // the ground past the wall within this of the road: a median, no parapet
 const PARAPET_H_M = 0.9;
 const PARAPET_W_M = 0.45;
 
@@ -47,6 +53,34 @@ export function deckDistances(graph) {
 }
 
 /**
+ * The same distance carried on through the graph's nodes: a road's approach is often several edges (a short one
+ * at the deck, then the street), and a distance kept to the deck's own edge stopped the walls after its few
+ * metres. Out to `reach` metres; deck stations stay Infinity.
+ */
+export function deckDistancesThrough(graph, reach) {
+  const base = deckDistances(graph);
+  const toDeck = base.toDeck.map((a) => Float64Array.from(a));
+  const node = new Map();
+  const relax = (id, d) => { if (id !== undefined && d < (node.get(id) ?? Infinity)) { node.set(id, d); return true; } return false; };
+  for (let round = 0; round < 8; round++) {
+    let changed = false;
+    graph.edges.forEach((e, k) => {
+      const out = toDeck[k]; const kinds = base.kindOf[k]; const n = e.s.length; const len = e.s[n - 1];
+      const d0 = node.get(e.from) ?? Infinity; const d1 = node.get(e.to) ?? Infinity;
+      // (forwards from the edge's start, backwards from its end; never across the edge's own deck stations)
+      let run = d0;
+      for (let i = 0; i < n; i++) { if (kinds[i] === 'deck') { run = Infinity; continue; } const d = run + e.s[i]; if (d < out[i] && d < reach) { out[i] = d; changed = true; } }
+      run = d1;
+      for (let i = n - 1; i >= 0; i--) { if (kinds[i] === 'deck') { run = Infinity; continue; } const d = run + (len - e.s[i]); if (d < out[i] && d < reach) { out[i] = d; changed = true; } }
+      if (kinds[0] !== 'deck' && relax(e.from, out[0])) changed = true;
+      if (kinds[n - 1] !== 'deck' && relax(e.to, out[n - 1])) changed = true;
+    });
+    if (!changed) break;
+  }
+  return { ...base, toDeck };
+}
+
+/**
  * The runs of wall: [{ side, stations: [{ x, y, z, nx, ny, inner, outer, foot }] }] (x, y on the road's line, z its
  * height, n the unit normal to the wall's side, inner/outer the block's offsets from the line, foot its faces'
  * bottom). graph: the solved structure graph; opts: groundAt(x, y) the finished ground, onOtherRoad(x, y, edge)
@@ -55,7 +89,7 @@ export function deckDistances(graph) {
 export function wingWallRuns(graph, { groundAt, onOtherRoad = () => false, shoulderM = 1, slopeM = 2 } = {}) {
   const z = graph.profile?.z;
   if (!z || !groundAt) return [];
-  const { kindOf, toDeck } = deckDistances(graph);
+  const { kindOf, toDeck } = deckDistancesThrough(graph, APPROACH_M);
   const runs = [];
   graph.edges.forEach((e, k) => {
     if (e.rail || !z[k]) return;   // (a railway's fill near its bridge: left, the track bed has its own ballast shoulders)
@@ -64,7 +98,7 @@ export function wingWallRuns(graph, { groundAt, onOtherRoad = () => false, shoul
       let run = null;
       const close = () => { if (run && run.stations.length >= 2) runs.push(run); run = null; };
       for (let i = 0; i < n; i++) {
-        if (kindOf[k][i] === 'deck' || !(toDeck[k][i] < WING_FILL_M)) { close(); continue; }
+        if (kindOf[k][i] === 'deck' || !(toDeck[k][i] < APPROACH_M)) { close(); continue; }
         const a = Math.max(0, i - 1); const b = Math.min(n - 1, i + 1);
         const tx = e.x[b] - e.x[a]; const ty = e.y[b] - e.y[a]; const L = Math.hypot(tx, ty);
         if (L < 1e-6) { close(); continue; }
@@ -72,16 +106,34 @@ export function wingWallRuns(graph, { groundAt, onOtherRoad = () => false, shoul
         const core = e.half + shoulderM;
         const inner = core - WALL_IN_M; let outer = core + slopeM + WALL_PAST_M;
         // (not over another road's pavement: stopped short of it)
-        for (let d = inner + 0.25; d <= outer + 1e-6; d += 0.25) {
-          if (onOtherRoad(e.x[i] + nx * d, e.y[i] + ny * d, k)) { outer = d - 0.3; break; }
+        // (not over another road's pavement: stopped just short of it, and never thinner than WALL_THIN_M: a
+        // street right against the raised road's edge gets a thin retaining wall on the shoulder's edge)
+        // (looked for a little past the block too: a gap of up to MEDIAN_GAP_M to the other pavement is filled)
+        let inner0 = inner; let beside = false;
+        for (let d = inner + 0.25; d <= outer + MEDIAN_GAP_M + 1e-6; d += 0.25) {
+          if (onOtherRoad(e.x[i] + nx * d, e.y[i] + ny * d, k)) { outer = d - 0.05; beside = true; break; }
         }
-        if (outer - inner < WALL_MIN_W_M) { close(); continue; }
+        if (outer - inner0 < WALL_THIN_M) inner0 = outer - WALL_THIN_M;
+        if (inner0 < e.half) { close(); continue; }   // (the other road is on this one's own pavement: a junction, no wall)
         const zr = z[k][i];
-        const gOut = groundAt(e.x[i] + nx * (outer + 0.5), e.y[i] + ny * (outer + 0.5));
-        const gMid = groundAt(e.x[i] + nx * outer, e.y[i] + ny * outer);
+        let gOut = groundAt(e.x[i] + nx * (outer + 0.5), e.y[i] + ny * (outer + 0.5));
+        const gPast = groundAt(e.x[i] + nx * (outer + 1.5), e.y[i] + ny * (outer + 1.5));
+        const median = beside && Number.isFinite(gPast) && Math.abs(zr - gPast) < MEDIAN_LEVEL_M;
+        let gMid = groundAt(e.x[i] + nx * outer, e.y[i] + ny * outer);
+        // (against another road the ground past the block is that road: the drop is the gap's own, read inside it)
+        if (beside) { const m = (inner0 + outer) / 2; gMid = Math.min(groundAt(e.x[i] + nx * m, e.y[i] + ny * m), groundAt(e.x[i] + nx * (outer - 0.4), e.y[i] + ny * (outer - 0.4))); }
+        if (beside) gOut = gMid;
         if (!Number.isFinite(zr) || !Number.isFinite(gOut) || zr - Math.min(gOut, gMid) < WALL_MIN_DROP_M) { close(); continue; }
+        // (past the wing itself, only where the fill's side has no slope: the terrain could not spread it, a
+        // raised carriageway beside a quay street or beside its own other carriageway. Copenhagen's Torvegade:
+        // two strips 2.5 m over the ground, vertical sides and a 2.3 m trench between them, 60 m long)
+        if (!(toDeck[k][i] < WING_FILL_M)) {
+          const gNear = groundAt(e.x[i] + nx * (core + STEEP_WITHIN_M), e.y[i] + ny * (core + STEEP_WITHIN_M));
+          if (!(zr - gNear >= STEEP_DROP_M) && !(beside && zr - gMid >= WALL_MIN_DROP_M)) { close(); continue; }
+        }
         run ||= { edge: k, side, stations: [] };
-        run.stations.push({ x: e.x[i], y: e.y[i], z: zr, nx, ny, inner, outer, foot: Math.min(gOut, gMid) - WALL_FOOT_M });
+        // (no parapet where the block fills the gap to another road's pavement: a median, not an edge)
+        run.stations.push({ x: e.x[i], y: e.y[i], z: zr, nx, ny, inner: inner0, outer, foot: Math.min(gOut, gMid) - WALL_FOOT_M, parapet: median ? 0 : PARAPET_H_M });
       }
       close();
     }
@@ -99,22 +151,24 @@ export function wingWallTriangles(runs) {
     for (let i = 0; i + 1 < st.length; i++) {
       const a = st[i]; const b = st[i + 1];
       const za = a.z + WALL_TOP_M; const zb = b.z + WALL_TOP_M;
-      const pa = a.outer - PARAPET_W_M; const pb = b.outer - PARAPET_W_M;
+      const ha = a.parapet ?? PARAPET_H_M; const hb = b.parapet ?? PARAPET_H_M;
+      const pa = a.outer - (ha ? Math.min(PARAPET_W_M, a.outer - a.inner) : 0); const pb = b.outer - (hb ? Math.min(PARAPET_W_M, b.outer - b.inner) : 0);
       // (side 1: the wall is on the left of travel, so "outside" is to the left; the windings below are for
       // side 1 and are turned round for side -1)
       const put = (q0, q1, q2, q3) => (s === 1 ? quad(q0, q1, q2, q3) : quad(q3, q2, q1, q0));
       put(P(a, a.inner, za), P(b, b.inner, zb), P(b, pb, zb), P(a, pa, za));                                   // top, inside the parapet
-      put(P(a, pa, za), P(b, pb, zb), P(b, pb, zb + PARAPET_H_M), P(a, pa, za + PARAPET_H_M));               // parapet's inner face
-      put(P(a, pa, za + PARAPET_H_M), P(b, pb, zb + PARAPET_H_M), P(b, b.outer, zb + PARAPET_H_M), P(a, a.outer, za + PARAPET_H_M));   // parapet's top
-      put(P(a, a.outer, za + PARAPET_H_M), P(b, b.outer, zb + PARAPET_H_M), P(b, b.outer, b.foot), P(a, a.outer, a.foot));             // outer face
+      if (ha || hb) put(P(a, pa, za), P(b, pb, zb), P(b, pb, zb + hb), P(a, pa, za + ha));               // parapet's inner face
+      put(P(a, pa, za + ha), P(b, pb, zb + hb), P(b, b.outer, zb + hb), P(a, a.outer, za + ha));   // parapet's top (the block's own top where there is none)
+      put(P(a, a.outer, za + ha), P(b, b.outer, zb + hb), P(b, b.outer, b.foot), P(a, a.outer, a.foot));             // outer face
       put(P(a, a.inner, a.foot), P(b, b.inner, b.foot), P(b, b.inner, zb), P(a, a.inner, za));               // inner face (under the shoulder)
     }
     // the two ends, closed: the block's rectangle and the parapet's (the L is not convex: no fan)
     for (const [q, flip] of [[st[0], false], [st[st.length - 1], true]]) {
-      const zt = q.z + WALL_TOP_M; const p = q.outer - PARAPET_W_M;
+      const hq = q.parapet ?? PARAPET_H_M;
+      const zt = q.z + WALL_TOP_M; const p = q.outer - Math.min(PARAPET_W_M, q.outer - q.inner);
       const rects = [
         [P(q, q.inner, q.foot), P(q, q.outer, q.foot), P(q, q.outer, zt), P(q, q.inner, zt)],
-        [P(q, p, zt), P(q, q.outer, zt), P(q, q.outer, zt + PARAPET_H_M), P(q, p, zt + PARAPET_H_M)],
+        ...(hq ? [[P(q, p, zt), P(q, q.outer, zt), P(q, q.outer, zt + hq), P(q, p, zt + hq)]] : []),
       ];
       // (seen from before the run's first station the ring above runs clockwise for side 1)
       const out = (s === 1) !== flip;
