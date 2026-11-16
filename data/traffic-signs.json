@@ -1,0 +1,403 @@
+{
+ "about": "Mapped traffic signs (traffic_sign=*): what each OSM value stands for, and the game's model for it in each sign set (white: the Vienna-convention set, Italy's; americas: East Coast USA's). A value is OSM's own word (hazard, maxspeed, overtaking...) or a country's code (DE:206, US:R1-1); a code's bracket or dash suffix carries its number (DE:274[50] a 50 limit). None: a sign MapNG does not stand (a place-name or route sign). services/roadSigns.js reads this; add codes here, not code there. Footway, cycle path and tram-lane signs, and supplementary plates (DE:10xx), are no road's: left out.",
+ "kinds": {
+  "stop": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_stop.dae",
+   "americas": "/levels/east_coast_usa/art/shapes/signs_usa/sign_stop.dae"
+  },
+  "give_way": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_give_way.dae",
+   "americas": "/levels/east_coast_usa/art/shapes/signs_usa/sign_yield.dae"
+  },
+  "no_entry": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_noentry.dae"
+  },
+  "one_way": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_one_way.dae"
+  },
+  "roundabout": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_roundabout.dae"
+  },
+  "priority_road": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_priorityroad.dae"
+  },
+  "priority_road_end": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_priorityroad_end.dae"
+  },
+  "no_overtaking": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_no_overtaking.dae"
+  },
+  "no_overtaking_end": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_no_overtaking_end.dae"
+  },
+  "dead_end": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_dead_end.dae"
+  },
+  "no_vehicles": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_restricted.dae"
+  },
+  "no_parking": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_no_parking.dae"
+  },
+  "parking": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_parking.dae"
+  },
+  "pedestrian_crossing": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_zebra.dae"
+  },
+  "keep_right": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_keep_right.dae"
+  },
+  "keep_left": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_keep_left.dae"
+  },
+  "hazard": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_other_danger.dae"
+  },
+  "hazard:curve_left": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_bend_l.dae",
+   "americas": "/levels/east_coast_usa/art/shapes/signs_usa/sign_bend_left.dae"
+  },
+  "hazard:curve_right": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_bend_l.dae",
+   "americas": "/levels/east_coast_usa/art/shapes/signs_usa/sign_bend_right.dae"
+  },
+  "hazard:curves": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_doublebend_l.dae",
+   "americas": "/levels/east_coast_usa/art/shapes/signs_usa/sign_sbend_left.dae"
+  },
+  "hazard:crossroads": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_crossroad.dae",
+   "americas": "/levels/east_coast_usa/art/shapes/signs_usa/sign_4way.dae"
+  },
+  "hazard:road_narrows": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_road_narrows.dae",
+   "americas": "/levels/east_coast_usa/art/shapes/signs_usa/sign_narrows.dae"
+  },
+  "hazard:dip": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_dip.dae",
+   "americas": "/levels/east_coast_usa/art/shapes/signs_usa/sign_dip.dae"
+  },
+  "hazard:bump": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_humps.dae",
+   "americas": "/levels/east_coast_usa/art/shapes/signs_usa/sign_bump.dae"
+  },
+  "hazard:uneven_road": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_uneven_road.dae",
+   "americas": "/levels/east_coast_usa/art/shapes/signs_usa/sign_bump.dae"
+  },
+  "hazard:slippery": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_slippery.dae",
+   "americas": "/levels/east_coast_usa/art/shapes/signs_usa/sign_slippery.dae"
+  },
+  "hazard:loose_gravel": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_loose_chippings.dae",
+   "americas": "/levels/east_coast_usa/art/shapes/signs_usa/sign_gravel.dae"
+  },
+  "hazard:side_winds": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_strong_winds.dae"
+  },
+  "hazard:steep_down": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_steep_down.dae"
+  },
+  "hazard:steep_up": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_steep_up.dae"
+  },
+  "hazard:low_flying_aircraft": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_low_aircraft.dae"
+  },
+  "hazard:pedestrians": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_zebra_warning.dae"
+  },
+  "hazard:roundabout": {
+   "white": "/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_roundabout_warning.dae"
+  },
+  "hazard:stop_ahead": {
+   "americas": "/levels/east_coast_usa/art/shapes/signs_usa/sign_stop_ahead.dae"
+  },
+  "hazard:yield_ahead": {
+   "americas": "/levels/east_coast_usa/art/shapes/signs_usa/sign_yield_ahead.dae"
+  },
+  "hazard:agricultural_vehicles": {
+   "americas": "/levels/east_coast_usa/art/shapes/signs_usa/sign_tractor.dae"
+  },
+  "weight_limit": {
+   "americas": "/levels/east_coast_usa/art/shapes/signs_usa/sign_weightlimit.dae"
+  }
+ },
+ "words": {
+  "stop": "stop",
+  "give_way": "give_way",
+  "yield": "give_way",
+  "maxspeed": "speed",
+  "overtaking": "no_overtaking",
+  "hazard": "hazard",
+  "no_entry": "no_entry",
+  "one_way": "one_way",
+  "roundabout": "roundabout",
+  "dead_end": "dead_end",
+  "pedestrian_crossing": "pedestrian_crossing",
+  "crossing": "pedestrian_crossing",
+  "priority_road": "priority_road",
+  "maxweight": "weight_limit"
+ },
+ "hazard": {
+  "curve": "hazard:curve_left",
+  "curves": "hazard:curves",
+  "dangerous_junction": "hazard:crossroads",
+  "junction": "hazard:crossroads",
+  "road_narrows": "hazard:road_narrows",
+  "dip": "hazard:dip",
+  "bump": "hazard:bump",
+  "uneven_road": "hazard:uneven_road",
+  "slippery": "hazard:slippery",
+  "loose_gravel": "hazard:loose_gravel",
+  "side_winds": "hazard:side_winds",
+  "low_flying_aircraft": "hazard:low_flying_aircraft",
+  "pedestrians": "hazard:pedestrians",
+  "school_zone": "hazard:pedestrians",
+  "children": "hazard:pedestrians",
+  "agricultural_vehicles": "hazard:agricultural_vehicles",
+  "steep_slope": "hazard:steep_down"
+ },
+ "codes": {
+  "DE": {
+   "101": "hazard",
+   "102": "hazard:crossroads",
+   "103-10": "hazard:curve_left",
+   "103-20": "hazard:curve_right",
+   "105-10": "hazard:curves",
+   "105-20": "hazard:curves",
+   "108": "hazard:steep_down",
+   "110": "hazard:steep_up",
+   "112": "hazard:uneven_road",
+   "114": "hazard:slippery",
+   "116": "hazard:loose_gravel",
+   "117": "hazard:side_winds",
+   "120": "hazard:road_narrows",
+   "121": "hazard:road_narrows",
+   "133": "hazard:pedestrians",
+   "136": "hazard:pedestrians",
+   "144": "hazard:low_flying_aircraft",
+   "205": "give_way",
+   "206": "stop",
+   "215": "roundabout",
+   "220": "one_way",
+   "222": "keep_right",
+   "250": "no_vehicles",
+   "260": "no_vehicles",
+   "267": "no_entry",
+   "274": "speed",
+   "276": "no_overtaking",
+   "280": "no_overtaking_end",
+   "283": "no_parking",
+   "286": "no_parking",
+   "306": "priority_road",
+   "307": "priority_road_end",
+   "314": "parking",
+   "350": "pedestrian_crossing",
+   "357": "dead_end",
+   "274.1": "speed",
+   "274.2": null
+  },
+  "AT": {
+   "1a": "hazard:curve_left",
+   "1b": "hazard:curves",
+   "2": "hazard:uneven_road",
+   "3a": "hazard:steep_down",
+   "3b": "hazard:steep_up",
+   "4": "hazard:road_narrows",
+   "6": "hazard:slippery",
+   "13": "hazard",
+   "1": "hazard",
+   "23": "give_way",
+   "24": "stop",
+   "2a": "no_entry",
+   "4a": "no_overtaking",
+   "10a": "speed",
+   "52a": "speed",
+   "5a": "no_entry"
+  },
+  "CH": {
+   "1.01": "hazard:curve_left",
+   "1.03": "hazard:curves",
+   "1.06": "hazard:uneven_road",
+   "1.07": "hazard:road_narrows",
+   "1.08": "hazard:steep_down",
+   "1.10": "hazard:slippery",
+   "1.30": "hazard",
+   "3.01": "stop",
+   "3.02": "give_way",
+   "2.02": "no_entry",
+   "2.44": "no_overtaking",
+   "2.30": "speed",
+   "3.03": "priority_road",
+   "3.04": "priority_road_end"
+  },
+  "FR": {
+   "A1a": "hazard:curve_right",
+   "A1b": "hazard:curve_left",
+   "A1c": "hazard:curves",
+   "A1d": "hazard:curves",
+   "A2a": "hazard:bump",
+   "A2b": "hazard:dip",
+   "A3": "hazard:road_narrows",
+   "A4": "hazard:slippery",
+   "A14": "hazard",
+   "A15b": "hazard:pedestrians",
+   "AB2": "hazard:crossroads",
+   "AB3a": "give_way",
+   "AB4": "stop",
+   "AB6": "priority_road",
+   "AB7": "priority_road_end",
+   "B1": "no_entry",
+   "B3": "no_overtaking",
+   "B14": "speed",
+   "B34": "no_overtaking_end",
+   "C1a": "parking",
+   "C13a": "dead_end",
+   "B6a1": "no_parking"
+  },
+  "IT": {
+   "39": "hazard:curve_left",
+   "40": "hazard:curves",
+   "41": "hazard:road_narrows",
+   "42": "hazard:bump",
+   "43": "hazard:dip",
+   "44": "hazard:slippery",
+   "35": "hazard",
+   "46": "hazard:loose_gravel",
+   "48": "hazard:side_winds",
+   "49": "hazard:steep_down",
+   "50": "hazard:steep_up",
+   "44a": "hazard:pedestrians",
+   "36": "give_way",
+   "37": "stop",
+   "47": "no_entry",
+   "48a": "no_overtaking",
+   "50a": "speed",
+   "51": "no_overtaking_end"
+  },
+  "PL": {
+   "A-1": "hazard:curve_right",
+   "A-2": "hazard:curve_left",
+   "A-3": "hazard:curves",
+   "A-4": "hazard:curves",
+   "A-5": "hazard:crossroads",
+   "A-7": "give_way",
+   "A-11": "hazard:uneven_road",
+   "A-11a": "hazard:bump",
+   "A-12a": "hazard:road_narrows",
+   "A-12b": "hazard:road_narrows",
+   "A-12c": "hazard:road_narrows",
+   "A-15": "hazard:slippery",
+   "A-16": "hazard:pedestrians",
+   "A-17": "hazard:pedestrians",
+   "A-23": "hazard:steep_down",
+   "A-24": "hazard:steep_up",
+   "A-30": "hazard",
+   "A-32": "hazard:loose_gravel",
+   "B-1": "no_vehicles",
+   "B-2": "no_entry",
+   "B-20": "stop",
+   "B-25": "no_overtaking",
+   "B-26": "no_overtaking",
+   "B-33": "speed",
+   "B-35": "no_parking",
+   "B-36": "no_parking",
+   "B-41": "no_overtaking_end",
+   "D-1": "priority_road",
+   "D-2": "priority_road_end",
+   "D-3": "one_way",
+   "D-6": "pedestrian_crossing",
+   "D-18": "parking",
+   "C-12": "roundabout",
+   "C-9": "keep_right",
+   "B-43": "speed",
+   "B-44": null,
+   "D-6b": "pedestrian_crossing",
+   "D-40": null,
+   "D-41": null
+  },
+  "NL": {
+   "B6": "give_way",
+   "B7": "stop",
+   "C2": "no_entry",
+   "C1": "no_vehicles",
+   "F1": "no_overtaking",
+   "F2": "no_overtaking_end",
+   "A1": "speed",
+   "B1": "priority_road",
+   "B2": "priority_road_end",
+   "E1": "no_parking",
+   "E4": "parking",
+   "J1": "hazard:curve_left",
+   "J3": "hazard:curves",
+   "J20": "hazard:bump",
+   "J17": "hazard:road_narrows",
+   "J16": "hazard:steep_down",
+   "J37": "hazard",
+   "D1": "roundabout",
+   "D2": "keep_right",
+   "L8": "dead_end",
+   "L2": "pedestrian_crossing",
+   "J23": "hazard:pedestrians",
+   "G11": null,
+   "G12": null
+  },
+  "GB": {
+   "601.1": "stop",
+   "602": "give_way",
+   "616": "no_entry",
+   "632": "no_overtaking",
+   "670": "speed",
+   "512": "hazard:curve_left",
+   "513": "hazard:curves",
+   "516": "hazard:road_narrows",
+   "517": "hazard:road_narrows",
+   "521": "hazard",
+   "523.1": "hazard:steep_down",
+   "524.1": "hazard:steep_up",
+   "544": "hazard:pedestrians",
+   "556": "hazard:uneven_road",
+   "557": "hazard:slippery",
+   "562": "hazard",
+   "583": "hazard:side_winds",
+   "1003A": null,
+   "610": "keep_left",
+   "652": "one_way",
+   "816": "dead_end"
+  },
+  "US": {
+   "R1-1": "stop",
+   "R1-2": "give_way",
+   "R2-1": "speed",
+   "R5-1": "no_entry",
+   "R6-1": "one_way",
+   "R6-2": "one_way",
+   "R12-1": "weight_limit",
+   "W1-1": "hazard:curve_left",
+   "W1-2": "hazard:curve_left",
+   "W1-3": "hazard:curves",
+   "W1-4": "hazard:curves",
+   "W1-5": "hazard:curves",
+   "W2-1": "hazard:crossroads",
+   "W2-2": "hazard:crossroads",
+   "W2-4": "hazard:crossroads",
+   "W3-1": "hazard:stop_ahead",
+   "W3-2": "hazard:yield_ahead",
+   "W4-2": "hazard:road_narrows",
+   "W5-1": "hazard:road_narrows",
+   "W8-1": "hazard:bump",
+   "W8-2": "hazard:dip",
+   "W8-5": "hazard:slippery",
+   "W8-7": "hazard:loose_gravel",
+   "W11-2": "hazard:pedestrians",
+   "W11-5": "hazard:agricultural_vehicles",
+   "W14-1": "dead_end",
+   "W14-2": "dead_end",
+   "W14-3": "no_overtaking",
+   "W7-1": "hazard:steep_down"
+  }
+ }
+}

@@ -14135,7 +14135,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     const obj = {
       __parent: 'signs',
       class: 'TSStatic',
-      name: `sign_${sign.kind}_${i}`,
+      name: `sign_${String(sign.kind).replace(/[^A-Za-z0-9_]/g, "_")}_${i}`,
       persistentId: generatePersistentId(),
       position: plate ? [base[0], base[1], roundTo(base[2] + plate.plateZ, 3)] : base,
       rotationMatrix: rotationMatrixFromYaw(sign.yaw),

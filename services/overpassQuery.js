@@ -8,7 +8,7 @@
  */
 import { tagObjectNodeTags } from './tagModels.js';
 
-export const OVERPASS_QUERY_VERSION = 9;   // 2: traffic_calming nodes; 3: food, drink and lodging nodes; 4: railways; 5: disused, preserved and abandoned lines; 6: bus stops, post boxes, picnic tables, flagpoles, recycling, information boards; 7: power towers mapped on their own; 8: shelters, toilets, statues, masts, towers, oil wells, bike stands, street cabinets, dumpsters; 9: wind turbines and railway platforms
+export const OVERPASS_QUERY_VERSION = 10;   // 2: traffic_calming nodes; 3: food, drink and lodging nodes; 4: railways; 5: disused, preserved and abandoned lines; 6: bus stops, post boxes, picnic tables, flagpoles, recycling, information boards; 7: power towers mapped on their own; 8: shelters, toilets, statues, masts, towers, oil wells, bike stands, street cabinets, dumpsters; 9: wind turbines and railway platforms; 10: every mapped traffic sign (traffic_sign=*)
 
 // Public Overpass mirrors (volunteer-run; any of them may be down).
 export const OVERPASS_ENDPOINTS = [
@@ -84,6 +84,8 @@ export const OSM_FILTER = {
     'water', 'wetland', 'surface', 'landcover', 'golf',
   ],
   wayTags: [['area', 'yes'], ['natural', 'tree_row'], ['railway', 'platform'], ...[...RAILWAY_WAYS, ...RAILWAY_LIFECYCLE_WAYS].map((v) => ['railway', v])],
+  // (points kept for any value of their key: a mapped traffic sign's value is a country's code, DE:274[50], US:R1-1)
+  nodeKeys: ['traffic_sign'],
   relationKeys: [
     'building', 'waterway', 'aeroway', 'man_made', 'military', 'historic', 'tourism', 'amenity',
     'landuse', 'natural', 'leisure', 'water', 'wetland', 'landcover',
@@ -112,6 +114,7 @@ export const OSM_FILTER = {
 const WAY_KEYS = new Set(OSM_FILTER.wayKeys);
 const RELATION_KEYS = new Set(OSM_FILTER.relationKeys);
 const NODE_TAGS = new Set(OSM_FILTER.nodeTags.map(([k, v]) => `${k}=${v}`));
+const NODE_KEYS = new Set(OSM_FILTER.nodeKeys || []);
 export const matchesOsmFilter = (el) => {
   const tags = el?.tags;
   if (!tags) return false;
@@ -124,7 +127,7 @@ export const matchesOsmFilter = (el) => {
     return false;
   }
   if (el.type === 'node') {
-    for (const k in tags) if (NODE_TAGS.has(`${k}=${tags[k]}`)) return true;
+    for (const k in tags) if (NODE_TAGS.has(`${k}=${tags[k]}`) || NODE_KEYS.has(k)) return true;
     return false;
   }
   return false;
@@ -140,6 +143,7 @@ export const buildOverpassQuery = (bounds, boxes = null) => {
     ...OSM_FILTER.wayTags.map(([k, v]) => `way["${k}"="${v}"](${bbox});`),
     ...OSM_FILTER.relationKeys.map((k) => `relation["${k}"](${bbox});`),
     ...OSM_FILTER.nodeTags.map(([k, v]) => `node["${k}"="${v}"](${bbox});`),
+    ...(OSM_FILTER.nodeKeys || []).map((k) => `node["${k}"](${bbox});`),
   ]);
   // Timeout 30 s matches the timeoutSec getOSMQueryParameters records into
   // export metadata; 128 MB maxsize (512 MB triggered server-side rejection).
