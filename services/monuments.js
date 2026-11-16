@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { PLAZA_MATERIAL, plazaTileM } from './plazas.js';
 
-const KINDS = { obelisk: { h: 6, min: 2, max: 40 }, stele: { h: 1.8, min: 0.8, max: 6 }, stone: { h: 1.1, min: 0.4, max: 3 } };
+const KINDS = { obelisk: { h: 6, min: 2, max: 200 }, stele: { h: 1.8, min: 0.8, max: 6 }, stone: { h: 1.1, min: 0.4, max: 3 } };
 
 /** A feature's monument kind ('obelisk' | 'stele' | 'stone') or null. */
 export function monumentKind(tags = {}) {

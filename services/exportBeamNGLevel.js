@@ -58,6 +58,7 @@ import { findCrossings } from './structures/crossings.js';
 import { tagModel, tagObjectFor, standTagObject, part } from './tagModels.js';
 import { fillRows, rowDirection } from './areaRows.js';
 import { buildPlatformMeshes } from './platforms.js';
+import { leaveBridgeBuildings } from './bridgeBuildings.js';
 import { buildMonumentMeshes, monumentKind, monumentHeight } from './monuments.js';
 import { solveProfilesSteps, gradeLimit } from './structures/profileSolve.js';
 import { appendAll, keepInPlace } from './keepInPlace.js';
@@ -10592,7 +10593,9 @@ function buildPoolWaterObjects(terrainData, squareSize, biome, stats = {}) {
       foamTex: waterProfile.waterFoamTex,
       rippleTex: waterProfile.waterRippleTex,
       ...structuredClone(look),
-      gridSize: Math.max(1, Math.floor(Math.min(100, b.sx, b.sy))),
+      // (never over the block's own width: the game reads gridSize as the grid's element size too, and a fountain's
+      // strips under a metre wide each logged "gridElementSize 1 is larger than scale", hundreds a level)
+      gridSize: Math.min(Math.max(1, Math.floor(Math.min(100, b.sx, b.sy))), roundTo(Math.min(b.sx, b.sy), 3)),
       gridElementSize: roundTo(clamp(Math.min(b.sx, b.sy) / 32, 0.05, 4), 2),
       name,
       persistentId: generatePersistentId(),
@@ -12805,43 +12808,12 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     const b = td.bounds; const ws = td.width * computeSquareSize(td);
     boundedFeatures = markShortSpans(boundedFeatures, (p) => [((p.lng - b.west) / (b.east - b.west) - 0.5) * ws, (0.5 - (b.north - p.lat) / (b.north - b.south)) * ws]);
   }
-  // (a building a road passes through up on a bridge, tunnel=building_passage on layer 1 or more: a bridge's tower or
-  // gatehouse. Built from the ground as a house, its walls stood across the deck: Tower Bridge. Left to the bridge)
+  // (a bridge's towers and gatehouses mapped as buildings are left to the bridge: services/bridgeBuildings.js)
   if (includeBuildings && boundedFeatures?.length) {
-    const raised = boundedFeatures.filter((f) => f.type === 'road' && f.tags?.tunnel === 'building_passage' && (Number.parseInt(f.tags.layer, 10) || 0) >= 1 && f.geometry?.length > 1);
-    if (raised.length) {
-      const pts = raised.flatMap((f) => f.geometry.flatMap((p, i) => (i ? [p, { lat: (p.lat + f.geometry[i - 1].lat) / 2, lng: (p.lng + f.geometry[i - 1].lng) / 2 }] : [p])));
-      const inRing = (p, g) => { let k = false; for (let i = 0, j = g.length - 1; i < g.length; j = i++) if (((g[i].lat > p.lat) !== (g[j].lat > p.lat)) && (p.lng < ((g[j].lng - g[i].lng) * (p.lat - g[i].lat)) / (g[j].lat - g[i].lat) + g[i].lng)) k = !k; return k; };
-      const before = boundedFeatures.length;
-      boundedFeatures = boundedFeatures.filter((f) => !(f.type === 'building' && f.geometry?.length > 2 && pts.some((p) => inRing(p, f.geometry))));
-      if (boundedFeatures.length < before) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Buildings: ${before - boundedFeatures.length} a bridge road passes through left to the bridge (towers, gatehouses).`);
-    }
-    // (and a building inside a bridge's own outline, man_made=bridge, with the bridge's road for traffic through it
-    // or beside it within 7 m (past its sidewalks): its towers, split round the road's arches: the Roebling Bridge's four parts. Shops on a
-    // bridge for walking stay)
-    const bridgeRings = boundedFeatures.filter((f) => f.type === 'bridge_infra' && f.geometry?.length > 3).map((f) => f.geometry);
-    if (bridgeRings.length) {
-      const WALK = new Set(['footway', 'pedestrian', 'path', 'cycleway', 'steps', 'bridleway', 'corridor']);
-      const deckRoads = boundedFeatures.filter((f) => f.type === 'road' && f.tags?.bridge && f.tags.bridge !== 'no' && !WALK.has(f.tags.highway) && f.geometry?.length > 1);
-      const inRing = (p, g) => { let k = false; for (let i = 0, j = g.length - 1; i < g.length; j = i++) if (((g[i].lat > p.lat) !== (g[j].lat > p.lat)) && (p.lng < ((g[j].lng - g[i].lng) * (p.lat - g[i].lat)) / (g[j].lat - g[i].lat) + g[i].lng)) k = !k; return k; };
-      const kx = 111320 * Math.cos((((td.bounds.north + td.bounds.south) / 2) * Math.PI) / 180); const ky = 110574;
-      const near = (g, road) => {
-        for (const p of g) for (let i = 0; i + 1 < road.length; i++) {
-          const ax = (road[i].lng - p.lng) * kx; const ay = (road[i].lat - p.lat) * ky; const bx = (road[i + 1].lng - p.lng) * kx; const by = (road[i + 1].lat - p.lat) * ky;
-          const vx = bx - ax; const vy = by - ay; const u = Math.max(0, Math.min(1, -(ax * vx + ay * vy) / (vx * vx + vy * vy || 1e-9)));
-          if (Math.hypot(ax + vx * u, ay + vy * u) < 7) return true;
-        }
-        return road.some((q) => inRing(q, g));
-      };
-      const before = boundedFeatures.length;
-      boundedFeatures = boundedFeatures.filter((f) => {
-        if (f.type !== 'building' || !(f.geometry?.length > 2)) return true;
-        const c = { lat: f.geometry.reduce((s, p) => s + p.lat, 0) / f.geometry.length, lng: f.geometry.reduce((s, p) => s + p.lng, 0) / f.geometry.length };
-        if (!bridgeRings.some((r) => inRing(c, r))) return true;
-        return !deckRoads.some((rd) => near(f.geometry, rd.geometry));
-      });
-      if (boundedFeatures.length < before) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Buildings: ${before - boundedFeatures.length} inside a bridge's outline beside its road left to the bridge (towers).`);
-    }
+    const left = leaveBridgeBuildings(boundedFeatures);
+    boundedFeatures = left.features;
+    if (left.passage) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Buildings: ${left.passage} a bridge road passes through left to the bridge (towers, gatehouses).`);
+    if (left.towers) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Buildings: ${left.towers} inside a bridge's outline beside its road left to the bridge (towers).`);
   }
   if (includeBuildings && boundedFeatures?.length) {
     const b = td.bounds; const ws = td.width * computeSquareSize(td);
@@ -14201,6 +14173,13 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       }
     }
   }
+  // (a world point inside a mapped water area: nothing stands there. A memorial or a block mapped in a basin by
+  // mistake, or a test point, stood in the water)
+  const inMappedWater = (() => {
+    const rings = (exportTerrainData.osmFeatures || []).filter((f) => f.type === 'water' && f.geometry?.length > 3 && f.geometry[0].lat === f.geometry[f.geometry.length - 1].lat && f.geometry[0].lng === f.geometry[f.geometry.length - 1].lng)
+      .map((f) => { const r = f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0)); let x0 = Infinity; let x1 = -Infinity; let y0 = Infinity; let y1 = -Infinity; for (const [x, y] of r) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } return { r, x0, x1, y0, y1 }; });
+    return (x, y) => rings.some(({ r, x0, x1, y0, y1 }) => { if (x < x0 || x > x1 || y < y0 || y > y1) return false; let k = false; for (let a2 = 0, b = r.length - 1; a2 < r.length; b = a2++) if (((r[a2][1] > y) !== (r[b][1] > y)) && (x < ((r[b][0] - r[a2][0]) * (y - r[a2][1])) / (r[b][1] - r[a2][1]) + r[a2][0])) k = !k; return k; });
+  })();
   // obelisks, steles and memorial stones the game has no model for: built (monuments.js); on the ground, not on a
   // drawn road nor inside a building (a memorial stone mapped inside a church)
   if (built('statues') && Array.isArray(sidewalks.meshes)) {
@@ -14208,13 +14187,14 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     const halls = (exportTerrainData.osmFeatures || []).filter((f) => f.type === 'building' && f.geometry?.length > 3).map((f) => f.geometry.map(toWm));
     const inHall = (x, y) => halls.some((r) => { let k = false; for (let a = 0, b = r.length - 1; a < r.length; b = a++) if (((r[a][1] > y) !== (r[b][1] > y)) && (x < ((r[b][0] - r[a][0]) * (y - r[a][1])) / (r[b][1] - r[a][1]) + r[a][0])) k = !k; return k; });
     const cwIndex = buildCarriagewayIndex(groundCarriageways);
-    const items = []; const skipped = { road: 0, building: 0 };
+    const items = []; const skipped = { road: 0, building: 0, water: 0 };
     for (const f of exportTerrainData.osmFeatures || []) {
       const kind = monumentKind(f.tags); if (!kind || !f.geometry?.length) continue;
       const g = f.geometry.length > 2 ? f.geometry.slice(0, f.geometry.length - 1) : f.geometry;
       const [x, y] = toWm({ lat: g.reduce((a, p) => a + p.lat, 0) / g.length, lng: g.reduce((a, p) => a + p.lng, 0) / g.length });
       if (isOnOtherCarriageway(cwIndex, x, y, 0, () => false)) { skipped.road++; continue; }
       if (inHall(x, y)) { skipped.building++; continue; }
+      if (inMappedWater(x, y)) { skipped.water++; continue; }
       const yaw = ((Number.parseInt(String(f.id).replace(/\D/g, '').slice(-6), 10) || 0) * 2.39996) % (Math.PI / 2);
       items.push({ x, y, z: getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize), kind, height: monumentHeight(kind, f.tags), yaw });
     }
@@ -14222,7 +14202,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       const res = buildMonumentMeshes(items);
       appendAll(sidewalks.meshes, res.meshes);
       const by = {}; for (const m of items) by[m.kind] = (by[m.kind] || 0) + 1;
-      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Monuments: ${Object.entries(by).map(([k, n]) => `${n} ${k}`).join(', ')} built${skipped.road || skipped.building ? `; left out: ${skipped.road} on drawn roads, ${skipped.building} inside buildings` : ''}.`);
+      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Monuments: ${Object.entries(by).map(([k, n]) => `${n} ${k}`).join(', ')} built${skipped.road || skipped.building || skipped.water ? `; left out: ${skipped.road} on drawn roads, ${skipped.building} inside buildings, ${skipped.water} in water` : ''}.`);
     }
   }
   const sidewalkTileDaes = await generateSidewalkTileDAEs(sidewalks.meshes, buildingTileSize(worldSize));
@@ -14322,7 +14302,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       const index = buildCarriagewayIndex(groundCarriageways);
       return (x, y) => isOnOtherCarriageway(index, x, y, 0, () => false);
     })(),
-    isBlocked: (x, y, z) => underDeck(x, y, z, z + 2),
+    isBlocked: (x, y, z) => underDeck(x, y, z, z + 2) || inMappedWater(x, y),
   });
   bollardPlacement.bollards.forEach((b, i) => streetFurnitureObjects.push({
     __parent: 'street_furniture',
