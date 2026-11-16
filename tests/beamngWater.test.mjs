@@ -506,4 +506,7 @@ test('a breakwater the coastline is drawn round stays; a pier mapped as an area 
   // the same pier where the data has land (a pier on a quay): left as it is
   const dry = grid(); for (let i = 0; i < dry.heightMap.length; i++) dry.heightMap[i] = 3;
   assert.equal(lowerSeabed(dry, { grid: new Uint8Array(W * W).fill(60), n: W }, 0, { coarse: false, piers: pier }).pierPixels, 0);
+  // a pier on a river far over the sea (the Chicago River, 175 m up): not brought down to the sea
+  const inland = grid(); for (let i = 0; i < inland.heightMap.length; i++) inland.heightMap[i] += 175;
+  assert.equal(lowerSeabed(inland, { grid: lc, n: W }, 0, { coarse: true, piers: pier }).pierPixels, 0, 'a river pier 175 m up stays');
 });

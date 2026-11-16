@@ -1410,6 +1410,12 @@ export function lowerSeabed(grid, landCover, seaZ, { coarse = false, keep = null
         if (!hit) continue;
         inside.push(r * width + c);
       }
+      // (a pier on a river or lake far over the sea is not the sea's: stood at the sea's height, a pier on the Chicago
+      // River, 175 m up, became a shaft 173 m deep. Judged by the middle of its ground)
+      if (inside.length) {
+        const zs = inside.map((idx) => heightMap[idx] - minHeight).sort((p, q) => p - q);
+        if (zs[zs.length >> 1] > seaZ + COAST_SEA_MAX_M) continue;
+      }
       // (only what is under that height: a pier or a mole the data has standing higher is left as the data has it)
       for (const idx of inside) {
         const now = edits.has(idx) ? edits.get(idx) - minHeight : heightMap[idx] - minHeight;
