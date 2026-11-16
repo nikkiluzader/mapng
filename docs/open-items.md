@@ -20,43 +20,27 @@ As of 2026-11-15, evening:
 
 ## This week's list (2026-11-15)
 
-1. Hoover Dam towers beside the access road bridge: measured, 10.6 and 11.3 m from its centre line (about 3 m
-   clear of the deck), as mapped. The deck check now covers a tower's whole base. A close-up in game is owed.
-2. Benches turned to face the road: right in the model photos; a look in game is owed.
-3. Phantom rails in Poland (a BeamNG developer): no export report yet. A survey of three Polish areas from the
-   planet tiles (`scripts/planet/railSurvey.mjs`) found rail trails built as track and closed tram lines built as
-   main line; both fixed. Abandoned lines stay off by default; a settings code made before that default may
-   still switch them on.
-4. Asset catalogue: tag library complete (0 catalogue tags without an entry); front direction shown in the
-   organiser; **67 models still to be photographed again** (framed too small), in game.
-5. Power towers mapped on their own: done (no wires: there is no line to say where they go).
-6. "Every road follows the survey" on a steep main road: Trollstigen checked from the solved data (9 to 10%,
-   as the real road); a 306 m stretch held 1.8 m over the ground after a bridge fixed. In-game look owed.
-7. New mapped objects in the 2D preview: confirmed (hover shows "Bus stops", "Information boards").
+All looked at, in game where it needed the game:
 
-### Hero Roads (experimental), 2026-11-14
+1. Hoover Dam towers beside the access road bridge: 10.6 and 11.3 m from its centre line, beside the deck, wires
+   several metres over it, as mapped. The deck check now covers a tower's whole base.
+2. Benches: seats face away from walls, towards the paths (Bologna, in game).
+3. Phantom rails in Poland: no export report yet. Rail trails and closed tram lines fixed from a survey of three
+   Polish areas (`scripts/planet/railSurvey.mjs`).
+4. Asset catalogue: tag library complete; front direction in the organiser; the 67 "too small" photos: 20 taken
+   again framed on what can be seen, 47 are spread-out sets that fill their box (flag cleared, noted).
+5. Power towers mapped on their own: stood, no wires.
+6. Every road follows the survey on a steep main road: Trollstigen, in game and in the solved data. Sweep: one
+   Alpine track (gt_chevril on Mapterhorn) now has short 18.5 to 19.5% stretches (steepGround 28 -> 41); new
+   baselines wait on the owner's word.
+7. New mapped objects in the 2D preview: confirmed.
 
-Done: lanes as wide as the driving lanes with the rest as shoulder; road pieces that run on into each other built
-as one Hero Road; nodes only where the shape needs them; the roads baked with the editor's own Bake on the first
-load (it runs with the editor closed) and placed from the baked files on later loads.
-`mainLevel.heroRoads().edit()` gives live roads for the editor.
+Found on the way:
 
-Open:
-1. Junctions are not joined: each Hero Road ends square at a junction.
-2. A one-way road with one lane gets that lane as wide as all of MapNG's driving width (7 m seen).
-3. The first load of a town took 42 s to build and bake 88 roads; a large city is not measured.
-4. The baked files are in the game's user folder, not in the level's zip: a shared level bakes again on the
-   other PC. Putting the bake into the zip at export would need the meshes made outside the game.
-5. Frame rate: baked Hero Roads against decal roads and Mesh Roads, not measured.
-6. Only tried on one game version.
-
-### Sidewalk mesh standing in a road: looked for, not found (2026-11-14)
-
-A detector over the built sidewalk meshes (scratch, `detect_pre.mjs`: every vertex well inside another road's
-driving width and more than 8 cm over it) finds nothing real on the roundabout town: what it reports are curbs on
-the far side of a T junction, where the side road's drawn end reaches past the through road's far edge. The
-"sidewalk slabs across a carriageway" in the lists below were measured in game before the later fixes and need
-their places measured again before any work on them.
+- A waterway relation was built as one open stream with the relation's tags: Bologna's Torrente Aposa, in a
+  culvert under the old town, ran across it. Fixed (only multipolygon relations are areas).
+- On 30 m elevation, Bologna's Piazza Maggiore is a 20 m hill (the coarse data's buildings) and its paved plaza a
+  flat slab: the slab hangs over the low side and the grass hill stands over it on the other. Not fixed.
 
 ## 1. Mesh Roads and junction heights (in progress)
 
