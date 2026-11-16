@@ -89,7 +89,7 @@
     "latitude": "Latitude",
     "longitude": "Longitude",
     "selectLocation": "Select a location...",
-    "searchPlaceholder": "Search for a location...",
+    "searchPlaceholder": "Search for a place, then press Enter",
     "noLocationsFound": "No locations found for \"{query}\"",
     "elevationDataSource": "Elevation data source",
     "standard30m": "Amazon (global 30 m)",

@@ -84,7 +84,7 @@
     "latitude": "Latitud",
     "longitude": "Longitud",
     "selectLocation": "Selecciona una ubicación...",
-    "searchPlaceholder": "Busca una ubicación...",
+    "searchPlaceholder": "Busca un lugar y pulsa Intro",
     "noLocationsFound": "No se encontraron ubicaciones para \"{query}\"",
     "elevationDataSource": "Fuente de datos de elevación",
     "standard30m": "Amazon (global 30 m)",

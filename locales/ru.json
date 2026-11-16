@@ -84,7 +84,7 @@
     "latitude": "Широта",
     "longitude": "Долгота",
     "selectLocation": "Выберите локацию...",
-    "searchPlaceholder": "Поиск локации...",
+    "searchPlaceholder": "Введите место и нажмите Enter",
     "noLocationsFound": "По запросу \"{query}\" ничего не найдено",
     "elevationDataSource": "Источник данных высот",
     "standard30m": "Amazon (глобальные 30 м)",

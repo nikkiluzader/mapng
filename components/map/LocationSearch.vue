@@ -105,22 +105,15 @@ const highlightedIndex = ref(-1);
 
 let debounceTimer = null;
 
+// The search runs when asked for (Enter), not as the place is typed: the lookup is OpenStreetMap's Nominatim,
+// whose usage policy forbids auto-complete on its public server
+// (https://operations.osmfoundation.org/policies/nominatim/). Typing only clears the last answer.
 const handleInput = () => {
   noResults.value = false;
-  
-  if (debounceTimer) {
-    clearTimeout(debounceTimer);
-  }
-  
-  if (!searchQuery.value || searchQuery.value.trim().length < 2) {
-    results.value = [];
-    showResults.value = false;
-    return;
-  }
-  
-  debounceTimer = setTimeout(async () => {
-    await performSearch();
-  }, 300);
+  if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; }
+  results.value = [];
+  showResults.value = false;
+  highlightedIndex.value = -1;
 };
 
 const performSearch = async () => {

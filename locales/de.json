@@ -84,7 +84,7 @@
     "latitude": "Breitengrad",
     "longitude": "Längengrad",
     "selectLocation": "Ort auswählen...",
-    "searchPlaceholder": "Nach einem Ort suchen...",
+    "searchPlaceholder": "Ort suchen, dann Enter drücken",
     "noLocationsFound": "Keine Treffer für „{query}“",
     "elevationDataSource": "Höhendatenquelle",
     "standard30m": "Amazon (global 30 m)",
