@@ -1,8 +1,9 @@
 // MapNG desktop: the web app in a window, its level export in a full Node
 // process (no 4 GB tab heap), the level written straight into BeamNG's mods.
-import { app, BrowserWindow, dialog, ipcMain, Menu, net, Notification, protocol, screen, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, net, Notification, protocol, screen, session as electronSession, shell } from 'electron';
 import { missingParts, incompleteMessage } from './installCheck.js';
-import { menuText, updaterText } from './menuText.js';
+import { menuText, updaterText, networkText } from './menuText.js';
+import { activityHtml, noteHost, watchSession } from './networkActivity.js';
 import { fork } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -340,6 +341,8 @@ function spawnRunner(script, dir) {
     // structured-clone versions, so bytes go as base64)
     stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
   });
+  // (every address the runner asks, for Help > Network Activity: networkActivity.js)
+  child.on('message', (msg) => { if (msg?.type === 'net-host' && typeof msg.host === 'string') noteHost(msg.host.slice(0, 255)); });
   // its mapng.com /api/* requests, made here (desktop/runner/common.mjs appApiFetch)
   child.on('message', async (msg) => {
     if (msg?.type !== 'api-fetch' || typeof msg.url !== 'string' || !msg.url.startsWith('/api/')) return;
@@ -1225,6 +1228,15 @@ ipcMain.handle('levels:cancel', (_event, levelName) => {
 
 const REPO = 'https://github.com/nikkiluzader/mapng';
 
+/** Help > Network Activity: a window with the list as it is now (no script, no preload; links cannot leave it). */
+function showNetworkActivity() {
+  const text = networkText(readSettings().language || app.getLocale());
+  const win = new BrowserWindow({ width: 760, height: 640, autoHideMenuBar: true, title: text.title, webPreferences: { sandbox: true, contextIsolation: true, javascript: false } });
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  win.webContents.on('will-navigate', (event) => event.preventDefault());
+  win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(activityHtml(text, app.getVersion()))}`);
+}
+
 let menuUpdater = null;
 function buildMenu(updater) {
   menuUpdater = updater;
@@ -1254,6 +1266,8 @@ function buildMenu(updater) {
         { label: m.softwareRendering, type: 'checkbox', checked: readSettings().softwareRendering === true, click: (item) => writeSettings({ softwareRendering: item.checked }) },
         { type: 'separator' },
         { label: m.logs, click: () => { fs.mkdirSync(JOBS(), { recursive: true }); shell.openPath(JOBS()); } },
+        // (what the app has connected to since it started, beside MapNG's published list)
+        { label: networkText(readSettings().language || app.getLocale()).menu, click: () => showNetworkActivity() },
         // (the report dialog in the window: what's included is shown, nothing sent without Send)
         { label: m.report, click: (_item, win) => (win || BrowserWindow.getAllWindows()[0])?.webContents.send('report:open', { kind: 'manual' }) },
         { label: m.issue, click: () => shell.openExternal(`${REPO}/issues`) },
@@ -1354,6 +1368,8 @@ app.on('second-instance', () => {
 });
 
 app.whenReady().then(() => {
+  // (every address asked from here on is counted for Help > Network Activity)
+  watchSession(electronSession.defaultSession);
   // (Windows: notifications name the app by this)
   if (process.platform === 'win32') app.setAppUserModelId('com.mapng.desktop');
   // (started from inside the zip, or with files missing: say so now, not at the first Generate)

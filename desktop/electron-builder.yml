@@ -25,6 +25,8 @@ files:
   - menuText.js
   - reportScrub.js
   - updateSignature.js
+  - networkHosts.js
+  - networkActivity.js
   - package.json
 extraResources:
   - from: ../dist

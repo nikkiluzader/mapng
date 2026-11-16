@@ -325,6 +325,78 @@ Content-Type: application/json
         <tr><td>GitHub (desktop app only)</td><td>Update checks</td><td>A request for the latest version, only if you allowed update checks</td></tr>
       </tbody>
     </table></div>
+
+    <h3 id="addresses">The exact addresses</h3>
+    <p>For anyone who would rather watch the network than take a table's word: these are all the addresses in MapNG's code. A test in the project reads the code and fails when an address is added without being listed here. The one address that is yours to choose is your own Overpass server, if you set one.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Address</th><th>What it is</th></tr></thead>
+      <tbody>
+        <tr><td><code>mapng.com</code></td><td>MapNG's own server: its OpenStreetMap tiles, relays, send codes, and the opt-in stats and reports</td></tr>
+        <tr><td><code>dev.mapng.com</code></td><td>MapNG's own server: its OpenStreetMap tiles, relays, send codes, and the opt-in stats and reports</td></tr>
+        <tr><td><code>s3.amazonaws.com</code></td><td>AWS Terrain Tiles (global 30 m)</td></tr>
+        <tr><td><code>tiles.mapterhorn.com</code></td><td>Mapterhorn free lidar</td></tr>
+        <tr><td><code>s3.opengeohub.org</code></td><td>OpenGeoHub GEDTM30</td></tr>
+        <tr><td><code>tnmaccess.nationalmap.gov</code></td><td>USGS: which lidar files cover an area</td></tr>
+        <tr><td><code>elevation.nationalmap.gov</code></td><td>USGS 3DEP elevation</td></tr>
+        <tr><td><code>s3-us-west-2.amazonaws.com</code></td><td>USGS lidar point clouds (measured bridge heights)</td></tr>
+        <tr><td><code>*.amazonaws.com</code></td><td>USGS download buckets named by its own answers</td></tr>
+        <tr><td><code>api.gpxz.io</code></td><td>GPXZ, with your own key</td></tr>
+        <tr><td><code>mapy.geoportal.gov.pl</code></td><td>GUGiK (Poland)</td></tr>
+        <tr><td><code>opendata.geoportal.gov.pl</code></td><td>GUGiK (Poland)</td></tr>
+        <tr><td><code>server.arcgisonline.com</code></td><td>Esri satellite imagery and map backgrounds</td></tr>
+        <tr><td><code>services.arcgisonline.com</code></td><td>Esri map labels</td></tr>
+        <tr><td><code>*.tile.openstreetmap.org</code></td><td>OpenStreetMap map tiles (that map layer only)</td></tr>
+        <tr><td><code>tile.openstreetmap.org</code></td><td>OpenStreetMap map tiles (that map layer only)</td></tr>
+        <tr><td><code>overpass-api.de</code></td><td>OpenStreetMap Overpass server</td></tr>
+        <tr><td><code>lz4.overpass-api.de</code></td><td>OpenStreetMap Overpass server</td></tr>
+        <tr><td><code>overpass.private.coffee</code></td><td>OpenStreetMap Overpass server</td></tr>
+        <tr><td><code>overpass.kumi.systems</code></td><td>OpenStreetMap Overpass server</td></tr>
+        <tr><td><code>overpass.openstreetmap.ru</code></td><td>OpenStreetMap Overpass server</td></tr>
+        <tr><td><code>tiles.overturemaps.org</code></td><td>Overture Maps</td></tr>
+        <tr><td><code>api.openstreetmap.org</code></td><td>openstreetmap.org, on Pull or Download only</td></tr>
+        <tr><td><code>nominatim.openstreetmap.org</code></td><td>Nominatim place search</td></tr>
+        <tr><td><code>nominatim.geocoding.ai</code></td><td>Nominatim place search</td></tr>
+        <tr><td><code>esa-worldcover.s3.eu-central-1.amazonaws.com</code></td><td>ESA WorldCover</td></tr>
+        <tr><td><code>api.inaturalist.org</code></td><td>iNaturalist: which tree species grow in the area</td></tr>
+        <tr><td><code>epsg.io</code></td><td>Projection details for an uploaded elevation file</td></tr>
+        <tr><td><code>github.com</code></td><td>GitHub: the desktop app's update check and download</td></tr>
+        <tr><td><code>api.github.com</code></td><td>GitHub: the desktop app's update check</td></tr>
+        <tr><td><code>*.githubusercontent.com</code></td><td>GitHub: the update's files</td></tr>
+        <tr><td><code>static.cloudflareinsights.com</code></td><td>Cloudflare Web Analytics (website only)</td></tr>
+        <tr><td><code>cloudflareinsights.com</code></td><td>Cloudflare Web Analytics (website only)</td></tr>
+      </tbody>
+    </table></div>
+    <p>The desktop app shows this for itself: <b>Help &gt; Network Activity</b> lists every address it has connected to since it started, with the number of requests, and marks any address that is not on this list. A name with a star stands for every address ending in it (the storage addresses that USGS and GitHub hand out for a download).</p>
+    <p>What MapNG does not do: it has no advertising or tracking code, it does not run anything in the background after you close it, and it downloads data only, never programs. The desktop app's own update is the one exception, and it is taken only when it carries MapNG's signature (below).</p>
+  </section>
+
+  <section id="files">
+    <h2>What the desktop app writes on your computer</h2>
+    <p>The website keeps its settings in your browser's storage and writes nothing else. The desktop app writes in three places, and nowhere else:</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Where</th><th>What</th></tr></thead>
+      <tbody>
+        <tr><td>Its own folder: <code>%APPDATA%\MapNG</code> on Windows, <code>~/.config/MapNG</code> on Linux</td><td>Your settings (<code>settings.json</code>), saved projects, generated terrain and downloaded map data kept for reuse (<code>terrain</code>, <code>download-cache</code>, <code>step-cache</code>), each export's log and job description (<code>jobs</code>), the list of your past exports (<code>export-history.jsonl</code>), and the window's own cache. Help &gt; Export Logs Folder opens it.</td></tr>
+        <tr><td>Your Downloads folder</td><td>Files you choose to save, at the place you pick in the save dialog, and a <code>MapNG Batch</code> folder when you run a batch of exports</td></tr>
+        <tr><td>Your BeamNG mods folder</td><td>A level's zip, only when you choose to install it there. MapNG reads the folder to list the MapNG levels in it; it never changes other mods.</td></tr>
+      </tbody>
+    </table></div>
+    <p>To remove everything MapNG keeps, uninstall it and delete its own folder above. Keys you enter (a GPXZ key, an Overpass address with a key) stay in the window's storage on your computer and are removed from an export's job files when the export ends.</p>
+  </section>
+
+  <section id="download">
+    <h2>The desktop download: how it is built, and how to check it</h2>
+    <p>A program you install can do more than a web page, so it is fair to ask where it came from. You never need it: <a href="/">mapng.com</a> does the same work in the browser, and the desktop app exists for exports too large for a browser tab.</p>
+    <ul>
+      <li><b>Built in the open.</b> The installers are not built on anyone's own computer. <a href="https://github.com/nikkiluzader/mapng/blob/main/.github/workflows/desktop-release.yml">A GitHub Actions workflow</a> builds them from a tagged commit of the public code, and every run's log is <a href="https://github.com/nikkiluzader/mapng/actions/workflows/desktop-release.yml">public</a>. Only the project's admin can create a release tag.</li>
+      <li><b>Checksums.</b> From the release after 0.3.2 on, each release carries <code>SHA256SUMS</code> files with the SHA-256 of every download, written by that same build.</li>
+      <li><b>Build provenance.</b> From the same release on, GitHub signs a statement of which commit and which workflow run produced each file. With GitHub's command line tool: <code>gh attestation verify MapNG-Setup-x.y.z.exe --repo nikkiluzader/mapng</code>.</li>
+      <li><b>Signed updates.</b> The app takes an update only when the release's update file carries MapNG's signature, checked against a key inside the app. A changed file is refused.</li>
+      <li><b>What it can do on your computer.</b> The window runs in Chromium's sandbox with no access to Node; only MapNG's own pages can ask the app to do anything, and those requests can only write in the places listed <a href="#files">above</a>. The window cannot be sent to another website.</li>
+      <li><b>Not yet: a Windows code signature.</b> The installer is not signed with a Windows certificate, so Windows SmartScreen warns about it. A certificate is planned. Until then the checksums and the build provenance are the way to know a file is the one that was built.</li>
+      <li><b>No installer needed.</b> There is a portable zip for Windows and an AppImage for Linux, and you can build and run it from the code yourself.</li>
+    </ul>
+    <p>Found a security problem? Please report it privately: <a href="https://github.com/nikkiluzader/mapng/security/advisories/new">open a private report on GitHub</a>.</p>
   </section>
 
   <section id="source">
@@ -340,7 +412,7 @@ Content-Type: application/json
   </section>
 
   <footer>
-    <p>Last updated 14 November 2026. If what MapNG collects ever changes, this page changes first.</p>
+    <p>Last updated 16 November 2026. If what MapNG collects ever changes, this page changes first.</p>
     <p><a href="/">Back to MapNG</a></p>
   </footer>
 </main>

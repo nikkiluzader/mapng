@@ -180,6 +180,8 @@ export function installBrowserShims({ assetsDir, apiOrigin = 'https://mapng.com'
       const blob = blobs.get(url);
       return Promise.resolve(blob ? new Response(blob) : new Response(null, { status: 404 }));
     }
+    // (the address goes to the app for Help > Network Activity: the host name only, never the path)
+    if (/^https?:/i.test(url || '') && process.send) { try { process.send({ type: 'net-host', host: new URL(url).hostname }); } catch { /* not an address */ } }
     if (url?.startsWith('/api/') && apiFetch) return apiFetch(url, init);
     if (url?.startsWith('/api/')) {
       const headers = new Headers(init?.headers || undefined);

@@ -136,6 +136,12 @@ This helps keep community resource hubs focused on curated, polished releases wh
 | iNaturalist | Which tree species grow in the area |
 | Nominatim | Location search and reverse naming |
 
+## Security and trust
+
+- What MapNG connects to (every address), what it stores and what the desktop app writes on your computer: [mapng.com/data.html](https://mapng.com/data.html).
+- The desktop app shows its own connections under **Help > Network Activity**.
+- How the desktop download is built, how to check a file you downloaded, and how to report a problem: [SECURITY.md](SECURITY.md).
+
 ## Export Hotspots and Privacy
 
 **Export hotspots**, in the Map layers box on the 2D map, draws the busy export areas. They come from users who choose to share: sharing is **off unless you turn it on** (**Share my exports** in the same box; MapNG asks once after your first export, and the desktop app's welcome screen has a checkbox).
