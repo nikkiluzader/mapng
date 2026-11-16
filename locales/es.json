@@ -833,6 +833,7 @@
   "mapSelector": {
     "moveTile": "Mover {label}",
     "mapLayers": "Capas del mapa",
+    "osmRefused": "El servidor de mapas de OpenStreetMap no responde aquí en este momento. Se muestra el mapa topográfico en su lugar.",
     "openStreetMap": "OpenStreetMap",
     "satellite": "Satélite",
     "topoMap": "Mapa topográfico",

@@ -833,6 +833,7 @@
   "mapSelector": {
     "moveTile": "Переместить {label}",
     "mapLayers": "Слои карты",
+    "osmRefused": "Сервер карт OpenStreetMap сейчас здесь не отвечает. Вместо него показана топографическая карта.",
     "openStreetMap": "OpenStreetMap",
     "satellite": "Спутник",
     "topoMap": "Топографическая",

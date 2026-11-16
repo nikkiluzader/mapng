@@ -12,12 +12,14 @@
         @ready="onMapReady"
      >
       <!-- Base Layers (one world: no copies east or west, services/mapView.js) -->
+      <!-- (its server refusing this visitor: the topo map stands in, services/tileRefusal.js) -->
       <l-tile-layer
-        v-if="selectedLayer === 'osm'"
+        v-if="selectedLayer === 'osm' && !osmRefused"
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution="&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors"
         layer-type="base"
         :options="{ ...ONE_WORLD, maxNativeZoom: 19 }"
+        @ready="watchOsmTiles"
       />
 
       <!-- The dark map: a choice of its own (dark mode no longer swaps the user's map) -->
@@ -39,7 +41,7 @@
       />
 
       <l-tile-layer
-        v-if="selectedLayer === 'topo'"
+        v-if="selectedLayer === 'topo' || (selectedLayer === 'osm' && osmRefused)"
         url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}"
         attribution="&copy; <a href='https://www.esri.com/'>Esri</a>"
         layer-type="base"
@@ -240,6 +242,7 @@
                 <input type="radio" v-model="selectedLayer" value="osm" class="accent-brand" />
                 <span>{{ t('mapSelector.openStreetMap') }}</span>
             </label>
+            <p v-if="selectedLayer === 'osm' && osmRefused" class="pl-7 pr-1 text-micro leading-snug text-amber-700 dark:text-amber-300" role="status" data-testid="osm-refused">{{ t('mapSelector.osmRefused') }}</p>
             <label :class="PANEL_ROW">
                 <input type="radio" v-model="selectedLayer" value="satellite" class="accent-brand" />
                 <span>{{ t('mapSelector.satellite') }}</span>
@@ -362,6 +365,7 @@
 </template>
 
 <script setup>
+import { tileRefusalWatch } from '../../services/tileRefusal.js';
 // (bundled, not fetched from a CDN: one less outside service)
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -497,6 +501,11 @@ const selectedLayer = ref(MAP_LAYERS.includes(storedLayer) ? storedLayer : 'osm'
 const satelliteNames = ref(readStored('mapng_satelliteLabels') !== 'false');
 const showLabels = computed(() => (selectedLayer.value === 'satellite' ? satelliteNames.value : selectedLayer.value === 'dark' || RELIEF_MODES.includes(selectedLayer.value)));
 watch(selectedLayer, (v) => { writeStored('mapng_mapLayer', v); syncReliefLayer(); });
+// OpenStreetMap's tile server refusing this visitor (429 "Access denied" under its usage policy): the topo map
+// stands in for this visit and a line says so. The choice stays "OpenStreetMap": the next visit tries it again.
+const osmRefused = ref(false);
+const osmTiles = tileRefusalWatch(() => { osmRefused.value = true; });
+const watchOsmTiles = (layer) => { osmTiles.reset(); layer?.on?.('tileerror', osmTiles.error); layer?.on?.('tileload', osmTiles.load); };
 const layerPanelOpen = ref(readStored('mapng_layerPanelOpen') !== 'false');
 watch(layerPanelOpen, (v) => writeStored('mapng_layerPanelOpen', String(v)));
 const PANEL_ROW = 'flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer';

@@ -838,6 +838,7 @@
   "mapSelector": {
     "moveTile": "Move {label}",
     "mapLayers": "Map layers",
+    "osmRefused": "OpenStreetMap's map server is not answering here right now. Showing the topo map instead.",
     "openStreetMap": "OpenStreetMap",
     "satellite": "Satellite",
     "topoMap": "Topo map",
