@@ -3781,6 +3781,11 @@ export function gradeSidewalkGround(runs, carriageways, grid, { overhead = () =>
             const f = past / blend;
             if (f >= 1) continue;
             key = past; target = top + (ground - top) * smooth01(f);
+            // (never below the slab's own top beside it: where the ground stood higher than the slab, the blend up
+            // from under the slab dug a gutter along its edge. A footway crossing a road whose crown stood 3 cm over
+            // the crossing left a 15 to 20 cm groove across the road at both its edges)
+            const surface = top + (run.walk ? WALK_UNDER_M : GROUND_UNDER_M) + DIP_CLEAR_M * (1 - share);
+            if (ground > surface) target = Math.max(target, surface);
           }
           best.claim(idx, key, target);
         }
