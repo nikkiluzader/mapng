@@ -8906,7 +8906,7 @@
    "builds": "A statue or sculpture on a plinth",
    "assets": [
     {"shape":"/levels/italy/art/shapes/buildings/italy_castle_statue.dae","region":"europe","usedToday":true,"pick":1},
-    {"shape":"/levels/jungle_rock_island/art/shapes/buildings/jri_observatory_statue.dae","region":"tropical","usedToday":false}
+    {"shape":"/levels/jungle_rock_island/art/shapes/buildings/jri_observatory_statue.dae","region":"tropical","usedToday":true,"pick":2}
    ],
    "generated": "An abstract sculpture shape",
    "properties": {

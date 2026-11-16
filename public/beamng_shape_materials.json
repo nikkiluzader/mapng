@@ -5453,7 +5453,7 @@
       "translucentBlendOp": "None",
       "version": 1.5
     },
-    "trafficLight": {
+    "trafficlight": {
       "Stages": [
         {
           "animFlags": 16,
@@ -6014,6 +6014,70 @@
     }
   },
   "tag_models": {
+    "Italy_bld_ind_windows": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/trim/plastic/italy_bld_ind_windows/Italy_bld_ind_windows_d.dds",
+          "detailNormalMapStrength": 0.5,
+          "detailScale": [
+            8,
+            8
+          ],
+          "diffuseColor": [
+            0.996078014,
+            0.996078014,
+            0.996078014,
+            0.867999971
+          ],
+          "normalMap": "/assets/materials/trim/plastic/italy_bld_ind_windows/Italy_bld_ind_windows_n.dds",
+          "reflectivityMap": "/assets/materials/trim/plastic/italy_bld_ind_windows/Italy_bld_ind_windows_r.dds",
+          "roughnessFactor": 0.690170348,
+          "specular": [
+            0.996078014,
+            0.996078014,
+            0.996078014,
+            1
+          ],
+          "specularMap": "/assets/materials/trim/plastic/italy_bld_ind_windows/Italy_bld_ind_windows_s.dds",
+          "vertColor": true
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "vertColor": null
+        }
+      ],
+      "alphaRef": 197,
+      "alphaTest": true,
+      "class": "Material",
+      "dynamicCubemap": true,
+      "groundType": "PLASTIC",
+      "mapTo": "Italy_bld_ind_windows",
+      "materialTag0": "beamng",
+      "materialTag1": "italy",
+      "name": "italy_bld_ind_windows",
+      "persistentId": "18209761-a1b1-42ea-8047-f65f67e56056",
+      "specularStrength0": "0.490196"
+    },
     "aircraft_corrugated_metal": {
       "Stages": [
         {
@@ -6778,6 +6842,94 @@
       "translucentBlendOp": "None",
       "version": 1.5
     },
+    "ind_concrete_eroded": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/tileable/concrete/ind_concrete_eroded/t_ind_concrete_eroded_ao.data.png",
+          "ambientOcclusionMapUseUV": null,
+          "baseColorFactor": [
+            0.992156923,
+            0.992156923,
+            0.992156923,
+            1
+          ],
+          "baseColorMap": "/assets/materials/tileable/concrete/ind_concrete_eroded/t_ind_concrete_eroded_b.color.png",
+          "detailNormalMapStrength": 5,
+          "detailScale": [
+            0.200000003,
+            0.200000003
+          ],
+          "diffuseMapUseUV": null,
+          "normalMap": "/assets/materials/tileable/concrete/ind_concrete_eroded/t_ind_concrete_eroded_nm.normal.png",
+          "opacityMapUseUV": null,
+          "pixelSpecular": true,
+          "roughnessMap": "/assets/materials/tileable/concrete/ind_concrete_eroded/t_ind_concrete_eroded_r.data.png",
+          "roughnessMapUseUV": null,
+          "specular": [
+            0.254901975,
+            0.254901975,
+            0.254901975,
+            1
+          ],
+          "vertColor": true
+        },
+        {
+          "ambientOcclusionMapUseUV": 1,
+          "baseColorFactor": null,
+          "baseColorMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_b.color.png",
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "diffuseMapUseUV": 1,
+          "opacityMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_o.data.png",
+          "opacityMapUseUV": 1,
+          "pixelSpecular": null,
+          "roughnessMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_r.data.png",
+          "roughnessMapUseUV": 1,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "ambientOcclusionMapUseUV": null,
+          "baseColorFactor": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "diffuseMapUseUV": null,
+          "opacityMapUseUV": null,
+          "pixelSpecular": null,
+          "roughnessMapUseUV": null,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "ambientOcclusionMapUseUV": null,
+          "baseColorFactor": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "diffuseMapUseUV": null,
+          "opacityMapUseUV": null,
+          "pixelSpecular": null,
+          "roughnessMapUseUV": null,
+          "specular": null,
+          "vertColor": null
+        }
+      ],
+      "activeLayers": 2,
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "groundType": "ASPHALT_OLD",
+      "mapTo": "ind_concrete_eroded",
+      "materialTag0": "beamng",
+      "materialTag1": "beamng",
+      "materialTag2": "Industrial",
+      "materialTag3": "vegetation",
+      "materialTag4": "east_coast_usa",
+      "name": "ind_concrete_eroded",
+      "persistentId": "2faa22b4-0122-4e79-895f-f199eab82c4a",
+      "specularStrength0": "0.3",
+      "specularStrength1": "0.2",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
     "ind_glass_transparent": {
       "Stages": [
         {
@@ -6838,6 +6990,156 @@
       "specularStrength0": "0.490196",
       "specularStrength1": "0.2",
       "translucent": true,
+      "version": 1.5
+    },
+    "ind_metal_rust": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/tileable/metal/ind_metal_rust/t_ind_metal_rust_ao.data.png",
+          "baseColorFactor": [
+            0.992156923,
+            0.992156923,
+            0.992156923,
+            1
+          ],
+          "baseColorMap": "/assets/materials/tileable/metal/ind_metal_rust/t_ind_metal_rust_b.color.png",
+          "detailScale": [
+            0.100000001,
+            0.100000001
+          ],
+          "metallicFactor": 1,
+          "metallicMap": "/assets/materials/tileable/metal/ind_metal_rust/t_ind_metal_rust_m.data.png",
+          "normalMap": "/assets/materials/tileable/metal/ind_metal_rust/t_ind_metal_rust_nm.normal.png",
+          "overlayMap": "/assets/materials/breakup/utah_breakup/utah_breakup_texture.dds",
+          "pixelSpecular": true,
+          "roughnessMap": "/assets/materials/tileable/metal/ind_metal_rust/t_ind_metal_rust_r.data.png",
+          "specular": [
+            0.996078014,
+            0.996078014,
+            0.996078014,
+            1
+          ],
+          "vertColor": true
+        },
+        {
+          "baseColorFactor": null,
+          "detailScale": null,
+          "metallicFactor": null,
+          "pixelSpecular": null,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "baseColorFactor": null,
+          "detailScale": null,
+          "metallicFactor": null,
+          "pixelSpecular": null,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "baseColorFactor": null,
+          "detailScale": null,
+          "metallicFactor": null,
+          "pixelSpecular": null,
+          "specular": null,
+          "vertColor": null
+        }
+      ],
+      "alphaRef": 104,
+      "alphaTest": true,
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "doubleSided": true,
+      "groundType": "METAL",
+      "invertBackFaceNormals": true,
+      "mapTo": "ind_metal_rust",
+      "materialTag0": "Industrial",
+      "materialTag1": "beamng",
+      "materialTag2": "beamng",
+      "materialTag3": "Natural",
+      "materialTag4": "east_coast_usa",
+      "name": "ind_metal_rust",
+      "persistentId": "8d318413-c70d-4030-9426-16f4e09fb732",
+      "specularStrength0": "0.3",
+      "specularStrength1": "0.2",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
+    "ind_metal_trim": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/trim/metal/ind_metal_trim/ind_metal_trim_ao.data.png",
+          "baseColorFactor": [
+            0.992156923,
+            0.992156923,
+            0.992156923,
+            1
+          ],
+          "baseColorMap": "/assets/materials/trim/metal/ind_metal_trim/ind_metal_trim_b.color.png",
+          "detailScale": [
+            0.100000001,
+            0.100000001
+          ],
+          "metallicFactor": 0.300000012,
+          "metallicMap": "/assets/materials/trim/metal/ind_metal_trim/ind_metal_trim_m.data.png",
+          "normalMap": "/assets/materials/trim/metal/m_metal_trim/ind_metal_trim_nm.normal.png",
+          "opacityMap": "/assets/materials/trim/metal/ind_metal_trim/ind_metal_trim_o.data.png",
+          "overlayMap": "/assets/materials/breakup/utah_breakup/utah_breakup_texture.dds",
+          "roughnessFactor": 0.667999983,
+          "roughnessMap": "/assets/materials/trim/metal/ind_metal_trim/ind_metal_trim_r.data.png",
+          "specular": [
+            0.996078014,
+            0.996078014,
+            0.996078014,
+            1
+          ],
+          "vertColor": true
+        },
+        {
+          "baseColorFactor": null,
+          "detailScale": null,
+          "metallicFactor": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "baseColorFactor": null,
+          "detailScale": null,
+          "metallicFactor": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "baseColorFactor": null,
+          "detailScale": null,
+          "metallicFactor": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "vertColor": null
+        }
+      ],
+      "alphaRef": 104,
+      "alphaTest": true,
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "doubleSided": true,
+      "dynamicCubemap": true,
+      "groundType": "METAL",
+      "invertBackFaceNormals": true,
+      "mapTo": "ind_metal_trim",
+      "materialTag0": "beamng",
+      "materialTag1": "beamng",
+      "materialTag2": "Industrial",
+      "materialTag3": "vegetation",
+      "materialTag4": "east_coast_usa",
+      "name": "ind_metal_trim",
+      "persistentId": "6fc54099-1c9a-4a9b-995f-74b5a831e70c",
+      "specularStrength0": "1.3",
+      "specularStrength1": "0.2",
+      "translucentBlendOp": "None",
       "version": 1.5
     },
     "ind_wood_trim": {
@@ -7093,70 +7395,6 @@
       "translucent": true,
       "translucentZWrite": true,
       "version": 1.5
-    },
-    "italy_bld_ind_windows": {
-      "Stages": [
-        {
-          "colorMap": "/assets/materials/trim/plastic/italy_bld_ind_windows/Italy_bld_ind_windows_d.dds",
-          "detailNormalMapStrength": 0.5,
-          "detailScale": [
-            8,
-            8
-          ],
-          "diffuseColor": [
-            0.996078014,
-            0.996078014,
-            0.996078014,
-            0.867999971
-          ],
-          "normalMap": "/assets/materials/trim/plastic/italy_bld_ind_windows/Italy_bld_ind_windows_n.dds",
-          "reflectivityMap": "/assets/materials/trim/plastic/italy_bld_ind_windows/Italy_bld_ind_windows_r.dds",
-          "roughnessFactor": 0.690170348,
-          "specular": [
-            0.996078014,
-            0.996078014,
-            0.996078014,
-            1
-          ],
-          "specularMap": "/assets/materials/trim/plastic/italy_bld_ind_windows/Italy_bld_ind_windows_s.dds",
-          "vertColor": true
-        },
-        {
-          "detailNormalMapStrength": null,
-          "detailScale": null,
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "specular": null,
-          "vertColor": null
-        },
-        {
-          "detailNormalMapStrength": null,
-          "detailScale": null,
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "specular": null,
-          "vertColor": null
-        },
-        {
-          "detailNormalMapStrength": null,
-          "detailScale": null,
-          "diffuseColor": null,
-          "roughnessFactor": null,
-          "specular": null,
-          "vertColor": null
-        }
-      ],
-      "alphaRef": 197,
-      "alphaTest": true,
-      "class": "Material",
-      "dynamicCubemap": true,
-      "groundType": "PLASTIC",
-      "mapTo": "Italy_bld_ind_windows",
-      "materialTag0": "beamng",
-      "materialTag1": "italy",
-      "name": "italy_bld_ind_windows",
-      "persistentId": "18209761-a1b1-42ea-8047-f65f67e56056",
-      "specularStrength0": "0.490196"
     },
     "italy_bld_metal": {
       "Stages": [
@@ -7525,6 +7763,42 @@
       "translucent": true,
       "translucentRecvShadows": true,
       "translucentZWrite": true
+    },
+    "jri_concrete_trim": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/trim/concrete/jri_concrete_trim/JRI_concrete_trim_d.color.png",
+          "diffuseColor": [
+            0.988235354,
+            0.988235354,
+            0.988235354,
+            1
+          ],
+          "normalMap": "/assets/materials/trim/concrete/jri_concrete_trim/JRI_concrete_trim_nm.normal.png",
+          "overlayMap": "/assets/materials/tileable/brick/ind_bricks_01/jri_breakup_texture_b_d.color.png",
+          "pixelSpecular": true,
+          "roughnessFactor": 0.638000011,
+          "specularMap": "/assets/materials/trim/concrete/jri_concrete_trim/jri_concrete_trim_s.color.png",
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {},
+        {},
+        {}
+      ],
+      "class": "Material",
+      "groundType": "ASPHALT_OLD",
+      "mapTo": "jri_concrete_trim",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "materialTag2": "Industrial",
+      "name": "jri_concrete_trim",
+      "order_simset": -1082130432,
+      "persistentId": "67166e0f-cf03-467e-a8f9-061159ca273e",
+      "specularColor0": "0.1 0.1 0.1 0.1",
+      "specularStrength0": "0.05",
+      "specularStrength1": "0.2",
+      "translucentBlendOp": "None"
     },
     "lod_vertcol": {
       "Stages": [

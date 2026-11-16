@@ -9769,7 +9769,7 @@ function nearestDeckRoad(carriageways, x, y) {
   return best;
 }
 
-function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriageways = [], deckCarriageways = [], deckParts = [], props = null, underDeck = () => false, deckAt = () => null, seaZ = -Infinity, roadLamps = true } = {}) {
+function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriageways = [], deckCarriageways = [], deckParts = [], props = null, footpaths = [], underDeck = () => false, deckAt = () => null, seaZ = -Infinity, roadLamps = true } = {}) {
   const profile = getStreetFurnitureProfile(biome);
   const benchModel = tagModel('amenity=bench', biome);
   if (!profile) return [];
@@ -9940,6 +9940,27 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
   const bldBoxes = [];
   const tagObjectSkipped = {};
   const placedTagObjects = [];
+  // The footpaths' centre lines by 32 m cell, for objects kept off them: the nearest within its half width plus `pad`
+  const pathCells = new Map();
+  for (const fp of footpaths) {
+    if (fp.crossing || fp.sidewalk) continue;
+    const n = fp.nodes || [];
+    for (let k = 0; k + 1 < n.length; k++) {
+      const key = `${Math.floor((n[k][0] + n[k + 1][0]) / 64)},${Math.floor((n[k][1] + n[k + 1][1]) / 64)}`;
+      if (!pathCells.has(key)) pathCells.set(key, []); pathCells.get(key).push([n[k], n[k + 1], fp.half || 1]);
+    }
+  }
+  const nearestFootpath = (x, y, pad) => {
+    let best = null;
+    const gx = Math.floor(x / 32); const gy = Math.floor(y / 32);
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (const [a, b, half] of pathCells.get(`${gx + dx},${gy + dy}`) || []) {
+      const vx = b[0] - a[0]; const vy = b[1] - a[1]; const L = vx * vx + vy * vy || 1e-9;
+      const u = Math.max(0, Math.min(1, ((x - a[0]) * vx + (y - a[1]) * vy) / L));
+      const cx = a[0] + vx * u; const cy = a[1] + vy * u; const d = Math.hypot(x - cx, y - cy);
+      if (d < half + pad && (!best || d - half < best.d - best.half)) best = { cx, cy, d, half };
+    }
+    return best;
+  };
   const insideBuilding = (() => {
     let grid = null; const C = 64;
     return (x, y) => {
@@ -9995,6 +10016,16 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
         stand.x += ux * moved; stand.y += uy * moved;
       }
     }
+    // (off a footpath's surface too: a bike stand mapped on a park path stood across it. Moved out beside the path,
+    // the side it is on, its own size clear)
+    const onPath = nearestFootpath(stand.x, stand.y, reach);
+    if (onPath) {
+      let ux = stand.x - onPath.cx; let uy = stand.y - onPath.cy; const d = Math.hypot(ux, uy);
+      if (d < 0.05) { const a = (i * 2.399963) % (2 * Math.PI); ux = Math.cos(a); uy = Math.sin(a); } else { ux /= d; uy /= d; }
+      const nx = onPath.cx + ux * (onPath.half + reach); const ny = onPath.cy + uy * (onPath.half + reach);
+      if ((rule.offBuildings && insideBuilding(nx, ny)) || nearestFootpath(nx, ny, reach * 0.5)) { tagObjectSkipped.onPath = (tagObjectSkipped.onPath || 0) + 1; continue; }
+      stand.x = nx; stand.y = ny;
+    }
     // (one of a kind in a place: a stop mapped twice, as the stop and as its platform, had two shelters in one another)
     if (placedTagObjects.some((o) => o.item === rule.item && Math.hypot(o.x - stand.x, o.y - stand.y) < Math.max(o.reach, reach))) { tagObjectSkipped.double = (tagObjectSkipped.double || 0) + 1; continue; }
     // (on a pier or deck: left out, as benches are; in the water: nowhere; under a deck that would cut through it: no)
@@ -10008,6 +10039,7 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
       persistentId: generatePersistentId(),
       position: [roundTo(stand.x, 3), roundTo(stand.y, 3), roundTo(z, 3)],
       rotationMatrix: rotationMatrixFromYaw(stand.facing + model.yawOffset),
+      ...(model.scale && model.scale !== 1 ? { scale: [model.scale, model.scale, model.scale] } : {}),
       shapeName: model.shapeFile,
       useInstanceRenderData: true,
     });
@@ -10015,7 +10047,7 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
     placedTagObjects.push({ item: rule.item, x: stand.x, y: stand.y, reach });
   }
   if (Object.keys(tagObjectCounts).length) console.log(`[BeamNG Export] Mapped objects from the model picks: ${Object.entries(tagObjectCounts).map(([k, v]) => `${v} ${k}`).join(', ')}`);
-  if (tagObjectSkipped.inBuilding || tagObjectSkipped.atWall || tagObjectSkipped.double) console.log(`[BeamNG Export] Mapped objects left out: ${tagObjectSkipped.inBuilding || 0} inside a building's outline (a roof's mast, a station's toilets), ${tagObjectSkipped.atWall || 0} against a wall with no room, ${tagObjectSkipped.double || 0} mapped twice in one place`);
+  if (tagObjectSkipped.inBuilding || tagObjectSkipped.atWall || tagObjectSkipped.double || tagObjectSkipped.onPath) console.log(`[BeamNG Export] Mapped objects left out: ${tagObjectSkipped.inBuilding || 0} inside a building's outline (a roof's mast, a station's toilets), ${tagObjectSkipped.atWall || 0} against a wall with no room, ${tagObjectSkipped.double || 0} mapped twice in one place, ${tagObjectSkipped.onPath || 0} on a footpath with no room beside it`);
   objects.tagObjectCounts = tagObjectCounts;
 
   // Benches along major town streets (streetProps.js), facing the road.
@@ -14048,6 +14080,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     deckCarriageways: includeBridges ? deckRoadsForLamps(decalRoads.carriageways || [], groundCarriageways) : [],
     deckParts: includeBridges ? bridgeDecks.flatMap((d) => d.parts) : [],
     props: streetProps,
+    footpaths: decalRoads.footpaths || [],
     underDeck,
     deckAt: sidewalks.deckAt,
     seaZ: -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0),

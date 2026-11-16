@@ -680,6 +680,45 @@
      ]
     }
    ]
+  },
+  "tourism=artwork#sculpture": {
+   "any": [
+    {
+     "shape": "/levels/italy/art/shapes/buildings/italy_castle_statue.dae",
+     "yaw": 0,
+     "size": [
+      1.42,
+      1.42,
+      2.84
+     ],
+     "box": [
+      -0.71,
+      -0.71,
+      -0.01,
+      0.71,
+      0.71,
+      2.83
+     ]
+    },
+    {
+     "shape": "/levels/jungle_rock_island/art/shapes/buildings/jri_observatory_statue.dae",
+     "yaw": 0,
+     "scale": 0.45,
+     "size": [
+      2.7,
+      2.34,
+      2.308
+     ],
+     "box": [
+      -1.35,
+      -1.17,
+      -0.243,
+      1.35,
+      1.17,
+      2.066
+     ]
+    }
+   ]
   }
  },
  "objects": {
@@ -845,7 +884,6 @@
    "when": {
     "artwork_type": [
      "statue",
-     "sculpture",
      "bust"
     ]
    },
@@ -854,6 +892,20 @@
    "item": "statues",
    "cap": 800,
    "beside": 2,
+   "offBuildings": true
+  },
+  "artworkSculpture": {
+   "tag": "tourism=artwork",
+   "when": {
+    "artwork_type": [
+     "sculpture"
+    ]
+   },
+   "pick": "tourism=artwork#sculpture",
+   "face": "any",
+   "item": "statues",
+   "cap": 800,
+   "beside": 3,
    "offBuildings": true
   },
   "lightingMast": {
@@ -870,7 +922,7 @@
     ]
    },
    "pick": "man_made=mast#lighting",
-   "face": "none",
+   "face": "any",
    "item": "masts",
    "cap": 800,
    "beside": 2,
@@ -888,7 +940,7 @@
     ]
    },
    "pick": "man_made=mast",
-   "face": "none",
+   "face": "any",
    "item": "masts",
    "cap": 800,
    "beside": 4,
@@ -908,7 +960,7 @@
     ]
    },
    "pick": "man_made=tower",
-   "face": "none",
+   "face": "any",
    "item": "masts",
    "cap": 300,
    "beside": 8,
@@ -937,7 +989,7 @@
   "oilWell": {
    "tag": "man_made=petroleum_well",
    "pick": "man_made=petroleum_well",
-   "face": "none",
+   "face": "any",
    "item": "oilWells",
    "cap": 1500,
    "beside": 9,

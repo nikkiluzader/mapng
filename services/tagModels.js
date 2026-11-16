@@ -29,7 +29,7 @@ export function tagModel(tag, biome, n = 0) {
   const list = tagModelsFor(tag, biome);
   if (!list.length) return null;
   const m = list[((Math.trunc(n) % list.length) + list.length) % list.length];
-  return { shapeFile: m.shape, yawOffset: ((m.yaw || 0) * Math.PI) / 180, size: m.size, box: m.box };
+  return { shapeFile: m.shape, yawOffset: ((m.yaw || 0) * Math.PI) / 180, size: m.size, box: m.box, scale: m.scale || 1 };
 }
 
 /** Every model any tag may place: the set whose materials ship with an export. */
@@ -79,7 +79,9 @@ export function standTagObject(rule, x, y, road, tags = {}, n = 0) {
   }
   // (OSM: 0 = north, clockwise; the way the object faces)
   if (Number.isFinite(dirDeg) && rule.face !== 'none') facing = ((90 - dirDeg) * Math.PI) / 180;
-  // (nothing to face: every one its own way, the same each time)
+  // (nothing to face: every one its own way, the same each time. face 'any': never turned to a road either, a
+  // field of pumpjacks or a mast, each its own way; 'none': as the model was made)
+  if (rule.face === 'any' && !Number.isFinite(dirDeg)) facing = (n * 2.399963) % (2 * Math.PI);
   if (facing === null) facing = rule.face === 'none' ? 0 : ((n * 2.399963) % (2 * Math.PI));
   return { x: px, y: py, facing };
 }

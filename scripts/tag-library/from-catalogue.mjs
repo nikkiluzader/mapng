@@ -127,7 +127,9 @@ for (const [key, byRegion] of Object.entries(picks.picks)) {
       const r = inCatalogue.get(shape);
       if (!r || r.mark !== 'use') throw new Error(`model-picks.json: ${tag}: ${shape} is not a model marked use in the catalogue`);
       if (!r.tags.includes(tag) && !lib.tags[tag].assets.some((a) => a.shape === shape && a.usedToday)) throw new Error(`model-picks.json: ${tag}: ${shape} does not carry the tag`);
-      return { shape, yaw: r.yaw ?? 0, size: r.size, box: r.box };
+      // (a pick's model may be set smaller or larger in data/model-picks.json models: { scale }; its size and box with it)
+      const s = Number(picks.models?.[shape]?.scale) > 0 ? Number(picks.models[shape].scale) : 1;
+      return s === 1 ? { shape, yaw: r.yaw ?? 0, size: r.size, box: r.box } : { shape, yaw: r.yaw ?? 0, scale: s, size: r.size.map((v) => +(v * s).toFixed(3)), box: r.box?.map((v) => +(v * s).toFixed(3)) };
     });
   }
   // (the library says which of a tag's models are the picks, first choice first; no pick for "any": nothing is
@@ -139,7 +141,7 @@ const ITEMS = new Set(JSON.parse(JSON.stringify((await import('../../services/bu
 for (const [id, o] of Object.entries(picks.objects || {})) {
   if (!tagModels[o.pick]) throw new Error(`model-picks.json: object ${id}: no pick ${o.pick}`);
   if (o.pick.split('#')[0] !== o.tag) throw new Error(`model-picks.json: object ${id}: its pick is for another tag`);
-  if (!['road', 'none'].includes(o.face)) throw new Error(`model-picks.json: object ${id}: face ${o.face}`);
+  if (!['road', 'none', 'any'].includes(o.face)) throw new Error(`model-picks.json: object ${id}: face ${o.face}`);
   if (!ITEMS.has(o.item)) throw new Error(`model-picks.json: object ${id}: no What to build item ${o.item}`);  // (the library's entry says so: fetched, built, by what)
   const e = lib.tags[o.tag]; e.fetched = true; if (e.status === 'planned') e.status = 'built';
   e.code = 'services/tagModels.js (data/model-picks.json)'; e.item = o.item; e.group = 'furniture';

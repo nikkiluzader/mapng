@@ -42,6 +42,16 @@ Found on the way:
 - On 30 m elevation, Bologna's Piazza Maggiore is a 20 m hill (the coarse data's buildings) and its paved plaza a
   flat slab: the slab hangs over the low side and the grass hill stands over it on the other. Not fixed.
 
+## Left for later (do these last, after the asset gaps' batch 2)
+
+- Concrete blocks (`barrier=block`): mapped on a road on purpose; needs the barrier code, not the object placer
+  (which moves objects off roads). As lines they are built as fences today.
+- Utility poles (`man_made=utility_pole`): belong with the poles and wires (services/streetProps.js).
+- Monuments of MapNG's own (obelisk, stele, plain stone): the game has two monument models only (an owl on a
+  pedestal, an armillary sphere); `memorial=stone|obelisk|stele` places nothing yet.
+- Trams and light rail running in a street: the tram-rail decal reads as broken brown patches across the lane
+  (Portland, seen 2026-11-16).
+
 ## 1. Mesh Roads and junction heights (in progress)
 
 Done 2026-11-13/14, from in-game profiles (every paved road walked at an even 0.5 m) and drawings of the worst
