@@ -1205,7 +1205,10 @@ export function buildDeckGeometry(deck, { groundAt, roadLines = [], groundRoads:
       const roadBelow = xy.map((_, k) => { const [x, y] = at(k, side.outer, 0); return roadUnder([x, y], z[k] - depth - ROAD_UNDER_GAP_M, roadLines); });
       const low = (k) => z[k] - depth - ground[k] < WALL_GAP_M && z[k] - slab > ground[k] && !roadBelow[k];
       const top = row(side.outer, -slab);
-      const foot = xy.map((_, k) => at(k, side.outer, ground[k] - FOOTING_M / 2 - z[k]));
+      // (not fitted to the ground vertex by vertex: to the lowest ground within two deck steps either way,
+      // FOOTING_M under it; a foot 1 m under each vertex's own ground showed where the ground dipped between them)
+      const lowGround = (k) => { let g = ground[k]; for (let j = Math.max(0, k - 2); j <= Math.min(ground.length - 1, k + 2); j++) if (ground[j] < g) g = ground[j]; return g; };
+      const foot = xy.map((_, k) => at(k, side.outer, lowGround(k) - FOOTING_M - z[k]));
       runs(top, foot, side.shown.filter(([i]) => low(i) && low(i + 1)), side.faceOut);
     }
     // girders (none on a thinned structure)

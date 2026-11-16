@@ -19,6 +19,8 @@ const STEEP_WITHIN_M = 1.5;             // ... within this of the shoulder's edg
 const WALL_IN_M = 0.3;                  // the block starts this far inside the shoulder's edge
 const WALL_PAST_M = 0.3;                // ... and ends this far past the steep strip
 const WALL_TOP_M = 0.03;                // its top over the road's height
+const WALL_BURY_M = 2;                  // the built faces end this far under the lowest ground near them
+const FOOT_REACH = 3;
 const WALL_FOOT_M = 0.6;                // its faces go this far into the ground
 const WALL_THIN_M = 0.3;                // against another road's pavement the wall is this thin, on the shoulder's edge
 const MEDIAN_GAP_M = 1.5;                // a gap this wide between the block and another road's pavement is filled too
@@ -146,7 +148,15 @@ export function wingWallTriangles(runs) {
   const tris = [];
   const quad = (a, b, c, d) => { tris.push([a, b, c], [a, c, d]); };   // (a, b, c, d counter-clockwise seen from outside)
   for (const run of runs) {
-    const st = run.stations; const s = run.side;
+    const s = run.side;
+    // (the faces are not fitted to the ground station by station: each runs to the lowest ground within
+    // FOOT_REACH stations either way, WALL_BURY_M under it. A foot 0.6 m under each station's own ground, straight
+    // between stations 4 m apart, came out of the ground where it dipped between them: a saw edge along a fill)
+    const st = run.stations.map((q, i, all) => {
+      let low = q.foot;
+      for (let j = Math.max(0, i - FOOT_REACH); j <= Math.min(all.length - 1, i + FOOT_REACH); j++) low = Math.min(low, all[j].foot);
+      return { ...q, foot: low - (WALL_BURY_M - WALL_FOOT_M) };
+    });
     const P = (q, off, zz) => [q.x + q.nx * off, q.y + q.ny * off, zz];
     for (let i = 0; i + 1 < st.length; i++) {
       const a = st[i]; const b = st[i + 1];

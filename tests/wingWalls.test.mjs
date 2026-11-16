@@ -80,3 +80,14 @@ test('the distance to a deck carries on through a junction to the next edge of t
   assert.equal(through[0][0], 6); assert.equal(through[1][0], 6); assert.equal(through[1][1], 56); assert.equal(through[1][2], 106);
   assert.equal(deckDistancesThrough(g, 60).toDeck[1][2], Infinity);
 });
+
+test('a wing wall\'s faces run into the ground on a clean foot, not fitted station by station', async () => {
+  const { wingWallTriangles } = await import('../services/structures/wingWalls.js');
+  // six stations 4 m apart; the ground (so each station's own foot) dips 1.5 m at the third
+  const own = [9.4, 9.4, 7.9, 9.4, 9.4, 9.4];
+  const run = { side: 1, stations: own.map((foot, i) => ({ x: i * 4, y: 0, z: 12, nx: 0, ny: 1, inner: 3, outer: 3.4, foot, parapet: 0 })) };
+  const zs = wingWallTriangles([run]).flat().filter((p) => p[2] < 11).map((p) => p[2]);
+  assert.ok(zs.length > 0);
+  // every foot under the dip's ground (7.9 + 0.6 = 8.5) by more than a metre: none can show at the dip
+  assert.ok(Math.max(...zs) <= 7.9 - 1.3, `feet at ${[...new Set(zs.map((v) => v.toFixed(1)))]}`);
+});
