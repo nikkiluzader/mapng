@@ -503,7 +503,9 @@ test('a breakwater the coastline is drawn round stays; a pier mapped as an area 
   const fineHigh = grid(); fineHigh.heightMap.set(high.heightMap);
   assert.equal(lowerSeabed(fineHigh, { grid: lc, n: W }, 0, { coarse: false, piers: pier }).pierPixels, 0, 'a fine survey has the pier as it is');
   // (a fine survey with the pier at the sea: a bare-earth survey took it out, as San Diego's Broadway Pier; it is stood up)
-  assert.ok(lowerSeabed(grid(), { grid: lc, n: W }, 0, { coarse: false, piers: pier }).pierPixels > 150, 'a fine survey holding the pier at the sea has it stood up');
+  const under = grid(); for (let i = 0; i < under.heightMap.length; i++) if (under.heightMap[i] === 0) under.heightMap[i] = -1.4;
+  assert.ok(lowerSeabed(under, { grid: lc, n: W }, 0, { coarse: false, piers: pier }).pierPixels > 150, 'a fine survey holding the pier under the sea has it stood up');
+  assert.equal(lowerSeabed(grid(), { grid: lc, n: W }, 0, { coarse: false, piers: pier }).pierPixels, 0, 'one at the water itself (a quay at sea level) is left');
   // the same pier where the data has land (a pier on a quay): left as it is
   const dry = grid(); for (let i = 0; i < dry.heightMap.length; i++) dry.heightMap[i] = 3;
   assert.equal(lowerSeabed(dry, { grid: new Uint8Array(W * W).fill(60), n: W }, 0, { coarse: false, piers: pier }).pierPixels, 0);
