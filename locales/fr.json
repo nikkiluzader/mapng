@@ -1261,6 +1261,8 @@
       "uploadUnreadable": "L'élévation importée n'a pas pu être lue.",
       "diskFull": "Le disque est plein : MapNG n'a pas pu enregistrer ses fichiers de travail. Libérez de l'espace (les grandes cartes demandent plusieurs gigaoctets) et réessayez.",
       "browserStorage": "Le navigateur n'a pas pu conserver les fichiers de ce niveau : une carte aussi grande demande plus d'espace temporaire que le navigateur n'en autorise. Libérez de l'espace disque et fermez les autres onglets, choisissez une taille plus petite, ou utilisez l'application de bureau MapNG, qui n'a pas cette limite.",
+      "outOfMemory": "Le navigateur a manqué de mémoire en construisant ce niveau : un onglet reçoit bien moins de mémoire que n'en a votre ordinateur. Choisissez une taille plus petite ou une résolution plus grossière (plus de mètres par pixel), fermez les autres onglets ou utilisez l'application de bureau MapNG, qui peut utiliser bien plus de mémoire.",
+      "outOfMemoryDesktop": "MapNG a manqué de mémoire en construisant ce niveau. Choisissez une taille plus petite ou une résolution plus grossière (plus de mètres par pixel), ou fermez les autres programmes et réessayez.",
       "mapPartGone": "MapNG ne détient plus une partie de cette carte (elle a été retirée de la mémoire). Relancez Générer, puis exportez.",
       "fetchTerrain": "Échec de la récupération des données de terrain. La zone demandée est peut-être trop grande ou le service est indisponible.",
       "usgsFallback": "Les données USGS 1m pour cette zone étaient absentes ou corrompues. Bascule vers le jeu de données global 30 m.\n\nLa sortie reste sur la grille de traitement actuelle de l'application.",

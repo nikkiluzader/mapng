@@ -1261,6 +1261,8 @@
       "uploadUnreadable": "Nie udało się odczytać przesłanych danych wysokości.",
       "diskFull": "Dysk jest pełny: MapNG nie mógł zapisać plików roboczych. Zwolnij miejsce (duże mapy wymagają kilku gigabajtów) i spróbuj ponownie.",
       "browserStorage": "Przeglądarka nie zdołała zachować plików tego poziomu: tak duża mapa wymaga więcej miejsca tymczasowego, niż przeglądarka pozwala. Zwolnij miejsce na dysku i zamknij inne karty, wybierz mniejszy rozmiar albo użyj aplikacji MapNG na komputer, która nie ma tego ograniczenia.",
+      "outOfMemory": "Przeglądarce zabrakło pamięci przy budowaniu tego poziomu: karta przeglądarki dostaje dużo mniej pamięci, niż ma komputer. Wybierz mniejszy rozmiar lub mniej szczegółową rozdzielczość (więcej metrów na piksel), zamknij inne karty albo użyj aplikacji MapNG na komputer, która może użyć dużo więcej pamięci.",
+      "outOfMemoryDesktop": "MapNG zabrakło pamięci przy budowaniu tego poziomu. Wybierz mniejszy rozmiar lub mniej szczegółową rozdzielczość (więcej metrów na piksel) albo zamknij inne programy i spróbuj ponownie.",
       "mapPartGone": "MapNG nie ma już części tej mapy (została usunięta z pamięci). Uruchom Generuj ponownie, a potem eksportuj.",
       "fetchTerrain": "Nie udało się pobrać danych terenu. Żądany obszar może być zbyt duży lub usługa jest niedostępna.",
       "usgsFallback": "Dla tego obszaru brakowało danych USGS 1m lub były uszkodzone. Używany jest globalny zestaw danych 30 m.\n\nWyjście pozostaje na obecnej siatce przetwarzania aplikacji.",

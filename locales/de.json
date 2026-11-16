@@ -1261,6 +1261,8 @@
       "uploadUnreadable": "Die hochgeladenen Höhendaten konnten nicht gelesen werden.",
       "diskFull": "Der Datenträger ist voll: MapNG konnte seine Arbeitsdateien nicht speichern. Gib Speicherplatz frei (große Karten brauchen mehrere Gigabyte) und versuche es erneut.",
       "browserStorage": "Der Browser konnte die Dateien dieses Levels nicht behalten: Eine so große Karte braucht mehr temporären Platz, als der Browser erlaubt. Gib Speicherplatz frei und schließe andere Tabs, wähle eine kleinere Größe oder nutze die MapNG-Desktop-App, die diese Grenze nicht hat.",
+      "outOfMemory": "Dem Browser ist beim Bauen dieses Levels der Speicher ausgegangen: ein Browser-Tab bekommt viel weniger Speicher, als dein Computer hat. Wähle eine kleinere Größe oder eine gröbere Auflösung (mehr Meter pro Pixel), schließe andere Tabs oder nutze die MapNG-Desktop-App, die viel mehr Speicher nutzen kann.",
+      "outOfMemoryDesktop": "MapNG ist beim Bauen dieses Levels der Speicher ausgegangen. Wähle eine kleinere Größe oder eine gröbere Auflösung (mehr Meter pro Pixel) oder schließe andere Programme und versuche es erneut.",
       "mapPartGone": "MapNG hat einen Teil dieser Karte nicht mehr (er wurde aus dem Speicher entfernt). Führe „Generieren“ erneut aus und exportiere dann.",
       "fetchTerrain": "Geländedaten konnten nicht geladen werden. Die angeforderte Fläche ist möglicherweise zu groß oder der Dienst ist nicht verfügbar.",
       "usgsFallback": "USGS-1m-Daten für diesen Bereich fehlten oder waren beschädigt. Fallback auf den globalen 30-m-Datensatz.\n\nDie Ausgabe bleibt auf dem aktuellen Verarbeitungsraster der App.",

@@ -634,7 +634,7 @@
 
 <script setup>
 import { backdropSourceCovers, effectiveBackdropSource } from '../../services/backdropSources.js';
-import { isDiskFull, isBrowserStorageGone, isMapPartGone } from '../../services/errorText.js';
+import { isDiskFull, isBrowserStorageGone, isMapPartGone, isOutOfMemory } from '../../services/errorText.js';
 import { ref, shallowRef, computed, watch, nextTick, onUnmounted, toRaw } from 'vue';
 import { useMainStore } from '../../stores/mainStore';
 import { useI18n } from 'vue-i18n';
@@ -2428,7 +2428,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
     });
     // (the desktop app says why and keeps the export's log)
     // (why it failed, kept on screen with the offer to send a report: the desktop app's log, or the page's last lines)
-    beamNGDesktopFailed.value = { raw: `${error?.name && error.name !== 'Error' ? `${error.name}: ` : ''}${error?.message || error}`, message: isDiskFull(error?.message || error) ? t('app.error.diskFull') : isBrowserStorageGone(error) ? t('app.error.browserStorage') : isMapPartGone(error) ? t('app.error.mapPartGone') : (error?.message || String(error) || t('export.errorBeamngLevel')), logPath: error?.logPath || null }; showExportOutcome('mapng-export-outcome-failed');
+    beamNGDesktopFailed.value = { raw: `${error?.name && error.name !== 'Error' ? `${error.name}: ` : ''}${error?.message || error}`, message: isDiskFull(error?.message || error) ? t('app.error.diskFull') : isBrowserStorageGone(error) ? t('app.error.browserStorage') : isMapPartGone(error) ? t('app.error.mapPartGone') : isOutOfMemory(error) ? t(desktopApp ? 'app.error.outOfMemoryDesktop' : 'app.error.outOfMemory') : (error?.message || String(error) || t('export.errorBeamngLevel')), logPath: error?.logPath || null }; showExportOutcome('mapng-export-outcome-failed');
   } finally {
     markJobEnd();
     heavyJobRunning.value = false;

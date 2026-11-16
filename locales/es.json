@@ -1261,6 +1261,8 @@
       "uploadUnreadable": "No se pudo leer la elevación subida.",
       "diskFull": "El disco está lleno: MapNG no pudo guardar sus archivos de trabajo. Libera espacio (los mapas grandes necesitan varios gigabytes) e inténtalo de nuevo.",
       "browserStorage": "El navegador no pudo conservar los archivos de este nivel: un mapa tan grande necesita más espacio temporal del que permite el navegador. Libera espacio en disco y cierra otras pestañas, elige un tamaño menor o usa la aplicación de escritorio de MapNG, que no tiene ese límite.",
+      "outOfMemory": "El navegador se quedó sin memoria al construir este nivel: una pestaña del navegador recibe mucha menos memoria de la que tiene tu ordenador. Elige un tamaño menor o una resolución más gruesa (más metros por píxel), cierra otras pestañas o usa la aplicación de escritorio de MapNG, que puede usar mucha más memoria.",
+      "outOfMemoryDesktop": "MapNG se quedó sin memoria al construir este nivel. Elige un tamaño menor o una resolución más gruesa (más metros por píxel), o cierra otros programas e inténtalo de nuevo.",
       "mapPartGone": "MapNG ya no conserva parte de este mapa (se borró de la memoria). Vuelve a pulsar Generar y luego exporta.",
       "fetchTerrain": "No se pudieron obtener los datos del terreno. El área solicitada puede ser demasiado grande o el servicio no está disponible.",
       "usgsFallback": "Los datos USGS 1m de esta zona faltan o están corruptos. Se usará el conjunto global de 30 m.\n\nLa salida se mantiene en la cuadrícula de procesamiento actual de la app.",
