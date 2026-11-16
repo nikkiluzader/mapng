@@ -625,6 +625,37 @@
    ],
    "smoke": true,
    "note": "a hillside village on 1 m lidar (Mapterhorn) with streets at 20 to 30%: held to their class grade they were dug 6 m into the hill (2026-11)"
+  },
+  {
+   "name": "dev_szczyrk",
+   "lat": 49.658961,
+   "lng": 18.961887,
+   "size": 2048,
+   "dem": "gpxz",
+   "categories": [
+    "mountain",
+    "village",
+    "steep-streets",
+    "forest"
+   ],
+   "smoke": true,
+   "note": "a mountain valley town in Poland on 1 m lidar (Mapterhorn): the middle of an area a BeamNG developer exported (2026-11); every such area is kept in the sweep"
+  },
+  {
+   "name": "dev_pilchowice",
+   "lat": 50.960211,
+   "lng": 15.650883,
+   "size": 2048,
+   "dem": "gpxz",
+   "categories": [
+    "reservoir",
+    "dam",
+    "water",
+    "railway",
+    "forest"
+   ],
+   "smoke": true,
+   "note": "a dam and its reservoir in wooded hills in Poland on 1 m lidar (Mapterhorn): the middle of an area a BeamNG developer exported (2026-11, water and console errors reported); every such area is kept in the sweep"
   }
  ]
 }
