@@ -188,8 +188,12 @@ function hasRoom(poly, r) {
 /** A riverbank outline drawn as area water: tidal or wide, and flat (see WIDE_RIVER_M). */
 function isRiverArea(tags, poly, heightAt) {
   const g = groundInside(poly, heightAt);
-  const flat = g[Math.floor(g.length * 0.9)] - g[Math.floor(g.length * 0.1)] <= AREA_FLAT_M;
-  return flat && (norm(tags.tidal) === 'yes' || hasRoom(poly, WIDE_RIVER_M / 2));
+  const spread = g[Math.floor(g.length * 0.9)] - g[Math.floor(g.length * 0.1)];
+  // (tidal water surveyed on two days stands at two levels in the data, one sheet at high water and the next at
+  // low: the Thames at 1.4 and 2.5 m. Judged sloping, it got a River ribbon, whose bed was dug, after which the
+  // lakes' pass found it flat and tiled it too, 0.9 m lower: three surfaces on one river)
+  const tidal = norm(tags.tidal) === 'yes';
+  return spread <= (tidal ? STILL_WATER_M : AREA_FLAT_M) && (tidal || hasRoom(poly, WIDE_RIVER_M / 2));
 }
 
 // Windows shrink symmetrically at the ends, so a line's ends stay put.

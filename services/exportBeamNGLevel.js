@@ -10683,7 +10683,7 @@ function coastLinesOf(terrainData, squareSize) {
  * plane where a tunnel reaches under sea level: none over its trenches, none
  * deeper than its roof over the tube.
  */
-function buildSeaBlockObjects(terrainData, squareSize, biome, seaLevelOffset, dryZones, tunnels, sourceHeightMap = terrainData.heightMap, seaAtUV = null, seaFloor = null) {
+function buildSeaBlockObjects(terrainData, squareSize, biome, seaLevelOffset, dryZones, tunnels, sourceHeightMap = terrainData.heightMap, seaAtUV = null, seaFloor = null, lakeAt = null) {
   const waterProfile = getWaterProfile(biome);
   const minHeight = Number(terrainData?.minHeight);
   const seaZ = (Number.isFinite(minHeight) ? -minHeight : 0) + (Number(seaLevelOffset) || 0);
@@ -10693,7 +10693,9 @@ function buildSeaBlockObjects(terrainData, squareSize, biome, seaLevelOffset, dr
     seaZ,
     // the sea where the ground was below it before grading, and still is
     // (sea floor that was lowered under the sea is sea: its height before is the measuring artifact)
-    heightAt: (x, y) => (seaFloor?.under(x, y)
+    // (not inside a lake or a river drawn as blocks over the sea's level: its bed, dug under the sea, is the
+    // lake's, and the sea's blocks lay under its water as a second surface: the Thames)
+    heightAt: (x, y) => (lakeAt?.(x, y) ? seaZ + 1 : seaFloor?.under(x, y)
       ? getTerrainHeightAtWorldXY(x, y, terrainData, squareSize)
       : Math.max(
         getTerrainHeightAtWorldXY(x, y, terrainData, squareSize),
@@ -14000,7 +14002,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   if (inlandBelowSea) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Ground below sea level the sea doesn't reach: the sea as blocks, not one plane.`);
   const seaAsBlocks = (tunnelList.length > 0 && tunnelsBelow(tunnelList, seaZ)) || cutBelowSea || inlandBelowSea;
   const seaObjects = seaAsBlocks
-    ? buildSeaBlockObjects(exportTerrainData, squareSize, biome, seaLevelOffset, dryZones, tunnelList, sourceHeightMap, seaAtUV, seaFloor)
+    ? buildSeaBlockObjects(exportTerrainData, squareSize, biome, seaLevelOffset, dryZones, tunnelList, sourceHeightMap, seaAtUV, seaFloor,
+      lakePlan?.lakes?.length ? (x, y) => lakePlan.lakes.some((l) => l.level > seaZ + 0.02 && l.poly.contains(x, y)) : null)
     : [buildSeaLevelWaterPlane(exportTerrainData, biome, seaLevelOffset)];
   waterStats.sea = seaAsBlocks ? { blocks: seaObjects.length } : { plane: true };
   waterStats.pools = {};
