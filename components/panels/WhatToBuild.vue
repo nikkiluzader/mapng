@@ -50,19 +50,25 @@
           <div v-if="open[g.id]" class="pb-1.5 pl-4 space-y-0.5">
             <div v-for="it in g.items" :key="it.id">
               <div class="flex items-center gap-1.5 min-h-[26px]">
-                <span class="text-caption flex-1 min-w-0 truncate" :class="it.on ? 'text-gray-800 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'">{{ t(`build.item_${it.id}`) }}</span>
+                <span class="text-caption min-w-0 truncate" :class="it.on ? 'text-gray-800 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'">{{ t(`build.item_${it.id}`) }}</span>
                 <button
                   v-if="showOsmTags && it.tags.length" type="button"
                   class="text-micro text-gray-500 hover:text-brand dark:text-gray-400 underline-offset-2 hover:underline shrink-0"
                   :aria-expanded="!!tagsOpen[it.id]" @click="tagsOpen[it.id] = !tagsOpen[it.id]"
                 >{{ t('build.tagsN', { n: it.tags.length }) }}</button>
-                <!-- (the game models behind this item, with photos: only where the site serves them, useAssetThumbs.js) -->
-                <button
-                  v-if="itemModels[it.id]?.length" type="button" data-testid="item-models"
-                  class="text-micro text-gray-500 hover:text-brand dark:text-gray-400 underline-offset-2 hover:underline shrink-0"
-                  :aria-expanded="!!modelsOpen[it.id]" @click="modelsOpen[it.id] = !modelsOpen[it.id]"
-                >{{ t('build.modelsN', { n: itemModels[it.id].length }) }}</button>
-                <span class="text-micro text-gray-500 dark:text-gray-400 shrink-0 tabular-nums">{{ it.detail }}</span>
+                <!-- (how many the area has, then the game models used for them: "6 in this area - 2 models used". The
+                     models, with photos, only where the site serves them: useAssetThumbs.js) -->
+                <span v-if="it.detail || itemModels[it.id]?.length" class="text-micro text-gray-400 dark:text-gray-500 shrink-0" aria-hidden="true">-</span>
+                <span class="text-micro text-gray-500 dark:text-gray-400 shrink-0 tabular-nums" data-testid="item-detail">{{ it.count ? t('build.inThisArea', { n: it.detail }) : it.detail }}</span>
+                <template v-if="itemModels[it.id]?.length">
+                  <span v-if="it.detail" class="text-micro text-gray-400 dark:text-gray-500 shrink-0" aria-hidden="true">-</span>
+                  <button
+                    type="button" data-testid="item-models"
+                    class="text-micro text-gray-500 hover:text-brand dark:text-gray-400 underline-offset-2 hover:underline shrink-0"
+                    :aria-expanded="!!modelsOpen[it.id]" @click="modelsOpen[it.id] = !modelsOpen[it.id]"
+                  >{{ t('build.modelsN', { n: itemModels[it.id].length }, itemModels[it.id].length) }}</button>
+                </template>
+                <span class="flex-1" />
                 <BaseSwitch size="sm" :on="it.on" :label="t(`build.item_${it.id}`)" :disabled="!hasOsmData" @toggle="setBuilt(it.id, !it.on)" />
               </div>
               <div v-if="itemModels[it.id]?.length && modelsOpen[it.id]" class="ml-2 mb-1.5 pl-2 border-l border-gray-200 dark:border-gray-600" data-testid="item-model-strip">
@@ -451,7 +457,7 @@ const groups = computed(() => {
     const items = g.items.map((it) => {
       const tags = (tagCounts.value[it.id] || []).map((x) => ({ ...x, on: !left.has(x.tag) }));
       const total = tags.reduce((n, x) => n + x.count, 0);
-      return { id: it.id, on: !off.has(it.id), tags, detail: total ? total.toLocaleString() : detailOf(it.id) };
+      return { id: it.id, on: !off.has(it.id), tags, count: total, detail: total ? total.toLocaleString() : detailOf(it.id) };
     });
     return { id: g.id, items, onCount: items.filter((i) => i.on).length };
   });
