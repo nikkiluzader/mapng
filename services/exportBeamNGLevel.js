@@ -2160,6 +2160,31 @@ export function splitAtDams(points, dams, toWorld) {
   return out.filter((p) => p.length >= 2);
 }
 
+/** A ground-following decal cut at the dams it crosses: [decal...], the pieces on a dam at its crest and over objects. */
+export function decalOntoDams(decal, dams) {
+  const nodes = decal?.nodes;
+  if (!dams?.length || !Array.isArray(nodes) || nodes.length < 2) return [decal];
+  const on = nodes.map((nd) => damAt(dams, nd[0], nd[1]) || null);
+  if (!on.some(Boolean)) return [decal];
+  const pieces = []; let start = 0;
+  for (let i = 1; i <= nodes.length; i++) {
+    if (i < nodes.length && on[i] === on[i - 1]) continue;
+    pieces.push([start, i - 1, on[i - 1]]); start = i;
+  }
+  const out = [];
+  pieces.forEach(([a, b, dam], k) => {
+    // (a piece on the dam reaches one node out onto the bank each way, at the crest's height: its ends meet the road)
+    const from = dam ? Math.max(0, a - 1) : a; const to = dam ? Math.min(nodes.length - 1, b + 1) : b;
+    if (to - from < 1) return;
+    const piece = { ...decal, nodes: nodes.slice(from, to + 1).map((nd) => (dam ? [nd[0], nd[1], Math.round((dam.crest + DAM_ROAD_LIFT_M) * 1000) / 1000, ...nd.slice(3)] : [...nd])) };
+    piece.name = pieces.length > 1 ? `${decal.name}_${dam ? 'dam' : 'g'}${k + 1}` : decal.name;
+    if (dam) piece.overObjects = true;
+    if (decal.persistentId) piece.persistentId = generatePersistentId();
+    out.push(piece);
+  });
+  return out.length ? out : [decal];
+}
+
 function chunkPolyline(points, maxNodes = 250, { widthM = 0, spacingM = 0 } = {}) {
   if (widthM > 0 && spacingM > 0) maxNodes = Math.max(20, Math.min(maxNodes, Math.floor(DECAL_PIECE_AREA_M2 / (widthM * spacingM)) + 1));
   if (points.length <= maxNodes) return [points];
@@ -5524,6 +5549,7 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
 
 // a road on a dam's crest rides this far over its concrete top (dams.js)
 const DAM_ROAD_LIFT_M = 0.02;   // (as a deck's road: the decal captures only surfaces just under its nodes)
+const DAM_BANKS_AGREE_M = 1.5;   // a dam's crest from its road's two ends only when they are this close in height
 
 // a cut-and-cover tunnel's trenches on fine elevation data: at most this deep
 // into the ground (solveExportTunnels' keepFitting)
@@ -6188,6 +6214,32 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
         structureGraph.dams = planDams(terrainData.osmFeatures || [], (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0), {
           groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize),
         });
+        // A road along a dam's crest says how high the crest is: the ground where the road comes onto the dam and
+        // where it leaves it. A survey that left the dam out (a terrain model with structures taken away) has the
+        // valley under the dam's outline, and the outline's high ground alone gave a crest 3.7 m under the road at
+        // both ends: a step up onto the bank each side, and the road itself solved down in the valley
+        // (Zapora Pilchowice). Each road's two ends on the dam; the dam takes their mean.
+        if (structureGraph.dams.length) {
+          const ends = new Map();
+          const groundAt = (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize);
+          structureGraph.edges.forEach((e) => {
+            if (e.external || e.tunnel || e.rail) return;
+            for (let i = 1; i < e.s.length; i++) {
+              const a0 = damAt(structureGraph.dams, e.x[i - 1], e.y[i - 1]); const b0 = damAt(structureGraph.dams, e.x[i], e.y[i]);
+              if (a0 === b0) continue;
+              // (the point just outside the dam: the bank's ground)
+              const d = a0 || b0; const out = a0 ? i : i - 1; const z = groundAt(e.x[out], e.y[out]);
+              if (Number.isFinite(z)) ends.set(d, [...(ends.get(d) || []), z]);
+            }
+          });
+          for (const [d, zs] of ends) {
+            if (zs.length < 2) continue;
+            const crest = zs.reduce((s, z) => s + z, 0) / zs.length;
+            // (only where the banks agree: a road that climbs across the dam is no level crest)
+            if (Math.max(...zs) - Math.min(...zs) > DAM_BANKS_AGREE_M || crest <= d.crest) continue;
+            d.gap += crest - d.crest; d.crest = crest; d.crestFromRoad = true;
+          }
+        }
         if (structureGraph.dams.length) structureGraph.edges.forEach((e, k) => {
           if (e.external || e.tunnel) return;
           const at = new Uint8Array(e.s.length); let any = false;
@@ -6548,6 +6600,12 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   yield;
   const pedestrianStreets = buildPedestrianStreetDecals(terrainData, squareSize, carriageways, { raisedFootways: !!opts.raisedFootways, sidewalkStrips: !!opts.sidewalkStrips });
   yield;
+  // A service road, a path or a pedestrian street along a dam's crest rides on it, as a road for traffic does
+  // (splitAtDams, the pins above): these follow the ground everywhere else, and across a dam the survey left out
+  // the ground is the valley floor. The road over Zapora Pilchowice (highway=service) lay 24 m down in the
+  // reservoir's bed under the crest. Each decal is cut where it steps onto or off a dam; its piece on the dam
+  // takes the crest's height and is drawn on the crest's object.
+  if (structureGraph?.dams?.length) pedestrianStreets.decals = pedestrianStreets.decals.flatMap(({ decal, street }) => decalOntoDams(decal, structureGraph.dams).map((d) => ({ decal: d, street })));
   for (const { decal, street } of pedestrianStreets.decals) getOrCreateSplineGroup(street).__items.push(decal);
 
   const carriagewayIndex = buildCarriagewayIndex(carriageways);
@@ -12985,7 +13043,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     for (const cw of decalRoads.carriageways || []) drawnHalf.set(cw.owner, Math.max(drawnHalf.get(cw.owner) || 0, cw.half || 0));
     for (const e of sg.edges) { const h = drawnHalf.get(e.seg); if (h > e.half) e.half = h; }
     // (a dam with a road on it shaped round that road: services/dams.js)
-    if (sg.dams?.length) assignDamAxes(sg);
+    // (and one nothing drives over: the path or service road along its crest, else its own line: dams.js)
+    if (sg.dams?.length) assignDamAxes(sg, decalRoads.pedestrianStreets || []);
     const decks = decksFromSolver(sg);
     const parts = decks.flatMap((d) => d.parts);
     sg.built = true;
@@ -13050,6 +13109,10 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // in a tube, a headwall or a cutting's walls (the hill over it is free).
   const tunnelList = decalRoads.tunnels?.tunnels || [];
   const groundCarriageways = (decalRoads.carriageways || []).filter((cw) => !cw.bridge && !cw.tunnel);
+  // (a railway's track bed: no road sign stands on it. A road curving beside a line put its chevrons on the track,
+  // and a sign at a junction by a level crossing stood between the rails)
+  const nearRail = railways?.lines?.length ? buildClearanceIndex(railways.lines) : null;
+  const onRailBed = (x, y) => !!nearRail && nearRail(x, y, 0.5);
   const underDeck = (x, y, z, zTop, margin) => (bridgeDecks.length > 0 && hitsDeck(bridgeDecks, x, y, z, zTop, margin))
     || (tunnelList.length > 0 && hitsTunnel(tunnelList, x, y, z, zTop));
   // the spawn on a drawn road, not on the OSM line 3 m over the terrain (the
@@ -13398,7 +13461,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       heightAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
       isBlocked: (() => {
         const index = buildCarriagewayIndex(groundCarriageways);
-        return (x, y) => isOnOtherCarriageway(index, x, y, 0.5, () => false) || underDeck(x, y, getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize), 4);
+        return (x, y) => isOnOtherCarriageway(index, x, y, 0.5, () => false) || onRailBed(x, y) || underDeck(x, y, getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize), 4);
       })(),
       style: getMarkingStyle(exportTerrainData.roadRules),
       leftHandTraffic: !!exportTerrainData.roadRules?.leftHandTraffic,
@@ -13453,7 +13516,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       heightAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
       isBlocked: (() => {
         const index = buildCarriagewayIndex(groundCarriageways);
-        return (x, y) => isOnOtherCarriageway(index, x, y, 0.5, () => false) || underDeck(x, y, getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize), 4);
+        return (x, y) => isOnOtherCarriageway(index, x, y, 0.5, () => false) || onRailBed(x, y) || underDeck(x, y, getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize), 4);
       })(),
       style: getMarkingStyle(exportTerrainData.roadRules),
       leftHandTraffic: !!exportTerrainData.roadRules?.leftHandTraffic,

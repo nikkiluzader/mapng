@@ -76,7 +76,7 @@ test('splitAtDams: a road is cut into its own piece where it runs on a dam', asy
   assert.equal(splitAtDams(pts, [], (p) => [p.x, 0]).length, 1);
 });
 
-test('arch dams: a dam with a road takes that road as its axis; the air side flares out with depth, the water side stays straight', async () => {
+test('a dam with a road takes that road as its axis; no wider on the map than its crest, the air side batters out with depth, the water side stays straight', async () => {
   const { planDams, buildDam, damTopGeometry } = await import('../services/dams.js');
   // gorge along y; the lake south (bed at 60 m), the valley north (floor 0 m)
   const ground = (x, y) => (Math.abs(x) > 30 ? 100 : y < -6 ? 60 : Math.abs(x) * 0.5);
@@ -84,7 +84,7 @@ test('arch dams: a dam with a road takes that road as its axis; the air side fla
   d.axis = Array.from({ length: 21 }, (_, i) => [-40 + i * 4, 0]);
   d.half = 3.5;
   const m = recorder();
-  assert.equal(buildDam(m, d, ground), 'arch dam');
+  assert.equal(buildDam(m, d, ground), 'concrete dam');
   const pts = m.tris.flatMap(([, v]) => v);
   const low = pts.filter((p) => p[2] < 20);
   assert.ok(low.some((p) => p[1] > 5), 'deep down, the dam reaches out on the valley side');
@@ -93,4 +93,62 @@ test('arch dams: a dam with a road takes that road as its axis; the air side fla
   const top = damTopGeometry(d);
   const zs = top.positions.filter((_, k) => k % 3 === 2);
   assert.ok(zs.some((z) => z === 100) && zs.every((z) => z >= 99), 'the crest top: a strip over the axis at the crest, with its skirt');
+});
+
+// ── the shapes of dams ────────────────────────────────────────────────────────────
+const gorge = (x, y) => (Math.abs(x) > 60 ? 100 : y < 0 ? 70 : Math.abs(x) * 0.3);   // lake to the south at 70 m, the valley north
+const axisOf = (d, n = 31) => { d.axis = Array.from({ length: n }, (_, i) => [-60 + (i * 120) / (n - 1), 0]); d.half = 2; return d; };
+const built = (d, g = gorge) => { const m = recorder(); const kind = buildDam(m, d, g); return { kind, pts: m.tris.flatMap(([, v]) => v), mats: new Set(m.tris.map(([mat]) => mat)) }; };
+
+test('a gravity dam mapped as its footprint: the air face runs straight from the crest edge to the footprint\'s edge', async () => {
+  const { planDams } = await import('../services/dams.js');
+  // 120 m long, its footprint from 4 m on the water side to 60 m on the air side
+  const [d] = planDams([feat([[-60, -4], [60, -4], [60, 60], [-60, 60], [-60, -4]], { waterway: 'dam' })], project, { groundAt: gorge });
+  const { kind, pts } = built(axisOf(d));
+  assert.equal(kind, 'concrete dam');
+  assert.equal(d.crest, 70, 'the crest at the lake side\'s ground');
+  const mid = pts.filter((p) => Math.abs(p[0]) < 6);
+  assert.ok(Math.max(...mid.map((p) => p[1])) > 50, 'its foot out near the footprint\'s edge');
+  // (half way down, about half way out: a straight batter, no hollow curve)
+  const half = mid.filter((p) => Math.abs(p[2] - 35) < 2 && p[1] > 5).map((p) => p[1]);
+  assert.ok(half.length && Math.min(...half) > 27 && Math.max(...half) < 36, `half way down ${[...new Set(half.map((v) => v.toFixed(0)))]}`);
+  assert.ok(pts.every((p) => p[1] > -4.5), 'the water side at the crest edge');
+});
+
+test('a fill dam: several times as wide as high, a slope on both sides, not concrete', async () => {
+  const { planDams, damKind } = await import('../services/dams.js');
+  const low = (x, y) => (Math.abs(x) >= 60 ? 20 : y < 0 ? 8 : 0);   // a 20 m dam, the lake's bed 8 m up
+  const [d] = planDams([feat([[-60, -45], [60, -45], [60, 55], [-60, 55], [-60, -45]], { waterway: 'dam' })], project, { groundAt: low });
+  const { kind, pts, mats } = built(axisOf(d), low);
+  assert.equal(kind, 'fill dam'); assert.deepEqual([...mats], ['stone']);
+  assert.ok(pts.some((p) => p[1] < -30) && pts.some((p) => p[1] > 40), 'slopes out to both edges of the footprint');
+  assert.equal(damKind({ tags: { material: 'earth' }, gap: 30 }), 'fill');
+  assert.equal(damKind({ tags: { start_date: '1912' }, gap: 60 }), 'masonry');
+  assert.equal(damKind({ tags: {}, gap: 60 }), 'concrete');
+});
+
+test('a dam nothing crosses gets a crest line: its own line, or the middle of its footprint', async () => {
+  const { planDams, assignDamAxes, ringCentreline } = await import('../services/dams.js');
+  const line = planDams([feat([[-60, 0], [0, 6], [60, 0]], { waterway: 'dam' })], project, { groundAt: gorge });
+  const area = planDams([feat([[-60, -4], [60, -4], [60, 30], [-60, 30], [-60, -4]], { waterway: 'dam' })], project, { groundAt: gorge });
+  const graph = { dams: [...line, ...area], classes: { segments: [] }, edges: [] };
+  assignDamAxes(graph);
+  assert.equal(line[0].axisFrom, 'line'); assert.equal(line[0].axis.length, 3);
+  assert.equal(area[0].axisFrom, 'outline');
+  assert.ok(area[0].axis.every(([, y]) => Math.abs(y - 13) < 0.5), 'down the middle of the footprint');
+  assert.ok(area[0].half > 0 && area[0].half <= 4);
+  // a curved footprint: a curved line
+  const arc = []; for (let a = 30; a <= 150; a += 10) arc.push([100 * Math.cos((a * Math.PI) / 180), 100 * Math.sin((a * Math.PI) / 180)]);
+  const ring = [...arc, ...arc.slice().reverse().map(([x, y]) => [x * 0.9, y * 0.9])];
+  const c = ringCentreline(ring);
+  assert.ok(c.length > 5 && c.every(([x, y]) => Math.abs(Math.hypot(x, y) - 95) < 4), 'follows the arc');
+});
+
+test('a path over a dam is its crest when it runs most of the dam\'s length', async () => {
+  const { planDams, assignDamAxes } = await import('../services/dams.js');
+  const [d] = planDams([feat([[-60, -4], [60, -4], [60, 30], [-60, 30], [-60, -4]], { waterway: 'dam' })], project, { groundAt: gorge });
+  const graph = { dams: [d], classes: { segments: [] }, edges: [] };
+  assignDamAxes(graph, [{ nodes: [[-80, 0], [-50, 0], [0, 0], [50, 0], [80, 0]], half: 1.2 }, { nodes: [[0, -20], [0, 0], [0, 50]], half: 1 }]);
+  assert.equal(d.axisFrom, 'way'); assert.equal(d.half, 1.2);
+  assert.ok(d.axis.every(([, y]) => y === 0));
 });

@@ -78,14 +78,16 @@ export function planDams(features, project, { groundAt } = {}) {
     const tagged = num(t.height);
     if (tagged) crest = Math.min(crest, low + tagged);
     if (crest - low < GAP_MIN_M) continue;   // the data shows it already (or a low weir)
-    out.push({ ring, crest, name: t.name || null, gap: crest - low, id: f.id });
+    // (area: mapped as its footprint, which then shapes its faces; line: mapped along its crest, the axis itself)
+    const mappedArea = isClosed(pts);
+    out.push({ ring, crest, name: t.name || null, gap: crest - low, id: f.id, area: mappedArea, line: mappedArea ? null : pts, lineHalf: mappedArea ? null : (num(t.width) || LINE_WIDTH_M) / 2, tags: t });
   }
   return out;
 }
 
 /** Concrete walls round the dam from the ground to the crest, and its top. Returns 'dam' or null. */
 export function buildDam(m, d, groundAt) {
-  if (d.axis?.length > 1) return buildArchDam(m, d, groundAt);
+  if (d.axis?.length > 1) return buildAxisDam(m, d, groundAt);
   const { ring, crest } = d;
   // (the walls follow the ground every SAMPLE_M, down into the gorge)
   const pts = alongRing(ring, SAMPLE_M);
@@ -200,8 +202,8 @@ const FACE_STEP_M = 3;
 const AXIS_STEP_M = 2;
 
 /** Each dam with a road on it (structure solver class 'dam') takes that road's line as its axis. */
-export function assignDamAxes(graph) {
-  for (const d of graph?.dams || []) { delete d.axis; delete d.half; }
+export function assignDamAxes(graph, ways = []) {
+  for (const d of graph?.dams || []) { delete d.axis; delete d.half; delete d.axisFrom; }
   for (const seg of graph?.classes?.segments || []) {
     if (seg.kind !== 'dam' || seg.i1 <= seg.i0) continue;
     const e = graph.edges[seg.edge];
@@ -211,9 +213,77 @@ export function assignDamAxes(graph) {
     const d = damAt(graph.dams, mid[0], mid[1]);
     if (!d) continue;
     const len = seg.s1 - seg.s0;
-    if (!d.axis || len > d.axisLen) { d.axis = pts; d.axisLen = len; d.half = e.half || 3.5; }
+    if (!d.axis || len > d.axisLen) { d.axis = pts; d.axisLen = len; d.half = e.half || 3.5; d.axisFrom = 'road'; }
+  }
+  for (const d of graph?.dams || []) {
+    if (d.axis) continue;
+    // a path, a track or a service road over the crest (ways: [{ nodes: [[x, y]...], half }], not in the graph):
+    // the one with the longest run on the dam, where it covers WAY_SHARE of the dam's length
+    const long = damLength(d);
+    let best = null;
+    for (const w of ways || []) {
+      let run = []; let top = [];
+      for (const nd of w.nodes || []) { if (inRing(nd[0], nd[1], d.ring)) run.push([nd[0], nd[1]]); else { if (run.length > top.length) top = run; run = []; } }
+      if (run.length > top.length) top = run;
+      if (top.length < 2) continue;
+      let len = 0; for (let i = 1; i < top.length; i++) len += Math.hypot(top[i][0] - top[i - 1][0], top[i][1] - top[i - 1][1]);
+      if (len >= WAY_SHARE * long && (!best || len > best.len)) best = { pts: top, len, half: w.half || 1.5 };
+    }
+    if (best) { d.axis = best.pts; d.axisLen = best.len; d.half = best.half; d.axisFrom = 'way'; continue; }
+    // nothing crosses it: a dam mapped along its crest has that line; one mapped as its footprint, the footprint's
+    // middle line. The crest as wide as a dam of its height has (a walkway, CREST_BARE_M at least).
+    const own = d.line?.length > 1 ? d.line : d.area ? ringCentreline(d.ring) : null;
+    if (own?.length > 1) {
+      d.axis = own; d.axisFrom = d.line ? 'line' : 'outline';
+      d.half = Math.max(0.5, (d.line ? Math.max(d.lineHalf, CREST_BARE_M / 2) : Math.min(CREST_BARE_MAX_M, Math.max(CREST_BARE_M, (d.gap || 0) / 8)) / 2) - CREST_KERB_M);
+    }
   }
 }
+
+const WAY_SHARE = 0.5;
+const CREST_BARE_M = 4;
+const CREST_BARE_MAX_M = 8;
+
+/** A dam's length: the longer side of its outline's box along its main direction. */
+function damLength(d) {
+  const { u, c } = mainDirection(d.ring);
+  let lo = Infinity; let hi = -Infinity;
+  for (const [x, y] of d.ring) { const s = (x - c[0]) * u[0] + (y - c[1]) * u[1]; lo = Math.min(lo, s); hi = Math.max(hi, s); }
+  return hi - lo;
+}
+
+// the direction a ring is longest in (its points' principal axis) and their centre
+function mainDirection(ring) {
+  const c = [0, 0]; for (const [x, y] of ring) { c[0] += x / ring.length; c[1] += y / ring.length; }
+  let sxx = 0; let sxy = 0; let syy = 0;
+  for (const [x, y] of ring) { const dx = x - c[0]; const dy = y - c[1]; sxx += dx * dx; sxy += dx * dy; syy += dy * dy; }
+  const ang = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+  return { u: [Math.cos(ang), Math.sin(ang)], c };
+}
+
+/**
+ * The middle line of a long outline: across its main direction every CENTRE_STEP_M, the midpoint of where the
+ * outline is cut. A dam curved in plan gives a curved line.
+ */
+export function ringCentreline(ring, step = CENTRE_STEP_M) {
+  if (!(ring?.length > 2)) return null;
+  const { u, c } = mainDirection(ring); const v = [-u[1], u[0]];
+  const st = ring.map(([x, y]) => [(x - c[0]) * u[0] + (y - c[1]) * u[1], (x - c[0]) * v[0] + (y - c[1]) * v[1]]);
+  let lo = Infinity; let hi = -Infinity; for (const [s] of st) { lo = Math.min(lo, s); hi = Math.max(hi, s); }
+  const out = [];
+  for (let s = lo + step / 2; s < hi; s += step) {
+    let a = Infinity; let b = -Infinity;
+    for (let i = 0; i < st.length; i++) {
+      const [s0, t0] = st[i]; const [s1, t1] = st[(i + 1) % st.length];
+      if ((s0 - s) * (s1 - s) > 0 || s0 === s1) continue;
+      const tt = t0 + ((t1 - t0) * (s - s0)) / (s1 - s0); a = Math.min(a, tt); b = Math.max(b, tt);
+    }
+    if (b - a < 0.5) continue;
+    const m = (a + b) / 2; out.push([c[0] + u[0] * s + v[0] * m, c[1] + u[1] * s + v[1] * m]);
+  }
+  return out.length > 1 ? out : null;
+}
+const CENTRE_STEP_M = 6;
 
 function resampleLine(pts, step) {
   const out = [pts[0]];
@@ -242,8 +312,40 @@ function archFrame(d, groundAt) {
     }
   });
   const side = lean < 0 ? 1 : -1;
-  return { p, n, side, hc: (d.half || 3.5) + CREST_KERB_M };
+  const hc = (d.half || 3.5) + CREST_KERB_M;
+  // (a dam mapped as its footprint: how far that reaches from the crest's middle on the air side and on the water
+  // side, at each point along it, smoothed along the dam. These are the feet of its two faces)
+  let air = null; let water = null;
+  if (d.area) {
+    const reach = (sgn) => smooth(p.map(([x, y], i) => { let r = 0; while (r < REACH_MAX_M && inRing(x + sgn * n[i][0] * (r + 1), y + sgn * n[i][1] * (r + 1), d.ring)) r += 1; return r; }), 3);
+    air = reach(side); water = reach(-side);
+  }
+  return { p, n, side, hc, air, water };
 }
+const REACH_MAX_M = 400;
+const smooth = (v, w) => v.map((_, i) => { let s = 0; let k = 0; for (let j = Math.max(0, i - w); j <= Math.min(v.length - 1, i + w); j++) { s += v[j]; k++; } return s / k; });
+
+// What the dam is made of, as far as the map says: masonry where it is old (start_date before MASONRY_BEFORE)
+// or protected as a monument, an earth or rock fill where it says so or where its footprint is several times as
+// wide as it is high (FILL_RATIO: a fill dam's two slopes), else concrete. A face's [material, tint].
+const MASONRY_BEFORE = 1935;
+const FILL_RATIO = 2.2;
+const WEATHERED = [0.62, 0.61, 0.59];
+const MASONRY = [0.72, 0.7, 0.66];
+const FILL = [0.5, 0.52, 0.44];
+export function damKind(d, frame = null) {
+  const t = d.tags || {};
+  const said = `${t.material || ''} ${t['dam:type'] || ''} ${t.embankment || ''} ${t.man_made || ''} ${t.description || ''}`.toLowerCase();
+  if (/earth|rock.?fill|embank|dyke|soil|gravel/.test(said)) return 'fill';
+  if (frame?.air && d.gap > 3) {
+    const wide = frame.air.map((a, i) => a + frame.water[i]).sort((a, b) => a - b);
+    if (wide[wide.length >> 1] / d.gap >= FILL_RATIO) return 'fill';
+  }
+  const year = Number.parseInt(String(t.start_date || t.opening_date || '').slice(0, 4), 10);
+  if (/masonry|stone/.test(said) || (Number.isFinite(year) && year < MASONRY_BEFORE) || t.heritage || t.historic) return 'masonry';
+  return 'concrete';
+}
+const FACE = { fill: ['stone', FILL], masonry: ['stone', MASONRY], concrete: ['concrete', WEATHERED] };
 
 // a triangle facing dir (flipped if it faces away)
 function facing(m, mat, a, b, c, ua, ub, uc, col, dir) {
@@ -255,68 +357,93 @@ function facing(m, mat, a, b, c, ua, ub, uc, col, dir) {
   else m.tri(mat, a, c, b, ua, uc, ub, col);
 }
 
-/** The arch's walls (water side, air side, ends) into a mesh builder. Returns 'arch dam' or null. */
-function buildArchDam(m, d, groundAt) {
-  const { p, n, side, hc } = archFrame(d, groundAt);
+// A dam's two faces. Each runs from the crest's edge down to its foot:
+//   - a dam mapped as its footprint: to the footprint's edge on that side, in a straight batter (a gravity dam's
+//     thick triangle, an arch dam's thin wall, a fill dam's two long slopes all come out as mapped). The bowl a
+//     dam makes seen from below is then the mapped one, not one flare for every dam: Zapora Pilchowice, 50 m thick
+//     at its foot and 7 m at its crest, was built 15 m thick with a hollow curve;
+//   - a dam mapped as a line, or one whose footprint is no wider than its crest: the water side straight down, the
+//     air side out by BATTER of its depth (a gravity wall), or the thin flare of an arch where the line is bent
+//     like one (ARCH_SAG of its chord) and high.
+const BATTER = 0.7;
+const ARCH_SAG = 0.12;
+const ARCH_MIN_M = 25;
+const SLOPE_MIN_M = 3;        // a side reaching less than this past the crest's edge is a wall straight down
+
+/** The dam's walls (water side, air side, ends) into a mesh builder. Returns its kind or null. */
+function buildAxisDam(m, d, groundAt) {
+  const frame = archFrame(d, groundAt);
+  const { p, n, side, hc } = frame;
+  // (a footprint that reaches no further than the crest's own edge says nothing about the faces)
+  const mid = (v) => v.slice().sort((a, b) => a - b)[v.length >> 1];
+  const shaped = !!frame.air && Math.max(mid(frame.air), mid(frame.water)) - hc >= SLOPE_MIN_M;
+  const air = shaped ? frame.air : null; const water = shaped ? frame.water : null;
   const { crest } = d;
   const gap = Math.max(d.gap || 0, 1);
+  const kind = damKind(d, shaped ? frame : null);
+  const [mat, tint] = FACE[kind];
   const g = (x, y) => { const v = groundAt(x, y); return Number.isFinite(v) ? v : crest; };
-  const thick = (depth) => BASE_FRAC * depth * (0.4 + 0.6 * Math.min(1, depth / gap));
+  // (bent like an arch: how far its middle stands off the line between its ends)
+  const chord = Math.hypot(p.at(-1)[0] - p[0][0], p.at(-1)[1] - p[0][1]) || 1;
+  const sag = Math.max(...p.map(([x, y]) => Math.abs((p.at(-1)[0] - p[0][0]) * (p[0][1] - y) - (p[0][0] - x) * (p.at(-1)[1] - p[0][1])) / chord));
+  const arch = !air && sag / chord >= ARCH_SAG && gap >= ARCH_MIN_M;
+  // how far a face stands out past the crest's edge at a depth under the crest, at axis point i
+  const outAt = (reach, sgn) => (i, depth) => {
+    if (reach) {
+      const r = Math.max(0, reach[i] - hc);
+      if (r < SLOPE_MIN_M) return 0;
+      const foot = g(p[i][0] + sgn * n[i][0] * reach[i], p[i][1] + sgn * n[i][1] * reach[i]);
+      return r * Math.min(1, depth / Math.max(1, crest - foot));
+    }
+    if (sgn !== side) return 0;
+    return arch ? BASE_FRAC * depth * (0.4 + 0.6 * Math.min(1, depth / gap)) : BATTER * depth;
+  };
   const levels = [];
   for (let dd = 0; dd <= gap + FACE_STEP_M; dd += FACE_STEP_M) levels.push(dd);
   const along = [0];
   for (let i = 1; i < p.length; i++) along.push(along[i - 1] + Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]));
-  // the water side: straight down from the crest's edge
-  const up = p.map(([x, y], i) => [x - side * n[i][0] * hc, y - side * n[i][1] * hc]);
-  const upFoot = up.map(([x, y]) => Math.min(crest, g(x, y) - FOOT_M));
-  // the air side: a column per axis point, flaring out level by level to where it meets the ground
-  const cols = p.map(([x, y], i) => {
-    const col = [];
-    let landed = false;
+  // a column per axis point and side: out level by level to where it meets the ground
+  const columns = (sgn, out) => p.map(([x, y], i) => {
+    const col = []; let landed = false;
     for (const dd of levels) {
       if (landed) { col.push(col[col.length - 1]); continue; }
-      const o = hc + thick(dd);
-      const px = x + side * n[i][0] * o; const py = y + side * n[i][1] * o;
+      const o = hc + out(i, dd);
+      const px = x + sgn * n[i][0] * o; const py = y + sgn * n[i][1] * o;
       const z = crest - dd; const gz = g(px, py);
       if (z <= gz) { col.push([px, py, Math.min(crest, gz - FOOT_M)]); landed = true; } else col.push([px, py, z]);
     }
+    // (a wall straight down that the levels did not land: its foot in the ground)
+    if (!landed) { const q = col[col.length - 1]; col[col.length - 1] = [q[0], q[1], Math.min(q[2], g(q[0], q[1]) - FOOT_M)]; }
     return col;
   });
+  const sides = [[side, columns(side, outAt(air, side))], [-side, columns(-side, outAt(water, -side))]];
   let tris = 0;
-  for (let i = 0; i + 1 < p.length; i++) {
-    const out = [side * n[i][0], side * n[i][1], 0];
-    // water side
-    if (upFoot[i] < crest || upFoot[i + 1] < crest) {
-      const a = [up[i][0], up[i][1], upFoot[i]]; const b = [up[i + 1][0], up[i + 1][1], upFoot[i + 1]];
-      const c = [up[i + 1][0], up[i + 1][1], crest]; const e = [up[i][0], up[i][1], crest];
-      const inw = [-out[0], -out[1], 0];
-      facing(m, 'concrete', a, b, c, [along[i] / 4, a[2] / 4], [along[i + 1] / 4, b[2] / 4], [along[i + 1] / 4, crest / 4], CONCRETE, inw);
-      facing(m, 'concrete', a, c, e, [along[i] / 4, a[2] / 4], [along[i + 1] / 4, crest / 4], [along[i] / 4, crest / 4], CONCRETE, inw);
-      tris += 2;
-    }
-    // air side (facing out and down the valley)
-    const A = cols[i]; const B = cols[i + 1];
-    for (let k = 0; k + 1 < levels.length; k++) {
-      const a = A[k]; const b = B[k]; const c = B[k + 1]; const e = A[k + 1];
-      if (a === e && b === c) break;
-      const uv = (q, s) => [s / 4, q[2] / 4];
-      facing(m, 'concrete', a, b, c, uv(a, along[i]), uv(b, along[i + 1]), uv(c, along[i + 1]), CONCRETE, out);
-      facing(m, 'concrete', a, c, e, uv(a, along[i]), uv(c, along[i + 1]), uv(e, along[i]), CONCRETE, out);
-      tris += 2;
+  const uv = (q, s) => [s / 4, q[2] / 4];
+  for (const [sgn, cols] of sides) {
+    for (let i = 0; i + 1 < p.length; i++) {
+      const out = [sgn * n[i][0], sgn * n[i][1], 0];
+      const A = cols[i]; const B = cols[i + 1];
+      for (let k = 0; k + 1 < levels.length; k++) {
+        const a = A[k]; const b = B[k]; const c = B[k + 1]; const e = A[k + 1];
+        if (a === e && b === c) break;
+        facing(m, mat, a, b, c, uv(a, along[i]), uv(b, along[i + 1]), uv(c, along[i + 1]), tint, out);
+        facing(m, mat, a, c, e, uv(a, along[i]), uv(c, along[i + 1]), uv(e, along[i]), tint, out);
+        tris += 2;
+      }
     }
   }
-  // the ends: closed where the arch stops short of the rock
+  // the ends: closed where the dam stops short of the rock
   for (const i of [0, p.length - 1]) {
-    const col = cols[i]; const dir = i === 0 ? [-(p[1][0] - p[0][0]), -(p[1][1] - p[0][1]), 0] : [p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1], 0];
-    const top = [up[i][0], up[i][1], crest]; const foot = [up[i][0], up[i][1], upFoot[i]];
-    const ring = [foot, ...col.slice().reverse()];
+    const dir = i === 0 ? [-(p[1][0] - p[0][0]), -(p[1][1] - p[0][1]), 0] : [p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1], 0];
+    const top = [p[i][0], p[i][1], crest];
+    const ring = [...sides[1][1][i], ...sides[0][1][i].slice().reverse()];
     for (let k = 0; k + 1 < ring.length; k++) {
       if (ring[k] === ring[k + 1]) continue;
-      facing(m, 'concrete', top, ring[k], ring[k + 1], [0, crest / 4], [1, ring[k][2] / 4], [1, ring[k + 1][2] / 4], CONCRETE, dir);
+      facing(m, mat, top, ring[k], ring[k + 1], [0, crest / 4], [1, ring[k][2] / 4], [1, ring[k + 1][2] / 4], tint, dir);
       tris++;
     }
   }
-  return tris ? 'arch dam' : null;
+  return tris ? `${arch ? 'arch' : kind} dam` : null;
 }
 
 /** The arch's crest top (road surface, its own object): the strip over the axis, small triangles and a skirt. */
