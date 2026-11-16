@@ -10,7 +10,7 @@ import { exportTer } from './exportTer.js';
 import { buildTerrainMaterials, isVegetationColor } from './osmTerrainMaterials.js';
 import { createOSMGroup, createSurroundingMeshes, SCENE_SIZE } from './export3d.js';
 import { planPools, poolFootprints, poolWaterBlocks, squareOpens, POOL_WATER_BLOCK } from './pools.js';
-import { planDams, damAt, damGuardrails, damTopGeometry, assignDamAxes } from './dams.js';
+import { planDams, damAt, damGuardrails, damTopGeometry, assignDamAxes, settleDamEnds } from './dams.js';
 import { planFountains, fountainFootprints, fountainWaterBlocks } from './fountains.js';
 import { streetIndex } from './buildingDetails.js';
 import { planPitches, pitchFootprints } from './sportsFields.js';
@@ -2160,6 +2160,7 @@ export function splitAtDams(points, dams, toWorld) {
   return out.filter((p) => p.length >= 2);
 }
 
+const DAM_DECAL_RAMP_M = 8;
 /** A ground-following decal cut at the dams it crosses: [decal...], the pieces on a dam at its crest and over objects. */
 export function decalOntoDams(decal, dams) {
   const nodes = decal?.nodes;
@@ -2176,7 +2177,19 @@ export function decalOntoDams(decal, dams) {
     // (a piece on the dam reaches one node out onto the bank each way, at the crest's height: its ends meet the road)
     const from = dam ? Math.max(0, a - 1) : a; const to = dam ? Math.min(nodes.length - 1, b + 1) : b;
     if (to - from < 1) return;
-    const piece = { ...decal, nodes: nodes.slice(from, to + 1).map((nd) => (dam ? [nd[0], nd[1], Math.round((dam.crest + DAM_ROAD_LIFT_M) * 1000) / 1000, ...nd.slice(3)] : [...nd])) };
+    const cut = nodes.slice(from, to + 1);
+    // (on the dam at its crest; its two ends come from the bank's ground to the crest over DAM_DECAL_RAMP_M, as the
+    // crest's top does: dams.js crestZAlong)
+    const run = [0]; for (let i = 1; i < cut.length; i++) run.push(run[i - 1] + Math.hypot(cut[i][0] - cut[i - 1][0], cut[i][1] - cut[i - 1][1]));
+    const zOn = (i) => {
+      let z = dam.crest + DAM_ROAD_LIFT_M;
+      for (const [far, bank] of [[run[i], cut[0][2]], [run.at(-1) - run[i], cut.at(-1)[2]]]) {
+        if (!Number.isFinite(bank) || Math.abs(bank - dam.crest) > DAM_BANKS_AGREE_M || far >= DAM_DECAL_RAMP_M) continue;
+        const k = far / DAM_DECAL_RAMP_M; z = bank + (z - bank) * k * k * (3 - 2 * k);
+      }
+      return Math.round(z * 1000) / 1000;
+    };
+    const piece = { ...decal, nodes: cut.map((nd, i) => (dam ? [nd[0], nd[1], zOn(i), ...nd.slice(3)] : [...nd])) };
     piece.name = pieces.length > 1 ? `${decal.name}_${dam ? 'dam' : 'g'}${k + 1}` : decal.name;
     if (dam) piece.overObjects = true;
     if (decal.persistentId) piece.persistentId = generatePersistentId();
@@ -13044,7 +13057,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     for (const e of sg.edges) { const h = drawnHalf.get(e.seg); if (h > e.half) e.half = h; }
     // (a dam with a road on it shaped round that road: services/dams.js)
     // (and one nothing drives over: the path or service road along its crest, else its own line: dams.js)
-    if (sg.dams?.length) assignDamAxes(sg, decalRoads.pedestrianStreets || []);
+    if (sg.dams?.length) {
+      assignDamAxes(sg, decalRoads.pedestrianStreets || []);
+      // (and its top's ends at the banks' ground: no kerb across the road where it comes onto the dam)
+      settleDamEnds(sg.dams, (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize));
+    }
     const decks = decksFromSolver(sg);
     const parts = decks.flatMap((d) => d.parts);
     sg.built = true;

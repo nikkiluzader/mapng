@@ -11,7 +11,9 @@ test('a ground-following road across a dam: its piece on the dam at the crest, d
   assert.equal(out.length, 3);
   const mid = out.find((d) => d.overObjects);
   assert.ok(mid, 'one piece over objects');
-  assert.ok(mid.nodes.every((n) => Math.abs(n[2] - 50.02) < 1e-6), 'at the crest');
+  assert.ok(mid.nodes.slice(2, -2).every((n) => Math.abs(n[2] - 50.02) < 1e-6), 'at the crest');
+  assert.equal(mid.nodes[0][2], 50); assert.equal(mid.nodes.at(-1)[2], 50);   // its ends at the banks' ground
+  assert.ok(mid.nodes.every((n) => n[2] >= 50 && n[2] <= 50.02), 'coming up to the crest between');
   assert.equal(mid.nodes[0][0], -5); assert.equal(mid.nodes.at(-1)[0], 105);   // one node out onto each bank
   assert.equal(new Set(out.map((d) => d.name)).size, 3, 'each piece its own name');
   const ground = out.filter((d) => !d.overObjects);

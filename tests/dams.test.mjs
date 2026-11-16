@@ -152,3 +152,34 @@ test('a path over a dam is its crest when it runs most of the dam\'s length', as
   assert.equal(d.axisFrom, 'way'); assert.equal(d.half, 1.2);
   assert.ok(d.axis.every(([, y]) => y === 0));
 });
+
+test('a crest comes to its banks\' ground at both ends: no kerb across the road', async () => {
+  const { planDams, assignDamAxes, settleDamEnds, crestZAlong, damTopGeometry } = await import('../services/dams.js');
+  const [d] = planDams([feat([[-60, -4], [60, -4], [60, 30], [-60, 30], [-60, -4]], { waterway: 'dam' })], project, { groundAt: gorge });
+  assignDamAxes({ dams: [d], classes: { segments: [] }, edges: [] }, [{ nodes: [[-80, 0], [-58, 0], [0, 0], [58, 0], [80, 0]], half: 2 }]);
+  d.crest = 100.3;   // (the banks 0.3 m under the crest)
+  const bank = (x, y) => (Math.abs(x) > 55 ? 100 : gorge(x, y));
+  settleDamEnds([d], bank);
+  assert.ok(Math.abs(d.endZ[0] - 99.96) < 1e-6 && Math.abs(d.endZ[1] - 99.96) < 1e-6, 'the ends just under the ground');
+  assert.equal(crestZAlong(d, 58, 116), 100.3, 'the crest in the middle');
+  let last = d.endZ[0];
+  for (let s = 0; s <= 10; s += 0.5) { const z = crestZAlong(d, s, 116); assert.ok(z >= last - 1e-9 && z - last < 0.05, 'a gentle ramp'); last = z; }
+  const top = damTopGeometry(d); const zs = top.positions.filter((_, k) => k % 3 === 2);
+  assert.ok(Math.max(...zs) === 100.3 && zs.some((z) => Math.abs(z - 99.96) < 1e-6), 'the top follows it');
+  // an end far from the crest's height is no bank: left at the crest
+  settleDamEnds([d], gorge); assert.deepEqual(d.endZ, [100.3, 100.3]);
+});
+
+test('a face from a ragged footprint is one smooth batter along the dam', async () => {
+  const { planDams } = await import('../services/dams.js');
+  // the footprint's air edge jumps between 40 and 60 m out every 12 m
+  const edge = []; for (let x = 60; x >= -60; x -= 12) edge.push([x, (x / 12) % 2 ? 40 : 60]);
+  const [d] = planDams([feat([[-60, -4], [60, -4], ...edge, [-60, -4]], { waterway: 'dam' })], project, { groundAt: gorge });
+  const { pts } = built(axisOf(d, 61));
+  // half way down, between the abutments: the face's distance out changes little from slice to slice
+  const row = new Map();
+  for (const q of pts) if (Math.abs(q[2] - 49) < 1.6 && q[1] > 5 && Math.abs(q[0]) < 30) row.set(Math.round(q[0] / 2), Math.max(row.get(Math.round(q[0] / 2)) || 0, q[1]));
+  const ys = [...row.entries()].sort((a, b) => a[0] - b[0]).map(([, y]) => y);
+  assert.ok(ys.length > 20);
+  for (let i = 1; i < ys.length; i++) assert.ok(Math.abs(ys[i] - ys[i - 1]) < 0.6, `no crease: ${ys.map((v) => v.toFixed(1))}`);
+});

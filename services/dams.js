@@ -295,6 +295,36 @@ function resampleLine(pts, step) {
   return out;
 }
 
+// Where a crest meets its banks, the
+// crest's top comes down (or up) to the bank's ground: a flat slab at the crest's one height stood 15 cm and more
+// proud of the ground at its end, a kerb across the road a car broke on (Zapora Pilchowice). The ends' ground from
+// settleDamEnds; the top blends to the crest over END_RAMP_MIN_M at least, no steeper than END_RAMP_SLOPE.
+const END_MAX_M = 1.5;        // an end further than this from the crest is no bank (left at the crest)
+const END_SINK_M = 0.04;      // the end this far under the ground: no lip
+const END_RAMP_MIN_M = 8;
+const END_RAMP_SLOPE = 0.05;
+
+/** Sets each dam's endZ [start, end]: the ground at its axis' two ends, where that is near its crest. */
+export function settleDamEnds(dams, groundAt) {
+  for (const d of dams || []) {
+    delete d.endZ;
+    // (a road of the graph too: it is pinned to the crest on the dam, and the bank beside it keeps its own ground)
+    if (!(d.axis?.length > 1) || !groundAt) continue;
+    d.endZ = [d.axis[0], d.axis.at(-1)].map(([x, y]) => { const g = groundAt(x, y); return Number.isFinite(g) && Math.abs(g - d.crest) <= END_MAX_M ? g - END_SINK_M : d.crest; });
+  }
+}
+
+/** The crest top's height s metres along a dam's axis of length total. */
+export function crestZAlong(d, s, total) {
+  if (!d.endZ) return d.crest;
+  let z = d.crest;
+  [[s, d.endZ[0]], [total - s, d.endZ[1]]].forEach(([from, ez]) => {
+    const ramp = Math.min(total * 0.3, Math.max(END_RAMP_MIN_M, Math.abs(ez - d.crest) / END_RAMP_SLOPE));
+    if (from < ramp && ramp > 0) { const k = Math.max(0, from) / ramp; const e = k * k * (3 - 2 * k); z = ez + (d.crest - ez) * e; }
+  });
+  return z;
+}
+
 /** The arch's frame: points along the axis, their normals, the air side's sign and the crest half width. */
 function archFrame(d, groundAt) {
   const p = resampleLine(d.axis, AXIS_STEP_M);
@@ -368,6 +398,8 @@ function facing(m, mat, a, b, c, ua, ub, uc, col, dir) {
 const BATTER = 0.7;
 const ARCH_SAG = 0.12;
 const ARCH_MIN_M = 25;
+const BATTER_SMOOTH = 0.25;
+const BURY_M = 3;              // a face runs this far into the ground
 const SLOPE_MIN_M = 3;        // a side reaching less than this past the crest's edge is a wall straight down
 
 /** The dam's walls (water side, air side, ends) into a mesh builder. Returns its kind or null. */
@@ -387,16 +419,24 @@ function buildAxisDam(m, d, groundAt) {
   const chord = Math.hypot(p.at(-1)[0] - p[0][0], p.at(-1)[1] - p[0][1]) || 1;
   const sag = Math.max(...p.map(([x, y]) => Math.abs((p.at(-1)[0] - p[0][0]) * (p[0][1] - y) - (p[0][0] - x) * (p.at(-1)[1] - p[0][1])) / chord));
   const arch = !air && sag / chord >= ARCH_SAG && gap >= ARCH_MIN_M;
-  // how far a face stands out past the crest's edge at a depth under the crest, at axis point i
-  const outAt = (reach, sgn) => (i, depth) => {
-    if (reach) {
-      const r = Math.max(0, reach[i] - hc);
-      if (r < SLOPE_MIN_M) return 0;
-      const foot = g(p[i][0] + sgn * n[i][0] * reach[i], p[i][1] + sgn * n[i][1] * reach[i]);
-      return r * Math.min(1, depth / Math.max(1, crest - foot));
-    }
-    if (sgn !== side) return 0;
-    return arch ? BASE_FRAC * depth * (0.4 + 0.6 * Math.min(1, depth / gap)) : BATTER * depth;
+  // How far a face stands out past the crest's edge at a depth under the crest, at axis point i. A mapped footprint
+  // gives the face's batter (how far out per metre down), not its foot line: each slice run to the outline's own
+  // corners made a face of creased wedges (Zapora Pilchowice from above). The batter read at every slice, then
+  // smoothed along the dam over BATTER_SMOOTH of its length, the deep slices weighing most; the face lands where
+  // it meets the ground, which draws the foot line a real dam has.
+  const outAt = (reach, sgn) => {
+    if (!reach) return (i, depth) => (sgn !== side ? 0 : arch ? BASE_FRAC * depth * (0.4 + 0.6 * Math.min(1, depth / gap)) : BATTER * depth);
+    const r = reach.map((v) => Math.max(0, v - hc));
+    if (mid(r) < SLOPE_MIN_M) return () => 0;
+    const deep = reach.map((v, i) => Math.max(0, crest - g(p[i][0] + sgn * n[i][0] * v, p[i][1] + sgn * n[i][1] * v)));
+    const w = Math.max(4, Math.round(p.length * BATTER_SMOOTH));
+    const all = r.reduce((s, v) => s + v, 0) / Math.max(1, deep.reduce((s, v) => s + v, 0));
+    const slope = p.map((_, i) => {
+      let num = 0; let den = 0;
+      for (let j = Math.max(0, i - w); j <= Math.min(p.length - 1, i + w); j++) { num += r[j]; den += deep[j]; }
+      return den > 1 ? num / den : all;
+    });
+    return (i, depth) => slope[i] * depth;
   };
   const levels = [];
   for (let dd = 0; dd <= gap + FACE_STEP_M; dd += FACE_STEP_M) levels.push(dd);
@@ -409,8 +449,11 @@ function buildAxisDam(m, d, groundAt) {
       if (landed) { col.push(col[col.length - 1]); continue; }
       const o = hc + out(i, dd);
       const px = x + sgn * n[i][0] * o; const py = y + sgn * n[i][1] * o;
-      const z = crest - dd; const gz = g(px, py);
-      if (z <= gz) { col.push([px, py, Math.min(crest, gz - FOOT_M)]); landed = true; } else col.push([px, py, z]);
+      const z = Math.min(crest - dd, crestZAlong(d, along[i], along.at(-1))); const gz = g(px, py);
+      // (the face is not fitted to the hill it stands in: it keeps its batter and stops BURY_M under the ground,
+      // its foot out of sight. Snapped to the ground's own height at each slice, the foot row was a ragged fan)
+      col.push([px, py, z]);
+      if (z <= gz - BURY_M) landed = true;
     }
     // (a wall straight down that the levels did not land: its foot in the ground)
     if (!landed) { const q = col[col.length - 1]; col[col.length - 1] = [q[0], q[1], Math.min(q[2], g(q[0], q[1]) - FOOT_M)]; }
@@ -450,7 +493,9 @@ function buildAxisDam(m, d, groundAt) {
 function archTopGeometry(d, groundAt, uvM) {
   const { p, n, hc } = archFrame(d, groundAt || (() => NaN));
   const positions = []; const uvs = [];
-  const z = d.crest;
+  const along = [0];
+  for (let i = 1; i < p.length; i++) along.push(along[i - 1] + Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]));
+  const zAt = (i) => crestZAlong(d, along[i], along.at(-1));
   const pt = (i, t) => [p[i][0] + n[i][0] * t, p[i][1] + n[i][1] * t];
   const across = Math.max(1, Math.ceil((2 * hc) / TOP_EDGE_M));
   const emitUp = (a, b, c) => {
@@ -462,13 +507,15 @@ function archTopGeometry(d, groundAt, uvM) {
   for (let i = 0; i + 1 < p.length; i++) {
     for (let k = 0; k < across; k++) {
       const t0 = -hc + (2 * hc * k) / across; const t1 = -hc + (2 * hc * (k + 1)) / across;
-      const a = [...pt(i, t0), z]; const b = [...pt(i + 1, t0), z]; const c = [...pt(i + 1, t1), z]; const e = [...pt(i, t1), z];
+      const z0 = zAt(i); const z1 = zAt(i + 1);
+      const a = [...pt(i, t0), z0]; const b = [...pt(i + 1, t0), z1]; const c = [...pt(i + 1, t1), z1]; const e = [...pt(i, t1), z0];
       emitUp(a, b, c); emitUp(a, c, e);
     }
     // skirts along both edges (the object's box gets a height)
     for (const t of [-hc, hc]) {
       const a = pt(i, t); const b = pt(i + 1, t);
-      for (const q of [[a, z - SKIRT_M], [b, z - SKIRT_M], [b, z], [a, z - SKIRT_M], [b, z], [a, z]]) { positions.push(q[0][0], q[0][1], q[1]); uvs.push(0, q[1] / uvM); }
+      const za = zAt(i); const zb = zAt(i + 1);
+      for (const q of [[a, za - SKIRT_M], [b, zb - SKIRT_M], [b, zb], [a, za - SKIRT_M], [b, zb], [a, za]]) { positions.push(q[0][0], q[0][1], q[1]); uvs.push(0, q[1] / uvM); }
     }
   }
   return { positions, uvs };
