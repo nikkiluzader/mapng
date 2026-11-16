@@ -160,7 +160,14 @@ export function shapeDownloads(repo, releases) {
   return { stars: Number(repo?.stargazers_count) || 0, forks: Number(repo?.forks_count) || 0, releases: out, total };
 }
 
-async function downloads(env, fetchFn) {
+// (download counts move slowly: GitHub is asked at most every GITHUB_FRESH_MS, the kept answer served between.
+// Asked on every refresh of the stats, about one request in two was refused: unsigned requests are limited by
+// address and a worker shares its addresses with others)
+export const GITHUB_FRESH_MS = 6 * 3600 * 1000;
+async function downloads(env, fetchFn, now = Date.now()) {
+  let kept = null;
+  try { const o = await env.OSM_TILES?.get(GITHUB_KEEP_KEY); kept = o ? await o.json() : null; } catch { kept = null; }
+  if (kept?.at && now - Date.parse(kept.at) < GITHUB_FRESH_MS) return kept;
   const get = async (path) => {
     const r = await fetchFn(`https://api.github.com/repos/${GITHUB_REPO}${path}`, { headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'mapng-stats' } });
     if (!r.ok) throw new Error(`GitHub ${r.status}`);
@@ -170,16 +177,16 @@ async function downloads(env, fetchFn) {
     const [repo, releases] = await Promise.all([get(''), get('/releases?per_page=100')]);
     const shaped = shapeDownloads(repo, releases);
     // (GitHub limits unsigned requests by address, and a worker shares its addresses: the last good answer is kept)
-    await env.OSM_TILES?.put(GITHUB_KEEP_KEY, JSON.stringify({ ...shaped, at: new Date().toISOString() }), { httpMetadata: { contentType: 'application/json' } });
+    await env.OSM_TILES?.put(GITHUB_KEEP_KEY, JSON.stringify({ ...shaped, at: new Date(now).toISOString() }), { httpMetadata: { contentType: 'application/json' } });
     return shaped;
   } catch {
-    try { const o = await env.OSM_TILES?.get(GITHUB_KEEP_KEY); return o ? await o.json() : null; } catch { return null; }
+    return kept;
   }
 }
 
 /** Everything /api/stats answers with. */
 export async function publicStats(env, fetchFn = fetch, now = Date.now()) {
-  const [v, tally, d] = await Promise.all([visits(env, fetchFn, now), readTally(env), downloads(env, fetchFn)]);
+  const [v, tally, d] = await Promise.all([visits(env, fetchFn, now), readTally(env), downloads(env, fetchFn, now)]);
   return {
     about: 'The numbers on https://mapng.com/stats.html: counts only, from fixed lists. No names, no addresses, no text anyone typed, no place more exact than a country. Export areas are at /api/hotspots and settings at /api/usage. Explained at https://mapng.com/data.html#stats',
     at: new Date(now).toISOString(),

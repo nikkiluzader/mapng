@@ -3,6 +3,8 @@
 // shows nothing more than before. Loaded once, when first asked for.
 import { ref } from 'vue';
 
+const NONE_KEY = 'mapng_asset_page_none';
+const NONE_FOR_MS = 24 * 3600 * 1000;
 const byItem = ref(null);   // { [itemId]: [{ shape, name, thumb, used, is, tag }] }, or null where there is none
 let asked = false;
 
@@ -51,10 +53,18 @@ export function modelsInUse(list, present, region = 'any') {
 export function useAssetThumbs() {
   if (!asked && typeof fetch === 'function') {
     asked = true;
-    fetch('/api/asset-page/data.json', { credentials: 'same-origin' })
-      .then((r) => (r.ok && String(r.headers.get('Content-Type') || '').includes('json') ? r.json() : null))
-      .then((d) => { if (d?.tags) byItem.value = modelsByItem(d); })
-      .catch(() => {});
+    // (a site that does not serve the data says so once: remembered for NONE_FOR_MS, not asked on every visit)
+    let none = 0; try { none = Number(localStorage.getItem(NONE_KEY)) || 0; } catch { /* storage blocked */ }
+    if (!(Date.now() - none < NONE_FOR_MS)) {
+      fetch('/api/asset-page/data.json', { credentials: 'same-origin' })
+        .then((r) => {
+          if (r.ok && String(r.headers.get('Content-Type') || '').includes('json')) return r.json();
+          if (r.status === 404) { try { localStorage.setItem(NONE_KEY, String(Date.now())); } catch { /* storage blocked */ } }
+          return null;
+        })
+        .then((d) => { if (d?.tags) { byItem.value = modelsByItem(d); try { localStorage.removeItem(NONE_KEY); } catch { /* storage blocked */ } } })
+        .catch(() => {});
+    }
   }
   return { assetModels: byItem, thumbUrl: (m) => `/api/asset-page/t/${m.thumb}` };
 }
