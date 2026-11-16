@@ -341,6 +341,8 @@ export const parseOverpassResponse = (data, bounds) => {
           el.tags.highway === "stop" ||
           el.tags.highway === "street_lamp" ||
           el.tags.barrier === "bollard" ||
+          el.tags.barrier === "block" ||
+          el.tags.man_made === "utility_pole" ||
           isGateBarrier(el.tags) ||
           el.tags.amenity === "bench" ||
           el.tags.emergency === "fire_hydrant" ||
@@ -359,7 +361,7 @@ export const parseOverpassResponse = (data, bounds) => {
             id: el.id.toString(), type: "fountain",
             geometry: [{ lat: el.lat, lng: el.lon }], tags: el.tags,
           });
-        } else if (isTagObjectNode(el.tags)) {
+        } else if (isTagObjectNode(el.tags) || el.tags.man_made === "obelisk") {
           // a bus stop, post box, picnic table ...: a model picked for its tag stands there (services/tagModels.js)
           rawFeatures.push({
             id: el.id.toString(), type: "tag_object",

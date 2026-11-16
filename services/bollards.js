@@ -2,12 +2,15 @@
 // BOLLARD_SHAPES): the steel bollard, or East Coast USA's concrete city
 // bollard where OSM says concrete or stone. A bollard mapped on a road drawn
 // for traffic is left out (it would stand in the AI's lane); on service roads,
-// paths and squares it stands where mapped.
+// paths and squares it stands where mapped. A concrete block (barrier=block, a point: a road or a track closed
+// with blocks) stands the same way, as the game's one-metre concrete cube.
 // Pure: callers pass world-space lookups.
 
 import { BOLLARD_SHAPES } from './beamngPropLibrary.js';
 
 const STONE = /concrete|stone|granite|brick/;
+export const BLOCK_SHAPE = '/levels/hirochi_raceway/art/shapes/objects/concrete_block.dae';
+const BLOCK_LIFT_M = 0.47;   // (the cube is modelled round its middle)
 
 /**
  * @param {object} p
@@ -22,11 +25,14 @@ export function placeBollards({ features = [], toWorld, heightAt, onDrawnRoad = 
   const bollards = [];
   const skipped = { onRoad: 0, blocked: 0 };
   for (const f of features) {
-    if (f?.type !== 'street_furniture' || f.tags?.barrier !== 'bollard' || !f.geometry?.length) continue;
+    const block = f?.tags?.barrier === 'block';
+    if (f?.type !== 'street_furniture' || (f.tags?.barrier !== 'bollard' && !block) || !f.geometry?.length) continue;
     const [x, y] = toWorld(f.geometry[0].lat, f.geometry[0].lng);
     if (onDrawnRoad(x, y)) { skipped.onRoad++; continue; }
     const z = heightAt(x, y);
     if (isBlocked(x, y, z)) { skipped.blocked++; continue; }
+    // (a block turned by its id: a row of them not all square to the grid)
+    if (block) { bollards.push({ shape: BLOCK_SHAPE, position: [x, y, z + BLOCK_LIFT_M], yaw: ((Number.parseInt(String(f.id).replace(/\D/g, '').slice(-6), 10) || 0) * 2.39996) % (2 * Math.PI), material: 'block' }); continue; }
     const material = STONE.test(String(f.tags.material ?? '').toLowerCase()) ? 'concrete' : 'steel';
     bollards.push({ shape: BOLLARD_SHAPES[material].shapeFile, position: [x, y, z], yaw: 0, material });
   }

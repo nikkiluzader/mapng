@@ -58,6 +58,7 @@ import { findCrossings } from './structures/crossings.js';
 import { tagModel, tagObjectFor, standTagObject, part } from './tagModels.js';
 import { fillRows, rowDirection } from './areaRows.js';
 import { buildPlatformMeshes } from './platforms.js';
+import { buildMonumentMeshes, monumentKind, monumentHeight } from './monuments.js';
 import { solveProfilesSteps, gradeLimit } from './structures/profileSolve.js';
 import { appendAll, keepInPlace } from './keepInPlace.js';
 import { classifyStructures } from './structures/structureRules.js';
@@ -1198,7 +1199,9 @@ function buildLevelRailways(sg, terrainData, squareSize, levelName) {
     const data = railTileDae(tile);
     if (data) daes.push({ key: tile.key, origin: tile.origin, data, triangles: tile.triangles });
   }
-  const props = { renderPriority: 3, textureLength: 40, breakAngle: 1, detail: DECAL_ROAD_DETAIL };
+  // (the tram texture repeats every 4 m along the rails, as the game's own levels lay it: stretched to 40 m its
+  // wear marks smeared into long blotches)
+  const props = { renderPriority: 3, textureLength: 4, breakAngle: 1, detail: DECAL_ROAD_DETAIL };
   const decals = [];
   crossingDecals(sg, { tagsOf }).forEach((c, i) => {
     const d = makeRoadDecal(c.nodes, `rail_crossing_${i + 1}`, 'railways', props, TRAMLINE_MATERIAL.name);
@@ -9714,7 +9717,8 @@ function collectMappedStreetProps(terrainData, squareSize) {
     if (tags.emergency === 'fire_hydrant') out.hydrants.push(p);
     else if (tags.amenity === 'waste_basket') out.bins.push(p);
     else if (tags.amenity === 'bench') out.benches.push(p);
-    else if (tags.power === 'pole') out.poles.push(Object.assign(p, { tags, id: f.id }));
+    // (a utility pole carries phone or power wires the map has no line for: it stands as a pole)
+    else if (tags.power === 'pole' || tags.man_made === 'utility_pole') out.poles.push(Object.assign(p, { tags, id: f.id }));
     // (a tower mapped with no line through it: one stands, nothing on a building or water. A tower on a mapped line
     // is that line's vertex and stands there already)
     else if (tags.power === 'tower' && !onBuildingOrWater(f.geometry[0])) out.poles.push(Object.assign(p, { tags, id: f.id, tower: true }));
@@ -14115,6 +14119,30 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         appendAll(sidewalks.meshes, res.meshes);
         console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Kerbed islands: ${res.count} traffic island(s) and roundabout centre(s) raised, ${res.triangles} triangles.`);
       }
+    }
+  }
+  // obelisks, steles and memorial stones the game has no model for: built (monuments.js); on the ground, not on a
+  // drawn road nor inside a building (a memorial stone mapped inside a church)
+  if (built('statues') && Array.isArray(sidewalks.meshes)) {
+    const toWm = (p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0);
+    const halls = (exportTerrainData.osmFeatures || []).filter((f) => f.type === 'building' && f.geometry?.length > 3).map((f) => f.geometry.map(toWm));
+    const inHall = (x, y) => halls.some((r) => { let k = false; for (let a = 0, b = r.length - 1; a < r.length; b = a++) if (((r[a][1] > y) !== (r[b][1] > y)) && (x < ((r[b][0] - r[a][0]) * (y - r[a][1])) / (r[b][1] - r[a][1]) + r[a][0])) k = !k; return k; });
+    const cwIndex = buildCarriagewayIndex(groundCarriageways);
+    const items = []; const skipped = { road: 0, building: 0 };
+    for (const f of exportTerrainData.osmFeatures || []) {
+      const kind = monumentKind(f.tags); if (!kind || !f.geometry?.length) continue;
+      const g = f.geometry.length > 2 ? f.geometry.slice(0, f.geometry.length - 1) : f.geometry;
+      const [x, y] = toWm({ lat: g.reduce((a, p) => a + p.lat, 0) / g.length, lng: g.reduce((a, p) => a + p.lng, 0) / g.length });
+      if (isOnOtherCarriageway(cwIndex, x, y, 0, () => false)) { skipped.road++; continue; }
+      if (inHall(x, y)) { skipped.building++; continue; }
+      const yaw = ((Number.parseInt(String(f.id).replace(/\D/g, '').slice(-6), 10) || 0) * 2.39996) % (Math.PI / 2);
+      items.push({ x, y, z: getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize), kind, height: monumentHeight(kind, f.tags), yaw });
+    }
+    if (items.length) {
+      const res = buildMonumentMeshes(items);
+      appendAll(sidewalks.meshes, res.meshes);
+      const by = {}; for (const m of items) by[m.kind] = (by[m.kind] || 0) + 1;
+      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Monuments: ${Object.entries(by).map(([k, n]) => `${n} ${k}`).join(', ')} built${skipped.road || skipped.building ? `; left out: ${skipped.road} on drawn roads, ${skipped.building} inside buildings` : ''}.`);
     }
   }
   const sidewalkTileDaes = await generateSidewalkTileDAEs(sidewalks.meshes, buildingTileSize(worldSize));
