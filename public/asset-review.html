@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>MapNG Asset Review</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<!-- The asset review page: every OpenStreetMap tag MapNG knows with the game models it places for it, each with
+     its photo. Shown on the dev site only (worker/assetPage.js): the data and photos come from private storage
+     through /api/asset-page/, made by scripts/tag-library/asset-page.mjs. -->
+<style>
+  @font-face { font-family: "Noto Sans"; src: url(/fonts/noto-sans-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass"; src: url(/fonts/overpass-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass Mono"; src: url(/fonts/overpass-mono-latin-wght-normal.woff2) format("woff2"); font-weight: 300 700; font-display: swap; }
+  :root {
+    color-scheme: light;
+    --bg: #f7f7f8; --surface: #ffffff; --surface-2: #f2f2f4; --border: #e3e3e8;
+    --text: #1d1d22; --text-2: #4a4a55; --muted: #6e6e7a;
+    --brand: #ff6600; --brand-ink: #c2410c; --brand-tint: #fff4ec;
+    --ok: #15803d; --ok-tint: #e8f6ec; --wait: #8a6100; --wait-tint: #fdf3d7; --off-tint: #ececf0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+      --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+      --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+      --ok: #4ade80; --ok-tint: #12301c; --wait: #f2c14e; --wait-tint: #33290f; --off-tint: #26262d;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+    --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+    --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+    --ok: #4ade80; --ok-tint: #12301c; --wait: #f2c14e; --wait-tint: #33290f; --off-tint: #26262d;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--brand-ink); }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 0 16px; }
+  header.top { background: linear-gradient(90deg, #ff6600, #f59e0b); color: #fff; }
+  header.top .wrap { padding-top: 18px; padding-bottom: 22px; }
+  .brand { display: inline-flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; }
+  .brand img { width: 22px; height: 22px; }
+  h1, h2 { font-family: "Overpass", "Noto Sans", system-ui, sans-serif; text-wrap: balance; }
+  h1 { margin: 10px 0 4px; font-size: 28px; line-height: 1.15; }
+  header.top p { margin: 0; max-width: 70ch; opacity: 0.95; }
+  .notice { margin: 14px 0 0; padding: 8px 12px; border-radius: 8px; background: rgba(0, 0, 0, 0.18); font-size: 13.5px; max-width: 90ch; }
+  .bar { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--border); }
+  .bar .wrap { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding-top: 10px; padding-bottom: 10px; }
+  input[type="search"] { flex: 1 1 260px; min-width: 0; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; }
+  select { padding: 7px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; }
+  label.check { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--text-2); white-space: nowrap; }
+  .count { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  main { padding: 16px 0 60px; }
+  h2 { margin: 26px 0 8px; font-size: 19px; display: flex; align-items: baseline; gap: 8px; }
+  h2 small { font: 13px "Noto Sans", sans-serif; color: var(--muted); font-weight: 400; }
+  .tag { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin: 0 0 10px; }
+  .tag-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; }
+  .tag-head code { font: 600 14px "Overpass Mono", ui-monospace, monospace; overflow-wrap: anywhere; }
+  .what { color: var(--text-2); }
+  .pill { font-size: 11.5px; padding: 1px 8px; border-radius: 999px; white-space: nowrap; background: var(--off-tint); color: var(--text-2); }
+  .pill.built { background: var(--ok-tint); color: var(--ok); }
+  .pill.partial, .pill.planned { background: var(--wait-tint); color: var(--wait); }
+  .builds { margin: 4px 0 0; font-size: 13.5px; color: var(--text-2); }
+  .meta { font-size: 12.5px; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 10px; margin-top: 10px; }
+  figure { margin: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface-2); display: flex; flex-direction: column; }
+  figure.used { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand) inset; }
+  figure button { all: unset; display: block; cursor: zoom-in; aspect-ratio: 4 / 3; background: #d9d9de; }
+  figure button:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+  figure img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  figcaption { padding: 6px 8px 8px; font-size: 12px; line-height: 1.35; }
+  figcaption b { display: block; font: 600 12px "Overpass Mono", ui-monospace, monospace; overflow-wrap: anywhere; }
+  figcaption span { display: block; color: var(--muted); overflow-wrap: anywhere; }
+  .badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .badge { font-size: 10.5px; padding: 0 6px; border-radius: 999px; background: var(--off-tint); color: var(--text-2); }
+  .badge.used { background: var(--brand); color: #fff; }
+  .none { margin-top: 8px; font-size: 13px; color: var(--muted); }
+  .state { padding: 40px 0; color: var(--text-2); }
+  dialog { border: 1px solid var(--border); border-radius: 12px; padding: 0; background: var(--surface); color: var(--text); max-width: min(960px, 94vw); }
+  dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
+  dialog img { display: block; max-width: 100%; max-height: 74vh; margin: 0 auto; }
+  dialog .info { padding: 10px 14px 14px; font-size: 13.5px; }
+  dialog .info code { font: 12.5px "Overpass Mono", ui-monospace, monospace; overflow-wrap: anywhere; }
+  dialog form { display: flex; justify-content: flex-end; padding: 0 14px 12px; }
+  dialog button.close { padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font: inherit; cursor: pointer; }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/favicon.svg" alt="">MapNG</a>
+    <h1>Asset review</h1>
+    <p>Every OpenStreetMap tag MapNG knows, with the BeamNG.drive models it has for it. A model with an orange frame is one an export places today.</p>
+    <p class="notice">For review only. The photos show BeamNG.drive's own models, taken in game; they are not published and this page exists on the dev site alone.</p>
+  </div>
+</header>
+<div class="bar">
+  <div class="wrap">
+    <input id="q" type="search" placeholder="Search a tag, a model name or a path" aria-label="Search">
+    <select id="group" aria-label="Group"><option value="">All groups</option></select>
+    <select id="status" aria-label="Status">
+      <option value="">Any status</option><option value="built">Built</option><option value="partial">Partly built</option><option value="planned">Planned</option><option value="ignored">Left out</option>
+    </select>
+    <label class="check"><input id="usedOnly" type="checkbox"> Placed today only</label>
+    <label class="check"><input id="withModels" type="checkbox" checked> Tags with models only</label>
+    <span id="count" class="count" role="status"></span>
+  </div>
+</div>
+<main class="wrap">
+  <div id="state" class="state">Loading the asset list…</div>
+  <div id="list"></div>
+</main>
+<dialog id="zoom" aria-label="Model photo">
+  <img id="zoomImg" alt="">
+  <div class="info" id="zoomInfo"></div>
+  <form method="dialog"><button class="close">Close</button></form>
+</dialog>
+<script>
+(async () => {
+  const $ = (id) => document.getElementById(id);
+  const el = (tag, attrs = {}, ...kids) => { const n = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'class') n.className = v; else if (k === 'text') n.textContent = v; else n.setAttribute(k, v); } for (const k of kids) if (k) n.append(k); return n; };
+  const GROUPS = { roads: 'Roads', walk: 'Walking and cycling', railways: 'Railways', water: 'Water', buildings: 'Buildings', furniture: 'Street furniture', green: 'Green and land', leisure: 'Leisure and sport', landmarks: 'Landmarks', industry: 'Industry and power', airfields: 'Airfields', parking: 'Parking' };
+  const STATUS = { built: 'Built', partial: 'Partly built', planned: 'Planned', ignored: 'Left out' };
+  const REGION = { any: 'everywhere', 'north-america': 'North America', europe: 'Europe', asia: 'Asia', 'south-america': 'South America', africa: 'Africa', oceania: 'Oceania' };
+  let data;
+  try {
+    const r = await fetch('/api/asset-page/data.json', { credentials: 'same-origin' });
+    if (!r.ok || !String(r.headers.get('Content-Type') || '').includes('json')) throw new Error(String(r.status));
+    data = await r.json();
+  } catch (e) {
+    $('state').textContent = 'The asset list could not be loaded here. It is served on the dev site only.';
+    return;
+  }
+  $('state').remove();
+  const groups = [...new Set(data.tags.map((t) => t.group || 'other'))];
+  groups.sort((a, b) => (Object.keys(GROUPS).indexOf(a) + 100 * !(a in GROUPS)) - (Object.keys(GROUPS).indexOf(b) + 100 * !(b in GROUPS)));
+  for (const g of groups) $('group').append(el('option', { value: g, text: GROUPS[g] || g }));
+  // (parts the code places that no tag lists)
+  if (data.parts?.length) data.tags.push(...data.parts.map((p) => ({ tag: p.tag || p.id, what: 'A part the export places', group: 'furniture', item: '', status: 'built', builds: '', count: 0, assets: [{ shape: p.shape, region: 'any', used: true, is: '' }] })));
+  const fmtSize = (s) => (s ? `${s.map((v) => (+v).toFixed(v < 10 ? 1 : 0)).join(' × ')} m` : '');
+  const fmtCount = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)} M` : n >= 1e3 ? `${Math.round(n / 1e3)} k` : String(n || ''));
+  const zoom = (a, m) => {
+    $('zoomImg').src = `/api/asset-page/t/${m.thumb}`; $('zoomImg').alt = m.name;
+    const info = $('zoomInfo'); info.replaceChildren(el('div', {}, el('b', { text: m.name }), document.createTextNode(a.is ? `: ${a.is}` : '')), el('div', {}, el('code', { text: a.shape })), el('div', { class: 'meta', text: [m.level, fmtSize(m.size), m.kind, `used ${REGION[a.region] || a.region}`].filter(Boolean).join(' · ') }));
+    $('zoom').showModal();
+  };
+  const card = (a) => {
+    const m = data.models[a.shape] || { name: a.shape.split('/').pop(), thumb: null };
+    const fig = el('figure', a.used ? { class: 'used' } : {});
+    if (m.thumb) {
+      const b = el('button', { type: 'button', 'aria-label': `Enlarge ${m.name}` }, el('img', { loading: 'lazy', decoding: 'async', alt: a.is || m.name, src: `/api/asset-page/t/${m.thumb}` }));
+      b.addEventListener('click', () => zoom(a, m)); fig.append(b);
+    }
+    const badges = el('div', { class: 'badges' });
+    if (a.used) badges.append(el('span', { class: 'badge used', text: 'placed today' }));
+    badges.append(el('span', { class: 'badge', text: REGION[a.region] || a.region }));
+    fig.append(el('figcaption', {}, el('b', { text: m.name }), el('span', { text: [m.level, fmtSize(m.size)].filter(Boolean).join(' · ') }), a.is ? el('span', { text: a.is }) : null, badges));
+    return fig;
+  };
+  const render = () => {
+    const q = $('q').value.trim().toLowerCase(); const g = $('group').value; const st = $('status').value; const usedOnly = $('usedOnly').checked; const withModels = $('withModels').checked;
+    const list = $('list'); list.replaceChildren();
+    let nTags = 0; let nModels = 0; const seen = new Set();
+    for (const grp of groups) {
+      if (g && g !== grp) continue;
+      const rows = [];
+      for (const t of data.tags) {
+        if ((t.group || 'other') !== grp || (st && t.status !== st)) continue;
+        let assets = usedOnly ? t.assets.filter((a) => a.used) : t.assets;
+        const tagHit = !q || `${t.tag} ${t.what} ${t.builds} ${t.item}`.toLowerCase().includes(q);
+        if (q && !tagHit) assets = assets.filter((a) => `${a.shape} ${a.is}`.toLowerCase().includes(q));
+        if (q && !tagHit && !assets.length) continue;
+        if ((withModels || usedOnly) && !assets.length) continue;
+        const box = el('section', { class: 'tag' });
+        box.append(el('div', { class: 'tag-head' }, el('code', { text: t.tag }), el('span', { class: 'what', text: t.what }), el('span', { class: `pill ${t.status}`, text: STATUS[t.status] || t.status }), t.count ? el('span', { class: 'meta', text: `${fmtCount(t.count)} in OpenStreetMap` }) : null));
+        if (t.builds) box.append(el('p', { class: 'builds', text: t.builds }));
+        if (assets.length) { const grid = el('div', { class: 'grid' }); for (const a of assets) { grid.append(card(a)); seen.add(a.shape); } box.append(grid); }
+        else box.append(el('p', { class: 'none', text: t.status === 'built' || t.status === 'partial' ? 'Built from MapNG\'s own meshes: no game model.' : 'No model chosen yet.' }));
+        rows.push(box); nTags++;
+      }
+      if (rows.length) { list.append(el('h2', {}, document.createTextNode(GROUPS[grp] || grp), el('small', { text: `${rows.length} tag${rows.length === 1 ? '' : 's'}` })), ...rows); }
+    }
+    nModels = seen.size;
+    $('count').textContent = `${nTags} tags, ${nModels} models`;
+    if (!nTags) list.append(el('p', { class: 'state', text: 'Nothing matches.' }));
+  };
+  let timer = 0;
+  $('q').addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(render, 150); });
+  for (const id of ['group', 'status', 'usedOnly', 'withModels']) $(id).addEventListener('change', render);
+  render();
+})();
+</script>
+</body>
+</html>

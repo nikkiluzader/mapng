@@ -38,6 +38,7 @@ import { overRate } from './limits.js';
 import { handleShareCodes } from './shareCodes.js';
 import { handleMapterhornTiles } from './mapterhornCache.js';
 import { handleTerrariumTiles } from './terrariumRelay.js';
+import { assetPageOn, handleAssetPage } from './assetPage.js';
 import { LATEST_UPDATE } from './updates.js';
 import { readWithRetry } from './retry.js';
 
@@ -353,6 +354,11 @@ const app = {
     if (url.pathname.startsWith(OSM_TILES_PREFIX)) {
       return handleOsmTiles(request, url, env, ctx);
     }
+
+    // the asset review page (dev site only): its page, data and photos
+    // (not /assets.html: /assets/ is the app's own script folder)
+    if (url.pathname === '/asset-review.html' || url.pathname === '/asset-review') return assetPageOn(env) ? env.ASSETS.fetch(request) : new Response('Not Found', { status: 404 });
+    if (url.pathname.startsWith('/api/asset-page/')) return handleAssetPage(request, url, env);
 
     if (url.pathname.startsWith('/api/terrarium/')) {
       return handleTerrariumTiles(request, url);
