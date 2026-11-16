@@ -160,6 +160,10 @@ Open, by how often it was measured:
 3. The two sweep areas BeamNG developers exported (dev_szczyrk, dev_pilchowice, added 2026-11-16) have baselines
    recorded as they are, not looked at in game: the dam area shows ground through a deck at 3 places and 5 spikes
    on the coarse survey with Ready to drive, and 4 spikes on the fine one.
+4. Amsterdam Centraal after the river-width fix (2026-11-16): the station's island is back on its surveyed ground
+   (it had been dug to the water, as London's banks were), and the ground now comes through the raised decks there in
+   far more places (Mapterhorn Ready 42 -> 323, 30 m Ready 11 -> 63; baselines re-recorded). The embankment the
+   survey holds under the station's decks has to be dealt with: not looked at in game.
 
 (Wing walls looked at in game in six places (Copenhagen, Utrecht, Dallas, Hamburg, Seattle, London), Tower Bridge
 with its towers left to the bridge, and the desktop app's Generate and export on this code: 2026-11-16.)
