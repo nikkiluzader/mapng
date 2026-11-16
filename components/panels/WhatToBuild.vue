@@ -271,6 +271,8 @@
 <script setup>
 import { useMeasureRoadWidths } from '../../composables/useMeasureRoadWidths.js';
 import { useAssetThumbs, modelsInUse, tagsPresent } from '../../composables/useAssetThumbs.js';
+import { resolveRegionalBiome } from '../../services/beamngRegion.js';
+import { regionOfBiome } from '../../services/tagModels.js';
 import { WIDTH_SOURCE_TAG } from '../../services/satRoadWidth.js';
 import { computed, reactive, toRaw } from 'vue';
 import { treeTable, treeModelLabel, sampleElevations } from '../../services/treeTable.js';
@@ -375,10 +377,19 @@ const MODEL_STRIP_MAX = 12;
 const { assetModels, thumbUrl } = useAssetThumbs();
 // (only what this area's export can place: a model placed today, for a tag the map data here holds. Every candidate
 // for every tag is on the review page)
+// (the area's region, as the export works it out from the place: services/beamngRegion.js)
+const areaRegion = computed(() => {
+  const td = toRaw(useMainStore().terrainData); const b = td?.bounds;
+  if (!b) return 'any';
+  try {
+    const look = resolveRegionalBiome({ lat: (b.north + b.south) / 2, lon: (b.east + b.west) / 2, features: toRaw(props.osmFeatures) || [], landCover: td.landCover || null });
+    return regionOfBiome(look?.biomeId);
+  } catch { return 'any'; }
+});
 const itemModels = computed(() => {
   const all = assetModels.value; if (!all) return {};
   const present = tagsPresent(toRaw(props.osmFeatures));
-  return Object.fromEntries(Object.entries(all).map(([id, list]) => [id, modelsInUse(list, present)]));
+  return Object.fromEntries(Object.entries(all).map(([id, list]) => [id, modelsInUse(list, present, areaRegion.value)]));
 });
 // (Expand all / Collapse all: every group; collapsing closes the tag lists under them too)
 const setAllGroups = (on) => { for (const g of CONTENT_GROUPS) open[g.id] = on; if (!on) for (const k of Object.keys(tagsOpen)) tagsOpen[k] = false; };

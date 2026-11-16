@@ -46,3 +46,17 @@ test('only the models this area\'s export can place are shown', () => {
   assert.deepEqual(modelsInUse(by.signs, present).map((m) => m.shape), ['/sign.dae']);
   assert.deepEqual(modelsInUse(by.benches, tagsPresent([])), []);
 });
+
+test('a tag with models of the area\'s own region shows those; else the ones for everywhere', () => {
+  const data = {
+    tags: [
+      { tag: 'highway=bus_stop', item: 'busStops', assets: [{ shape: '/any.dae', used: true, region: 'any' }, { shape: '/us.dae', used: true, region: 'north-america' }] },
+      { tag: 'amenity=bench', item: 'busStops', assets: [{ shape: '/bench.dae', used: true, region: 'any' }, { shape: '/eu-bench.dae', used: true, region: 'europe' }] },
+    ],
+    models: Object.fromEntries(['/any.dae', '/us.dae', '/bench.dae', '/eu-bench.dae'].map((s, i) => [s, { name: s, thumb: `${i}.jpg` }])),
+  };
+  const list = modelsByItem(data).busStops; const present = () => true;
+  assert.deepEqual(modelsInUse(list, present, 'north-america').map((m) => m.shape), ['/us.dae', '/bench.dae']);
+  assert.deepEqual(modelsInUse(list, present, 'europe').map((m) => m.shape), ['/any.dae', '/eu-bench.dae']);
+  assert.deepEqual(modelsInUse(list, present, 'any').map((m) => m.shape), ['/any.dae', '/bench.dae']);
+});
