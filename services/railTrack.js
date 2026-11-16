@@ -321,11 +321,12 @@ export const TRAMLINE_MATERIAL = {
     metallicFactor: 1,
     metallicMap: '/assets/materials/decalroad/lines/tramline/t_tramline_m.data.png',
     normalMap: '/assets/materials/decalroad/lines/tramline/t_tramline_nm.normal.png',
-    pixelSpecular: true,
     roughnessMap: '/assets/materials/decalroad/lines/tramline/t_tramline_r.data.png',
   }, {}, {}, {}],
-  alphaRef: 0, annotation: 'STREET', dynamicCubemap: true, groundType: 'ASPHALT',
-  materialTag0: 'beamng', materialTag1: 'vehicle', translucent: true, translucentBlendOp: 'None', translucentRecvShadows: true, version: 1.5,
+  // (as West Coast USA's own road_tramline: blended over the road. Drawn with blending off (translucentBlendOp None)
+  // the texture's clear asphalt between and beside the rails came out as solid brown patches across the lane)
+  alphaRef: 255, annotation: 'STREET', castShadows: false, dynamicCubemap: true, groundType: 'ASPHALT',
+  materialTag0: 'RoadAndPath', materialTag1: 'beamng', specularStrength0: '0', translucent: true, translucentZWrite: true, version: 1.5,
 };
 // the tram texture's strip across its two rails (drawn for standard gauge)
 export const TRAMLINE_WIDTH_M = 2.6;
