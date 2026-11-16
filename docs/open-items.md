@@ -168,6 +168,13 @@ Open, by how often it was measured:
    (it had been dug to the water, as London's banks were), and the ground now comes through the raised decks there in
    far more places (Mapterhorn Ready 42 -> 323, 30 m Ready 11 -> 63; baselines re-recorded). The embankment the
    survey holds under the station's decks has to be dealt with: not looked at in game.
+   Looked at in 2D on 2026-11-16 (scratch/devareas/amc_comb.png): the worst spots are not the rail decks but the
+   road ramps diving under the station. The export cuts the two carriageways to -3 m where the survey has one
+   gentle ramp down to about +1 m, and leaves a ridge at +5 m under the deck between them (b019). Needs the
+   structure solver looked at for a tunnel approach beside a deck; not fixed.
+5. tychonas on GPXZ (30 m there, not lidar): the centre street is still held to its class grade and sits in a
+   trench up to 6 m deep with toothed sides. By design on coarse data; on the 1 m lidar it follows the hill
+   (checked in game 2026-11-16). A small deck fragment at the map's east edge (500, -338) is a mess of slabs.
 
 (Wing walls looked at in game in six places (Copenhagen, Utrecht, Dallas, Hamburg, Seattle, London), Tower Bridge
 with its towers left to the bridge, and the desktop app's Generate and export on this code: 2026-11-16.)
