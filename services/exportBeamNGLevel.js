@@ -12816,6 +12816,32 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       boundedFeatures = boundedFeatures.filter((f) => !(f.type === 'building' && f.geometry?.length > 2 && pts.some((p) => inRing(p, f.geometry))));
       if (boundedFeatures.length < before) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Buildings: ${before - boundedFeatures.length} a bridge road passes through left to the bridge (towers, gatehouses).`);
     }
+    // (and a building inside a bridge's own outline, man_made=bridge, with the bridge's road for traffic through it
+    // or beside it within 7 m (past its sidewalks): its towers, split round the road's arches: the Roebling Bridge's four parts. Shops on a
+    // bridge for walking stay)
+    const bridgeRings = boundedFeatures.filter((f) => f.type === 'bridge_infra' && f.geometry?.length > 3).map((f) => f.geometry);
+    if (bridgeRings.length) {
+      const WALK = new Set(['footway', 'pedestrian', 'path', 'cycleway', 'steps', 'bridleway', 'corridor']);
+      const deckRoads = boundedFeatures.filter((f) => f.type === 'road' && f.tags?.bridge && f.tags.bridge !== 'no' && !WALK.has(f.tags.highway) && f.geometry?.length > 1);
+      const inRing = (p, g) => { let k = false; for (let i = 0, j = g.length - 1; i < g.length; j = i++) if (((g[i].lat > p.lat) !== (g[j].lat > p.lat)) && (p.lng < ((g[j].lng - g[i].lng) * (p.lat - g[i].lat)) / (g[j].lat - g[i].lat) + g[i].lng)) k = !k; return k; };
+      const kx = 111320 * Math.cos((((td.bounds.north + td.bounds.south) / 2) * Math.PI) / 180); const ky = 110574;
+      const near = (g, road) => {
+        for (const p of g) for (let i = 0; i + 1 < road.length; i++) {
+          const ax = (road[i].lng - p.lng) * kx; const ay = (road[i].lat - p.lat) * ky; const bx = (road[i + 1].lng - p.lng) * kx; const by = (road[i + 1].lat - p.lat) * ky;
+          const vx = bx - ax; const vy = by - ay; const u = Math.max(0, Math.min(1, -(ax * vx + ay * vy) / (vx * vx + vy * vy || 1e-9)));
+          if (Math.hypot(ax + vx * u, ay + vy * u) < 7) return true;
+        }
+        return road.some((q) => inRing(q, g));
+      };
+      const before = boundedFeatures.length;
+      boundedFeatures = boundedFeatures.filter((f) => {
+        if (f.type !== 'building' || !(f.geometry?.length > 2)) return true;
+        const c = { lat: f.geometry.reduce((s, p) => s + p.lat, 0) / f.geometry.length, lng: f.geometry.reduce((s, p) => s + p.lng, 0) / f.geometry.length };
+        if (!bridgeRings.some((r) => inRing(c, r))) return true;
+        return !deckRoads.some((rd) => near(f.geometry, rd.geometry));
+      });
+      if (boundedFeatures.length < before) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Buildings: ${before - boundedFeatures.length} inside a bridge's outline beside its road left to the bridge (towers).`);
+    }
   }
   if (includeBuildings && boundedFeatures?.length) {
     const b = td.bounds; const ws = td.width * computeSquareSize(td);
