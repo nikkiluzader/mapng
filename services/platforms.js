@@ -61,8 +61,10 @@ export function buildPlatformMeshes(platforms, opts = {}) {
     ring = closedRing(ring) && !pl.strip ? ring.slice(0, -1) : bufferLine(ring, pl.width > 0 ? Math.min(pl.width, 20) : DEFAULT_WIDTH_M);
     if (ring.length < 3) continue;
     // (counter-clockwise, so the top faces up and the sides face out)
-    let a2 = 0; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) a2 += (ring[j][0] - ring[i][0]) * (ring[j][1] + ring[i][1]);
-    if (a2 > 0) ring = ring.slice().reverse();
+    // (the shoelace sum: negative for a clockwise ring. The sign was taken the wrong way round, every ring turned
+    // clockwise, and every side faced in: culled from outside, the islands' and platforms' sides were missing)
+    let a2 = 0; for (let i = 0; i < ring.length; i++) { const p = ring[i]; const q = ring[(i + 1) % ring.length]; a2 += p[0] * q[1] - q[0] * p[1]; }
+    if (a2 < 0) ring = ring.slice().reverse();
     // its top: over the nearest track where one runs near, else over the ground; never under the ground
     const tz = ring.map(([x, y]) => trackZ(x, y));
     const anyTrack = !Number.isFinite(pl.over) && tz.some((z) => z !== null);
