@@ -9827,7 +9827,11 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
   const benchSurroundings = () => (benchLines ||= {
     water: (terrainData.osmFeatures || []).filter((f) => (f.type === 'water' || f.type === 'coastline') && f.geometry?.length > 1 && !isUndergroundWater(f.tags))
       .map((f) => boxed(f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0)))),
-    ways: [...roads.map((r) => boxed(r.pts)), ...footpaths.filter((fp) => fp.nodes?.length > 1).map((fp) => boxed(fp.nodes))],
+    // (every mapped way on the ground, walked or driven: a pedestrian street is no drawn footpath and no street for
+    // cars, and the benches along one were turned to a road 20 m off; a square mapped as an area is no line to face)
+    ways: (terrainData.osmFeatures || []).filter((f) => f.type === 'road' && f.geometry?.length > 1 && f.tags?.area !== 'yes' && !f.tags?.tunnel && !(f.tags?.bridge && f.tags.bridge !== 'no')
+      && !['proposed', 'construction', 'corridor', 'elevator', 'platform'].includes(f.tags?.highway))
+      .map((f) => boxed(f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0)))),
   });
 
   const objects = [];
