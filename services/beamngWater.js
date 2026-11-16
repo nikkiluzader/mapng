@@ -1245,6 +1245,8 @@ export function fillRemnants(heightMap, width, height, lowered, { rounds = 2, ke
 const SEA_SURFACE_BAND_M = 0.3;
 const SEABED_DEPTH_M = 2;
 const SEABED_RAMP_CELLS = 3;
+const SEA_FLAT_M = 0.05;       // a fine survey's water is flat: a neighbour within this is the same water
+const SEA_SPREAD_M = 15;       // the lowering is carried this far past the land cover's water cells
 const SEA_SHOAL_MAX_M = 6;     // in water joined to the sea, ground up to this far over it is still the sea's floor
 const COAST_REACH_M = 150;          // a cell is judged by a mapped coastline this near
 const COAST_MARGIN_M = 2.5;         // the sea begins this far out from the mapped line
@@ -1407,6 +1409,34 @@ export function lowerSeabed(grid, landCover, seaZ, { coarse = false, keep = null
       }
       const target = seaZ - SEABED_DEPTH_M * Math.min(1, d / SEABED_RAMP_CELLS);
       if (target < z) edits.set(idx, target + minHeight);
+    }
+  }
+  // A fine survey holds the water's surface flat, right up to the quay. The land cover's 10 m cells stop short of
+  // the quay in blocks, and the water left unlowered between a block's edge and the real quay stood at the sea's
+  // level as a stepped shelf: big teeth along every quay at a bridge's end (Copenhagen, Utrecht, Hamburg). The
+  // lowering is carried on from the lowered water to the grid points beside it that lie at the same flat level
+  // (within SEA_FLAT_M of their neighbour, no higher than the sea's surface band), no further than
+  // SEA_SPREAD_M from the land cover's water: it stops at the quay the survey measured. Ground at the sea's
+  // level that is not flat with the water (a low street behind its kerb) is not reached.
+  if (!coarse && edits.size) {
+    const sq = worldSize > 0 ? worldSize / width : 1;
+    // (steps along the grid's axes: a diagonal run takes 1.4 steps a square)
+    const maxSteps = Math.max(1, Math.round((SEA_SPREAD_M * 1.5) / sq));
+    const shallow = seaZ - SEABED_DEPTH_M / SEABED_RAMP_CELLS + minHeight;
+    let frontier = [];
+    for (const idx of edits.keys()) if (heightMap[idx] - minHeight <= top) frontier.push(idx);
+    for (let step = 0; step < maxSteps && frontier.length; step++) {
+      const next = [];
+      for (const idx of frontier) {
+        const r = Math.floor(idx / width); const c = idx - r * width; const z0 = heightMap[idx];
+        for (const k of [c > 0 ? idx - 1 : -1, c < width - 1 ? idx + 1 : -1, r > 0 ? idx - width : -1, r < height - 1 ? idx + width : -1]) {
+          if (k < 0 || edits.has(k)) continue;
+          const zk = heightMap[k];
+          if (zk - minHeight > top || Math.abs(zk - z0) > SEA_FLAT_M) continue;
+          if (shallow < zk) { edits.set(k, shallow); next.push(k); }
+        }
+      }
+      frontier = next;
     }
   }
   // A pier, breakwater, groyne or quay mapped as an area is a platform over the water. Where the ground under

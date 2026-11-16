@@ -10,6 +10,7 @@
 // full-grid buffer is 1 GiB at 16k). Nothing here knows about any place.
 
 import { findSideArms, sideArmFromEnd, sideArmStation, throughSurface } from './sideArms.js';
+import { WING_FILL_M } from './wingWalls.js';
 import { seatable } from './profileSolve.js';
 
 const TILE = 64;
@@ -33,7 +34,7 @@ const CORE_OUTER = 0.6;         // ...where the lower road may take the upper's 
 const SIDE_WARP_M = 12;         // a side road leaves its through road's edge at that road's grade across it, level again this far on
 const SIDE_WARP_MAX = 0.2;
 const SIDE_SQUARE_M = 15;       // a side road's pieces this far past its through road's edge never reach back behind it
-const WING_FILL_M = 15;          // a road's fill this near a deck's end has walled sides, not slopes
+// (WING_FILL_M: a road's fill this near a deck's end has walled sides, not slopes; the walls: wingWalls.js)
 const ABUT_FILL_MAX_M = 1.5;     // an abutment fills at most this deep: deeper is what the bridge crosses
 const DECK_ABUT_CLEAR_M = 0.3;  // abutment fill stops this far under the deck's underside          // a deck end on fill rests on it this far: no cap there
 

@@ -530,3 +530,30 @@ test('a patch of riverbed over the bank limit, dug ground all round it, is dug t
   const out2 = Float32Array.from(bank); res2.apply((idx, v) => { out2[idx] = v; });
   assert.equal(out2[32 * W + 32], 5, 'a bank joined to the land outside stays');
 });
+
+test('on a fine survey the sea floor reaches the quay the survey measured, not the land cover cells', async () => {
+  const { lowerSeabed } = await import('../services/beamngWater.js');
+  // 1 m grid, 80 m wide; the quay runs diagonally (land where x + y > 0, 1.5 m up); water flat at 0.1 m.
+  // The land cover (10 m cells) calls a cell water only when its middle is 8 m or more out from the quay.
+  const W = 80; const ws = 80; const hm = new Float32Array(W * W); const N = 8; const lc = new Uint8Array(N * N);
+  const xy = (r, c) => [((c / W) - 0.5) * ws, (0.5 - (r + 1) / W) * ws];
+  for (let r = 0; r < W; r++) for (let c = 0; c < W; c++) { const [x, y] = xy(r, c); hm[r * W + c] = x + y > 0 ? 1.5 : 0.1; }
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) { const x = (c + 0.5 - N / 2) * 10; const y = (N / 2 - r - 0.5) * 10; lc[r * N + c] = x + y < -8 * Math.SQRT2 ? 80 : 50; }
+  // a low street behind the quay, at the water's height but not joined to it flat: stays
+  for (let r = 0; r < W; r++) for (let c = 0; c < W; c++) { const [x, y] = xy(r, c); if (x + y > 6 && x + y < 10) hm[r * W + c] = 0.1; }
+  const res = lowerSeabed({ heightMap: hm, width: W, height: W, minHeight: 0, worldSize: ws }, { grid: lc, n: N }, 0, { coarse: false });
+  const out = Float32Array.from(hm); res.apply((idx, v) => { out[idx] = v; });
+  let shelf = 0; let street = 0; let land = 0;
+  for (let r = 0; r < W; r++) for (let c = 0; c < W; c++) {
+    const [x, y] = xy(r, c); const v = out[r * W + c];
+    if (x + y < -1 && x + y > -12 && v > -0.3) shelf++;              // water within 12 m of the quay left at the surface
+    if (x + y > 6.5 && x + y < 9.5 && v < 0.1 - 1e-6) street++;      // the street lowered
+    if (x + y > 1 && (x + y < 6 || x + y > 10) && v !== 1.5) land++;
+  }
+  assert.equal(shelf, 0, `${shelf} water points beside the quay left at the surface`);
+  assert.equal(street, 0, 'the low street behind the quay stays');
+  assert.equal(land, 0, 'the quay itself stays');
+  // coarse elevation: unchanged by this (no spread)
+  const coarse = lowerSeabed({ heightMap: hm, width: W, height: W, minHeight: 0, worldSize: ws }, { grid: lc, n: N }, 0, { coarse: true });
+  assert.ok(coarse.pixels <= res.pixels);
+});

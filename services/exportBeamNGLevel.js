@@ -59,6 +59,7 @@ import { tagModel, tagObjectFor, standTagObject, part } from './tagModels.js';
 import { fillRows, rowDirection } from './areaRows.js';
 import { buildPlatformMeshes } from './platforms.js';
 import { leaveBridgeBuildings } from './bridgeBuildings.js';
+import { wingWallRuns, buildWingWallMesh } from './structures/wingWalls.js';
 import { buildMonumentMeshes, monumentKind, monumentHeight } from './monuments.js';
 import { solveProfilesSteps, gradeLimit } from './structures/profileSolve.js';
 import { appendAll, keepInPlace } from './keepInPlace.js';
@@ -95,7 +96,7 @@ import { buildRoadSignProps } from './roadSigns.js';
 import { generateRoadLamps } from './streetLamps.js';
 import { buildIngameProbes } from './ingameProbes.js';
 import { smoothLine } from './lineSmoothing.js';
-import { buildPlazaMeshes, courtyardPathHalf, courtyardPaved, getPlazaMaterialDefs, isCourtyard, isPlaza, plazaSurface } from './plazas.js';
+import { buildPlazaMeshes, courtyardPathHalf, courtyardPaved, getPlazaMaterialDefs, isCourtyard, isPlaza, plazaSurface, PLAZA_MATERIAL, plazaTileM } from './plazas.js';
 import { buildSidewalkMeshesParallel, cornerPatches, inferCrossingSidewalks, buildWallDeckMesh, gutterLines, isCurbedClass, lowerUnderWallDecks, checkSidewalkGround, CURB_ONLY_M, ZEBRA_CROSSING_MATERIAL, gradeSidewalkGround, getSidewalkMaterialDefs, SIDEWALK_MATERIALS, sidewalkFootways, streetSides, DEFAULT_SIDEWALK_LOOK, setCurbHeight, CURB_HEIGHTS_M,
 } from './beamngSidewalks.js';
 import { buildRoadNameZones } from './roadNameZones.js';
@@ -14171,6 +14172,22 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         appendAll(sidewalks.meshes, res.meshes);
         console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Kerbed islands: ${res.count} traffic island(s) and roundabout centre(s) raised, ${res.triangles} triangles.`);
       }
+    }
+  }
+  // wing walls: the walls a road's fill stands behind beside a bridge's end (structures/wingWalls.js). The terrain
+  // there has steep sides by design; bare, they showed as rows of teeth at every raised bridge approach
+  if (includeRoads && sg?.classes && sg.profile?.z && Array.isArray(sidewalks.meshes)) {
+    const cwIndexW = buildCarriagewayIndex(groundCarriageways);
+    const runs = wingWallRuns(sg, {
+      groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
+      onOtherRoad: (x, y) => isOnOtherCarriageway(cwIndexW, x, y, 0, () => false),
+      shoulderM: Math.max(1, squareSize), slopeM: Math.max(2, 2 * squareSize),
+    });
+    const mesh = buildWingWallMesh(runs, PLAZA_MATERIAL('concrete'), plazaTileM('concrete'));
+    if (mesh) {
+      sidewalks.meshes.push(mesh);
+      const len = runs.reduce((s, r) => s + r.stations.slice(1).reduce((q, st, i) => q + Math.hypot(st.x - r.stations[i].x, st.y - r.stations[i].y), 0), 0);
+      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Wing walls: ${runs.length} run(s), ${Math.round(len)} m, beside raised roads at bridge ends.`);
     }
   }
   // (a world point inside a mapped water area: nothing stands there. A memorial or a block mapped in a basin by
