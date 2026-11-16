@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { modelsByItem } from '../composables/useAssetThumbs.js';
+import { modelsByItem, modelsInUse, tagsPresent } from '../composables/useAssetThumbs.js';
 
 test('the models of an item: one entry per model, the placed ones first, none without a photo', () => {
   const data = {
@@ -29,4 +29,20 @@ test('a sign model is listed with the signs, not with its tag\'s road item', () 
   assert.deepEqual(out.roadSurfaces.map((m) => m.name), ['kerb']);
   assert.deepEqual(out.signs.map((m) => m.name), ['sign']);
   assert.deepEqual(out.billboards.map((m) => m.name), ['board']);
+});
+
+test('only the models this area\'s export can place are shown', () => {
+  const data = {
+    tags: [
+      { tag: 'amenity=bench', item: 'benches', assets: [{ shape: '/bench.dae', used: true }, { shape: '/other-bench.dae', used: false }] },
+      { tag: 'leisure=picnic_table', item: 'benches', assets: [{ shape: '/table.dae', used: true }] },
+      { tag: 'traffic_sign=*', item: 'signs', assets: [{ shape: '/sign.dae', used: true }] },
+    ],
+    models: Object.fromEntries(['/bench.dae', '/other-bench.dae', '/table.dae', '/sign.dae'].map((s, i) => [s, { name: s, thumb: `${i}.jpg` }])),
+  };
+  const by = modelsByItem(data);
+  const present = tagsPresent([{ tags: { amenity: 'bench' } }, { tags: { traffic_sign: 'US:R1-1' } }, { tags: { leisure: 'no' } }]);
+  assert.deepEqual(modelsInUse(by.benches, present).map((m) => m.shape), ['/bench.dae']);   // no picnic table mapped here; the other bench is only a candidate
+  assert.deepEqual(modelsInUse(by.signs, present).map((m) => m.shape), ['/sign.dae']);
+  assert.deepEqual(modelsInUse(by.benches, tagsPresent([])), []);
 });

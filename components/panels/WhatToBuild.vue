@@ -58,16 +58,16 @@
                 >{{ t('build.tagsN', { n: it.tags.length }) }}</button>
                 <!-- (the game models behind this item, with photos: only where the site serves them, useAssetThumbs.js) -->
                 <button
-                  v-if="assetModels?.[it.id]?.length" type="button" data-testid="item-models"
+                  v-if="itemModels[it.id]?.length" type="button" data-testid="item-models"
                   class="text-micro text-gray-500 hover:text-brand dark:text-gray-400 underline-offset-2 hover:underline shrink-0"
                   :aria-expanded="!!modelsOpen[it.id]" @click="modelsOpen[it.id] = !modelsOpen[it.id]"
-                >{{ t('build.modelsN', { n: assetModels[it.id].length }) }}</button>
+                >{{ t('build.modelsN', { n: itemModels[it.id].length }) }}</button>
                 <span class="text-micro text-gray-500 dark:text-gray-400 shrink-0 tabular-nums">{{ it.detail }}</span>
                 <BaseSwitch size="sm" :on="it.on" :label="t(`build.item_${it.id}`)" :disabled="!hasOsmData" @toggle="setBuilt(it.id, !it.on)" />
               </div>
-              <div v-if="assetModels?.[it.id]?.length && modelsOpen[it.id]" class="ml-2 mb-1.5 pl-2 border-l border-gray-200 dark:border-gray-600" data-testid="item-model-strip">
+              <div v-if="itemModels[it.id]?.length && modelsOpen[it.id]" class="ml-2 mb-1.5 pl-2 border-l border-gray-200 dark:border-gray-600" data-testid="item-model-strip">
                 <ul class="flex flex-wrap gap-1.5">
-                  <li v-for="m in assetModels[it.id].slice(0, MODEL_STRIP_MAX)" :key="m.shape" class="w-[72px]">
+                  <li v-for="m in itemModels[it.id].slice(0, MODEL_STRIP_MAX)" :key="m.shape" class="w-[72px]">
                     <img
                       :src="thumbUrl(m)" :alt="m.is || m.name" :title="`${m.name}${m.is ? ': ' + m.is : ''} (${m.tag})`" loading="lazy" decoding="async" width="72" height="54"
                       class="w-[72px] h-[54px] object-cover rounded border bg-gray-200 dark:bg-gray-700"
@@ -76,7 +76,7 @@
                     <div class="text-micro leading-tight truncate text-gray-600 dark:text-gray-300">{{ m.name }}</div>
                   </li>
                 </ul>
-                <a href="/asset-review.html" target="_blank" rel="noopener" class="mt-1 inline-block text-micro text-brand hover:underline">{{ assetModels[it.id].length > MODEL_STRIP_MAX ? t('build.modelsAllN', { n: assetModels[it.id].length }) : t('build.modelsAll') }}</a>
+                <a href="/asset-review.html" target="_blank" rel="noopener" class="mt-1 inline-block text-micro text-brand hover:underline">{{ t('build.modelsAll') }}</a>
               </div>
               <ul v-if="showOsmTags && tagsOpen[it.id]" class="ml-2 mb-1 pl-2 border-l border-gray-200 dark:border-gray-600 space-y-0.5">
                 <li v-for="tg in it.tags" :key="tg.tag" class="flex items-center gap-1.5">
@@ -270,7 +270,7 @@
 
 <script setup>
 import { useMeasureRoadWidths } from '../../composables/useMeasureRoadWidths.js';
-import { useAssetThumbs } from '../../composables/useAssetThumbs.js';
+import { useAssetThumbs, modelsInUse, tagsPresent } from '../../composables/useAssetThumbs.js';
 import { WIDTH_SOURCE_TAG } from '../../services/satRoadWidth.js';
 import { computed, reactive, toRaw } from 'vue';
 import { treeTable, treeModelLabel, sampleElevations } from '../../services/treeTable.js';
@@ -373,6 +373,13 @@ const tagsOpen = reactive({});
 const modelsOpen = reactive({});
 const MODEL_STRIP_MAX = 12;
 const { assetModels, thumbUrl } = useAssetThumbs();
+// (only what this area's export can place: a model placed today, for a tag the map data here holds. Every candidate
+// for every tag is on the review page)
+const itemModels = computed(() => {
+  const all = assetModels.value; if (!all) return {};
+  const present = tagsPresent(toRaw(props.osmFeatures));
+  return Object.fromEntries(Object.entries(all).map(([id, list]) => [id, modelsInUse(list, present)]));
+});
 // (Expand all / Collapse all: every group; collapsing closes the tag lists under them too)
 const setAllGroups = (on) => { for (const g of CONTENT_GROUPS) open[g.id] = on; if (!on) for (const k of Object.keys(tagsOpen)) tagsOpen[k] = false; };
 const activePreset = computed(() => (props.advanced ? advancedPreset.value : basicPreset.value));
