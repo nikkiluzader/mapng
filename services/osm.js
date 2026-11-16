@@ -203,7 +203,9 @@ const isAreaLikeWay = (tags, nodes) => {
   if (tags.area === "no") return false;
   const closed = isClosedRing(nodes);
   if (!closed) return false;
-  if (tags.highway || tags.railway || tags.barrier) return false;
+  // (a lift's shaft drawn as a building, highway=elevator: an area, see the way loop)
+  const liftShaft = tags.highway === "elevator" && !!tags.building && tags.building !== "no";
+  if ((tags.highway && !liftShaft) || tags.railway || tags.barrier) return false;
   if (tags.waterway) {
     return ["riverbank", "dock", "boatyard", "dam"].includes(tags.waterway);
   }
@@ -493,7 +495,10 @@ export const parseOverpassResponse = (data, bounds) => {
     // (a via ferrata is a cable-protected climbing route up a rock face, not a
     // road or a path: built as one, its 'bridge' pieces became a road deck on
     // pillars hanging off the cliff, Via Ferrata Le Roc de Tovière, Tignes)
-    if (tags.highway && !NOT_A_ROUTE.has(tags.highway)) {
+    // (a lift mapped as its shaft's outline, highway=elevator on a closed way that is a building too, is that
+    // building: read as a route it was never built. The two lift towers on Hoover Dam's crest)
+    const liftBuilding = tags.highway === "elevator" && !!tags.building && tags.building !== "no" && isClosedRing(w.nodes);
+    if (tags.highway && !NOT_A_ROUTE.has(tags.highway) && !liftBuilding) {
       // Keep original way geometry. Aggressive signature-based joining can produce
       // long discontinuous polylines across intersections/branches.
       rawFeatures.push({ id: id.toString(), type: "road", geometry: w.nodes, tags });

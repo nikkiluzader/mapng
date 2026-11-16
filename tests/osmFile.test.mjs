@@ -189,3 +189,11 @@ test('a JOSM file of several downloads covers the box round all of them', async 
   // an area inside the whole, but reaching past the last download alone
   assert.equal(osmFileCoverage(bounds, { south: 46.002, west: 7.002, north: 46.018, east: 7.008 }).coverage, 'full');
 });
+
+test('a lift mapped as its shaft (highway=elevator on a closed way that is a building) is a building, not a route', () => {
+  const way = (id, tags, pts) => ({ type: 'way', id, tags, geometry: pts.map(([lon, lat]) => ({ lat, lon })) });
+  const ring = [[7.001, 46.001], [7.0011, 46.001], [7.0011, 46.0011], [7.001, 46.0011], [7.001, 46.001]];
+  const out = parseOverpassResponse({ elements: [way(50, { highway: 'elevator', building: 'transportation' }, ring), way(51, { highway: 'elevator' }, ring.slice(0, 3))] }, { north: 46.01, south: 46, east: 7.01, west: 7 });
+  assert.equal(out.find((f) => String(f.id).startsWith('50'))?.type, 'building');
+  assert.ok(!out.some((f) => String(f.id).startsWith('51') && f.type === 'building'), 'a lift drawn as a line stays as it was');
+});
