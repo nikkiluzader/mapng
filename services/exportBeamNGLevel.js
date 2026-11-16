@@ -12805,6 +12805,18 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     const b = td.bounds; const ws = td.width * computeSquareSize(td);
     boundedFeatures = markShortSpans(boundedFeatures, (p) => [((p.lng - b.west) / (b.east - b.west) - 0.5) * ws, (0.5 - (b.north - p.lat) / (b.north - b.south)) * ws]);
   }
+  // (a building a road passes through up on a bridge, tunnel=building_passage on layer 1 or more: a bridge's tower or
+  // gatehouse. Built from the ground as a house, its walls stood across the deck: Tower Bridge. Left to the bridge)
+  if (includeBuildings && boundedFeatures?.length) {
+    const raised = boundedFeatures.filter((f) => f.type === 'road' && f.tags?.tunnel === 'building_passage' && (Number.parseInt(f.tags.layer, 10) || 0) >= 1 && f.geometry?.length > 1);
+    if (raised.length) {
+      const pts = raised.flatMap((f) => f.geometry.flatMap((p, i) => (i ? [p, { lat: (p.lat + f.geometry[i - 1].lat) / 2, lng: (p.lng + f.geometry[i - 1].lng) / 2 }] : [p])));
+      const inRing = (p, g) => { let k = false; for (let i = 0, j = g.length - 1; i < g.length; j = i++) if (((g[i].lat > p.lat) !== (g[j].lat > p.lat)) && (p.lng < ((g[j].lng - g[i].lng) * (p.lat - g[i].lat)) / (g[j].lat - g[i].lat) + g[i].lng)) k = !k; return k; };
+      const before = boundedFeatures.length;
+      boundedFeatures = boundedFeatures.filter((f) => !(f.type === 'building' && f.geometry?.length > 2 && pts.some((p) => inRing(p, f.geometry))));
+      if (boundedFeatures.length < before) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Buildings: ${before - boundedFeatures.length} a bridge road passes through left to the bridge (towers, gatehouses).`);
+    }
+  }
   if (includeBuildings && boundedFeatures?.length) {
     const b = td.bounds; const ws = td.width * computeSquareSize(td);
     const project = (lat, lng) => [((lng - b.west) / (b.east - b.west) - 0.5) * ws, (0.5 - (b.north - lat) / (b.north - b.south)) * ws];

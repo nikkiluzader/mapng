@@ -424,6 +424,9 @@ export const parseOverpassResponse = (data, bounds) => {
 
   const getFeatureType = (tags) => {
     if (tags.man_made === "bridge" && !tags.highway) return "bridge_infra";
+    // (a bridge's pier or abutment mapped as a building, bridge:support=*: the bridge's own builder makes its supports.
+    // Built as a building it stood as a house across the deck: Tower Bridge's towers, a road driving into a wall)
+    if (tags["bridge:support"] && tags["bridge:support"] !== "no") return "bridge_support";
     if (!!tags.building || ["castle", "fort", "monastery", "tower", "ruins"].includes(tags.historic)) return "building";
     if (tags.natural === "coastline") return "coastline";
     if (
