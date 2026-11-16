@@ -372,6 +372,7 @@ export function damKind(d, frame = null) {
     if (wide[wide.length >> 1] / d.gap >= FILL_RATIO) return 'fill';
   }
   const year = Number.parseInt(String(t.start_date || t.opening_date || '').slice(0, 4), 10);
+  if (/concrete/.test(said)) return 'concrete';   // (said outright: a listed concrete dam is still concrete)
   if (/masonry|stone/.test(said) || (Number.isFinite(year) && year < MASONRY_BEFORE) || t.heritage || t.historic) return 'masonry';
   return 'concrete';
 }
@@ -399,6 +400,12 @@ const BATTER = 0.7;
 const ARCH_SAG = 0.12;
 const ARCH_MIN_M = 25;
 const BATTER_SMOOTH = 0.25;
+const SURVEYED_M = 3;
+const SKIN_M = 0.6;
+const SKIN_STEP_M = 0.5;
+const SKIN_REACH_M = 20;
+const PROFILE_PCT = 0.75;
+const PROFILE_MIN_SHARE = 0.08;
 const BURY_M = 3;              // a face runs this far into the ground
 const SLOPE_MIN_M = 3;        // a side reaching less than this past the crest's edge is a wall straight down
 
@@ -419,6 +426,9 @@ function buildAxisDam(m, d, groundAt) {
   const chord = Math.hypot(p.at(-1)[0] - p[0][0], p.at(-1)[1] - p[0][1]) || 1;
   const sag = Math.max(...p.map(([x, y]) => Math.abs((p.at(-1)[0] - p[0][0]) * (p[0][1] - y) - (p[0][0] - x) * (p.at(-1)[1] - p[0][1])) / chord));
   const arch = !air && sag / chord >= ARCH_SAG && gap >= ARCH_MIN_M;
+  // (the survey holds the dam: most of the crest line's ground within SURVEYED_M of the crest)
+  const under = p.map(([x, y]) => crest - g(x, y)).sort((a, b) => a - b);
+  const surveyed = under[Math.floor(under.length * 0.7)] <= SURVEYED_M;
   // How far a face stands out past the crest's edge at a depth under the crest, at axis point i. A mapped footprint
   // gives the face's batter (how far out per metre down), not its foot line: each slice run to the outline's own
   // corners made a face of creased wedges (Zapora Pilchowice from above). The batter read at every slice, then
@@ -427,7 +437,42 @@ function buildAxisDam(m, d, groundAt) {
   const outAt = (reach, sgn) => {
     if (!reach) return (i, depth) => (sgn !== side ? 0 : arch ? BASE_FRAC * depth * (0.4 + 0.6 * Math.min(1, depth / gap)) : BATTER * depth);
     const r = reach.map((v) => Math.max(0, v - hc));
-    if (mid(r) < SLOPE_MIN_M) return () => 0;
+    if (!surveyed && mid(r) < SLOPE_MIN_M) return () => 0;
+    // A survey that holds the dam itself (the ground along the crest at the crest's height): the face is that
+    // surveyed shape with a skin over it, SKIN_M out, from the crest edge to the mapped footprint's edge. One
+    // batter stood in front of a hollow face in the middle and behind it at the sides, the model showing in a
+    // strip (Hoover Dam). Read level by level outwards, then evened along the dam.
+    if (surveyed) {
+      // (slice by slice the skin carried every bit of the survey's noise, each tower and every half-metre step of
+      // the reading: a face of dents and facets. One profile for the whole face instead: at each depth, how far out
+      // the surveyed face stands, taken over all the slices that reach that depth (PROFILE_PCT of them: the skin
+      // stays in front of nearly all of the face), then evened down the face and never stepping back in. Swept
+      // along the crest, whose own line already carries the dam's curve in plan.)
+      const nLev = Math.floor((gap + FACE_STEP_M) / FACE_STEP_M) + 1;
+      const seen = Array.from({ length: nLev }, () => []);
+      p.forEach(([x, y], i) => {
+        const cap = Math.max(r[i], SKIN_REACH_M); let o = 0;
+        for (let k = 0; k < nLev; k++) {
+          const z = crest - k * FACE_STEP_M;
+          while (o < cap && g(x + sgn * n[i][0] * (hc + o), y + sgn * n[i][1] * (hc + o)) > z - SKIN_M) o += SKIN_STEP_M;
+          if (o >= cap) break;   // (into the hillside or past the footprint: this slice says nothing deeper)
+          seen[k].push(o);
+        }
+      });
+      const prof = [];
+      for (let k = 0; k < nLev; k++) {
+        const v = seen[k].sort((a, b) => a - b);
+        if (v.length >= Math.max(3, p.length * PROFILE_MIN_SHARE)) prof.push(v[Math.min(v.length - 1, Math.floor(v.length * PROFILE_PCT))]);
+        else prof.push(k < 2 ? 0 : prof[k - 1] + (prof[k - 1] - prof[k - 2]));   // (deeper than the survey shows: on at the last slope)
+      }
+      for (let pass = 0; pass < 2; pass++) for (let k = 1; k + 1 < nLev; k++) prof[k] = (prof[k - 1] + 2 * prof[k] + prof[k + 1]) / 4;
+      for (let k = 1; k < nLev; k++) prof[k] = Math.max(prof[k], prof[k - 1]);
+      return (i, depth) => {
+        if (depth <= 0) return 0;
+        const f = Math.min(nLev - 1, depth / FACE_STEP_M); const k = Math.floor(f); const k1 = Math.min(nLev - 1, k + 1);
+        return prof[k] + (prof[k1] - prof[k]) * (f - k) + SKIN_M;
+      };
+    }
     const deep = reach.map((v, i) => Math.max(0, crest - g(p[i][0] + sgn * n[i][0] * v, p[i][1] + sgn * n[i][1] * v)));
     const w = Math.max(4, Math.round(p.length * BATTER_SMOOTH));
     const all = r.reduce((s, v) => s + v, 0) / Math.max(1, deep.reduce((s, v) => s + v, 0));

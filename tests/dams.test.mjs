@@ -125,6 +125,7 @@ test('a fill dam: several times as wide as high, a slope on both sides, not conc
   assert.equal(damKind({ tags: { material: 'earth' }, gap: 30 }), 'fill');
   assert.equal(damKind({ tags: { start_date: '1912' }, gap: 60 }), 'masonry');
   assert.equal(damKind({ tags: {}, gap: 60 }), 'concrete');
+  assert.equal(damKind({ tags: { material: 'concrete', heritage: '2', historic: 'heritage' }, gap: 200 }), 'concrete');
 });
 
 test('a dam nothing crosses gets a crest line: its own line, or the middle of its footprint', async () => {
@@ -182,4 +183,20 @@ test('a face from a ragged footprint is one smooth batter along the dam', async 
   const ys = [...row.entries()].sort((a, b) => a[0] - b[0]).map(([, y]) => y);
   assert.ok(ys.length > 20);
   for (let i = 1; i < ys.length; i++) assert.ok(Math.abs(ys[i] - ys[i - 1]) < 0.6, `no crease: ${ys.map((v) => v.toFixed(1))}`);
+});
+
+test('a dam the survey holds: the faces are a skin over the surveyed shape, hollow where it is hollow', async () => {
+  const { planDams } = await import('../services/dams.js');
+  // the dam in the ground: crest 100 m over |y| < 4, a hollow air face (out by depth squared / 100) down to the floor at 0
+  const held = (x, y) => (y < 4 ? (y < -4 ? 70 : 100) : Math.max(0, 100 - Math.sqrt((y - 4) * 100)));
+  const [d] = planDams([feat([[-60, -4], [60, -4], [60, 110], [-60, 110], [-60, -4]], { waterway: 'dam', height: '100' })], project, { groundAt: held });
+  assert.ok(d, 'planned'); d.crest = 100;
+  const { pts } = built(axisOf(d), held);
+  // 50 m down the surveyed face is 25 m out from the crest edge; a straight batter to the footprint's edge would be 53 m
+  const mid = pts.filter((q) => Math.abs(q[0]) < 10 && Math.abs(q[2] - 50) < 1.1 && q[1] > 6).map((q) => q[1]);
+  assert.ok(mid.length && Math.min(...mid) > 28 && Math.max(...mid) < 33, `on the surveyed face: ${[...new Set(mid.map((v) => v.toFixed(0)))]}`);
+  // a noisy survey (bumps of a metre, a tower standing on the face): the same even face, one profile along the dam
+  const noisy = (x, y) => held(x, y) + (y > 6 && y < 100 ? Math.sin(x * 1.7) * Math.cos(y * 2.3) + (Math.abs(x - 20) < 4 && Math.abs(y - 30) < 4 ? 15 : 0) : 0);
+  const rough = built(axisOf({ ...d }), noisy).pts.filter((q) => Math.abs(q[0]) < 40 && Math.abs(q[2] - 49) < 1.6 && q[1] > 6).map((q) => q[1]);
+  assert.ok(rough.length > 10 && Math.max(...rough) - Math.min(...rough) < 0.2, `uniform along the dam: ${Math.min(...rough).toFixed(2)}..${Math.max(...rough).toFixed(2)}`);
 });
