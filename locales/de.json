@@ -833,6 +833,7 @@
   "mapSelector": {
     "moveTile": "{label} verschieben",
     "mapLayers": "Kartenebenen",
+    "streetMap": "Straßenkarte",
     "osmRefused": "Der Kartenserver von OpenStreetMap antwortet hier gerade nicht. Stattdessen wird die Topo-Karte gezeigt.",
     "openStreetMap": "OpenStreetMap",
     "satellite": "Satellit",

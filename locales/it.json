@@ -833,6 +833,7 @@
   "mapSelector": {
     "moveTile": "Sposta {label}",
     "mapLayers": "Layer mappa",
+    "streetMap": "Mappa stradale",
     "osmRefused": "Il server delle mappe di OpenStreetMap al momento non risponde qui. Al suo posto viene mostrata la mappa topografica.",
     "openStreetMap": "OpenStreetMap",
     "satellite": "Satellite",

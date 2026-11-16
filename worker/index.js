@@ -163,7 +163,8 @@ const OSM_TILES_PREFIX = '/api/osm-tiles/';
 const OSM_TILES_MANIFEST_KEY = 'osm/manifest.json';
 // (osm-all/: the planet with every tagged object; its own manifest, which only app versions that
 // filter on reading ask for, so earlier versions never see those archives)
-const OSM_TILES_KEY_RE = /^osm(?:-all)?\/[A-Za-z0-9._-]+\.pmtiles$/;
+// (osm/, osm-all/: the map data archives; basemap/: the street map the app draws, services/ownBaseMap.js)
+export const OSM_TILES_KEY_RE = /^(?:osm(?:-all)?|basemap)\/[A-Za-z0-9._-]+\.pmtiles$/;
 const OSM_TILES_ALL_MANIFEST_KEY = 'osm-all/manifest.json';
 const OSM_TILES_RANGE_TTL_S = 30 * 24 * 3600;
 const OSM_TILES_MANIFEST_TTL_S = 300;

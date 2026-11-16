@@ -833,6 +833,7 @@
   "mapSelector": {
     "moveTile": "Déplacer {label}",
     "mapLayers": "Couches de carte",
+    "streetMap": "Plan des rues",
     "osmRefused": "Le serveur de cartes d'OpenStreetMap ne répond pas ici pour le moment. La carte topographique est affichée à la place.",
     "openStreetMap": "OpenStreetMap",
     "satellite": "Satellite",

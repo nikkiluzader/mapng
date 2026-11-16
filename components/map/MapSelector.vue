@@ -41,7 +41,7 @@
       />
 
       <l-tile-layer
-        v-if="selectedLayer === 'topo' || (selectedLayer === 'osm' && osmRefused)"
+        v-if="selectedLayer === 'topo' || (selectedLayer === 'osm' && osmRefused) || (selectedLayer === 'street' && !ownMap)"
         url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}"
         attribution="&copy; <a href='https://www.esri.com/'>Esri</a>"
         layer-type="base"
@@ -238,6 +238,10 @@
         </button>
         <div v-if="layerPanelOpen" class="p-2 space-y-1">
             <p :class="PANEL_HEADING">{{ t('mapSelector.groupMap') }}</p>
+            <label v-if="ownMap" :class="PANEL_ROW" data-testid="layer-street">
+                <input type="radio" v-model="selectedLayer" value="street" class="accent-brand" />
+                <span>{{ t('mapSelector.streetMap') }}</span>
+            </label>
             <label :class="PANEL_ROW">
                 <input type="radio" v-model="selectedLayer" value="osm" class="accent-brand" />
                 <span>{{ t('mapSelector.openStreetMap') }}</span>
@@ -366,6 +370,7 @@
 
 <script setup>
 import { tileRefusalWatch } from '../../services/tileRefusal.js';
+import { ownMapAvailable, createOwnMapLayer } from '../../services/ownBaseMap.js';
 import { osmTilesInUse, osmTilesShown } from '../../services/osmTilesInUse.js';
 // (bundled, not fetched from a CDN: one less outside service)
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -492,18 +497,26 @@ const initialZoom = props.zoom;
 const currentCenter = ref(props.center);
 const currentZoom = ref(props.zoom);
 // Remembered across reloads.
-const MAP_LAYERS = ['osm', 'satellite', 'topo', 'dark', ...RELIEF_MODES];
+const MAP_LAYERS = ['street', 'osm', 'satellite', 'topo', 'dark', ...RELIEF_MODES];
 const readStored = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
 const writeStored = (key, value) => { try { localStorage.setItem(key, value); } catch { /* storage blocked */ } };
 const storedLayer = readStored('mapng_mapLayer');
 // (a first visit opens on the topo map: OpenStreetMap's own tile server is volunteer-run and turns heavy use away,
 // so it is a choice, not the default)
 const selectedLayer = ref(MAP_LAYERS.includes(storedLayer) ? storedLayer : 'topo');
+// MapNG's own street map (services/ownBaseMap.js): offered where its archive answers, and then what a first visit
+// opens on. Chosen but not there (another site, the archive withdrawn): the topo map stands in.
+const ownMap = ref(false);
+ownMapAvailable().then((there) => {
+  ownMap.value = there;
+  if (there && !MAP_LAYERS.includes(storedLayer)) selectedLayer.value = 'street';
+  syncOwnMapLayer();
+});
 // Names on satellite imagery (default on). The OSM and topo maps have their
 // own names, and the dark base never does: labels go only where missing.
 const satelliteNames = ref(readStored('mapng_satelliteLabels') !== 'false');
 const showLabels = computed(() => (selectedLayer.value === 'satellite' ? satelliteNames.value : selectedLayer.value === 'dark' || RELIEF_MODES.includes(selectedLayer.value)));
-watch(selectedLayer, (v) => { writeStored('mapng_mapLayer', v); syncReliefLayer(); });
+watch(selectedLayer, (v) => { writeStored('mapng_mapLayer', v); syncReliefLayer(); syncOwnMapLayer(); });
 // OpenStreetMap's tile server refusing this visitor (429 "Access denied" under its usage policy): the topo map
 // stands in for this visit and a line says so. The choice stays "OpenStreetMap": the next visit tries it again.
 const osmRefused = ref(false);
@@ -567,6 +580,25 @@ const syncReliefLayer = () => {
   if (!RELIEF_MODES.includes(selectedLayer.value)) return;
   reliefLayer = createReliefLayer(L, selectedLayer.value, { ...ONE_WORLD, zIndex: 1, onRange: (lo, hi) => { heightRange.value = [lo, hi]; } });
   reliefLayer.addTo(map);
+};
+
+// (the own street map is drawn in the browser, by a layer made when first shown)
+let ownMapLayer = null; let ownMapTurn = 0;
+const syncOwnMapLayer = async () => {
+  const map = leafletMap.value;
+  if (!map) return;
+  const turn = ++ownMapTurn;
+  if (ownMapLayer) { map.removeLayer(ownMapLayer); ownMapLayer = null; }
+  if (selectedLayer.value !== 'street' || !ownMap.value) return;
+  try {
+    const layer = await createOwnMapLayer({ lang: String(locale.value || 'en').slice(0, 2), leaflet: { ...ONE_WORLD, zIndex: 1 } });
+    // (the choice changed while the renderer loaded)
+    if (turn !== ownMapTurn) return;
+    ownMapLayer = layer; layer.addTo(map);
+  } catch (err) {
+    console.warn('[map] The street map could not be drawn:', err?.message || err);
+    ownMap.value = false;
+  }
 };
 
 const labelLayers = computed(() => (selectedLayer.value === 'dark'
@@ -1171,6 +1203,7 @@ watch(() => props.boxLocked, (locked, was) => {
 const onMapReady = (map) => {
   leafletMap.value = map;
   syncReliefLayer();
+  syncOwnMapLayer();
   bgLayer = attachBackgroundLayer(map, {
     getMask: () => store.backgroundMask,
     getTool: () => store.backgroundTool,

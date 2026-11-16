@@ -18,6 +18,7 @@
     "@fontsource-variable/overpass": "^5.3.0",
     "@fontsource-variable/overpass-mono": "^5.3.0",
     "@photostructure/tz-lookup": "11.7.0",
+    "@protomaps/basemaps": "^5.7.2",
     "@tresjs/cientos": "^4.3.1",
     "@tresjs/core": "^4.0.0",
     "@vue-leaflet/vue-leaflet": "^0.10.0",
@@ -33,6 +34,7 @@
     "pmtiles": "^4.5.0",
     "polygon-clipping": "^0.15.7",
     "proj4": "^2.20.2",
+    "protomaps-leaflet": "^5.1.0",
     "three": "^0.162.0",
     "vue": "^3.5.0",
     "vue-i18n": "^11.3.0"
