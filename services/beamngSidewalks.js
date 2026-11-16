@@ -3687,6 +3687,7 @@ const GROUND_BLEND_MIN_M = 1;
 const GROUND_BLEND_MAX_M = 10;
 const GROUND_BLEND_RUN = 2;      // 1 m of height difference blends over 2 m
 const GROUND_ROAD_MARGIN_M = 0.3;
+const WALK_FILL_MAX_M = 2;       // a walk's ground raised at most this far
 
 const smooth01 = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 
@@ -3787,6 +3788,9 @@ export function gradeSidewalkGround(runs, carriageways, grid, { overhead = () =>
             const surface = top + (run.walk ? WALK_UNDER_M : GROUND_UNDER_M) + DIP_CLEAR_M * (1 - share);
             if (ground > surface) target = Math.max(target, surface);
           }
+          // (a walk well over the ground is on a structure, a footway rising with a bridge beside its deck: the ground is
+          // not built up to it. Built up, it stood as a wall two squares wide and 6 m high beside the deck)
+          if (run.walk && target - ground > WALK_FILL_MAX_M) continue;
           best.claim(idx, key, target);
         }
       }
