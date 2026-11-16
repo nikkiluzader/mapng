@@ -1,7 +1,7 @@
 {
  "_note": "Area baselines for scripts/sweep/runSweep.mjs: re-record with --save after a change that improves an area (commit the file with it).",
- "recorded": "2026-11-15",
- "commit": "71c1b5f",
+ "recorded": "2026-11-16",
+ "commit": "cf6c1f6",
  "areas": {
   "normandy_flat@gpxz/untouched": {
    "steps": 0,
@@ -1490,7 +1490,7 @@
    "swFloat": 1734,
    "swBuried": 709,
    "lintErrors": 0,
-   "lintWarnings": 1,
+   "lintWarnings": 0,
    "decks": 3,
    "maxDeckH": 4.7,
    "deckKm": 0.09,
@@ -1516,28 +1516,28 @@
    "snapMovedPct": 10,
    "snapP90cm": 53,
    "lintErrors": 0,
-   "lintWarnings": 1,
+   "lintWarnings": 0,
    "decks": 3,
    "maxDeckH": 4.7,
    "deckKm": 0.09,
    "maxDeckLen": 57,
    "tunnels": 2,
    "tunnelsLeft": 1,
-   "seconds": 6
+   "seconds": 7
   },
   "gt_chevril@gpxz/ready": {
    "steps": 0,
    "steepStruct": 18,
-   "steepGround": 45,
+   "steepGround": 47,
    "shortX": 1,
    "groundGaps": 5,
    "thruDeck": 7,
    "spikes": 252,
-   "bumps": 16,
-   "cross": 32,
+   "bumps": 17,
+   "cross": 33,
    "junctions": 2,
-   "creases": 1264,
-   "swFloat": 71,
+   "creases": 1262,
+   "swFloat": 66,
    "swBuried": 26,
    "snapMovedPct": 10,
    "snapP90cm": 53,
@@ -1549,7 +1549,7 @@
    "maxDeckLen": 74,
    "tunnels": 2,
    "tunnelsLeft": 1,
-   "seconds": 7
+   "seconds": 8
   },
   "gt_chevril@t30/untouched": {
    "steps": 0,
@@ -1566,14 +1566,14 @@
    "swFloat": 3907,
    "swBuried": 3118,
    "lintErrors": 0,
-   "lintWarnings": 1,
+   "lintWarnings": 0,
    "decks": 2,
    "maxDeckH": 4.7,
    "deckKm": 0.03,
    "maxDeckLen": 24,
    "tunnels": 0,
    "tunnelsLeft": 3,
-   "seconds": 5
+   "seconds": 6
   },
   "gt_chevril@t30/noshape": {
    "steps": 0,
@@ -1590,14 +1590,14 @@
    "swFloat": 1270,
    "swBuried": 986,
    "lintErrors": 0,
-   "lintWarnings": 1,
+   "lintWarnings": 0,
    "decks": 2,
    "maxDeckH": 4.7,
    "deckKm": 0.12,
    "maxDeckLen": 115,
    "tunnels": 0,
    "tunnelsLeft": 3,
-   "seconds": 6
+   "seconds": 7
   },
   "gt_chevril@t30/ready": {
    "steps": 0,
@@ -1614,7 +1614,7 @@
    "swFloat": 1102,
    "swBuried": 810,
    "lintErrors": 0,
-   "lintWarnings": 1,
+   "lintWarnings": 0,
    "decks": 4,
    "maxDeckH": 11.93,
    "deckKm": 0.12,
@@ -2548,14 +2548,14 @@
    "snapMovedPct": 12,
    "snapP90cm": 66,
    "lintErrors": 0,
-   "lintWarnings": 1,
+   "lintWarnings": 0,
    "decks": 2,
    "maxDeckH": 4.7,
    "deckKm": 0.03,
    "maxDeckLen": 24,
    "tunnels": 2,
    "tunnelsLeft": 1,
-   "seconds": 6
+   "seconds": 7
   },
   "gt_chevril@mh/untouched": {
    "steps": 3,
@@ -2572,19 +2572,19 @@
    "swFloat": 1538,
    "swBuried": 692,
    "lintErrors": 0,
-   "lintWarnings": 1,
+   "lintWarnings": 0,
    "decks": 3,
    "maxDeckH": 4.7,
    "deckKm": 0.12,
    "maxDeckLen": 74,
    "tunnels": 2,
    "tunnelsLeft": 1,
-   "seconds": 6
+   "seconds": 7
   },
   "gt_chevril@mh/ready": {
    "steps": 0,
    "steepStruct": 0,
-   "steepGround": 28,
+   "steepGround": 41,
    "shortX": 1,
    "groundGaps": 11,
    "thruDeck": 0,
@@ -2592,8 +2592,8 @@
    "bumps": 9,
    "cross": 30,
    "junctions": 3,
-   "creases": 1237,
-   "swFloat": 56,
+   "creases": 1234,
+   "swFloat": 49,
    "swBuried": 22,
    "snapMovedPct": 12,
    "snapP90cm": 66,
