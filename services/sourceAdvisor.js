@@ -3,6 +3,18 @@
 // deep it goes at the centre, which is its resolution). Answers are cached per tile, so panning around asks again
 // only for new tiles; requests go through MapNG's tile cache (mapterhorn.js).
 import { MAPTERHORN_CACHE_URL, MAPTERHORN_TILE_URL } from './mapterhorn.js';
+import { loadLidarCoverage, coveredCell } from './lidarCoverage.js';
+
+// Where there is lidar at all is known without asking: the coverage index (services/lidarCoverage.js, the same one
+// the "Free lidar coverage" map layer draws) lists every z13 tile that exists. Asked tile by tile instead, the hint
+// sent a request for each z13 tile under the selection every time the map moved, and most of the world has none:
+// about 115,000 "not found" answers a day (2026-11-16). The index is believed while it is fresh; an old one may
+// miss a country added since, so past INDEX_FRESH_DAYS the tiles are asked for again.
+export const INDEX_FRESH_DAYS = 60;
+export const indexIsFresh = (index, now = Date.now()) => {
+  const made = Date.parse(index?.generated || '');
+  return index?.z === 13 && Number.isFinite(made) && now - made < INDEX_FRESH_DAYS * 86400000;
+};
 
 const TILE = 512;
 const MERC_HALF = 20037508.342789244;
@@ -41,10 +53,14 @@ export function boxAround(center, sideKm) {
  * Mapterhorn lidar over a box: { coverage: 0..1 of the box's z13 tiles, zoom: deepest at the centre (0 = none),
  * metersPerPixel: that zoom's ground resolution, reachable }.
  */
-export async function probeMapterhorn(bounds, { fetchImpl = fetch, signal } = {}) {
+export async function probeMapterhorn(bounds, { fetchImpl = fetch, signal, index = undefined, now = Date.now() } = {}) {
   const a = tileXY(bounds.north, bounds.west, 13), b = tileXY(bounds.south, bounds.east, 13);
+  // (the index, where it can be had and is fresh: null = ask for the tiles as before)
+  let idx = index;
+  if (idx === undefined) { try { idx = await loadLidarCoverage(fetchImpl); } catch { idx = null; } }
+  if (idx && !indexIsFresh(idx, now)) idx = null;
   const jobs = [];
-  for (let y = a.y; y <= b.y; y++) for (let x = a.x; x <= b.x; x++) jobs.push(exists(13, x, y, fetchImpl, signal));
+  for (let y = a.y; y <= b.y; y++) for (let x = a.x; x <= b.x; x++) jobs.push(idx ? coveredCell(idx, x, y) : exists(13, x, y, fetchImpl, signal));
   const found = await Promise.all(jobs);
   if (found.every((f) => f === null)) return { coverage: 0, zoom: 0, metersPerPixel: null, reachable: false };
   const coverage = found.filter(Boolean).length / found.length;
