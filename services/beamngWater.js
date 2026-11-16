@@ -964,6 +964,7 @@ export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [], shal
     // SHEET_REACH_CELLS away on every side, to SHEET_FLAT_M (flatAt), is that water; a beach or a bank slopes)
     // (only a stretch of it SHEET_MIN_M2 or more: a jetty's or a quay's level top is no water. Not with terrain
     // shaping off: there only the surface at the lake's own level gets its shallow bed)
+    const sheetLevels = [];   // (raw heights of the second water levels found)
     if (!shallow) {
       const cand = new Uint8Array(gw * gh);
       for (let gy = 0; gy < gh; gy++) for (let gx = 0; gx < gw; gx++) {
@@ -972,6 +973,7 @@ export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [], shal
         if (c >= 0 && r >= 0 && c <= width - 1 && r <= height - 1 && flatAt(c, r)) cand[i] = 1;
       }
       const minCells = SHEET_MIN_M2 / (cell * cell); const stack = [];
+      const cellHeight = (i) => { const c = Math.round(c0 + (i % gw) * k + (k - 1) / 2); const r = Math.round(r0 + Math.floor(i / gw) * k + (k - 1) / 2); return c < 0 || r < 0 || c > width - 1 || r > height - 1 ? null : heightMap[r * width + c]; };
       for (let s = 0; s < gw * gh; s++) {
         if (cand[s] !== 1) continue;
         const patch = [s]; cand[s] = 2; stack.push(s);
@@ -979,7 +981,20 @@ export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [], shal
           const i = stack.pop(); const gx = i % gw;
           for (const j of [gx > 0 ? i - 1 : -1, gx < gw - 1 ? i + 1 : -1, i - gw, i + gw]) if (j >= 0 && j < gw * gh && cand[j] === 1) { cand[j] = 2; patch.push(j); stack.push(j); }
         }
-        if (patch.length >= minCells) for (const i of patch) { seed[i] = 0; wet[i] = 1; flaw[i] = 1; lowDry[i] = 0; }
+        if (patch.length >= minCells) {
+          for (const i of patch) { seed[i] = 0; wet[i] = 1; flaw[i] = 1; lowDry[i] = 0; }
+          sheetLevels.push(cellHeight(patch[patch.length >> 1]));
+        }
+      }
+      // (and every other bit of ground at such a stretch's own height: its rim, where the ground beside it is the
+      // shore and the test above fails, and the scraps left between cuts under a bridge stood on as dark blocks
+      // and a row of teeth in the water)
+      if (sheetLevels.length) {
+        for (let i = 0; i < gw * gh; i++) {
+          if (!high[i] || flaw[i]) continue;
+          const h0 = cellHeight(i);
+          if (h0 != null && sheetLevels.some((z) => Math.abs(h0 - z) <= SHEET_FLAT_M)) { seed[i] = 0; wet[i] = 1; flaw[i] = 1; lowDry[i] = 0; }
+        }
       }
     }
     // (a thin low strip of "ground" in the water is the survey's own flaw: a
@@ -1050,6 +1065,9 @@ export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [], shal
     // (the floor's share of the depth at a spot: 1 at the dam, DAM_FAR_SHARE at the far end)
     const floorShare = (c, r) => (damSoft ? 1 - (1 - DAM_FAR_SHARE) * Math.min(1, sample(damSoft, c, r) / damFar) : 1);
     const blendOver = Math.max(LAKE_BANK_M, 2.5 * sigma * cell);
+    // (a pixel at a second water level's own height is that water, whatever its cell was taken for: a big lake's
+    // cells are several pixels wide, and the pixels of one beside a cut under a bridge stood on as spikes)
+    const atSheet = (raw) => sheetLevels.some((z) => Math.abs(raw - z) <= SHEET_FLAT_M);
     for (let r = Math.max(0, Math.floor(pr0)); r <= Math.min(height - 1, Math.ceil(pr1)); r++) {
       for (let c = Math.max(0, Math.floor(pc0)); c <= Math.min(width - 1, Math.ceil(pc1)); c++) {
         const idx = r * width + c;
@@ -1059,7 +1077,7 @@ export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [], shal
         const gi = cellOf(c, r);
         const above = ground - level;
         if (loose ? above >= (shallow ? LAKE_CUT_FULL_M : LAKE_CUT_TOP_M)
-          : above >= LAKE_CUT_FULL_M && !(flaw[gi] && above < LAKE_CUT_TOP_M)) continue;
+          : above >= LAKE_CUT_FULL_M && !((flaw[gi] || atSheet(heightMap[idx])) && above < LAKE_CUT_TOP_M)) continue;
         const [x, y] = toWorld(c, r);
         if (!poly.contains(x, y) || keep(x, y)) continue;
         const exact = sample(dist, c, r) * cell;
@@ -1071,7 +1089,7 @@ export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [], shal
         const edge = LAKE_BED_EDGE_M + (LAKE_BED_M - LAKE_BED_EDGE_M) * Math.min(1, exact / LAKE_BANK_M);
         let target = level - Math.max(edge, depth * t * (2 - t) * floorShare(c, r));
         // (ground a little over a rough or falling water surface: cut less and less, so the bank meets the bed without a step)
-        if (loose && !shallow && above > LAKE_CUT_FULL_M && !flaw[gi]) {
+        if (loose && !shallow && above > LAKE_CUT_FULL_M && !flaw[gi] && !atSheet(heightMap[idx])) {
           const q = (above - LAKE_CUT_FULL_M) / (LAKE_CUT_TOP_M - LAKE_CUT_FULL_M);
           target += (ground - target) * q * q * (3 - 2 * q);
         }
