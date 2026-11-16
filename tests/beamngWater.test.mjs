@@ -510,3 +510,20 @@ test('a breakwater the coastline is drawn round stays; a pier mapped as an area 
   const inland = grid(); for (let i = 0; i < inland.heightMap.length; i++) inland.heightMap[i] += 175;
   assert.equal(lowerSeabed(inland, { grid: lc, n: W }, 0, { coarse: true, piers: pier }).pierPixels, 0, 'a river pier 175 m up stays');
 });
+
+test('a patch of riverbed over the bank limit, dug ground all round it, is dug too (no columns)', async () => {
+  const { carveWaterUnderDecks } = await import('../services/beamngWater.js');
+  const W = 64; const ws = 64; const heightMap = new Float32Array(W * W).fill(3);
+  // a 6 m patch in the river's middle stands 5 m over the water (over the 4 m bank limit); the rest 3 m
+  for (let r = 29; r < 35; r++) for (let c = 29; c < 35; c++) heightMap[r * W + c] = 5;
+  const rivers = [{ nodes: [[-30, 0, 0, 40, 1], [30, 0, 0, 40, 1]], outline: [true, true] }];
+  const grid = { heightMap, width: W, height: W, worldSize: ws, minHeight: 0 };
+  const res = carveWaterUnderDecks({ rivers }, grid, () => false);
+  const out = Float32Array.from(heightMap); res.apply((idx, v) => { out[idx] = v; });
+  assert.ok(out[32 * W + 32] < 0, `the patch is dug: ${out[32 * W + 32]}`);
+  // ground over the limit reaching out of the river (a real bank) stays
+  const bank = Float32Array.from(heightMap); for (let r = 0; r < 35; r++) for (let c = 29; c < 35; c++) bank[r * W + c] = 5;
+  const res2 = carveWaterUnderDecks({ rivers }, { ...grid, heightMap: bank }, () => false);
+  const out2 = Float32Array.from(bank); res2.apply((idx, v) => { out2[idx] = v; });
+  assert.equal(out2[32 * W + 32], 5, 'a bank joined to the land outside stays');
+});

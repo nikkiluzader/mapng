@@ -1052,6 +1052,7 @@ export function carveWaterUnderDecks({ rivers = [], lakes = [] }, grid, covered,
   const toPixel = (x, y) => [(x / worldSize + 0.5) * width, ((0.5 - y / worldSize) * height - 1)];
   const toWorld = (c, r) => [((c / width) - 0.5) * worldSize, (0.5 - (r + 1) / height) * worldSize];
   const edits = new Map();
+  const banks = new Map();   // (ground inside a river over the bank limit: dug only when surrounded, below)
   const lower = (idx, target) => {
     if (target < heightMap[idx] - minHeight) edits.set(idx, Math.min(edits.get(idx) ?? Infinity, target + minHeight));
   };
@@ -1075,12 +1076,32 @@ export function carveWaterUnderDecks({ rivers = [], lakes = [] }, grid, covered,
           if (d > half) continue;
           const surface = az + (bz - az) * t;
           const ground = heightMap[idx] - minHeight;
-          if (!under && ground > surface + HIDDEN_BANK_MAX_M) continue;
           if (ground <= surface - HIDDEN_BED_M || (under ? keepUnder(x, y) : keep(x, y))) continue;
-          lower(idx, surface - HIDDEN_BED_M * Math.min(1, (half - d) / HIDDEN_SLOPE_M + 0.2));
+          const target = surface - HIDDEN_BED_M * Math.min(1, (half - d) / HIDDEN_SLOPE_M + 0.2);
+          if (!under && ground > surface + HIDDEN_BANK_MAX_M) { if (!banks.has(idx)) banks.set(idx, target); continue; }
+          lower(idx, target);
         }
       }
     }
+  }
+  // (ground over the bank limit standing among dug ground: dug with it. Left, the higher patches of a riverbed the
+  // survey held just over the limit stood as columns 5 m high among the dug ground: Dallas's Trinity River)
+  // (each patch of them found whole: one that touches no ground left as it is, all round it dug, is dug too)
+  const seen = new Set();
+  for (const start of banks.keys()) {
+    if (seen.has(start)) continue;
+    const patch = []; const queue = [start]; seen.add(start); let open = false;
+    while (queue.length) {
+      const idx = queue.pop(); patch.push(idx);
+      const r = Math.floor(idx / width); const c = idx - r * width;
+      for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const rr = r + dr; const cc = c + dc;
+        if (rr < 0 || cc < 0 || rr >= height || cc >= width) { open = true; continue; }
+        const j = rr * width + cc;
+        if (banks.has(j)) { if (!seen.has(j)) { seen.add(j); queue.push(j); } } else if (!edits.has(j)) open = true;
+      }
+    }
+    if (!open) for (const idx of patch) lower(idx, banks.get(idx));
   }
   for (const { poly, level } of lakes) {
     const [x0, y0, x1, y1] = poly.box;
