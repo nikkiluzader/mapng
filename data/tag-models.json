@@ -664,7 +664,7 @@
    "any": [
     {
      "shape": "/levels/east_coast_usa/art/shapes/clutter/clutter_city_bike_stand.dae",
-     "yaw": 0,
+     "yaw": 90,
      "size": [
       4.16,
       0.64,

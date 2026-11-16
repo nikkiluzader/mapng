@@ -60,6 +60,10 @@
   "/levels/driver_training/art/shapes/objects/turbine.dae": {
    "lift": 25,
    "note": "its origin is at 25 m up the tower (box from -25 to 72 m): raised by that, its foot on the ground; its rotor 52.4 m across, its hub 72 m up: a mapped turbine's rotor:diameter or height sets its size, else the gap to its nearest neighbour"
+  },
+  "/levels/east_coast_usa/art/shapes/clutter/clutter_city_bike_stand.dae": {
+   "yaw": 90,
+   "note": "a 4.2 m row of hoops along the model's X: turned so the row runs along the kerb, not out into the road (the owner, 2026-11-16)"
   }
  },
  "picks": {
