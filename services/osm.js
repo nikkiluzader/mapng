@@ -431,6 +431,8 @@ export const parseOverpassResponse = (data, bounds) => {
       tags.water === "dock" || tags.harbour === "yes"
     ) return "water";
     if (tags.barrier) return "barrier";
+    // (a railway platform mapped with nothing else on it: platforms.js raises it beside its track)
+    if (tags.railway === "platform" && !tags.highway) return "platform";
     if (
       tags.landuse || tags.leisure || tags.natural || tags.amenity ||
       tags.aeroway || tags.tourism || tags.man_made || tags.public_transport ||
@@ -564,7 +566,8 @@ export const parseOverpassResponse = (data, bounds) => {
       continue;
     }
     const isLinearWaterway = f.type === "water" && !!f.tags?.waterway && f.tags?.area !== "yes" && !isClosedRing(f.geometry);
-    if (f.type === "road" || f.type === "railway" || f.type === "barrier" || f.type === "coastline" || f.type === "power_line" || f.type === "cliff" || isLinearWaterway) {
+    const isLinearPlatform = f.type === "platform" && !isClosedRing(f.geometry);
+    if (f.type === "road" || f.type === "railway" || f.type === "barrier" || f.type === "coastline" || f.type === "power_line" || f.type === "cliff" || isLinearWaterway || isLinearPlatform) {
       const clippedSegments = clipLineString(f.geometry, bounds);
       clippedSegments.forEach((segment, index) => {
         if (segment.length > 1) {

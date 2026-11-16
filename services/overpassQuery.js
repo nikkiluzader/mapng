@@ -8,7 +8,7 @@
  */
 import { tagObjectNodeTags } from './tagModels.js';
 
-export const OVERPASS_QUERY_VERSION = 8;   // 2: traffic_calming nodes; 3: food, drink and lodging nodes; 4: railways; 5: disused, preserved and abandoned lines; 6: bus stops, post boxes, picnic tables, flagpoles, recycling, information boards; 7: power towers mapped on their own; 8: shelters, toilets, statues, masts, towers, oil wells, bike stands, street cabinets, dumpsters
+export const OVERPASS_QUERY_VERSION = 9;   // 2: traffic_calming nodes; 3: food, drink and lodging nodes; 4: railways; 5: disused, preserved and abandoned lines; 6: bus stops, post boxes, picnic tables, flagpoles, recycling, information boards; 7: power towers mapped on their own; 8: shelters, toilets, statues, masts, towers, oil wells, bike stands, street cabinets, dumpsters; 9: wind turbines and railway platforms
 
 // Public Overpass mirrors (volunteer-run; any of them may be down).
 export const OVERPASS_ENDPOINTS = [
@@ -83,7 +83,7 @@ export const OSM_FILTER = {
     'power', 'military', 'historic', 'tourism', 'amenity', 'landuse', 'natural', 'leisure',
     'water', 'wetland', 'surface', 'landcover', 'golf',
   ],
-  wayTags: [['area', 'yes'], ['natural', 'tree_row'], ...[...RAILWAY_WAYS, ...RAILWAY_LIFECYCLE_WAYS].map((v) => ['railway', v])],
+  wayTags: [['area', 'yes'], ['natural', 'tree_row'], ['railway', 'platform'], ...[...RAILWAY_WAYS, ...RAILWAY_LIFECYCLE_WAYS].map((v) => ['railway', v])],
   relationKeys: [
     'building', 'waterway', 'aeroway', 'man_made', 'military', 'historic', 'tourism', 'amenity',
     'landuse', 'natural', 'leisure', 'water', 'wetland', 'landcover',

@@ -50,6 +50,7 @@ export const CONTENT_GROUPS = [
     // A disused line's rails mostly still lie there; an abandoned line's are mostly gone)
     { id: 'railwaysDisused', tags: ['railway=disused'] },
     { id: 'railwaysAbandoned', tags: ['railway=abandoned'] },
+    { id: 'platforms', tags: ['railway=platform'] },
   ] },
   { id: 'buildings', items: [
     { id: 'buildings', option: { includeBuildings: false } },

@@ -8554,9 +8554,9 @@
    "count": 197000,
    "group": "railways",
    "item": "platforms",
-   "status": "planned",
-   "fetched": false,
-   "builds": "A raised slab beside the track, with benches and a shelter",
+   "status": "built",
+   "fetched": true,
+   "builds": "A raised slab, paved on top and concrete down its sides, 0.55 m over the nearest track's height (0.3 m over the ground with no track near); a line given its width (3 m untagged); an elevated station's platform a metre-deep slab",
    "assets": [
     {"shape":"/levels/east_coast_usa/art/shapes/clutter/clutter_city_bench_wood.dae","region":"north-america","usedToday":false},
     {"shape":"/levels/italy/art/shapes/buildings/italy_clutter_metalbench.dae","region":"europe","usedToday":false}
@@ -8587,7 +8587,8 @@
      "effect": "yes: platform lamps",
      "used": false
     }
-   }
+   },
+   "code": "services/platforms.js"
   },
   "railway=preserved": {
    "what": "A heritage railway (old tagging)",

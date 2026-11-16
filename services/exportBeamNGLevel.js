@@ -57,6 +57,7 @@ import { buildStructureGraph } from './structures/graph.js';
 import { findCrossings } from './structures/crossings.js';
 import { tagModel, tagObjectFor, standTagObject, part } from './tagModels.js';
 import { fillRows, rowDirection } from './areaRows.js';
+import { buildPlatformMeshes } from './platforms.js';
 import { solveProfilesSteps, gradeLimit } from './structures/profileSolve.js';
 import { appendAll, keepInPlace } from './keepInPlace.js';
 import { classifyStructures } from './structures/structureRules.js';
@@ -1217,7 +1218,8 @@ function buildLevelRailways(sg, terrainData, squareSize, levelName) {
       if (d) decals.push(d);
     });
   // (the track bed's lines, for what keeps off it: trees, bushes, rocks)
-  const lines = sg.edges.filter((e) => e.rail).map((e) => ({ points: Array.from(e.s, (_, i) => [e.x[i], e.y[i]]), half: e.half + 1 }));
+  // (and each point's solved height: a platform beside the track stands over it, platforms.js)
+  const lines = sg.edges.map((e, k) => (e.rail ? { points: Array.from(e.s, (_, i) => [e.x[i], e.y[i]]), half: e.half + 1, z: sg.profile?.z?.[k] ? Array.from(sg.profile.z[k]) : null } : null)).filter(Boolean);
   return {
     tiles: track.tiles, daes, decals, lines,
     stats: { ...railwayStats(sg, segs), ...track.stats, crossings: (sg.railCrossings || []).length + (sg.railUnjoined || []).length, streetTramKm: Math.round(streetTramM / 10) / 100, streetTramLines: street.length, levelName },
@@ -14060,6 +14062,18 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       });
       appendAll(sidewalks.meshes, plazas.meshes);
       console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Plazas: ${plazas.count} of ${squares.length} pedestrian square(s) and courtyard(s) paved, ${plazas.triangles} triangles.`);
+    }
+    // railway platforms, raised beside their track (platforms.js)
+    if (built('platforms') && built('railways')) {
+      const pf = (exportTerrainData.osmFeatures || []).filter((f) => f.tags?.railway === 'platform' && f.geometry?.length >= 2 && f.tags.location !== 'underground' && !(Number.parseInt(f.tags.layer, 10) < 0));
+      if (pf.length) {
+        const res = buildPlatformMeshes(pf.map((f) => ({ points: f.geometry.map(toW), width: Number.parseFloat(f.tags.width) })), {
+          groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
+          tracks: (railways?.lines || []).filter((l) => l.z),
+        });
+        appendAll(sidewalks.meshes, res.meshes);
+        console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Platforms: ${res.count} of ${pf.length} railway platform(s) raised beside their track, ${res.triangles} triangles.`);
+      }
     }
   }
   const sidewalkTileDaes = await generateSidewalkTileDAEs(sidewalks.meshes, buildingTileSize(worldSize));

@@ -10,7 +10,8 @@ const bounds = { north: 1, south: 0, east: 1, west: 0 };
 
 test('the Overpass query and the tile filter ask for the lines built: those in use, and disused, preserved and abandoned ones', () => {
   const asked = OSM_FILTER.wayTags.filter(([k]) => k === 'railway').map(([, v]) => v).sort();
-  assert.deepEqual(asked, ['abandoned', 'disused', 'funicular', 'light_rail', 'monorail', 'narrow_gauge', 'preserved', 'rail', 'subway', 'tram']);
+  // (and platforms: raised beside their track, platforms.js)
+  assert.deepEqual(asked, ['abandoned', 'disused', 'funicular', 'light_rail', 'monorail', 'narrow_gauge', 'platform', 'preserved', 'rail', 'subway', 'tram']);
   const q = buildOverpassQuery({ south: 0, west: 0, north: 1, east: 1 });
   assert.match(q, /way\["railway"="rail"\]\(0,0,1,1\);/);
   assert.match(q, /way\["railway"="disused"\]\(0,0,1,1\);/);
@@ -145,7 +146,7 @@ test('a main line tunnel passing under the whole map (every end on the map\'s ed
 test('What to build: disused and abandoned lines have rows of their own, and switching one off leaves the others', async () => {
   const { CONTENT_GROUPS, filterOsmByTags, contentExportOptions } = await import('../services/buildContent.js');
   const group = CONTENT_GROUPS.find((g) => g.id === 'railways');
-  assert.deepEqual(group.items.map((i) => i.id), ['railways', 'railwaysDisused', 'railwaysAbandoned']);
+  assert.deepEqual(group.items.map((i) => i.id), ['railways', 'railwaysDisused', 'railwaysAbandoned', 'platforms']);
   assert.ok(group.items[0].tags.includes('railway=preserved'));
   const feats = [{ id: 'a', type: 'railway', tags: { railway: 'rail' } }, { id: 'b', type: 'railway', tags: { railway: 'disused' } }, { id: 'c', type: 'railway', tags: { railway: 'abandoned' } }];
   const choice = contentExportOptions ? contentExportOptions(['railwaysAbandoned'], []) : null;
