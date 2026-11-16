@@ -14183,6 +14183,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       onOtherRoad: (x, y) => isOnOtherCarriageway(cwIndexW, x, y, 0, () => false),
       shoulderM: Math.max(1, squareSize), slopeM: Math.max(2, 2 * squareSize),
     });
+    // (a test hook, as __MAPNG_STRUCT_DEBUG: the runs, for a map of the walls)
+    if (typeof globalThis.__MAPNG_WALL_DEBUG === 'function') globalThis.__MAPNG_WALL_DEBUG(runs);
     const mesh = buildWingWallMesh(runs, PLAZA_MATERIAL('concrete'), plazaTileM('concrete'));
     if (mesh) {
       sidewalks.meshes.push(mesh);

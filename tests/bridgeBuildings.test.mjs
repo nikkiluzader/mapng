@@ -38,10 +38,11 @@ test('buildings in a bridge outline beside its road are its towers; others stay'
     road([[0, -20], [0, 320]], { highway: 'secondary', bridge: 'yes', layer: '1' }),
     building('towerWest', ring(-10, 50, -5, 58)),     // 5 m from the road, in the outline
     building('towerEast', ring(5, 50, 10, 58)),
+    building('works', ring(5, 80, 10, 88), { building: 'industrial' }),   // in the outline, 5 m from the road, but a building with a use
     building('beside', ring(20, 50, 30, 60)),          // outside the outline
     building('under', ring(-60, 100, -40, 120)),       // far off, outside
   ]);
-  assert.deepEqual(ids(res), ['beside', 'under']);
+  assert.deepEqual(ids(res), ['works', 'beside', 'under']);
   assert.equal(res.towers, 2);
 });
 

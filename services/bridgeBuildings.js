@@ -5,10 +5,13 @@
 // 2. A building whose middle lies inside a bridge's own outline (man_made=bridge), with one of the bridge's roads
 //    for traffic through it or within TOWER_REACH_M of it (past its sidewalks): its towers, split round the road's
 //    arches (the Roebling Bridge's four parts). Shops on a bridge for walking stay: footways and pedestrian
-//    streets are not roads for traffic here.
+//    streets are not roads for traffic here. So does a building with a stated use (building=industrial, house...).
 
 const TOWER_REACH_M = 7;
 const WALK = new Set(['footway', 'pedestrian', 'path', 'cycleway', 'steps', 'bridleway', 'corridor']);
+// (rule 2 takes only a building with no stated use: a tower's parts are mapped building=yes. One with a use,
+// building=industrial under Seattle's Fremont Bridge approach, is a building that stands there, and stays)
+const GENERIC = new Set(['yes', 'tower', 'bridge', 'gatehouse', 'ruins']);
 
 const inRing = (p, g) => {
   let k = false;
@@ -45,7 +48,7 @@ export function leaveBridgeBuildings(features = []) {
       return road.some((q) => inRing(q, g));
     };
     const kept = out.filter((f) => {
-      if (!isBuilding(f)) return true;
+      if (!isBuilding(f) || !GENERIC.has(String(f.tags?.building ?? 'yes'))) return true;
       const c = { lat: f.geometry.reduce((s, p) => s + p.lat, 0) / f.geometry.length, lng: f.geometry.reduce((s, p) => s + p.lng, 0) / f.geometry.length };
       if (!bridgeRings.some((r) => inRing(c, r))) return true;
       return !deckRoads.some((rd) => near(f.geometry, rd.geometry));
