@@ -496,7 +496,9 @@ const MAP_LAYERS = ['osm', 'satellite', 'topo', 'dark', ...RELIEF_MODES];
 const readStored = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
 const writeStored = (key, value) => { try { localStorage.setItem(key, value); } catch { /* storage blocked */ } };
 const storedLayer = readStored('mapng_mapLayer');
-const selectedLayer = ref(MAP_LAYERS.includes(storedLayer) ? storedLayer : 'osm');
+// (a first visit opens on the topo map: OpenStreetMap's own tile server is volunteer-run and turns heavy use away,
+// so it is a choice, not the default)
+const selectedLayer = ref(MAP_LAYERS.includes(storedLayer) ? storedLayer : 'topo');
 // Names on satellite imagery (default on). The OSM and topo maps have their
 // own names, and the dark base never does: labels go only where missing.
 const satelliteNames = ref(readStored('mapng_satelliteLabels') !== 'false');
