@@ -87,26 +87,64 @@
   dialog .info code { font: 12.5px "Overpass Mono", ui-monospace, monospace; overflow-wrap: anywhere; }
   dialog form { display: flex; justify-content: flex-end; padding: 0 14px 12px; }
   dialog button.close { padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font: inherit; cursor: pointer; }
+  .stats { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 12px 0 0; font-size: 14px; }
+  .stats b { font: 700 20px "Overpass", sans-serif; display: block; line-height: 1.1; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface); }
+  .seg button { all: unset; cursor: pointer; padding: 6px 12px; font-size: 13.5px; color: var(--text-2); white-space: nowrap; }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+  .seg button:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+  .lbl { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .ctl { display: inline-flex; align-items: center; gap: 6px; }
+  .link { all: unset; cursor: pointer; font-size: 13px; color: var(--brand-ink); text-decoration: underline; text-underline-offset: 2px; }
+  details.sec { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin: 0 0 10px; }
+  details.sec > summary { cursor: pointer; list-style: none; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 12px 14px; }
+  details.sec > summary::-webkit-details-marker { display: none; }
+  details.sec > summary::before { content: "▸"; color: var(--muted); width: 1em; }
+  details.sec[open] > summary::before { content: "▾"; }
+  details.sec > summary h2 { margin: 0; font-size: 18px; display: inline; }
+  details.sec > summary code { font: 12.5px "Overpass Mono", ui-monospace, monospace; color: var(--muted); overflow-wrap: anywhere; }
+  .sec-count { margin-left: auto; font-size: 13px; color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .sec-count b { color: var(--brand-ink); }
+  .sec-body { padding: 0 14px 14px; }
+  h3 { margin: 16px 0 0; font: 600 14px "Overpass", "Noto Sans", sans-serif; color: var(--text-2); display: flex; align-items: baseline; gap: 8px; }
+  h3 small { font: 12.5px "Noto Sans", sans-serif; color: var(--muted); font-weight: 400; }
+  .chips { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 5px; }
+  .chip { font: 10.5px "Overpass Mono", ui-monospace, monospace; padding: 0 5px; border-radius: 4px; background: var(--off-tint); color: var(--text-2); overflow-wrap: anywhere; }
+  .chip.on { background: var(--brand-tint); color: var(--brand-ink); }
+  .path { font: 11px "Overpass Mono", ui-monospace, monospace !important; }
+  dialog dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; margin: 8px 0 0; }
+  dialog dt { color: var(--muted); } dialog dd { margin: 0; overflow-wrap: anywhere; }
+  dialog table { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: 13px; }
+  dialog th, dialog td { text-align: left; padding: 4px 8px 4px 0; border-top: 1px solid var(--border); vertical-align: top; }
+  dialog th { color: var(--muted); font-weight: 500; }
+  .tag-block { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .tag-block:first-child { border-top: 0; margin-top: 4px; padding-top: 0; }
 </style>
 </head>
 <body>
 <header class="top">
   <div class="wrap">
     <a class="brand" href="/"><img src="/favicon.svg" alt="">MapNG</a>
-    <h1>Asset review</h1>
-    <p>Every OpenStreetMap tag MapNG knows, with the BeamNG.drive models it has for it. A model with an orange frame is one an export places today.</p>
+    <h1>BeamNG assets in MapNG</h1>
+    <p>Which of the game's models MapNG puts into the levels it builds, organised the way the game holds them: by level and by kind of asset. What each one stands for on the map is listed on its card.</p>
+    <div class="stats" id="stats"></div>
     <p class="notice">For review only. The photos show BeamNG.drive's own models, taken in game; they are not published and this page exists on the dev site alone.</p>
   </div>
 </header>
 <div class="bar">
   <div class="wrap">
-    <input id="q" type="search" placeholder="Search a tag, a model name or a path" aria-label="Search">
-    <select id="group" aria-label="Group"><option value="">All groups</option></select>
-    <select id="status" aria-label="Status">
-      <option value="">Any status</option><option value="built">Built</option><option value="partial">Partly built</option><option value="planned">Planned</option><option value="ignored">Left out</option>
-    </select>
-    <label class="check"><input id="usedOnly" type="checkbox"> Placed today only</label>
-    <label class="check"><input id="withModels" type="checkbox" checked> Tags with models only</label>
+    <span class="ctl"><span class="lbl">Group by</span>
+      <span class="seg" id="view" role="group" aria-label="Group by">
+        <button type="button" data-v="level" aria-pressed="true">Game level</button><button type="button" data-v="kind" aria-pressed="false">Kind of asset</button><button type="button" data-v="tag" aria-pressed="false">Map feature</button>
+      </span></span>
+    <span class="ctl"><span class="lbl">Show</span>
+      <span class="seg" id="scope" role="group" aria-label="Show">
+        <button type="button" data-s="used" aria-pressed="true">Placed today</button><button type="button" data-s="all" aria-pressed="false">All candidates</button>
+      </span></span>
+    <input id="q" type="search" placeholder="Search a model name, a file path or a map tag" aria-label="Search">
+    <button class="link" id="openAll" type="button">Expand all</button>
+    <button class="link" id="closeAll" type="button">Collapse all</button>
     <span id="count" class="count" role="status"></span>
   </div>
 </div>
@@ -114,7 +152,7 @@
   <div id="state" class="state">Loading the asset list…</div>
   <div id="list"></div>
 </main>
-<dialog id="zoom" aria-label="Model photo">
+<dialog id="zoom" aria-label="Model details">
   <img id="zoomImg" alt="">
   <div class="info" id="zoomInfo"></div>
   <form method="dialog"><button class="close">Close</button></form>
@@ -123,9 +161,9 @@
 (async () => {
   const $ = (id) => document.getElementById(id);
   const el = (tag, attrs = {}, ...kids) => { const n = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'class') n.className = v; else if (k === 'text') n.textContent = v; else n.setAttribute(k, v); } for (const k of kids) if (k) n.append(k); return n; };
-  const GROUPS = { roads: 'Roads', signs: 'Signs', walk: 'Walking and cycling', railways: 'Railways', water: 'Water', buildings: 'Buildings', furniture: 'Street furniture', green: 'Green and land', leisure: 'Leisure and sport', landmarks: 'Landmarks', industry: 'Industry and power', airfields: 'Airfields', parking: 'Parking' };
+  const FEATURE_GROUPS = { roads: 'Roads', signs: 'Signs', walk: 'Walking and cycling', railways: 'Railways', water: 'Water', buildings: 'Buildings', furniture: 'Street furniture', green: 'Green and land', leisure: 'Leisure and sport', landmarks: 'Landmarks', industry: 'Industry and power', airfields: 'Airfields', parking: 'Parking' };
   const STATUS = { built: 'Built', partial: 'Partly built', planned: 'Planned', ignored: 'Left out' };
-  const REGION = { any: 'everywhere', 'north-america': 'North America', europe: 'Europe', asia: 'Asia', 'south-america': 'South America', africa: 'Africa', oceania: 'Oceania' };
+  const REGION = { any: 'everywhere', 'north-america': 'North America', europe: 'Europe', tropical: 'the tropics' };
   let data;
   try {
     const r = await fetch('/api/asset-page/data.json', { credentials: 'same-origin' });
@@ -136,61 +174,107 @@
     return;
   }
   $('state').remove();
-  const groups = [...new Set(data.tags.map((t) => t.group || 'other'))];
-  groups.sort((a, b) => (Object.keys(GROUPS).indexOf(a) + 100 * !(a in GROUPS)) - (Object.keys(GROUPS).indexOf(b) + 100 * !(b in GROUPS)));
-  for (const g of groups) $('group').append(el('option', { value: g, text: GROUPS[g] || g }));
-  // (parts the code places that no tag lists)
-  if (data.parts?.length) data.tags.push(...data.parts.map((p) => ({ tag: p.tag || p.id, what: 'A part the export places', group: 'furniture', item: '', status: 'built', builds: '', count: 0, assets: [{ shape: p.shape, region: 'any', used: true, is: '' }] })));
+  if (data.parts?.length) data.tags.push(...data.parts.map((p) => ({ tag: p.tag || p.id, what: 'A part the export places', group: 'furniture', status: 'built', builds: '', count: 0, assets: [{ shape: p.shape, region: 'any', used: true, is: '' }] })));
+
+  // Each model once, with everything MapNG does with it: the map tags it stands for, where, and whether an export places it today.
+  const models = new Map();
+  for (const t of data.tags) for (const a of t.assets) {
+    const base = data.models[a.shape]; if (!base) continue;
+    let m = models.get(a.shape);
+    if (!m) { m = { ...base, uses: [], used: false, is: '' }; models.set(a.shape, m); }
+    m.uses.push({ tag: t.tag, what: t.what, builds: t.builds, status: t.status, region: a.region || 'any', used: !!a.used });
+    m.used = m.used || !!a.used; if (a.is && !m.is) m.is = a.is;
+  }
+  const all = [...models.values()];
+  const levelName = (l) => (l.startsWith('shared:') ? `Shared by every level (${l.slice(7).trim()})` : l.replace(/_/g, ' ').replace(/\b[a-z]/g, (c) => c.toUpperCase()).replace(/\bUsa\b/, 'USA').replace(/\bV2\b/, 'v2'));
+  const levelPath = (l) => (l.startsWith('shared:') ? `/${l.slice(7).trim().replace('_', '/')}/` : `/levels/${l}/`);
   const fmtSize = (s) => (s ? `${s.map((v) => (+v).toFixed(v < 10 ? 1 : 0)).join(' × ')} m` : '');
   const fmtCount = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)} M` : n >= 1e3 ? `${Math.round(n / 1e3)} k` : String(n || ''));
-  const zoom = (a, m) => {
+  const folderOf = (m) => m.shape.slice(0, m.shape.lastIndexOf('/') + 1);
+  const usedCount = all.filter((m) => m.used).length;
+  $('stats').append(
+    el('div', {}, el('b', { text: String(usedCount) }), document.createTextNode('models placed today')),
+    el('div', {}, el('b', { text: String(new Set(all.filter((m) => m.used).map((m) => m.level)).size) }), document.createTextNode('levels they come from')),
+    el('div', {}, el('b', { text: all.length.toLocaleString('en') }), document.createTextNode('candidates looked at')));
+
+  const state = { view: 'level', scope: 'used', q: '', open: new Set() };
+  const hit = (m, q) => !q || `${m.name} ${m.shape} ${m.kind} ${m.is} ${m.uses.map((u) => `${u.tag} ${u.what}`).join(' ')}`.toLowerCase().includes(q);
+  const visible = () => all.filter((m) => (state.scope === 'all' || m.used) && hit(m, state.q));
+
+  const zoom = (m) => {
     $('zoomImg').src = `/api/asset-page/t/${m.thumb}`; $('zoomImg').alt = m.name;
-    const info = $('zoomInfo'); info.replaceChildren(el('div', {}, el('b', { text: m.name }), document.createTextNode(a.is ? `: ${a.is}` : '')), el('div', {}, el('code', { text: a.shape })), el('div', { class: 'meta', text: [m.level, fmtSize(m.size), m.kind, `used ${REGION[a.region] || a.region}`].filter(Boolean).join(' · ') }));
+    const uses = el('table', {}, el('tr', {}, el('th', { text: 'Stands for (map tag)' }), el('th', { text: 'What MapNG builds there' }), el('th', { text: 'Where' }), el('th', { text: 'Today' })));
+    for (const u of m.uses) uses.append(el('tr', {}, el('td', {}, el('code', { text: u.tag }), document.createTextNode(u.what ? ` ${u.what}` : '')), el('td', { text: u.builds || '' }), el('td', { text: REGION[u.region] || u.region }), el('td', { text: u.used ? 'placed' : 'candidate' })));
+    $('zoomInfo').replaceChildren(
+      el('div', {}, el('b', { text: m.name }), document.createTextNode(m.is ? `: ${m.is}` : '')),
+      el('dl', {}, el('dt', { text: 'File' }), el('dd', {}, el('code', { text: m.shape })), el('dt', { text: 'Level' }), el('dd', { text: levelName(m.level) }), el('dt', { text: 'Kind' }), el('dd', { text: m.kind || 'not sorted' }), el('dt', { text: 'Size' }), el('dd', { text: fmtSize(m.size) || 'unknown' })),
+      uses);
     $('zoom').showModal();
   };
-  const card = (a) => {
-    const m = data.models[a.shape] || { name: a.shape.split('/').pop(), thumb: null };
-    const fig = el('figure', a.used ? { class: 'used' } : {});
-    if (m.thumb) {
-      const b = el('button', { type: 'button', 'aria-label': `Enlarge ${m.name}` }, el('img', { loading: 'lazy', decoding: 'async', alt: a.is || m.name, src: `/api/asset-page/t/${m.thumb}` }));
-      b.addEventListener('click', () => zoom(a, m)); fig.append(b);
-    }
-    const badges = el('div', { class: 'badges' });
-    if (a.used) badges.append(el('span', { class: 'badge used', text: 'placed today' }));
-    badges.append(el('span', { class: 'badge', text: REGION[a.region] || a.region }));
-    fig.append(el('figcaption', {}, el('b', { text: m.name }), el('span', { text: [m.level, fmtSize(m.size)].filter(Boolean).join(' · ') }), a.is ? el('span', { text: a.is }) : null, badges));
+  const card = (m) => {
+    const fig = el('figure', m.used ? { class: 'used' } : {});
+    const b = el('button', { type: 'button', 'aria-label': `Details of ${m.name}` }, el('img', { loading: 'lazy', decoding: 'async', alt: m.is || m.name, src: `/api/asset-page/t/${m.thumb}` }));
+    b.addEventListener('click', () => zoom(m)); fig.append(b);
+    const tags = [...new Map(m.uses.map((u) => [u.tag, u])).values()];
+    const chips = el('div', { class: 'chips', title: 'What it stands for on the map' });
+    for (const u of tags.slice(0, 4)) chips.append(el('span', { class: `chip${m.uses.some((x) => x.tag === u.tag && x.used) ? ' on' : ''}`, text: u.tag }));
+    if (tags.length > 4) chips.append(el('span', { class: 'chip', text: `+${tags.length - 4}` }));
+    const regions = [...new Set(m.uses.filter((u) => u.used || !m.used).map((u) => REGION[u.region] || u.region))];
+    const badges = el('div', { class: 'badges' }, m.used ? el('span', { class: 'badge used', text: 'placed today' }) : el('span', { class: 'badge', text: 'candidate' }), el('span', { class: 'badge', text: regions.join(', ') }));
+    fig.append(el('figcaption', {}, el('b', { text: m.name }), el('span', { class: 'path', text: state.view === 'level' ? folderOf(m).replace(levelPath(m.level), '') || '/' : folderOf(m) }), el('span', { text: [fmtSize(m.size), m.is].filter(Boolean).join(' · ') }), badges, chips));
     return fig;
   };
-  const render = () => {
-    const q = $('q').value.trim().toLowerCase(); const g = $('group').value; const st = $('status').value; const usedOnly = $('usedOnly').checked; const withModels = $('withModels').checked;
-    const list = $('list'); list.replaceChildren();
-    let nTags = 0; let nModels = 0; const seen = new Set();
-    for (const grp of groups) {
-      if (g && g !== grp) continue;
-      const rows = [];
-      for (const t of data.tags) {
-        if ((t.group || 'other') !== grp || (st && t.status !== st)) continue;
-        let assets = usedOnly ? t.assets.filter((a) => a.used) : t.assets;
-        const tagHit = !q || `${t.tag} ${t.what} ${t.builds} ${t.item}`.toLowerCase().includes(q);
-        if (q && !tagHit) assets = assets.filter((a) => `${a.shape} ${a.is}`.toLowerCase().includes(q));
-        if (q && !tagHit && !assets.length) continue;
-        if ((withModels || usedOnly) && !assets.length) continue;
-        const box = el('section', { class: 'tag' });
-        box.append(el('div', { class: 'tag-head' }, el('code', { text: t.tag }), el('span', { class: 'what', text: t.what }), el('span', { class: `pill ${t.status}`, text: STATUS[t.status] || t.status }), t.count ? el('span', { class: 'meta', text: `${fmtCount(t.count)} in OpenStreetMap` }) : null));
-        if (t.builds) box.append(el('p', { class: 'builds', text: t.builds }));
-        if (assets.length) { const grid = el('div', { class: 'grid' }); for (const a of assets) { grid.append(card(a)); seen.add(a.shape); } box.append(grid); }
-        else box.append(el('p', { class: 'none', text: t.status === 'built' || t.status === 'partial' ? 'Built from MapNG\'s own meshes: no game model.' : 'No model chosen yet.' }));
-        rows.push(box); nTags++;
-      }
-      if (rows.length) { list.append(el('h2', {}, document.createTextNode(GROUPS[grp] || grp), el('small', { text: `${rows.length} tag${rows.length === 1 ? '' : 's'}` })), ...rows); }
+  // (a section's cards are made when it is first opened: 1,887 photos are not asked for at once)
+  const fill = (body, groups) => {
+    for (const [name, list] of groups) {
+      if (name) body.append(el('h3', {}, document.createTextNode(name), el('small', { text: `${list.length}` })));
+      const grid = el('div', { class: 'grid' }); for (const m of list.sort((a, b) => a.name.localeCompare(b.name))) grid.append(card(m)); body.append(grid);
     }
-    nModels = seen.size;
-    $('count').textContent = `${nTags} tags, ${nModels} models`;
-    if (!nTags) list.append(el('p', { class: 'state', text: 'Nothing matches.' }));
   };
+  const section = (key, title, sub, list, groups, extra) => {
+    const d = el('details', { class: 'sec' }); const placed = list.filter((m) => m.used).length;
+    d.append(el('summary', {}, el('h2', { text: title }), sub ? el('code', { text: sub }) : null, el('span', { class: 'sec-count' }, el('b', { text: `${placed} placed` }), document.createTextNode(state.scope === 'all' ? ` · ${list.length} in all` : ''))));
+    const body = el('div', { class: 'sec-body' }); d.append(body); let made = false;
+    const make = () => { if (made) return; made = true; if (extra) body.append(extra); fill(body, groups()); };
+    d.addEventListener('toggle', () => { if (d.open) { make(); state.open.add(key); } else state.open.delete(key); });
+    if (state.open.has(key) || state.q) { d.open = true; make(); }
+    return d;
+  };
+  const by = (list, f) => { const g = new Map(); for (const m of list) { const k = f(m); if (!g.has(k)) g.set(k, []); g.get(k).push(m); } return g; };
+  const render = () => {
+    const list = $('list'); list.replaceChildren(); const vis = visible(); let n = 0;
+    if (state.view === 'level') {
+      // the game's levels, the ones MapNG takes most from first; inside each, its kinds of asset
+      const levels = [...by(vis, (m) => m.level)].sort((a, b) => b[1].filter((m) => m.used).length - a[1].filter((m) => m.used).length || b[1].length - a[1].length);
+      for (const [lvl, ms] of levels) { list.append(section(`l:${lvl}`, levelName(lvl), levelPath(lvl), ms, () => [...by(ms, (m) => m.kind || 'Not sorted')].sort((a, b) => a[0].localeCompare(b[0])))); n++; }
+    } else if (state.view === 'kind') {
+      const kinds = [...by(vis, (m) => m.kind || 'Not sorted')].sort((a, b) => a[0].localeCompare(b[0]));
+      for (const [kind, ms] of kinds) { list.append(section(`k:${kind}`, kind, '', ms, () => [...by(ms, (m) => levelName(m.level))].sort((a, b) => a[0].localeCompare(b[0])))); n++; }
+    } else {
+      // by what is on the map: the feature groups, each tag with what MapNG builds for it
+      const groups = Object.keys(FEATURE_GROUPS); const shown = new Set(vis.map((m) => m.shape));
+      for (const grp of [...new Set([...groups, ...data.tags.map((t) => t.group || 'other')])]) {
+        const tags = data.tags.filter((t) => (t.group || 'other') === grp && t.assets.some((a) => shown.has(a.shape) && (state.scope === 'all' || a.used)));
+        if (!tags.length) continue;
+        const ms = [...new Set(tags.flatMap((t) => t.assets.filter((a) => shown.has(a.shape) && (state.scope === 'all' || a.used)).map((a) => a.shape)))].map((s) => models.get(s));
+        const d = section(`t:${grp}`, FEATURE_GROUPS[grp] || grp, `${tags.length} map tag${tags.length === 1 ? '' : 's'}`, ms, () => []);
+        const body = d.querySelector('.sec-body'); let made = false;
+        const make = () => { if (made) return; made = true; for (const t of tags) { const box = el('div', { class: 'tag-block' }, el('div', { class: 'tag-head' }, el('code', { text: t.tag }), el('span', { class: 'what', text: t.what }), el('span', { class: `pill ${t.status}`, text: STATUS[t.status] || t.status }), t.count ? el('span', { class: 'meta', text: `${fmtCount(t.count)} in OpenStreetMap` }) : null)); if (t.builds) box.append(el('p', { class: 'builds', text: t.builds })); const grid = el('div', { class: 'grid' }); for (const a of t.assets) if (shown.has(a.shape) && (state.scope === 'all' || a.used)) grid.append(card(models.get(a.shape))); box.append(grid); body.append(box); } };
+        d.addEventListener('toggle', () => { if (d.open) make(); }); if (d.open) make();
+        list.append(d); n++;
+      }
+    }
+    $('count').textContent = `${vis.length.toLocaleString('en')} model${vis.length === 1 ? '' : 's'} in ${n} section${n === 1 ? '' : 's'}`;
+    if (!vis.length) list.append(el('p', { class: 'state', text: 'Nothing matches.' }));
+    // (nothing opened yet and nothing searched for: the first section shows what a section holds)
+    else if (!state.open.size && !state.q) { const first = list.querySelector('details'); if (first) first.open = true; }
+  };
+  const press = (group, attr, key) => group.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; for (const x of group.querySelectorAll('button')) x.setAttribute('aria-pressed', String(x === b)); state[key] = b.getAttribute(attr); state.open.clear(); render(); });
+  press($('view'), 'data-v', 'view'); press($('scope'), 'data-s', 'scope');
   let timer = 0;
-  $('q').addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(render, 150); });
-  for (const id of ['group', 'status', 'usedOnly', 'withModels']) $(id).addEventListener('change', render);
+  $('q').addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => { state.q = $('q').value.trim().toLowerCase(); render(); }, 180); });
+  $('openAll').addEventListener('click', () => { for (const d of document.querySelectorAll('details.sec')) d.open = true; });
+  $('closeAll').addEventListener('click', () => { state.open.clear(); for (const d of document.querySelectorAll('details.sec')) d.open = false; });
   render();
 })();
 </script>
