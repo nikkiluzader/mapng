@@ -29,6 +29,7 @@ export const RIVER_KINDS = {
 const WIDTH_MAX_M = 600;
 const WIDTH_STEP_M = 2;
 const WIDTH_PAD = 1.05;
+const FOREIGN_FROM = 3;       // an outline this many times the waterway's usual width is checked for being another river's
 const CHANNEL_PROBE_M = 3;
 // Without a riverbank outline the OSM line often runs a few metres up the
 // slope beside the bed; nodes slide across to the lowest ground within this.
@@ -256,7 +257,7 @@ function buildRoadEdgeDistance(roads, cell = 32) {
  * @param {Array} [p.roads]      ground roads [{ points: [[x, y]...], half }]
  */
 export function planRivers({ features = [], toWorld, heightAt, roads = [] }) {
-  const stats = { dry: 0, underground: 0, otherKinds: 0, chains: 0, pieces: 0, cutAtRoads: 0, widthFromOutline: 0, nodesInAreaWater: 0 };
+  const stats = { dry: 0, underground: 0, otherKinds: 0, chains: 0, pieces: 0, cutAtRoads: 0, widthFromOutline: 0, nodesInAreaWater: 0, nodesInOtherWater: 0 };
   const ways = [];
   for (const f of features) {
     if (f.type !== 'water' || !(f.geometry?.length > 1) || isClosed(f.geometry)) continue;
@@ -333,6 +334,7 @@ export function planRivers({ features = [], toWorld, heightAt, roads = [] }) {
     const tagged = Number.parseFloat(String(chain.tags.width ?? '').replace(',', '.'));
     let centres = pts.map((p) => [...p]);
     const fromOutline = pts.map(() => false);
+    const foreign = pts.map(() => false);
     let widths = pts.map((p, i) => {
       const n = [-tangents[i][1], tangents[i][0]];
       const poly = outlines.find((o) => o.contains(p[0], p[1]));
@@ -340,6 +342,16 @@ export function planRivers({ features = [], toWorld, heightAt, roads = [] }) {
       let dl = 0; let dr = 0;
       while (dl < WIDTH_MAX_M && poly.contains(p[0] + n[0] * (dl + WIDTH_STEP_M), p[1] + n[1] * (dl + WIDTH_STEP_M))) dl += WIDTH_STEP_M;
       while (dr < WIDTH_MAX_M && poly.contains(p[0] - n[0] * (dr + WIDTH_STEP_M), p[1] - n[1] * (dr + WIDTH_STEP_M))) dr += WIDTH_STEP_M;
+      // (the outline is this waterway's own only where the water runs on along it at least as far as it is wide.
+      // A stream's mouth lies inside the big river it joins: measured across there, along the big river, it came
+      // out 770 to 1,050 m wide, and the bed dug that wide took every city block beside the Thames down to the
+      // water. Such a node is in other water: no ribbon there)
+      const across = dl + dr + WIDTH_STEP_M;
+      if (across > spec.width * FOREIGN_FROM) {
+        const t = tangents[i]; let along = 0;
+        for (const s of [1, -1]) { let d = 0; while (along + d < across && outlines.some((o) => o.contains(p[0] + t[0] * s * (d + WIDTH_STEP_M), p[1] + t[1] * s * (d + WIDTH_STEP_M)))) d += WIDTH_STEP_M; along += d; }
+        if (along < across) { foreign[i] = true; stats.nodesInOtherWater++; return Number.isFinite(tagged) && tagged > 0 ? tagged : spec.width; }
+      }
       centres[i] = [p[0] + (n[0] * (dl - dr)) / 2, p[1] + (n[1] * (dl - dr)) / 2];
       stats.widthFromOutline++;
       fromOutline[i] = true;
@@ -402,6 +414,7 @@ export function planRivers({ features = [], toWorld, heightAt, roads = [] }) {
       piece = []; pieceOutline = [];
     };
     centres.forEach(([x, y], i) => {
+      if (foreign[i]) { flush(); return; }
       if (areas.some((a) => a.contains(x, y))) { stats.nodesInAreaWater++; flush(); return; }
       let edge = edgeDistance(x, y);
       if (i > 0) { // a road crossing between this node and the last

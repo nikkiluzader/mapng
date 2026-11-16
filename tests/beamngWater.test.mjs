@@ -33,6 +33,27 @@ test('dry washes, culverts and drains make no River; chained ways make one', () 
   assert.ok(Math.abs(r.nodes[0][2] - (sloped(r.nodes[0][0]) + 0.25)) < 0.1);
 });
 
+test('a stream that enters a big river is not measured across the big river', () => {
+  // (a river 200 m wide running east to west, its ground sloping so it is not area water; a stream comes up from the
+  // south and ends 100 m inside its outline. Across the stream there, the outline is 1,000 m of the river's length)
+  const { rivers, stats } = planRivers({
+    features: [
+      line([[0, -200], [0, 100]], { waterway: 'stream' }),
+      line([[-500, 100], [500, 100]], { waterway: 'river' }),
+      ring(box(-500, 0, 500, 200), { natural: 'water', water: 'river' }),
+    ],
+    toWorld,
+    heightAt: (x) => x * 0.02,
+  });
+  assert.ok(stats.nodesInOtherWater > 0, 'the stream\'s nodes in the river are found');
+  const stream = rivers.filter((r) => r.kind === 'stream');
+  assert.ok(stream.length >= 1);
+  for (const r of stream) for (const n of r.nodes) { assert.ok(n[3] <= 12, `a stream's width: ${n[3]}`); assert.ok(n[1] <= 5, `no ribbon inside the river: y=${n[1]}`); }
+  const river = rivers.find((r) => r.kind === 'river');
+  const mid = river.nodes[Math.floor(river.nodes.length / 2)];
+  assert.ok(mid[3] > 190 && mid[3] < 230, `the river keeps its own 200 m: ${mid[3]}`);
+});
+
 test('a riverbank outline gives the width and recentres the nodes', () => {
   const { rivers, stats } = planRivers({
     features: [
