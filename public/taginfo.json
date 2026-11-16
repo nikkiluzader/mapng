@@ -9,7 +9,7 @@
     "doc_url": "https://github.com/nikkiluzader/mapng",
     "icon_url": "https://mapng.com/favicon.svg",
     "contact_name": "Nikki Luzader",
-    "contact_email": "nikkiluzader@gmail.com"
+    "contact_email": "contact@mapng.com"
   },
   "tags": [
     { "key": "highway", "object_types": ["way"], "description": "Roads are exported as drivable BeamNG DecalRoads with AI lanes; footways, cycleways and paths are drawn as narrow surfaces, and paved footways as raised sidewalks." },
