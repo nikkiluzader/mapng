@@ -414,7 +414,25 @@
     "city-grid",
     "water-bridge"
    ],
-   "smoke": true
+   "smoke": true,
+   "note": "Dam and the canal ring (the owner, 2026-11-16: Amsterdam's bridges, overpasses and water need work)"
+  },
+  {
+   "name": "ams_centraal",
+   "lat": 52.3789,
+   "lng": 4.9,
+   "size": 1024,
+   "dem": "gpxz",
+   "categories": [
+    "canals",
+    "water-bridge",
+    "overpass",
+    "railway",
+    "station",
+    "water"
+   ],
+   "smoke": true,
+   "note": "Amsterdam Centraal and the IJ: canals bridged every block, the raised railway into the station and its platforms, road and tram overpasses, the harbour's water (added 2026-11-16, the owner's ask: bridges, overpasses and water need work here)"
   },
   {
    "name": "w_prague",
@@ -594,6 +612,19 @@
     "motorway"
    ]
   },
-  {"name": "tychonas", "lat": 34.727648, "lng": 33.136198, "size": 1024, "dem": "gpxz", "categories": ["hillside", "steep-streets", "sidewalks"], "smoke": true, "note": "a hillside village on 1 m lidar (Mapterhorn) with streets at 20 to 30%: held to their class grade they were dug 6 m into the hill (2026-11)"}
-  ]
+  {
+   "name": "tychonas",
+   "lat": 34.727648,
+   "lng": 33.136198,
+   "size": 1024,
+   "dem": "gpxz",
+   "categories": [
+    "hillside",
+    "steep-streets",
+    "sidewalks"
+   ],
+   "smoke": true,
+   "note": "a hillside village on 1 m lidar (Mapterhorn) with streets at 20 to 30%: held to their class grade they were dug 6 m into the hill (2026-11)"
+  }
+ ]
 }

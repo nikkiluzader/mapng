@@ -30,10 +30,14 @@ export function bufferLine(pts, width) {
 
 /**
  * The platforms' meshes. platforms: [{ points: [[x, y]...] (closed for an area), width }]; groundAt(x, y);
- * tracks: [{ points: [[x, y]...], z: [...] }] (each point's track height). Returns { meshes, count, triangles }.
+ * tracks: [{ points: [[x, y]...], z: [...] }] (each point's track height); a platform's `over`: a set height over
+ * the ground instead (a kerbed island). opts.topSet / sideSet / name: the paving sets and the meshes' name. Returns
+ * { meshes, count, triangles }.
  */
-export function buildPlatformMeshes(platforms, { groundAt, tracks = [] } = {}) {
+export function buildPlatformMeshes(platforms, opts = {}) {
+  const { groundAt, tracks = [] } = opts;
   const top = { pos: [], uv: [] }; const side = { pos: [], uv: [] };
+  const topSet = opts.topSet || 'pavers'; const sideSet = opts.sideSet || 'concrete'; const name = opts.name || 'platforms';
   let count = 0; let triangles = 0;
   const trackZ = (x, y) => {
     let best = null; let bd = TRACK_NEAR_M;
@@ -48,20 +52,22 @@ export function buildPlatformMeshes(platforms, { groundAt, tracks = [] } = {}) {
     }
     return best;
   };
-  const tTop = plazaTileM('pavers'); const tSide = plazaTileM('concrete');
+  const tTop = plazaTileM(topSet); const tSide = plazaTileM(sideSet);
   for (const pl of platforms) {
     let ring = pl.points;
     if (!(ring?.length >= 2)) continue;
-    ring = closedRing(ring) ? ring.slice(0, -1) : bufferLine(ring, pl.width > 0 ? Math.min(pl.width, 20) : DEFAULT_WIDTH_M);
+    // (pl.strip: a band along the line, closed or not: a kerb round an island, its inside left to the ground)
+    ring = closedRing(ring) && !pl.strip ? ring.slice(0, -1) : bufferLine(ring, pl.width > 0 ? Math.min(pl.width, 20) : DEFAULT_WIDTH_M);
     if (ring.length < 3) continue;
     // (counter-clockwise, so the top faces up and the sides face out)
     let a2 = 0; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) a2 += (ring[j][0] - ring[i][0]) * (ring[j][1] + ring[i][1]);
     if (a2 > 0) ring = ring.slice().reverse();
     // its top: over the nearest track where one runs near, else over the ground; never under the ground
     const tz = ring.map(([x, y]) => trackZ(x, y));
-    const anyTrack = tz.some((z) => z !== null);
+    const anyTrack = !Number.isFinite(pl.over) && tz.some((z) => z !== null);
     const g = ring.map(([x, y]) => groundAt(x, y));
     const z = ring.map((_, i) => {
+      if (Number.isFinite(pl.over)) return g[i] + pl.over;   // (a set height over the ground: a kerbed island)
       if (anyTrack) { const t = tz[i] ?? tz.find((v) => v !== null); return Math.max(g[i] + 0.1, t + PLATFORM_OVER_RAIL_M); }
       return g[i] + PLATFORM_OVER_GROUND_M;
     });
@@ -87,14 +93,14 @@ export function buildPlatformMeshes(platforms, { groundAt, tracks = [] } = {}) {
     count++;
   }
   const meshes = [];
-  for (const [set, p] of [['pavers', top], ['concrete', side]]) {
+  for (const [set, p] of (topSet === sideSet ? [[topSet, { pos: [...top.pos, ...side.pos], uv: [...top.uv, ...side.uv] }]] : [[topSet, top], [sideSet, side]])) {
     if (!p.pos.length) continue;
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(p.pos), 3));
     geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(p.uv), 2));
     geo.computeVertexNormals();
     const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ name: PLAZA_MATERIAL(set) }));
-    mesh.name = `platforms_${set}`;
+    mesh.name = `${name}_${set}`;
     meshes.push(mesh);
   }
   return { meshes, count, triangles };

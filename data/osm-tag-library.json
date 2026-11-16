@@ -1664,10 +1664,10 @@
    "count": 3200000,
    "group": "roads",
    "item": "kerbs",
-   "status": "planned",
+   "status": "partial",
    "fetched": true,
    "fetchedNote": "Ways are fetched; nodes are not",
-   "builds": "A raised kerb line, as round traffic islands",
+   "builds": "A closed kerb (a traffic island, a roundabout's centre) raised 15 cm: a solid slab when small, else a 30 cm kerb round its ground; an open kerb line is the street's curb the sidewalks build",
    "assets": [
     {"shape":"/art/shapes/objects/s_curb_module.dae","region":"any","usedToday":false},
     {"shape":"/levels/johnson_valley/art/shapes/building/s_roadside.dae","region":"north-america","usedToday":false,"is":"Yellow and black striped kerb length","from":"catalogue"},
@@ -1684,7 +1684,8 @@
      "used": false
     }
    },
-   "note": "Deliberately skipped today (resolveNativeBarrierAsset in exportBeamNGLevel.js returns null): it used to get a guard rail"
+   "note": "Deliberately skipped today (resolveNativeBarrierAsset in exportBeamNGLevel.js returns null): it used to get a guard rail",
+   "code": "services/platforms.js"
   },
   "barrier=lift_gate": {
    "what": "A boom barrier",
@@ -8052,9 +8053,13 @@
    "builds": "A wind turbine at a mapped wind generator; a solar field's panel rows east-west, facing the equator; rooftop panels left to their building",
    "assets": [
     {"shape":"/levels/driver_training/art/shapes/objects/turbine.dae","region":"any","usedToday":true,"pick":1},
-    {"shape":"/levels/driver_training/art/shapes/objects/turbine_tower.dae","region":"any","usedToday":false,"is":"A wind turbine tower (the blades are separate models)","size":[3.7,7.6,130],"seen":"2026-11-15","maybe":true},
+    {"shape":"/levels/driver_training/art/shapes/objects/turbine_tower.dae","region":"any","usedToday":true,"is":"A wind turbine tower (the blades are separate models)","size":[3.7,7.6,130],"seen":"2026-11-15"},
     {"shape":"/levels/west_coast_usa/art/shapes/objects/solarpanel.dae","region":"north-america","usedToday":true},
     {"shape":"/levels/small_island/art/shapes/buildings/si_res_solar_panels.dae","region":"tropical","usedToday":false},
+    {"shape":"/levels/driver_training/art/shapes/objects/turbine_blades1.dae","region":"any","usedToday":true},
+    {"shape":"/levels/driver_training/art/shapes/objects/turbine_blades2.dae","region":"any","usedToday":true},
+    {"shape":"/levels/driver_training/art/shapes/objects/turbine_blades3.dae","region":"any","usedToday":true},
+    {"shape":"/levels/driver_training/art/shapes/objects/turbine_blades4.dae","region":"any","usedToday":true},
     {"shape":"/levels/driver_training/art/shapes/objects/solarpanel.dae","region":"any","usedToday":false,"is":"Ground-mount solar panel row, 16 m","from":"catalogue"},
     {"shape":"/levels/small_island/art/shapes/buildings/si_res_solar_panel_tall.dae","region":"tropical","usedToday":false,"is":"Small solar panel on lattice mast with cabinet","from":"catalogue"}
    ],

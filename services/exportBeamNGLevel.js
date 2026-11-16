@@ -10046,7 +10046,8 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
       stand.x = nx; stand.y = ny;
     }
     // (one of a kind in a place: a stop mapped twice, as the stop and as its platform, had two shelters in one another)
-    if (placedTagObjects.some((o) => o.item === rule.item && Math.hypot(o.x - stand.x, o.y - stand.y) < Math.max(o.reach, reach))) { tagObjectSkipped.double = (tagObjectSkipped.double || 0) + 1; continue; }
+    const keep = rule.fit ? Math.max(reach, (rule.fit.rotor * (model.scale || 1)) / 2 * 0.9) : reach;
+    if (placedTagObjects.some((o) => o.item === rule.item && Math.hypot(o.x - stand.x, o.y - stand.y) < Math.max(o.reach, keep))) { tagObjectSkipped.double = (tagObjectSkipped.double || 0) + 1; continue; }
     // (on a pier or deck: left out, as benches are; in the water: nowhere; under a deck that would cut through it: no)
     if (deckAt(stand.x, stand.y) !== null) continue;
     const z = getTerrainHeightAtWorldXY(stand.x, stand.y, terrainData, squareSize);
@@ -10062,8 +10063,26 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
       shapeName: model.shapeFile,
       useInstanceRenderData: true,
     });
+    // (built of the game's own pieces, as its own levels build it: a wind turbine's tower and the rotor that turns on
+    // it. The base stands in the picked model's place; the rotor at its offset, turned and sized with it)
+    if (rule.assembly) {
+      const placed = objects[objects.length - 1];
+      const s = model.scale || 1; const yaw = stand.facing; const cs = Math.cos(yaw); const sn = Math.sin(yaw);
+      placed.shapeName = part(rule.assembly.base).shapeFile;
+      placed.position[2] = roundTo(z, 3);
+      placed.rotationMatrix = rotationMatrixFromYaw(yaw);
+      const rotor = part(rule.assembly.spin[i % rule.assembly.spin.length]);
+      const [ox, oy, oz] = rotor.offset || [0, 0, 0];
+      objects.push({
+        __parent: 'street_furniture', class: 'TSStatic', name: `${rule.id}_${i}_rotor`, persistentId: generatePersistentId(),
+        position: [roundTo(stand.x + (ox * cs - oy * sn) * s, 3), roundTo(stand.y + (ox * sn + oy * cs) * s, 3), roundTo(z + oz * s, 3)],
+        rotationMatrix: rotationMatrixFromYaw(yaw),
+        ...(s !== 1 ? { scale: [s, s, s] } : {}),
+        shapeName: rotor.shapeFile, playAmbient: rotor.spins ? true : false, useInstanceRenderData: true,
+      });
+    }
     tagObjectCounts[rule.id] = (tagObjectCounts[rule.id] || 0) + 1;
-    placedTagObjects.push({ item: rule.item, x: stand.x, y: stand.y, reach });
+    placedTagObjects.push({ item: rule.item, x: stand.x, y: stand.y, reach: keep });
   }
   if (Object.keys(tagObjectCounts).length) console.log(`[BeamNG Export] Mapped objects from the model picks: ${Object.entries(tagObjectCounts).map(([k, v]) => `${v} ${k}`).join(', ')}`);
   if (tagObjectSkipped.inBuilding || tagObjectSkipped.atWall || tagObjectSkipped.double || tagObjectSkipped.onPath) console.log(`[BeamNG Export] Mapped objects left out: ${tagObjectSkipped.inBuilding || 0} inside a building's outline (a roof's mast, a station's toilets), ${tagObjectSkipped.atWall || 0} against a wall with no room, ${tagObjectSkipped.double || 0} mapped twice in one place, ${tagObjectSkipped.onPath || 0} on a footpath with no room beside it`);
@@ -14073,6 +14092,23 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         });
         appendAll(sidewalks.meshes, res.meshes);
         console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Platforms: ${res.count} of ${pf.length} railway platform(s) raised beside their track, ${res.triangles} triangles.`);
+      }
+    }
+    // traffic islands and roundabout centres mapped as a closed kerb (barrier=kerb): a kerb 30 cm wide and 15 cm high
+    // round them, their inside left to the ground as painted (grass or paving; a concrete top had the grass growing
+    // through it); a small one (60 m² or less, a splitter between lanes) a solid concrete slab. An open kerb line is a street's curb, which the sidewalks build already
+    {
+      const ringArea = (r) => { let s = 0; for (let a = 0, b = r.length - 1; a < r.length; b = a++) s += (r[b][0] + r[a][0]) * (r[b][1] - r[a][1]); return Math.abs(s) / 2; };
+      const islands = (exportTerrainData.osmFeatures || []).filter((f) => f.tags?.barrier === 'kerb' && f.geometry?.length > 3
+        && f.geometry[0].lat === f.geometry[f.geometry.length - 1].lat && f.geometry[0].lng === f.geometry[f.geometry.length - 1].lng)
+        .map((f) => ({ points: f.geometry.map(toW), width: 0.3, over: Number.parseFloat(f.tags.height) > 0 && Number.parseFloat(f.tags.height) < 0.5 ? Number.parseFloat(f.tags.height) : 0.15 }))
+        .filter((pl) => { const A = ringArea(pl.points); return A >= 3 && A <= 4000; })
+        // (a small one, a splitter between lanes, solid concrete; a larger one a kerb round its ground)
+        .map((pl) => ({ ...pl, strip: ringArea(pl.points) > 60 }));
+      if (islands.length) {
+        const res = buildPlatformMeshes(islands, { groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize), topSet: 'concrete', sideSet: 'concrete', name: 'kerb_islands' });
+        appendAll(sidewalks.meshes, res.meshes);
+        console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Kerbed islands: ${res.count} traffic island(s) and roundabout centre(s) raised, ${res.triangles} triangles.`);
       }
     }
   }

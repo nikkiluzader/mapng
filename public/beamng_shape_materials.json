@@ -5214,6 +5214,56 @@
       "persistentId": "2d896300-72c6-4455-b9b6-9fdb7493d79b",
       "version": 1.5
     },
+    "m_plastic_trim": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/trim/plastic/m_plastic_trim/t_plastic_trim_01_ao.data.png",
+          "baseColorMap": "/assets/materials/trim/plastic/m_plastic_trim/t_plastic_trim_01_b.color.png",
+          "diffuseMapUseUV": null,
+          "normalMap": "/assets/materials/trim/plastic/m_plastic_trim/t_plastic_trim_01_nm.normal.png",
+          "opacityMap": "/assets/materials/trim/plastic/m_plastic_trim/t_plastic_trim_01_o.data.png",
+          "opacityMapUseUV": null,
+          "pixelSpecular": true,
+          "roughnessMap": "/assets/materials/trim/plastic/m_plastic_trim/t_plastic_trim_01_r.data.png",
+          "roughnessMapUseUV": null,
+          "vertColor": true
+        },
+        {
+          "baseColorMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_b.color.png",
+          "diffuseMapUseUV": 1,
+          "opacityMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_o.data.png",
+          "opacityMapUseUV": 1,
+          "pixelSpecular": null,
+          "roughnessMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_r.data.png",
+          "roughnessMapUseUV": 1,
+          "vertColor": null
+        },
+        {
+          "diffuseMapUseUV": null,
+          "opacityMapUseUV": null,
+          "pixelSpecular": null,
+          "roughnessMapUseUV": null,
+          "vertColor": null
+        },
+        {
+          "diffuseMapUseUV": null,
+          "opacityMapUseUV": null,
+          "pixelSpecular": null,
+          "roughnessMapUseUV": null,
+          "vertColor": null
+        }
+      ],
+      "activeLayers": 2,
+      "alphaRef": 70,
+      "alphaTest": true,
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "mapTo": "m_plastic_trim",
+      "name": "m_plastic_trim",
+      "persistentId": "58af4fda-ddc7-45c0-9fd1-1cd95ff9a327",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
     "m_wood_wall": {
       "Stages": [
         {

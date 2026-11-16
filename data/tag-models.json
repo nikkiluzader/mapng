@@ -1063,8 +1063,18 @@
    "offBuildings": true,
    "fit": {
     "rotor": 52.4,
-    "hub": 72,
+    "hub": 101.4,
     "min": 0.35
+   },
+   "assembly": {
+    "base": "WIND_TURBINE.tower",
+    "spin": [
+     "WIND_TURBINE.rotor1",
+     "WIND_TURBINE.rotor2",
+     "WIND_TURBINE.rotor3",
+     "WIND_TURBINE.rotor4"
+    ],
+    "note": "as the game's own turbines (driver_training's prefabs): the tower, and on it a rotor model that turns by itself (playAmbient), 101.4 m up and 3.5 m in front of the mast"
    }
   }
  },
@@ -1642,6 +1652,66 @@
      4.1,
      2.54
     ]
+   },
+   "ship": true
+  },
+  "WIND_TURBINE.tower": {
+   "tag": "power=generator",
+   "shape": "/levels/driver_training/art/shapes/objects/turbine_tower.dae",
+   "facts": {
+    "note": "its foot at its origin (27 m of it below, for a slope)"
+   },
+   "ship": true
+  },
+  "WIND_TURBINE.rotor1": {
+   "tag": "power=generator",
+   "shape": "/levels/driver_training/art/shapes/objects/turbine_blades1.dae",
+   "facts": {
+    "offset": [
+     0,
+     -3.52027345,
+     101.410286
+    ],
+    "spins": true
+   },
+   "ship": true
+  },
+  "WIND_TURBINE.rotor2": {
+   "tag": "power=generator",
+   "shape": "/levels/driver_training/art/shapes/objects/turbine_blades2.dae",
+   "facts": {
+    "offset": [
+     0,
+     -3.52027345,
+     101.410286
+    ],
+    "spins": true
+   },
+   "ship": true
+  },
+  "WIND_TURBINE.rotor3": {
+   "tag": "power=generator",
+   "shape": "/levels/driver_training/art/shapes/objects/turbine_blades3.dae",
+   "facts": {
+    "offset": [
+     0,
+     -3.52027345,
+     101.410286
+    ],
+    "spins": true
+   },
+   "ship": true
+  },
+  "WIND_TURBINE.rotor4": {
+   "tag": "power=generator",
+   "shape": "/levels/driver_training/art/shapes/objects/turbine_blades4.dae",
+   "facts": {
+    "offset": [
+     0,
+     -3.52027345,
+     101.410286
+    ],
+    "spins": true
    },
    "ship": true
   }
