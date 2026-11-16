@@ -1251,6 +1251,7 @@ const COAST_MARGIN_M = 2.5;         // the sea begins this far out from the mapp
 const COAST_FINE_M = 25;            // within this of the line a grid point is judged by itself, not by its 10 m land cover cell
 const PIER_AREA_MAX_M = 2.5;         // ... and on coarse elevation no more than this
 const PIER_AREA_TOP_M = 1.5;         // a pier mapped as an area stands this far over the sea
+const PIER_FINE_WET_M = 0.5;         // on a fine survey only a pier whose ground lies no higher than this over the sea (the survey took it out)
 const COAST_VOTE_CELLS = 50;          // the land cover's water beside the coastline must agree on the sea's side: this many cells ...
 const COAST_VOTE_SHARE = 0.8;         // ... and this share of them
 const COAST_SEA_MAX_M = 40;         // ground on the coastline's sea side up to this far over the sea is the data's smear
@@ -1415,7 +1416,9 @@ export function lowerSeabed(grid, landCover, seaZ, { coarse = false, keep = null
   let pierPixels = 0;
   // (coarse elevation only: a fine survey has what stands there, and a platform added beside its quays and
   // bridges stood up as steps: Amsterdam)
-  if (coarse && piers?.length && worldSize > 0) {
+  // (and on a fine survey where it holds the pier at the sea or under it: a bare-earth survey takes piers out with
+  // the buildings, and San Diego's Broadway Pier, its street and its signs, lay under the bay)
+  if (piers?.length && worldSize > 0) {
     const sq = worldSize / width; const topZ = seaZ + PIER_AREA_TOP_M;
     for (const ring of piers) {
       if (!(ring?.length >= 3)) continue;
@@ -1436,6 +1439,7 @@ export function lowerSeabed(grid, landCover, seaZ, { coarse = false, keep = null
       if (inside.length) {
         const zs = inside.map((idx) => heightMap[idx] - minHeight).sort((p, q) => p - q);
         if (zs[zs.length >> 1] > seaZ + COAST_SEA_MAX_M) continue;
+        if (!coarse && zs[zs.length >> 1] > seaZ + PIER_FINE_WET_M) continue;
       }
       // (only what is under that height: a pier or a mole the data has standing higher is left as the data has it)
       for (const idx of inside) {
