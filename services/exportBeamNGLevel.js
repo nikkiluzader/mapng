@@ -14099,14 +14099,19 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     // through it); a small one (60 m² or less, a splitter between lanes) a solid concrete slab. An open kerb line is a street's curb, which the sidewalks build already
     {
       const ringArea = (r) => { let s = 0; for (let a = 0, b = r.length - 1; a < r.length; b = a++) s += (r[b][0] + r[a][0]) * (r[b][1] - r[a][1]); return Math.abs(s) / 2; };
+      const inRingW = (x, y, r) => { let k = false; for (let a = 0, b = r.length - 1; a < r.length; b = a++) if (((r[a][1] > y) !== (r[b][1] > y)) && (x < ((r[b][0] - r[a][0]) * (y - r[a][1])) / (r[b][1] - r[a][1]) + r[a][0])) k = !k; return k; };
+      const nearRingW = (x, y, r, d) => { for (let a = 0, b = r.length - 1; a < r.length; b = a++) { const vx = r[a][0] - r[b][0]; const vy = r[a][1] - r[b][1]; const L = vx * vx + vy * vy || 1e-9; const u = Math.max(0, Math.min(1, ((x - r[b][0]) * vx + (y - r[b][1]) * vy) / L)); if (Math.hypot(r[b][0] + vx * u - x, r[b][1] + vy * u - y) < d) return true; } return false; };
+      const medianPoints = (sidewalks.medianRuns || []).flatMap((run) => run.points || []);
       const islands = (exportTerrainData.osmFeatures || []).filter((f) => f.tags?.barrier === 'kerb' && f.geometry?.length > 3
         && f.geometry[0].lat === f.geometry[f.geometry.length - 1].lat && f.geometry[0].lng === f.geometry[f.geometry.length - 1].lng)
         .map((f) => ({ points: f.geometry.map(toW), width: 0.3, over: Number.parseFloat(f.tags.height) > 0 && Number.parseFloat(f.tags.height) < 0.5 ? Number.parseFloat(f.tags.height) : 0.15 }))
         .filter((pl) => { const A = ringArea(pl.points); return A >= 3 && A <= 4000; })
+        // (not where the sidewalks built a divided road's median already: that median is the island, its kerbs and slab)
+        .filter((pl) => !medianPoints.some(([x, y]) => inRingW(x, y, pl.points) || nearRingW(x, y, pl.points, 1)))
         // (a small one, a splitter between lanes, solid concrete; a larger one a kerb round its ground)
         .map((pl) => ({ ...pl, strip: ringArea(pl.points) > 60 }));
       if (islands.length) {
-        const res = buildPlatformMeshes(islands, { groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize), topSet: 'concrete', sideSet: 'concrete', name: 'kerb_islands' });
+        const res = buildPlatformMeshes(islands, { groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize), drape: terrainDrape(exportTerrainData, squareSize), topSet: 'concrete', sideSet: 'concrete', name: 'kerb_islands' });
         appendAll(sidewalks.meshes, res.meshes);
         console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Kerbed islands: ${res.count} traffic island(s) and roundabout centre(s) raised, ${res.triangles} triangles.`);
       }

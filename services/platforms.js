@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import { PLAZA_MATERIAL, plazaTileM } from './plazas.js';
+import { drapedMesh } from './sportsFields.js';
 
 export const PLATFORM_OVER_RAIL_M = 0.55;     // a main line's platform over the rails (0.55 m: the common European height)
 export const PLATFORM_OVER_GROUND_M = 0.3;    // with no track near: a tram or bus platform's kerb
@@ -71,12 +72,25 @@ export function buildPlatformMeshes(platforms, opts = {}) {
       if (anyTrack) { const t = tz[i] ?? tz.find((v) => v !== null); return Math.max(g[i] + 0.1, t + PLATFORM_OVER_RAIL_M); }
       return g[i] + PLATFORM_OVER_GROUND_M;
     });
-    let tris;
-    try { tris = THREE.ShapeUtils.triangulateShape(ring.map(([x, y]) => new THREE.Vector2(x, y)), []); } catch { continue; }
-    if (!tris.length) continue;
-    for (const [i, j, k] of tris) {
-      for (const n of [i, j, k]) { top.pos.push(ring[n][0], ring[n][1], z[n]); top.uv.push(ring[n][0] / tTop, ring[n][1] / tTop); }
-      triangles++;
+    // (a slab at a set height over the ground, with the terrain's drape given: its top laid on the terrain's own
+    // triangles, that height over it everywhere. Its corners alone set it once: the long thin triangles of a splitter
+    // island ran corner to corner across a road's crown and fall, and its top folded along them)
+    if (Number.isFinite(pl.over) && opts.drape) {
+      let ok = true;
+      try {
+        drapedMesh({ tri: (_m, A, B, C) => { for (const v of [A, B, C]) { top.pos.push(v[0], v[1], v[2] + pl.over); top.uv.push(v[0] / tTop, v[1] / tTop); } triangles++; } },
+          topSet, ring, [], opts.drape.drapeAt, () => null, opts.drape.grid);
+      } catch { ok = false; }
+      if (!ok) continue;
+      for (let i = 0; i < ring.length; i++) z[i] = opts.drape.drapeAt(ring[i][0], ring[i][1]) + pl.over;
+    } else {
+      let tris;
+      try { tris = THREE.ShapeUtils.triangulateShape(ring.map(([x, y]) => new THREE.Vector2(x, y)), []); } catch { continue; }
+      if (!tris.length) continue;
+      for (const [i, j, k] of tris) {
+        for (const n of [i, j, k]) { top.pos.push(ring[n][0], ring[n][1], z[n]); top.uv.push(ring[n][0] / tTop, ring[n][1] / tTop); }
+        triangles++;
+      }
     }
     for (let i = 0; i < ring.length; i++) {
       const j = (i + 1) % ring.length;
