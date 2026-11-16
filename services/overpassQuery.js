@@ -8,7 +8,7 @@
  */
 import { tagObjectNodeTags } from './tagModels.js';
 
-export const OVERPASS_QUERY_VERSION = 7;   // 2: traffic_calming nodes; 3: food, drink and lodging nodes; 4: railways; 5: disused, preserved and abandoned lines; 6: bus stops, post boxes, picnic tables, flagpoles, recycling, information boards; 7: power towers mapped on their own
+export const OVERPASS_QUERY_VERSION = 8;   // 2: traffic_calming nodes; 3: food, drink and lodging nodes; 4: railways; 5: disused, preserved and abandoned lines; 6: bus stops, post boxes, picnic tables, flagpoles, recycling, information boards; 7: power towers mapped on their own; 8: shelters, toilets, statues, masts, towers, oil wells, bike stands, street cabinets, dumpsters
 
 // Public Overpass mirrors (volunteer-run; any of them may be down).
 export const OVERPASS_ENDPOINTS = [

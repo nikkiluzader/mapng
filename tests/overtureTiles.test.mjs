@@ -152,7 +152,7 @@ test('base: OSM source_tags pass through, filtered like the live Overpass query'
   const layers = decodeMvt(encodeMvt({
     land: [{ type: 1, props: { id: 't1', source_tags: JSON.stringify({ natural: 'tree', leaf_type: 'needleleaved' }) }, parts: [[[100, 100]]] }],
     infrastructure: [
-      { type: 1, props: { id: 'a1', source_tags: JSON.stringify({ tourism: 'artwork' }) }, parts: [[[200, 200]]] },
+      { type: 1, props: { id: 'a1', source_tags: JSON.stringify({ man_made: 'survey_point' }) }, parts: [[[200, 200]]] },
       { type: 1, props: { id: 's1', source_tags: JSON.stringify({ highway: 'traffic_signals' }) }, parts: [[[300, 300]]] },
     ],
     land_use: [{ type: 3, props: { id: 'p1', source_tags: JSON.stringify({ leisure: 'park', name: 'Arroyo Park' }) }, parts: [[[0, 0], [500, 0], [500, 500], [0, 500], [0, 0]]] }],

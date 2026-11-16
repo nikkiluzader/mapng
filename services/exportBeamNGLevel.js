@@ -9936,6 +9936,34 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
   // information boards (data/model-picks.json; services/tagModels.js). Each by its road, clear of the lanes.
   const tagObjectCounts = {};
   const tagFeatures = (terrainData.osmFeatures || []).filter((f) => f.type === 'tag_object' && f.geometry?.length === 1);
+  // The building outlines, for the objects that never stand inside one (a cell above a building's box first)
+  const bldBoxes = [];
+  const tagObjectSkipped = {};
+  const placedTagObjects = [];
+  const insideBuilding = (() => {
+    let grid = null; const C = 64;
+    return (x, y) => {
+      if (!grid) {
+        grid = new Map();
+        for (const b of terrainData.osmFeatures || []) {
+          if (b.type !== 'building' || !(b.geometry?.length > 2)) continue;
+          const ring = b.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0));
+          let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
+          for (const [px, py] of ring) { x0 = Math.min(x0, px); y0 = Math.min(y0, py); x1 = Math.max(x1, px); y1 = Math.max(y1, py); }
+          const k = bldBoxes.push(ring) - 1;
+          for (let gx = Math.floor(x0 / C); gx <= Math.floor(x1 / C); gx++) for (let gy = Math.floor(y0 / C); gy <= Math.floor(y1 / C); gy++) {
+            const key = `${gx},${gy}`; if (!grid.has(key)) grid.set(key, []); grid.get(key).push(k);
+          }
+        }
+      }
+      for (const k of grid.get(`${Math.floor(x / C)},${Math.floor(y / C)}`) || []) {
+        const r = bldBoxes[k]; let inside = false;
+        for (let a = 0, b = r.length - 1; a < r.length; b = a++) if (((r[a][1] > y) !== (r[b][1] > y)) && (x < ((r[b][0] - r[a][0]) * (y - r[a][1])) / (r[b][1] - r[a][1]) + r[a][0])) inside = !inside;
+        if (inside) return true;
+      }
+      return false;
+    };
+  })();
   for (let i = 0; i < tagFeatures.length; i++) {
     const f = tagFeatures[i]; const rule = tagObjectFor(f.tags);
     if (!rule || (tagObjectCounts[rule.id] || 0) >= (rule.cap ?? 2000)) continue;
@@ -9944,7 +9972,31 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
     const model = tagModel(rule.pick, biome, i);
     if (!model) continue;   // (no model for this region: a board whose text is another country's)
     const world = geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0);
+    // (a mast on a roof, toilets or bike stands mapped inside a building: they are part of it, not stood in it)
+    if (rule.offBuildings && insideBuilding(world[0], world[1])) { tagObjectSkipped.inBuilding = (tagObjectSkipped.inBuilding || 0) + 1; continue; }
     const stand = standTagObject(rule, world[0], world[1], findNearestRoad(world[0], world[1], roads, MAX_ROAD_SEARCH_M), f.tags, i);
+    // (its footprint clear of a building's wall: a statue's pedestal mapped against a facade stood half in it. Its
+    // turned outline (corners and edge middles) moved out from the wall a quarter metre at a time, as far as its own
+    // size; left out where that does not clear it)
+    const reach = Math.max(0.3, Math.hypot(model.size?.[0] ?? 1, model.size?.[1] ?? 1) / 2);
+    if (rule.offBuildings) {
+      const yaw = stand.facing + model.yawOffset; const cs = Math.cos(yaw); const sn = Math.sin(yaw);
+      const b = model.box || [-(model.size?.[0] ?? 1) / 2, -(model.size?.[1] ?? 1) / 2, 0, (model.size?.[0] ?? 1) / 2, (model.size?.[1] ?? 1) / 2, 1];
+      const local = [[b[0], b[1]], [b[3], b[1]], [b[3], b[4]], [b[0], b[4]], [(b[0] + b[3]) / 2, b[1]], [b[3], (b[1] + b[4]) / 2], [(b[0] + b[3]) / 2, b[4]], [b[0], (b[1] + b[4]) / 2]];
+      const inside = (cx, cy) => local.map(([lx, ly]) => [cx + lx * cs - ly * sn, cy + lx * sn + ly * cs]).filter(([px, py]) => insideBuilding(px, py));
+      let hit = inside(stand.x, stand.y);
+      if (hit.length) {
+        const mx = hit.reduce((s, q) => s + q[0], 0) / hit.length; const my = hit.reduce((s, q) => s + q[1], 0) / hit.length;
+        let ux = stand.x - mx; let uy = stand.y - my; const ul = Math.hypot(ux, uy);
+        if (ul > 1e-6) { ux /= ul; uy /= ul; }
+        let moved = 0;
+        while (hit.length && ul > 1e-6 && moved < reach) { moved += 0.25; hit = inside(stand.x + ux * moved, stand.y + uy * moved); }
+        if (hit.length || insideBuilding(stand.x + ux * moved, stand.y + uy * moved)) { tagObjectSkipped.atWall = (tagObjectSkipped.atWall || 0) + 1; continue; }
+        stand.x += ux * moved; stand.y += uy * moved;
+      }
+    }
+    // (one of a kind in a place: a stop mapped twice, as the stop and as its platform, had two shelters in one another)
+    if (placedTagObjects.some((o) => o.item === rule.item && Math.hypot(o.x - stand.x, o.y - stand.y) < Math.max(o.reach, reach))) { tagObjectSkipped.double = (tagObjectSkipped.double || 0) + 1; continue; }
     // (on a pier or deck: left out, as benches are; in the water: nowhere; under a deck that would cut through it: no)
     if (deckAt(stand.x, stand.y) !== null) continue;
     const z = getTerrainHeightAtWorldXY(stand.x, stand.y, terrainData, squareSize);
@@ -9960,8 +10012,10 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
       useInstanceRenderData: true,
     });
     tagObjectCounts[rule.id] = (tagObjectCounts[rule.id] || 0) + 1;
+    placedTagObjects.push({ item: rule.item, x: stand.x, y: stand.y, reach });
   }
   if (Object.keys(tagObjectCounts).length) console.log(`[BeamNG Export] Mapped objects from the model picks: ${Object.entries(tagObjectCounts).map(([k, v]) => `${v} ${k}`).join(', ')}`);
+  if (tagObjectSkipped.inBuilding || tagObjectSkipped.atWall || tagObjectSkipped.double) console.log(`[BeamNG Export] Mapped objects left out: ${tagObjectSkipped.inBuilding || 0} inside a building's outline (a roof's mast, a station's toilets), ${tagObjectSkipped.atWall || 0} against a wall with no room, ${tagObjectSkipped.double || 0} mapped twice in one place`);
   objects.tagObjectCounts = tagObjectCounts;
 
   // Benches along major town streets (streetProps.js), facing the road.

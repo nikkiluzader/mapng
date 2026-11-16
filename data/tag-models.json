@@ -299,6 +299,387 @@
      ]
     }
    ]
+  },
+  "amenity=waste_disposal": {
+   "any": [
+    {
+     "shape": "/art/shapes/garage_and_dealership/Clutter/italy_clutter_dumpster.dae",
+     "yaw": 90,
+     "size": [
+      1.57,
+      0.83,
+      1.2
+     ],
+     "box": [
+      -0.78,
+      -0.42,
+      0,
+      0.78,
+      0.41,
+      1.2
+     ]
+    }
+   ]
+  },
+  "man_made=street_cabinet": {
+   "any": [
+    {
+     "shape": "/levels/italy/art/shapes/buildings/electric_box_big.dae",
+     "yaw": -90,
+     "size": [
+      0.56,
+      0.44,
+      1.04
+     ],
+     "box": [
+      -0.04,
+      -0.36,
+      0,
+      0.52,
+      0.08,
+      1.04
+     ]
+    }
+   ]
+  },
+  "amenity=shelter": {
+   "any": [
+    {
+     "shape": "/levels/Utah/art/shapes/buildings/ut_BBQ_roof_a.dae",
+     "yaw": -90,
+     "size": [
+      5.7,
+      5.87,
+      3.56
+     ],
+     "box": [
+      -2.85,
+      -2.94,
+      -0.5,
+      2.85,
+      2.93,
+      3.06
+     ]
+    },
+    {
+     "shape": "/levels/Utah/art/shapes/buildings/ut_BBQ_roof_b.dae",
+     "yaw": -90,
+     "size": [
+      4.69,
+      6.94,
+      3.56
+     ],
+     "box": [
+      -2.35,
+      -3.47,
+      -0.5,
+      2.34,
+      3.47,
+      3.06
+     ]
+    }
+   ]
+  },
+  "amenity=shelter#transport": {
+   "any": [
+    {
+     "shape": "/art/shapes/objects/s_busstop_wcu.dae",
+     "yaw": 180,
+     "size": [
+      1.6,
+      3.88,
+      3.12
+     ],
+     "box": [
+      -1.17,
+      -1.94,
+      -0.27,
+      0.43,
+      1.94,
+      2.85
+     ]
+    }
+   ],
+   "north-america": [
+    {
+     "shape": "/levels/Utah/art/shapes/buildings/busstop_utah.dae",
+     "yaw": 0,
+     "size": [
+      1.43,
+      4.15,
+      3.14
+     ],
+     "box": [
+      -0.71,
+      -2.06,
+      -0.54,
+      0.71,
+      2.08,
+      2.6
+     ]
+    }
+   ],
+   "europe": [
+    {
+     "shape": "/levels/italy/art/shapes/buildings/italy_city_busstop.dae",
+     "yaw": 90,
+     "size": [
+      6.1,
+      2.61,
+      3.79
+     ],
+     "box": [
+      -3.05,
+      -1.58,
+      -0.25,
+      3.05,
+      1.03,
+      3.54
+     ]
+    },
+    {
+     "shape": "/art/shapes/objects/s_busstop_it.dae",
+     "yaw": 180,
+     "size": [
+      1.76,
+      4.43,
+      3.11
+     ],
+     "box": [
+      -0.93,
+      -2.21,
+      -0.29,
+      0.84,
+      2.22,
+      2.82
+     ]
+    }
+   ]
+  },
+  "amenity=toilets": {
+   "any": [
+    {
+     "shape": "/levels/hirochi_raceway/art/shapes/objects/toilet.dae",
+     "yaw": 90,
+     "size": [
+      1.21,
+      1.16,
+      2.46
+     ],
+     "box": [
+      -0.6,
+      -0.58,
+      -0.07,
+      0.61,
+      0.58,
+      2.38
+     ]
+    }
+   ]
+  },
+  "historic=memorial": {
+   "any": [
+    {
+     "shape": "/levels/italy/art/shapes/buildings/italy_castle_statue.dae",
+     "yaw": 0,
+     "size": [
+      1.42,
+      1.42,
+      2.84
+     ],
+     "box": [
+      -0.71,
+      -0.71,
+      -0.01,
+      0.71,
+      0.71,
+      2.83
+     ]
+    }
+   ]
+  },
+  "tourism=artwork": {
+   "any": [
+    {
+     "shape": "/levels/italy/art/shapes/buildings/italy_castle_statue.dae",
+     "yaw": 0,
+     "size": [
+      1.42,
+      1.42,
+      2.84
+     ],
+     "box": [
+      -0.71,
+      -0.71,
+      -0.01,
+      0.71,
+      0.71,
+      2.83
+     ]
+    }
+   ]
+  },
+  "man_made=mast": {
+   "any": [
+    {
+     "shape": "/levels/west_coast_usa/art/shapes/buildings/celltower.dae",
+     "yaw": 0,
+     "size": [
+      5.46,
+      4.9,
+      28.94
+     ],
+     "box": [
+      -2.74,
+      -1.81,
+      -0.02,
+      2.72,
+      3.09,
+      28.91
+     ]
+    }
+   ],
+   "europe": [
+    {
+     "shape": "/levels/italy/art/shapes/buildings/italy_bld_antenna.dae",
+     "yaw": 0,
+     "size": [
+      3.7,
+      3.68,
+      29.96
+     ],
+     "box": [
+      -1.85,
+      -1.84,
+      -0.42,
+      1.85,
+      1.84,
+      29.54
+     ]
+    }
+   ]
+  },
+  "man_made=mast#lighting": {
+   "any": [
+    {
+     "shape": "/levels/driver_training/art/shapes/buildings/s_light_pole_high_mast.dae",
+     "yaw": 0,
+     "size": [
+      0.9,
+      0.84,
+      18.3
+     ],
+     "box": [
+      -0.45,
+      -0.44,
+      -0.27,
+      0.45,
+      0.4,
+      18.03
+     ]
+    }
+   ]
+  },
+  "man_made=tower": {
+   "any": [
+    {
+     "shape": "/levels/west_coast_usa/art/shapes/buildings/antenna.dae",
+     "yaw": 0,
+     "size": [
+      12.19,
+      12.19,
+      64.32
+     ],
+     "box": [
+      -6.09,
+      -6.09,
+      -3.18,
+      6.1,
+      6.1,
+      61.15
+     ]
+    }
+   ]
+  },
+  "man_made=tower#observation": {
+   "any": [
+    {
+     "shape": "/levels/small_island/art/shapes/buildings/si_res_observatory.dae",
+     "yaw": 0,
+     "size": [
+      9.08,
+      7.95,
+      11.9
+     ],
+     "box": [
+      -4.55,
+      -2.57,
+      -5.05,
+      4.53,
+      5.38,
+      6.86
+     ]
+    }
+   ]
+  },
+  "man_made=petroleum_well": {
+   "any": [
+    {
+     "shape": "/levels/west_coast_usa/art/shapes/objects/pumpjack_a.dae",
+     "yaw": 0,
+     "size": [
+      4.07,
+      15.59,
+      10.47
+     ],
+     "box": [
+      -2.03,
+      -10.5,
+      -1.7,
+      2.03,
+      5.09,
+      8.76
+     ]
+    },
+    {
+     "shape": "/levels/west_coast_usa/art/shapes/objects/industrial_pumpjack.dae",
+     "yaw": 0,
+     "size": [
+      4.15,
+      15.55,
+      13.09
+     ],
+     "box": [
+      -2.11,
+      -10.46,
+      -1.22,
+      2.03,
+      5.09,
+      11.86
+     ]
+    }
+   ]
+  },
+  "amenity=bicycle_parking": {
+   "any": [
+    {
+     "shape": "/levels/east_coast_usa/art/shapes/clutter/clutter_city_bike_stand.dae",
+     "yaw": 0,
+     "size": [
+      4.16,
+      0.64,
+      1.16
+     ],
+     "box": [
+      -2.08,
+      -0.32,
+      0,
+      2.08,
+      0.32,
+      1.16
+     ]
+    }
+   ]
   }
  },
  "objects": {
@@ -378,6 +759,211 @@
    "item": "infoBoards",
    "cap": 2000,
    "beside": 1
+  },
+  "dumpster": {
+   "tag": "amenity=waste_disposal",
+   "pick": "amenity=waste_disposal",
+   "face": "road",
+   "item": "bins",
+   "cap": 3000,
+   "beside": 0.8,
+   "offBuildings": true
+  },
+  "streetCabinet": {
+   "tag": "man_made=street_cabinet",
+   "pick": "man_made=street_cabinet",
+   "face": "road",
+   "item": "streetCabinets",
+   "cap": 3000,
+   "beside": 0.6,
+   "offBuildings": true
+  },
+  "transportShelter": {
+   "tag": "amenity=shelter",
+   "when": {
+    "shelter_type": [
+     "public_transport"
+    ]
+   },
+   "pick": "amenity=shelter#transport",
+   "face": "road",
+   "item": "shelters",
+   "cap": 2000,
+   "beside": 1.6,
+   "offBuildings": true
+  },
+  "shelter": {
+   "tag": "amenity=shelter",
+   "when": {
+    "shelter_type": [
+     "picnic_shelter",
+     "gazebo",
+     "pavilion",
+     "weather_shelter"
+    ]
+   },
+   "pick": "amenity=shelter",
+   "face": "road",
+   "item": "shelters",
+   "cap": 1500,
+   "beside": 3.5,
+   "offBuildings": true
+  },
+  "toilets": {
+   "tag": "amenity=toilets",
+   "unless": {
+    "location": [
+     "roof",
+     "rooftop"
+    ]
+   },
+   "pick": "amenity=toilets",
+   "face": "road",
+   "item": "toilets",
+   "cap": 1000,
+   "beside": 1.5,
+   "offBuildings": true
+  },
+  "memorialStatue": {
+   "tag": "historic=memorial",
+   "when": {
+    "memorial": [
+     "statue",
+     "bust",
+     "sculpture"
+    ]
+   },
+   "pick": "historic=memorial",
+   "face": "road",
+   "item": "statues",
+   "cap": 800,
+   "beside": 2,
+   "offBuildings": true
+  },
+  "artworkStatue": {
+   "tag": "tourism=artwork",
+   "when": {
+    "artwork_type": [
+     "statue",
+     "sculpture",
+     "bust"
+    ]
+   },
+   "pick": "tourism=artwork",
+   "face": "road",
+   "item": "statues",
+   "cap": 800,
+   "beside": 2,
+   "offBuildings": true
+  },
+  "lightingMast": {
+   "tag": "man_made=mast",
+   "when": {
+    "tower:type": [
+     "lighting"
+    ]
+   },
+   "unless": {
+    "location": [
+     "roof",
+     "rooftop"
+    ]
+   },
+   "pick": "man_made=mast#lighting",
+   "face": "none",
+   "item": "masts",
+   "cap": 800,
+   "beside": 2,
+   "offBuildings": true
+  },
+  "mast": {
+   "tag": "man_made=mast",
+   "unless": {
+    "location": [
+     "roof",
+     "rooftop"
+    ],
+    "tower:type": [
+     "lighting"
+    ]
+   },
+   "pick": "man_made=mast",
+   "face": "none",
+   "item": "masts",
+   "cap": 800,
+   "beside": 4,
+   "offBuildings": true
+  },
+  "commTower": {
+   "tag": "man_made=tower",
+   "when": {
+    "tower:type": [
+     "communication"
+    ]
+   },
+   "unless": {
+    "location": [
+     "roof",
+     "rooftop"
+    ]
+   },
+   "pick": "man_made=tower",
+   "face": "none",
+   "item": "masts",
+   "cap": 300,
+   "beside": 8,
+   "offBuildings": true
+  },
+  "lookoutTower": {
+   "tag": "man_made=tower",
+   "when": {
+    "tower:type": [
+     "observation"
+    ]
+   },
+   "unless": {
+    "location": [
+     "roof",
+     "rooftop"
+    ]
+   },
+   "pick": "man_made=tower#observation",
+   "face": "road",
+   "item": "masts",
+   "cap": 300,
+   "beside": 6,
+   "offBuildings": true
+  },
+  "oilWell": {
+   "tag": "man_made=petroleum_well",
+   "pick": "man_made=petroleum_well",
+   "face": "none",
+   "item": "oilWells",
+   "cap": 1500,
+   "beside": 9,
+   "offBuildings": true
+  },
+  "bikeStand": {
+   "tag": "amenity=bicycle_parking",
+   "unless": {
+    "bicycle_parking": [
+     "building",
+     "shed",
+     "lockers",
+     "garage_boxes"
+    ],
+    "location": [
+     "underground",
+     "indoor",
+     "roof"
+    ]
+   },
+   "pick": "amenity=bicycle_parking",
+   "face": "road",
+   "item": "bikeStands",
+   "cap": 2000,
+   "beside": 0.9,
+   "offBuildings": true
   }
  },
  "parts": {

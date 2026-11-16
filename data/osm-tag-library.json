@@ -495,13 +495,13 @@
    ],
    "count": 960000,
    "group": "furniture",
-   "item": "bikeRacks",
-   "status": "planned",
-   "fetched": false,
+   "item": "bikeStands",
+   "status": "built",
+   "fetched": true,
    "fetchedNote": "Areas are fetched (a colour in the OSM-style texture); nodes are not",
    "builds": "Bike stands in a row",
    "assets": [
-    {"shape":"/levels/east_coast_usa/art/shapes/clutter/clutter_city_bike_stand.dae","region":"north-america","setting":"city","usedToday":false}
+    {"shape":"/levels/east_coast_usa/art/shapes/clutter/clutter_city_bike_stand.dae","region":"north-america","setting":"city","usedToday":true,"pick":1}
    ],
    "properties": {
     "capacity": {
@@ -516,7 +516,8 @@
      "effect": "yes: under a roof",
      "used": false
     }
-   }
+   },
+   "code": "services/tagModels.js (data/model-picks.json)"
   },
   "amenity=cafe": {
    "what": "A cafe",
@@ -978,27 +979,27 @@
    "count": 699000,
    "group": "furniture",
    "item": "shelters",
-   "status": "planned",
-   "fetched": false,
+   "status": "built",
+   "fetched": true,
    "fetchedNote": "Areas are fetched (47% are buildings and built as sheds); nodes are not",
    "builds": "A bus shelter, picnic shelter or gazebo by its type",
    "assets": [
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/busstop_wca.dae","region":"north-america","setting":"city","usedToday":false,"is":"A small bus shelter","size":[1.4,4.1,3.1],"seen":"2026-11-15"},
-    {"shape":"/levels/Utah/art/shapes/buildings/ut_BBQ_roof_a.dae","region":"north-america","setting":"rural","usedToday":false},
+    {"shape":"/levels/Utah/art/shapes/buildings/ut_BBQ_roof_a.dae","region":"north-america","setting":"rural","usedToday":true,"pick":1},
     {"shape":"/levels/hirochi_raceway/art/shapes/objects/gazebo_white.dae","region":"any","usedToday":false,"maybe":true},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/shelter_industrial.dae","region":"north-america","setting":"industrial","usedToday":false},
+    {"shape":"/art/shapes/objects/s_busstop_it.dae","region":"any","usedToday":true,"is":"Green glass bus shelter, European","pick":2},
+    {"shape":"/art/shapes/objects/s_busstop_wcu.dae","region":"any","usedToday":true,"is":"Red-roofed bus shelter with seats","pick":1},
+    {"shape":"/levels/italy/art/shapes/buildings/italy_city_busstop.dae","region":"europe","usedToday":true,"is":"Green bus shelter, European","pick":1},
+    {"shape":"/levels/Utah/art/shapes/buildings/busstop_utah.dae","region":"north-america","usedToday":true,"is":"Blue bus shelter with bench","pick":1},
+    {"shape":"/levels/Utah/art/shapes/buildings/ut_BBQ_roof_b.dae","region":"north-america","usedToday":true,"is":"Roofed picnic shelter on a slab","pick":2},
     {"shape":"/art/shapes/objects/s_busstop_ecu.dae","region":"any","usedToday":false,"is":"Glass bus shelter, curved roof","from":"catalogue"},
-    {"shape":"/art/shapes/objects/s_busstop_it.dae","region":"any","usedToday":false,"is":"Green glass bus shelter, European","from":"catalogue"},
     {"shape":"/art/shapes/objects/s_busstop_jri.dae","region":"any","usedToday":false,"is":"Small hut-style bus shelter","from":"catalogue"},
     {"shape":"/art/shapes/objects/s_busstop_utah.dae","region":"any","usedToday":false,"is":"Red-roofed bus shelter with seats","from":"catalogue"},
     {"shape":"/art/shapes/objects/s_busstop_wcu_01.dae","region":"any","usedToday":false,"is":"Open red-roofed bus shelter, one back panel","from":"catalogue"},
     {"shape":"/art/shapes/objects/s_busstop_wcu_02.dae","region":"any","usedToday":false,"is":"Open red-roofed bus shelter, one back panel","from":"catalogue"},
-    {"shape":"/art/shapes/objects/s_busstop_wcu.dae","region":"any","usedToday":false,"is":"Red-roofed bus shelter with seats","from":"catalogue"},
     {"shape":"/levels/east_coast_usa/art/shapes/buildings/busstop_eca.dae","region":"north-america","usedToday":false,"is":"Blue bus shelter with bench","from":"catalogue"},
     {"shape":"/levels/italy/art/shapes/buildings/italy_bld_airport_shelter.dae","region":"europe","usedToday":false,"is":"Striped roof on posts, open shelter, generic","from":"catalogue"},
-    {"shape":"/levels/italy/art/shapes/buildings/italy_city_busstop.dae","region":"europe","usedToday":false,"is":"Green bus shelter, European","from":"catalogue"},
-    {"shape":"/levels/Utah/art/shapes/buildings/busstop_utah.dae","region":"north-america","usedToday":false,"is":"Blue bus shelter with bench","from":"catalogue"},
-    {"shape":"/levels/Utah/art/shapes/buildings/ut_BBQ_roof_b.dae","region":"north-america","usedToday":false,"is":"Roofed picnic shelter on a slab","from":"catalogue"},
     {"shape":"/levels/Utah/art/shapes/buildings/ut_busstop_old.dae","region":"north-america","usedToday":false,"is":"Rustic wooden bus shelter","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/objects/busstop.dae","region":"north-america","usedToday":false,"is":"Glass bus shelter with bench","from":"catalogue"}
    ],
@@ -1017,7 +1018,8 @@
      "used": false
     }
    },
-   "note": "ut_BBQ_roof and the hirochi gazebos (event tents) are name matches only"
+   "note": "ut_BBQ_roof and the hirochi gazebos (event tents) are name matches only",
+   "code": "services/tagModels.js (data/model-picks.json)"
   },
   "amenity=telephone": {
    "what": "A public telephone",
@@ -1040,12 +1042,12 @@
    "count": 529000,
    "group": "furniture",
    "item": "toilets",
-   "status": "planned",
-   "fetched": false,
+   "status": "built",
+   "fetched": true,
    "fetchedNote": "Areas are fetched (and built when they are buildings); nodes are not",
    "builds": "A toilet cabin or small block where no building is mapped",
    "assets": [
-    {"shape":"/levels/hirochi_raceway/art/shapes/objects/toilet.dae","region":"any","usedToday":false,"is":"A portable toilet cabin","size":[1.2,1.2,2.5],"seen":"2026-11-15"},
+    {"shape":"/levels/hirochi_raceway/art/shapes/objects/toilet.dae","region":"any","usedToday":true,"is":"A portable toilet cabin","size":[1.2,1.2,2.5],"seen":"2026-11-15","pick":1},
     {"shape":"/levels/automation_test_track/art/shapes/buildings/s_bld_toilet_nz.dae","region":"any","usedToday":false}
    ],
    "properties": {
@@ -1058,7 +1060,8 @@
      "used": false
     }
    },
-   "note": "What hirochi \"toilet\" looks like (portable cabin or fixture) is unchecked"
+   "note": "What hirochi \"toilet\" looks like (portable cabin or fixture) is unchecked",
+   "code": "services/tagModels.js (data/model-picks.json)"
   },
   "amenity=vending_machine": {
    "what": "A vending or ticket machine",
@@ -1130,14 +1133,14 @@
    "count": 325000,
    "group": "furniture",
    "item": "bins",
-   "status": "planned",
-   "fetched": false,
+   "status": "built",
+   "fetched": true,
    "fetchedNote": "Areas are fetched; nodes (most of them) are not",
    "builds": "A dumpster",
    "assets": [
     {"shape":"/levels/west_coast_usa/art/shapes/objects/dumpster.dae","region":"north-america","usedToday":false,"is":"A large roll-off skip, lorry sized: not a small wheeled bin","size":[2.6,5.3,2.3],"seen":"2026-11-15"},
     {"shape":"/art/shapes/garage_and_dealership/Clutter/ind_dumpster_full.dae","region":"any","usedToday":false},
-    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_clutter_dumpster.dae","region":"europe","usedToday":false},
+    {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_clutter_dumpster.dae","region":"europe","usedToday":true,"pick":1},
     {"shape":"/art/shapes/garage_and_dealership/Clutter/ind_dumpster_empty.dae","region":"any","usedToday":false,"is":"Empty skip","from":"catalogue"},
     {"shape":"/art/shapes/objects/s_trash_pile_01.dae","region":"any","usedToday":false,"is":"Small rubbish pile with bags and boxes; dumpster dressing","from":"catalogue"},
     {"shape":"/art/shapes/objects/s_trash_pile_02.dae","region":"any","usedToday":false,"is":"Small rubbish pile with bags and boxes; dumpster dressing","from":"catalogue"},
@@ -1161,7 +1164,8 @@
     {"shape":"/levels/west_coast_usa/art/shapes/objects/garbage_plasticbag.dae","region":"north-america","usedToday":false,"is":"Single rubbish bag or sack; dressing beside dumpsters","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/objects/garbage_sack.dae","region":"north-america","usedToday":false,"is":"Single rubbish bag or sack; dressing beside dumpsters","from":"catalogue"}
    ],
-   "note": "Listed under Bins in buildContent.js, but nothing is built"
+   "note": "Listed under Bins in buildContent.js, but nothing is built",
+   "code": "services/tagModels.js (data/model-picks.json)"
   },
   "barrier=block": {
    "what": "Large concrete or stone blocks",
@@ -4704,14 +4708,14 @@
     "area"
    ],
    "count": 521000,
-   "group": "landmarks",
-   "item": "monuments",
-   "status": "planned",
-   "fetched": false,
+   "group": "furniture",
+   "item": "statues",
+   "status": "built",
+   "fetched": true,
    "fetchedNote": "Areas are fetched; nodes are not",
    "builds": "A statue, stele or stone on a plinth by its type",
    "assets": [
-    {"shape":"/levels/italy/art/shapes/buildings/italy_castle_statue.dae","region":"europe","usedToday":false},
+    {"shape":"/levels/italy/art/shapes/buildings/italy_castle_statue.dae","region":"europe","usedToday":true,"pick":1},
     {"shape":"/levels/jungle_rock_island/art/shapes/buildings/jri_observatory_statue.dae","region":"tropical","usedToday":false}
    ],
    "generated": "Plinth, stele or obelisk (the fountain obelisk builder could be reused)",
@@ -4729,7 +4733,8 @@
      "used": false
     }
    },
-   "note": "Both native statues are of specific figures: fit unchecked"
+   "note": "Both native statues are of specific figures: fit unchecked",
+   "code": "services/tagModels.js (data/model-picks.json)"
   },
   "historic=monument": {
    "what": "A large monument",
@@ -6149,19 +6154,19 @@
     "node"
    ],
    "count": 533000,
-   "group": "landmarks",
-   "item": "towers",
-   "status": "planned",
-   "fetched": false,
+   "group": "furniture",
+   "item": "masts",
+   "status": "built",
+   "fetched": true,
    "builds": "A phone mast or a guyed radio mast; a floodlight mast for lighting",
    "assets": [
-    {"shape":"/levels/west_coast_usa/art/shapes/buildings/celltower.dae","region":"north-america","usedToday":false,"is":"A cell tower","size":[5.5,4.9,28.9],"seen":"2026-11-15"},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/celltower.dae","region":"north-america","usedToday":true,"is":"A cell tower","size":[5.5,4.9,28.9],"seen":"2026-11-15","pick":1},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/antenna.dae","region":"north-america","usedToday":false},
-    {"shape":"/levels/driver_training/art/shapes/buildings/s_light_pole_high_mast.dae","region":"any","usedToday":false},
+    {"shape":"/levels/driver_training/art/shapes/buildings/s_light_pole_high_mast.dae","region":"any","usedToday":true,"pick":1},
     {"shape":"/levels/italy/art/shapes/buildings/italy_airport_lightpole.dae","region":"europe","usedToday":false},
+    {"shape":"/levels/italy/art/shapes/buildings/italy_bld_antenna.dae","region":"europe","usedToday":true,"is":"Red and white lattice antenna mast, 30 m","pick":1},
     {"shape":"/art/shapes/objects/s_tower_01.dae","region":"any","usedToday":false,"is":"Rusty lattice tower, 15 m, stands alone","from":"catalogue"},
     {"shape":"/levels/italy/art/shapes/buildings/italy_airport_lightpole_v2.dae","region":"europe","usedToday":false,"is":"Red-white airport apron light mast","from":"catalogue"},
-    {"shape":"/levels/italy/art/shapes/buildings/italy_bld_antenna.dae","region":"europe","usedToday":false,"is":"Red and white lattice antenna mast, 30 m","from":"catalogue"},
     {"shape":"/levels/italy/art/shapes/misc/port_floodlight.dae","region":"europe","usedToday":false,"is":"Port floodlight mast, 32 m","from":"catalogue"},
     {"shape":"/levels/johnson_valley/art/shapes/building/s_building_radio_tower.dae","region":"north-america","usedToday":false,"is":"Hut with roof antennas; hut not a tower","from":"catalogue"},
     {"shape":"/levels/johnson_valley/art/shapes/misc/antenna.dae","region":"north-america","usedToday":false,"is":"Red and white lattice radio mast, 64 m","from":"catalogue"},
@@ -6183,7 +6188,8 @@
      "effect": "Scales the model",
      "used": false
     }
-   }
+   },
+   "code": "services/tagModels.js (data/model-picks.json)"
   },
   "man_made=petroleum_well": {
    "what": "An oil or gas well",
@@ -6191,17 +6197,18 @@
     "node"
    ],
    "count": 342000,
-   "group": "industry",
+   "group": "furniture",
    "item": "oilWells",
-   "status": "planned",
-   "fetched": false,
+   "status": "built",
+   "fetched": true,
    "builds": "A pumpjack",
    "assets": [
-    {"shape":"/levels/west_coast_usa/art/shapes/objects/pumpjack_a.dae","region":"north-america","usedToday":false,"is":"An oil pumpjack","size":[4.1,15.6,10.5],"seen":"2026-11-15"},
+    {"shape":"/levels/west_coast_usa/art/shapes/objects/pumpjack_a.dae","region":"north-america","usedToday":true,"is":"An oil pumpjack","size":[4.1,15.6,10.5],"seen":"2026-11-15","pick":1},
     {"shape":"/levels/west_coast_usa/art/shapes/objects/pumpjack_b.dae","region":"north-america","usedToday":false,"maybe":true},
-    {"shape":"/levels/west_coast_usa/art/shapes/objects/industrial_pumpjack.dae","region":"north-america","usedToday":false}
+    {"shape":"/levels/west_coast_usa/art/shapes/objects/industrial_pumpjack.dae","region":"north-america","usedToday":true,"pick":2}
    ],
-   "note": "Whether the pumpjack animates is unchecked. 342 k, mostly North America"
+   "note": "Whether the pumpjack animates is unchecked. 342 k, mostly North America",
+   "code": "services/tagModels.js (data/model-picks.json)"
   },
   "man_made=pier": {
    "what": "A pier or jetty (also man_made=quay as an area)",
@@ -6376,7 +6383,7 @@
     {"shape":"/levels/Industrial/art/shapes/buildings/tankfarm/ind_big_tank.dae","region":"any","setting":"industrial","usedToday":false},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_oil_ref_tank.dae","region":"north-america","setting":"industrial","usedToday":false},
     {"shape":"/levels/Industrial/art/shapes/buildings/tankfarm/ind_sphere_tank.dae","region":"any","setting":"industrial","usedToday":false},
-    {"shape":"/levels/johnson_valley/art/shapes/building/s_watertank.dae","region":"north-america","setting":"rural","usedToday":true,"picture":"Picture shows a tiny blob though size says 79 m"},
+    {"shape":"/levels/johnson_valley/art/shapes/building/s_watertank.dae","region":"north-america","setting":"rural","usedToday":true},
     {"shape":"/levels/east_coast_usa/art/shapes/buildings/eca_gas_tank.dae","region":"north-america","usedToday":false,"is":"Fenced horizontal propane tank, complete","from":"catalogue"},
     {"shape":"/levels/italy/art/shapes/buildings/italy_airport_fueltank.dae","region":"europe","usedToday":false,"is":"Round fuel tank with rim walkway","from":"catalogue"},
     {"shape":"/levels/italy/art/shapes/buildings/s_quarry_tank_4x10.dae","region":"europe","usedToday":false,"is":"Green corrugated vertical tank on concrete base","from":"catalogue"},
@@ -6419,14 +6426,14 @@
    ],
    "count": 336000,
    "group": "furniture",
-   "item": "cabinets",
-   "status": "planned",
-   "fetched": false,
+   "item": "streetCabinets",
+   "status": "built",
+   "fetched": true,
    "builds": "A grey cabinet at the back of the sidewalk",
    "assets": [
     {"shape":"/levels/west_coast_usa/art/shapes/objects/trafficlightbox_green.dae","region":"north-america","usedToday":false},
     {"shape":"/levels/italy/art/shapes/buildings/electric_box_small.dae","region":"europe","usedToday":false},
-    {"shape":"/levels/italy/art/shapes/buildings/electric_box_big.dae","region":"europe","usedToday":false},
+    {"shape":"/levels/italy/art/shapes/buildings/electric_box_big.dae","region":"europe","usedToday":true,"pick":1},
     {"shape":"/levels/italy/art/shapes/buildings/italy_airport_electrical_cabinet.dae","region":"europe","usedToday":false},
     {"shape":"/levels/italy/art/shapes/buildings/italy_bld_radio_generator.dae","region":"europe","usedToday":false,"is":"Red-white equipment cabinets on pad; dresses radio masts","from":"catalogue"}
    ],
@@ -6443,7 +6450,8 @@
      "effect": "Cabinet colour",
      "used": false
     }
-   }
+   },
+   "code": "services/tagModels.js (data/model-picks.json)"
   },
   "man_made=surveillance": {
    "what": "A surveillance camera",
@@ -6483,21 +6491,21 @@
     "area"
    ],
    "count": 464000,
-   "group": "landmarks",
-   "item": "towers",
-   "status": "planned",
-   "fetched": false,
+   "group": "furniture",
+   "item": "masts",
+   "status": "built",
+   "fetched": true,
    "fetchedNote": "Areas are fetched; nodes (most) are not",
    "builds": "By tower:type: a lattice or tube communication tower, an observation tower, a floodlight tower",
    "assets": [
     {"shape":"/levels/east_coast_usa/art/shapes/buildings/eca_bld_firewatch_tower.dae","region":"north-america","setting":"rural","usedToday":false},
+    {"shape":"/levels/small_island/art/shapes/buildings/si_res_observatory.dae","region":"tropical","usedToday":true,"is":"Wooden hut on stilt scaffold, lookout","pick":1},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/antenna.dae","region":"north-america","usedToday":true,"is":"Red and white lattice radio mast, 64 m","pick":1},
     {"shape":"/art/shapes/objects/s_tower_01.dae","region":"any","usedToday":false,"is":"Rusty lattice tower, 15 m, stands alone","from":"catalogue"},
     {"shape":"/levels/automation_test_track/art/shapes/buildings/s_bld_track_marshal_tower.dae","region":"any","usedToday":false,"is":"Blue lattice marshal tower with cabin on concrete base","from":"catalogue"},
     {"shape":"/levels/hirochi_raceway/art/shapes/objects/marshal_tower.dae","region":"any","usedToday":false,"is":"Marshal tower on steel frame with roofed cabin","from":"catalogue"},
     {"shape":"/levels/johnson_valley/art/shapes/misc/antenna.dae","region":"north-america","usedToday":false,"is":"Red and white lattice radio mast, 64 m","from":"catalogue"},
     {"shape":"/levels/jungle_rock_island/art/shapes/buildings/jri_airfield_tower.dae","region":"tropical","usedToday":false,"is":"Airfield control cabin on a lattice tower","from":"catalogue"},
-    {"shape":"/levels/small_island/art/shapes/buildings/si_res_observatory.dae","region":"tropical","usedToday":false,"is":"Wooden hut on stilt scaffold, lookout","from":"catalogue"},
-    {"shape":"/levels/west_coast_usa/art/shapes/buildings/antenna.dae","region":"north-america","usedToday":false,"is":"Red and white lattice radio mast, 64 m","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/marshaltower.dae","region":"north-america","usedToday":false,"is":"Blue lattice marshal tower with cabin on concrete base","from":"catalogue"}
    ],
    "generated": "A generic lattice tower scaled to height",
@@ -6518,7 +6526,8 @@
      "effect": "Also a building (17%): already built as one",
      "used": false
     }
-   }
+   },
+   "code": "services/tagModels.js (data/model-picks.json)"
   },
   "man_made=utility_pole": {
    "what": "A utility pole (telecom or other)",
@@ -6532,7 +6541,7 @@
    "fetched": false,
    "builds": "A wooden pole like power=pole",
    "assets": [
-    {"shape":"/levels/east_coast_usa/art/shapes/buildings/electrical_pole.dae","region":"north-america","usedToday":false,"picture":"Picture nearly empty, 104 m bounding box looks wrong"},
+    {"shape":"/levels/east_coast_usa/art/shapes/buildings/electrical_pole.dae","region":"north-america","usedToday":false,"maybe":true},
     {"shape":"/levels/automation_test_track/art/shapes/objects/powerpole.dae","region":"any","usedToday":false},
     {"shape":"/levels/johnson_valley/art/shapes/power_lines/electric_pole_02.dae","region":"north-america","usedToday":false},
     {"shape":"/art/shapes/common/power_lines_procedural/electric_pole_wood_old_01.dae","region":"any","usedToday":false,"is":"Wooden utility pole with crossarms","from":"catalogue"},
@@ -8119,7 +8128,7 @@
    "fetched": true,
    "builds": "Poles at its vertices and wires between them",
    "assets": [
-    {"shape":"/levels/east_coast_usa/art/shapes/buildings/electrical_pole.dae","region":"north-america","usedToday":true,"picture":"Picture nearly empty, 104 m bounding box looks wrong"},
+    {"shape":"/levels/east_coast_usa/art/shapes/buildings/electrical_pole.dae","region":"north-america","usedToday":true},
     {"shape":"/levels/johnson_valley/art/shapes/power_lines/electric_pole_01.dae","region":"north-america","usedToday":true},
     {"shape":"/art/shapes/common/power_lines_procedural/electric_pole_wood_old_01.dae","region":"any","usedToday":false,"is":"Wooden utility pole with crossarms","from":"catalogue"},
     {"shape":"/art/shapes/common/power_lines_procedural/electric_pole_wood_old_02.dae","region":"any","usedToday":false,"is":"Wooden utility pole with crossarms","from":"catalogue"},
@@ -8160,7 +8169,7 @@
    "fetched": true,
    "builds": "A wooden or steel pole, wires strung between poles",
    "assets": [
-    {"shape":"/levels/east_coast_usa/art/shapes/buildings/electrical_pole.dae","region":"north-america","usedToday":true,"picture":"Picture nearly empty, 104 m bounding box looks wrong"},
+    {"shape":"/levels/east_coast_usa/art/shapes/buildings/electrical_pole.dae","region":"north-america","usedToday":true},
     {"shape":"/levels/automation_test_track/art/shapes/objects/powerpole.dae","region":"any","usedToday":true},
     {"shape":"/levels/johnson_valley/art/shapes/power_lines/electric_pole_02.dae","region":"north-america","usedToday":true},
     {"shape":"/levels/west_coast_usa/art/shapes/objects/powerpole4.dae","region":"north-america","usedToday":true},
@@ -8889,14 +8898,14 @@
     "area"
    ],
    "count": 375000,
-   "group": "landmarks",
-   "item": "monuments",
-   "status": "planned",
-   "fetched": false,
+   "group": "furniture",
+   "item": "statues",
+   "status": "built",
+   "fetched": true,
    "fetchedNote": "Areas are fetched; nodes are not",
    "builds": "A statue or sculpture on a plinth",
    "assets": [
-    {"shape":"/levels/italy/art/shapes/buildings/italy_castle_statue.dae","region":"europe","usedToday":false},
+    {"shape":"/levels/italy/art/shapes/buildings/italy_castle_statue.dae","region":"europe","usedToday":true,"pick":1},
     {"shape":"/levels/jungle_rock_island/art/shapes/buildings/jri_observatory_statue.dae","region":"tropical","usedToday":false}
    ],
    "generated": "An abstract sculpture shape",
@@ -8909,7 +8918,8 @@
      "effect": "stone / bronze / metal",
      "used": false
     }
-   }
+   },
+   "code": "services/tagModels.js (data/model-picks.json)"
   },
   "tourism=camp_site": {
    "what": "A camp site",

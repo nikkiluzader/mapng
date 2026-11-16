@@ -97,7 +97,8 @@ for (const [tag, e] of [...Object.entries(lib.tags), ...Object.entries(lib.untag
       // place, the entry says so, for a decision in the code.
       const { picture, ...rest } = a;
       if (m && !confirmed) { out.push({ ...rest, picture: `${m.use === 'skip' ? 'Not fit to place: ' : ''}${m.useWhy || 'see the catalogue'}` }); noted++; changes.push(`noted   ${tag}: ${a.shape.split('/').pop()} (${m.useWhy})`); }
-      else out.push(rest);
+      // (and marked maybe where the catalogue has it as maybe: a model the code names whose photo was taken again)
+      else out.push({ ...rest, ...(r?.mark === 'maybe' && !rest.usedToday ? { maybe: true } : {}) });
       continue;
     }
     // Matched by its name only, never placed by the code: it stays where the picture confirms it.
