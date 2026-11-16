@@ -13602,6 +13602,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         // (lakes at or under the sea plane: the sea covers them)
         seaZ: -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0),
       });
+      // (a test hook, as __MAPNG_STRUCT_DEBUG: the planned lakes)
+      if (typeof globalThis.__MAPNG_LAKE_DEBUG === 'function') globalThis.__MAPNG_LAKE_DEBUG(lakePlan);
       // (no bed within LAKE_KEEP_M of a ground road's edge: its sidewalk and
       // quay stay on their ground)
       // (a deck's road no quay: the bed runs on under the bridge)

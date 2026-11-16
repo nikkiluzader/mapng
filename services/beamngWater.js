@@ -690,6 +690,9 @@ const LAKE_SIZE_DEPTH = 0.15;
 const LAKE_DEPTH_MAX_M = 400;
 const RIVER_AREA_MAX_M = 4;
 const LAKE_FLAT_M = 0.25;        // a lake's surface within this (10th to 90th percentile): recorded flat, its waterline known
+const SHEET_FLAT_M = 0.02;      // water at a second level in the data: flat to this ...
+const SHEET_MIN_M2 = 1500;      // ... over at least this much of the lake
+const SHEET_REACH_CELLS = 2;    // ... with the ground this many grid cells away on every side
 const LAKE_THIN_M = 6;          // dry ground inside a lake narrower than this, and low: the survey's flaw, not a bank
 const LAKE_SMOOTH_SHARE = 0.1;  // the bed's distance to the shore smoothed over this share of the lake's reach
 const LAKE_SMOOTH_MAX_CELLS = 80;
@@ -907,6 +910,15 @@ export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [], shal
     // two of noise) or falls along its length (a river drawn as area water),
     // no one level says where the water is: the whole outline is water, and
     // ground up to LAKE_CUT_TOP_M over the level is cut less and less.
+    // (level with the ground SHEET_REACH_CELLS grid cells away on every side, to SHEET_FLAT_M: a water surface)
+    const flatAt = (c, r) => {
+      const h0 = heightMap[r * width + c]; const d = SHEET_REACH_CELLS * k;
+      for (const [dc, dr] of [[d, 0], [-d, 0], [0, d], [0, -d]]) {
+        const cc = c + dc; const rr = r + dr;
+        if (cc < 0 || rr < 0 || cc > width - 1 || rr > height - 1 || Math.abs(heightMap[rr * width + cc] - h0) > SHEET_FLAT_M) return false;
+      }
+      return true;
+    };
     let loose = !!lake.river;
     if (!loose) {
       const low = [];
@@ -917,6 +929,8 @@ export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [], shal
         const [x, y] = toWorld(c, r);
         if (!poly.contains(x, y)) continue;
         const above = heightMap[r * width + c] - minHeight - level;
+        // (water at a second level, dead flat, says nothing about how rough the surface is: see below)
+        if (!shallow && above >= LAKE_CUT_FULL_M && flatAt(c, r)) continue;
         if (above < LAKE_CUT_TOP_M) low.push(above);
       }
       low.sort((p, q) => p - q);
@@ -927,6 +941,7 @@ export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [], shal
     const wet = new Uint8Array(gw * gh);
     const lowDry = new Uint8Array(gw * gh);   // inside, dry, but under LAKE_CUT_TOP_M over the water
     const flaw = new Uint8Array(gw * gh);     // dry cells taken for water (the thin low strips below)
+    const high = new Uint8Array(gw * gh);     // inside, LAKE_CUT_FULL_M to LAKE_CUT_TOP_M over the level (whatever the surface's kind)
     for (let gy = 0; gy < gh; gy++) {
       for (let gx = 0; gx < gw; gx++) {
         const c = c0 + gx * k + (k - 1) / 2; const r = r0 + gy * k + (k - 1) / 2;
@@ -935,10 +950,36 @@ export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [], shal
         const i = gy * gw + gx;
         if (poly.contains(x, y) && !keep(x, y)) {
           const above = onMap ? heightMap[Math.round(r) * width + Math.round(c)] - minHeight - level : 0;
+          if (above >= LAKE_CUT_FULL_M && above < LAKE_CUT_TOP_M) high[i] = 1;
           if (above < LAKE_CUT_FULL_M || loose) wet[i] = 1;
           else { seed[i] = 1; if (above < LAKE_CUT_TOP_M) lowDry[i] = 1; }
         } else if (lakeDams.length && nearDam(x, y)) damSeed[i] = 1;   // a dam: no shore
         else if (onMap) seed[i] = 1;   // the shore (off the map: none)
+      }
+    }
+    // (water the survey holds at a second level: a reservoir flown on two days stands at two heights in the data,
+    // each dead flat. The lake takes the level most of it has; the rest, up to LAKE_CUT_TOP_M higher, was "ground
+    // over the water" and stayed: a whole arm of Jezioro Pilchowickie stood as a flat dry shelf 1.85 m over the
+    // lake, with a notch under its railway bridge. Ground inside the outline that is level with the ground
+    // SHEET_REACH_CELLS away on every side, to SHEET_FLAT_M (flatAt), is that water; a beach or a bank slopes)
+    // (only a stretch of it SHEET_MIN_M2 or more: a jetty's or a quay's level top is no water. Not with terrain
+    // shaping off: there only the surface at the lake's own level gets its shallow bed)
+    if (!shallow) {
+      const cand = new Uint8Array(gw * gh);
+      for (let gy = 0; gy < gh; gy++) for (let gx = 0; gx < gw; gx++) {
+        const i = gy * gw + gx; if (!high[i]) continue;
+        const c = Math.round(c0 + gx * k + (k - 1) / 2); const r = Math.round(r0 + gy * k + (k - 1) / 2);
+        if (c >= 0 && r >= 0 && c <= width - 1 && r <= height - 1 && flatAt(c, r)) cand[i] = 1;
+      }
+      const minCells = SHEET_MIN_M2 / (cell * cell); const stack = [];
+      for (let s = 0; s < gw * gh; s++) {
+        if (cand[s] !== 1) continue;
+        const patch = [s]; cand[s] = 2; stack.push(s);
+        while (stack.length) {
+          const i = stack.pop(); const gx = i % gw;
+          for (const j of [gx > 0 ? i - 1 : -1, gx < gw - 1 ? i + 1 : -1, i - gw, i + gw]) if (j >= 0 && j < gw * gh && cand[j] === 1) { cand[j] = 2; patch.push(j); stack.push(j); }
+        }
+        if (patch.length >= minCells) for (const i of patch) { seed[i] = 0; wet[i] = 1; flaw[i] = 1; lowDry[i] = 0; }
       }
     }
     // (a thin low strip of "ground" in the water is the survey's own flaw: a
@@ -1030,7 +1071,7 @@ export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [], shal
         const edge = LAKE_BED_EDGE_M + (LAKE_BED_M - LAKE_BED_EDGE_M) * Math.min(1, exact / LAKE_BANK_M);
         let target = level - Math.max(edge, depth * t * (2 - t) * floorShare(c, r));
         // (ground a little over a rough or falling water surface: cut less and less, so the bank meets the bed without a step)
-        if (loose && !shallow && above > LAKE_CUT_FULL_M) {
+        if (loose && !shallow && above > LAKE_CUT_FULL_M && !flaw[gi]) {
           const q = (above - LAKE_CUT_FULL_M) / (LAKE_CUT_TOP_M - LAKE_CUT_FULL_M);
           target += (ground - target) * q * q * (3 - 2 * q);
         }

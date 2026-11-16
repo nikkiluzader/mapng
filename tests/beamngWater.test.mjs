@@ -578,3 +578,27 @@ test('on a fine survey the sea floor reaches the quay the survey measured, not t
   const coarse = lowerSeabed({ heightMap: hm, width: W, height: W, minHeight: 0, worldSize: ws }, { grid: lc, n: N }, 0, { coarse: true });
   assert.ok(coarse.pixels <= res.pixels);
 });
+
+test('lake beds: water the survey holds at a second level is water; a beach at that height is shore', async () => {
+  const { planLakes, carveLakeBeds } = await import('../services/beamngWater.js');
+  // a 200 m grid at 1 m, ground at 10 m. A lake 160 x 80 m: most of it recorded at 5 m, its east 40 m dead flat at
+  // 6.8 m (flown on another day), and along its south side a beach rising 40 cm a metre to 6.6 m.
+  const N = 201; const SIZE = 200;
+  const hm = new Float32Array(N * N).fill(10);
+  const toPixel = (x, y) => [Math.round((x / SIZE + 0.5) * (N - 1)), Math.round((0.5 - y / SIZE) * (N - 1))];
+  const at = (x, y) => { const [c, r] = toPixel(x, y); return hm[r * N + c]; };
+  for (let x = -80; x <= 80; x++) for (let y = -40; y <= 40; y++) {
+    const [c, r] = toPixel(x, y);
+    hm[r * N + c] = x > 40 ? 6.8 : y < -36 ? Math.min(6.8, 5 + (-36 - y) * 0.4) : 5;
+  }
+  const ring = [[-80, -40], [80, -40], [80, 40], [-80, 40], [-80, -40]];
+  const plan = planLakes({ features: [{ type: 'water', tags: { natural: 'water' }, geometry: ring.map(([x, y]) => ({ lat: y, lng: x })) }], toWorld: (lat, lng) => [lng, lat], heightAt: at });
+  const level = plan.lakes[0].level;
+  assert.ok(Math.abs(level - 5.05) < 0.01, `the level most of the lake has: ${level}`);
+  const before = at(0, -39);
+  const beds = carveLakeBeds(plan.lakes, { heightMap: hm, width: N, height: N, worldSize: SIZE, minHeight: 0 });
+  beds.apply((idx, v) => { hm[idx] = v; });
+  assert.ok(at(60, 0) < level - 0.3, `the east arm is under the water now: ${at(60, 0)}`);
+  assert.equal(at(0, -39), before, 'the beach stays as surveyed');
+  assert.ok(before > level + 0.5, 'and it was over the water');
+});
