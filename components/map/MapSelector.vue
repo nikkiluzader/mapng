@@ -366,6 +366,7 @@
 
 <script setup>
 import { tileRefusalWatch } from '../../services/tileRefusal.js';
+import { osmTilesInUse, osmTilesShown } from '../../services/osmTilesInUse.js';
 // (bundled, not fetched from a CDN: one less outside service)
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -505,6 +506,8 @@ watch(selectedLayer, (v) => { writeStored('mapng_mapLayer', v); syncReliefLayer(
 // stands in for this visit and a line says so. The choice stays "OpenStreetMap": the next visit tries it again.
 const osmRefused = ref(false);
 const osmTiles = tileRefusalWatch(() => { osmRefused.value = true; });
+// (while OpenStreetMap's own tiles are on the map, the support options are hidden: services/osmTilesInUse.js)
+watch([selectedLayer, osmRefused], () => { osmTilesInUse.value = osmTilesShown(selectedLayer.value, osmRefused.value); }, { immediate: true });
 const watchOsmTiles = (layer) => { osmTiles.reset(); layer?.on?.('tileerror', osmTiles.error); layer?.on?.('tileload', osmTiles.load); };
 const layerPanelOpen = ref(readStored('mapng_layerPanelOpen') !== 'false');
 watch(layerPanelOpen, (v) => writeStored('mapng_layerPanelOpen', String(v)));

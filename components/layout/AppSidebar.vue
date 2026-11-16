@@ -39,7 +39,10 @@
         <RotateCw :size="18" />
       </BaseButton>
       <!-- Support MapNG (Ko-fi: components/modals/SupportTipModal.vue) -->
+      <!-- (not while OpenStreetMap's own tiles are on the map: services/osmTilesInUse.js) -->
       <BaseButton
+        v-if="!osmTilesInUse"
+        data-testid="support-heart"
         size="sm"
         variant="ghost"
         class="text-gray-400 hover:text-brand transition-colors p-1 rounded-full hover:bg-brand-50/60 dark:hover:bg-gray-800"
@@ -120,6 +123,7 @@
 </template>
 
 <script setup>
+import { osmTilesInUse } from '../../services/osmTilesInUse.js';
 import { computed, onMounted, ref } from 'vue';
 import { desktopApp, DESKTOP_DOWNLOAD_URL } from '../../services/platform/desktop.js';
 import { useI18n } from 'vue-i18n';
