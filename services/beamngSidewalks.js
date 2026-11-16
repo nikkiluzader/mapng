@@ -3696,6 +3696,7 @@ const smooth01 = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
  *   grid: { heightMap, width, height, worldSize, minHeight } (raw heights;
  *         world z = raw - minHeight, world x, y centred, y north)
  * overhead(x, y, z, zTop): a deck or tunnel there (the ground is not raised).
+ * besideDeck(x, y, z): a deck runs alongside there at about that height (a walk there is the bridge's sidewalk).
  * Returns { pixels, apply(set) }: set(idx, raw) for every edited pixel.
  */
 // pixel index -> [key, sum, n] in typed arrays (open addressing): a Map of
@@ -3730,7 +3731,7 @@ class PixelClaims {
   }
 }
 
-export function gradeSidewalkGround(runs, carriageways, grid, { overhead = () => false } = {}) {
+export function gradeSidewalkGround(runs, carriageways, grid, { overhead = () => false, besideDeck = () => false } = {}) {
   const { heightMap, width, height, worldSize, minHeight = 0 } = grid;
   const toPixel = (x, y) => [(x / worldSize + 0.5) * width, ((0.5 - y / worldSize) * height - 1)];
   const toWorld = (c, r) => [((c / width) - 0.5) * worldSize, (0.5 - (r + 1) / height) * worldSize];
@@ -3756,6 +3757,15 @@ export function gradeSidewalkGround(runs, carriageways, grid, { overhead = () =>
       const s0 = along; along += L;
       // outward: left of travel for side 1, right for side -1
       const nx = (-dy / L) * run.side; const ny = (dx / L) * run.side;
+      // (a walk well over the ground at both ends of a piece is on a structure, a footway rising with a bridge beside
+      // its deck: the ground is not built up to it. Built up, it stood as a wall two squares wide and 6 m high beside
+      // the deck. The whole piece left, not square by square: that left steps along a walk partly over the limit)
+      // (only a walk alongside a deck, at its height: the bridge's own sidewalk mapped apart. A walk climbing to a
+      // footbridge's end is on its approach, and that earth is built: Kingston's footbridge mounds)
+      if (run.walk) {
+        const gAt = (x, y) => { const [c, r] = toPixel(x, y); const ci = Math.max(0, Math.min(width - 1, Math.round(c))); const ri = Math.max(0, Math.min(height - 1, Math.round(r))); return heightMap[ri * width + ci] - minHeight; };
+        if (az - gAt(ax, ay) > WALK_FILL_MAX_M && bz - gAt(bx, by) > WALK_FILL_MAX_M && besideDeck((ax + bx) / 2, (ay + by) / 2, (az + bz) / 2)) continue;
+      }
       const zTop = (az + bz) / 2 + CURB_H + CROSS_SLOPE * w;
       const reach = w + GROUND_BLEND_MAX_M;
       const xs = [ax - nx * inward, bx - nx * inward, ax + nx * reach, bx + nx * reach]; const ys = [ay - ny * inward, by - ny * inward, ay + ny * reach, by + ny * reach];
@@ -3788,9 +3798,6 @@ export function gradeSidewalkGround(runs, carriageways, grid, { overhead = () =>
             const surface = top + (run.walk ? WALK_UNDER_M : GROUND_UNDER_M) + DIP_CLEAR_M * (1 - share);
             if (ground > surface) target = Math.max(target, surface);
           }
-          // (a walk well over the ground is on a structure, a footway rising with a bridge beside its deck: the ground is
-          // not built up to it. Built up, it stood as a wall two squares wide and 6 m high beside the deck)
-          if (run.walk && target - ground > WALK_FILL_MAX_M) continue;
           best.claim(idx, key, target);
         }
       }

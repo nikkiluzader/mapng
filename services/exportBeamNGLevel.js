@@ -9663,6 +9663,29 @@ const lampLink = (lightName) => ({ child: lightName, instanceColor: [0, 0, 0, 1]
  */
 // A lattice tower's base is 7.8 m square: a line's vertex this near a building's wall has the tower in the wall.
 const TOWER_BASE_CLEAR_M = 7;
+/**
+ * (x, y, z) -> whether a deck runs alongside there, at about that height: within its half width and 2.5 m, between
+ * its ends (not beyond one: a walk climbing to a deck's end is on its approach), its road 3 m over z to 1.5 m under it.
+ */
+function besideDeckAt(bridgeDecks = []) {
+  const parts = bridgeDecks.flatMap((d) => d.parts || []).filter((p) => p.xy?.length > 1);
+  return (x, y, z) => {
+    for (const part of parts) {
+      const P = part.xy; const reach = (part.half || 4) + 2.5;
+      for (let i = 0; i + 1 < P.length; i++) {
+        const vx = P[i + 1][0] - P[i][0]; const vy = P[i + 1][1] - P[i][1]; const L2 = vx * vx + vy * vy;
+        if (L2 < 1e-6) continue;
+        const u = ((x - P[i][0]) * vx + (y - P[i][1]) * vy) / L2;
+        if ((i === 0 && u < 0) || (i + 2 === P.length && u > 1) || u < -0.05 || u > 1.05) continue;
+        if (Math.hypot(P[i][0] + vx * u - x, P[i][1] + vy * u - y) > reach) continue;
+        // (a walk climbing alongside to the deck's height is still under it by a metre or two)
+        const dz = deckHeightAt(part, x, y) - z;
+        if (dz < 3 && dz > -1.5) return true;
+      }
+    }
+    return false;
+  };
+}
 function collectMappedStreetProps(terrainData, squareSize) {
   const out = { hydrants: [], bins: [], benches: [], poles: [], powerLines: [] };
   const toWorld = (p) => {
@@ -10006,7 +10029,7 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
     // neighbour, rotors never through each other. Tehachapi's old turbines stand 35 m apart, the model's rotor is 52)
     let fitScale = 1;
     if (rule.fit) {
-      const rd = Number.parseFloat(f.tags['rotor:diameter']); const h = Number.parseFloat(f.tags.height);
+      const rd = Number.parseFloat(f.tags[rule.fit.key || 'rotor:diameter']); const h = Number.parseFloat(f.tags.height);
       if (rd > 0) fitScale = rd / rule.fit.rotor; else if (h > 0) fitScale = h / rule.fit.hub;
       else {
         let nd = Infinity;
@@ -13247,7 +13270,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     const graded = gradeSidewalkGround([...sidewalks.runs, ...sidewalks.walkRuns, ...sidewalks.cornerRuns, ...sidewalks.cornerGround], groundCarriageways, {
       heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
       worldSize: exportTerrainData.width * squareSize, minHeight: Number(exportTerrainData.minHeight) || 0,
-    }, { overhead: underDeck });
+    }, { overhead: underDeck, besideDeck: besideDeckAt(bridgeDecks) });
     const hmSide = heightMapEditor(exportTerrainData);
     graded.apply((idx, v) => { hmSide.set(idx, v); sidewalkGroundIdx.add(idx); });
     lowerUnderWallDecks(sidewalks.wallDecks, {
