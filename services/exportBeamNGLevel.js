@@ -60,6 +60,7 @@ import { fillRows, rowDirection } from './areaRows.js';
 import { buildPlatformMeshes } from './platforms.js';
 import { leaveBridgeBuildings } from './bridgeBuildings.js';
 import { buildingsUnderDecks } from './buildingsUnderDecks.js';
+import { benchFacing, boxed } from './benchFacing.js';
 import { wingWallRuns, buildWingWallMesh } from './structures/wingWalls.js';
 import { buildMonumentMeshes, monumentKind, monumentHeight } from './monuments.js';
 import { solveProfilesSteps, gradeLimit } from './structures/profileSolve.js';
@@ -9802,6 +9803,9 @@ function nearestDeckRoad(carriageways, x, y) {
   return best;
 }
 
+// (a culvert or a piped stream is no view)
+const isUndergroundWater = (tags = {}) => ['culvert', 'yes', 'flooded'].includes(String(tags.tunnel || '')) || tags.location === 'underground' || String(tags.layer || '').startsWith('-');
+
 function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriageways = [], deckCarriageways = [], deckParts = [], props = null, footpaths = [], underDeck = () => false, deckAt = () => null, seaZ = -Infinity, roadLamps = true } = {}) {
   const profile = getStreetFurnitureProfile(biome);
   const benchModel = tagModel('amenity=bench', biome);
@@ -9818,6 +9822,13 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
 
   const roads = projectDrivableRoads(terrainData, squareSize);
   const MAX_ROAD_SEARCH_M = 30;
+  // (what a bench looks at: the shores of mapped water, the paths and the streets; made when the first bench asks)
+  let benchLines = null;
+  const benchSurroundings = () => (benchLines ||= {
+    water: (terrainData.osmFeatures || []).filter((f) => (f.type === 'water' || f.type === 'coastline') && f.geometry?.length > 1 && !isUndergroundWater(f.tags))
+      .map((f) => boxed(f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0)))),
+    ways: [...roads.map((r) => boxed(r.pts)), ...footpaths.filter((fp) => fp.nodes?.length > 1).map((fp) => boxed(fp.nodes))],
+  });
 
   const objects = [];
   let lampCount = 0;
@@ -9911,6 +9922,8 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
     } else if (nearRoad) {
       facing = Math.atan2(nearRoad.cy - posY, nearRoad.cx - posX);
     }
+    // (a bench: over the water it stands by, else at the path or street beside it, benchFacing.js)
+    if (isBench) { const f = benchFacing(posX, posY, tags, benchSurroundings()); if (f != null) facing = f; }
     if (facing === null) facing = 0;
     const yaw = facing + (asset.yawOffset ?? 0);
 
