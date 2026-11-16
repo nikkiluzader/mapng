@@ -79,6 +79,14 @@
             "limit": 3000,
             "period": 60
           }
+        },
+        {
+          "name": "RL_NOMINATIM",
+          "namespace_id": "2004",
+          "simple": {
+            "limit": 50,
+            "period": 60
+          }
         }
       ]
     }
@@ -138,6 +146,14 @@
       "namespace_id": "1003",
       "simple": {
         "limit": 3000,
+        "period": 60
+      }
+    },
+    {
+      "name": "RL_NOMINATIM",
+      "namespace_id": "1004",
+      "simple": {
+        "limit": 50,
         "period": 60
       }
     }

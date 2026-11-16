@@ -34,7 +34,7 @@ import { handleHotspots, handleUsage } from './hotspots.js';
 import { handleCrashReports } from './crashReports.js';
 import { handleAdmin } from './admin.js';
 import { handlePublicStats } from './publicStats.js';
-import { overRate } from './limits.js';
+import { overRate, overRateAll } from './limits.js';
 import { handleShareCodes } from './shareCodes.js';
 import { handleMapterhornTiles } from './mapterhornCache.js';
 import { handleTerrariumTiles } from './terrariumRelay.js';
@@ -437,6 +437,9 @@ const app = {
 
       // (what is not already kept here is asked of someone else's server, in MapNG's name: per sender, so many a minute)
       if (await overRate(env, 'RL_READ', request, stripPrefix)) return jsonResponse({ error: 'Too many requests' }, 429, { 'Retry-After': '60' });
+      // (and for the address lookup, everyone together: OpenStreetMap's Nominatim allows an app one request a
+      // second in all, https://operations.osmfoundation.org/policies/nominatim/. Answers kept here do not count)
+      if (isNominatimOrigin && await overRateAll(env, 'RL_NOMINATIM', 'nominatim')) return jsonResponse({ error: 'Too many requests' }, 429, { 'Retry-After': '2' });
       try {
         const upstream = await fetch(upstreamUrl, {
           method: 'GET',

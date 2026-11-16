@@ -38,6 +38,16 @@ export async function overRate(env, limiter, request, scope) {
   } catch { return false; }
 }
 
+/** True when everyone together has asked `scope` too often this minute (one key for all senders). */
+export async function overRateAll(env, limiter, scope) {
+  const binding = env?.[limiter];
+  if (!binding?.limit) return false;
+  try {
+    const { success } = await binding.limit({ key: `${scope}:all` });
+    return !success;
+  } catch { return false; }
+}
+
 /** True when today's total for `name` is used up; otherwise `n` is taken from it. */
 export async function overBudget(env, name, max, n = 1) {
   if (!env?.HOTSPOTS) return false;

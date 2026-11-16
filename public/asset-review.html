@@ -211,7 +211,7 @@
       uses);
     $('zoom').showModal();
   };
-  const card = (m) => {
+  const card = (m, withKind = false) => {
     const fig = el('figure', m.used ? { class: 'used' } : {});
     const b = el('button', { type: 'button', 'aria-label': `Details of ${m.name}` }, el('img', { loading: 'lazy', decoding: 'async', alt: m.is || m.name, src: `/api/asset-page/t/${m.thumb}` }));
     b.addEventListener('click', () => zoom(m)); fig.append(b);
@@ -221,14 +221,18 @@
     if (tags.length > 4) chips.append(el('span', { class: 'chip', text: `+${tags.length - 4}` }));
     const regions = [...new Set(m.uses.filter((u) => u.used || !m.used).map((u) => REGION[u.region] || u.region))];
     const badges = el('div', { class: 'badges' }, m.used ? el('span', { class: 'badge used', text: 'placed today' }) : el('span', { class: 'badge', text: 'candidate' }), el('span', { class: 'badge', text: regions.join(', ') }));
-    fig.append(el('figcaption', {}, el('b', { text: m.name }), el('span', { class: 'path', text: state.view === 'level' ? folderOf(m).replace(levelPath(m.level), '') || '/' : folderOf(m) }), el('span', { text: [fmtSize(m.size), m.is].filter(Boolean).join(' · ') }), badges, chips));
+    fig.append(el('figcaption', {}, el('b', { text: m.name }), el('span', { class: 'path', text: state.view === 'level' ? folderOf(m).replace(levelPath(m.level), '') || '/' : folderOf(m) }), withKind && m.kind ? el('span', { text: m.kind }) : null, el('span', { text: [fmtSize(m.size), m.is].filter(Boolean).join(' · ') }), badges, chips));
     return fig;
   };
   // (a section's cards are made when it is first opened: 1,887 photos are not asked for at once)
+  // (groups of one or two models gathered into one grid at the end, each card saying its own kind or level: a
+  // heading per model made short, choppy sections)
+  const SMALL = 'One or two of a kind';
+  const gather = (groups) => { const big = groups.filter(([, l]) => l.length > 2); const small = groups.filter(([, l]) => l.length <= 2).flatMap(([, l]) => l); return small.length && big.length + (small.length ? 1 : 0) < groups.length ? [...big, [SMALL, small]] : groups; };
   const fill = (body, groups) => {
     for (const [name, list] of groups) {
       if (name) body.append(el('h3', {}, document.createTextNode(name), el('small', { text: `${list.length}` })));
-      const grid = el('div', { class: 'grid' }); for (const m of list.sort((a, b) => a.name.localeCompare(b.name))) grid.append(card(m)); body.append(grid);
+      const grid = el('div', { class: 'grid' }); for (const m of list.sort((a, b) => a.name.localeCompare(b.name))) grid.append(card(m, name === SMALL)); body.append(grid);
     }
   };
   const section = (key, title, sub, list, groups, extra) => {
@@ -246,7 +250,7 @@
     if (state.view === 'level') {
       // the game's levels, the ones MapNG takes most from first; inside each, its kinds of asset
       const levels = [...by(vis, (m) => m.level)].sort((a, b) => b[1].filter((m) => m.used).length - a[1].filter((m) => m.used).length || b[1].length - a[1].length);
-      for (const [lvl, ms] of levels) { list.append(section(`l:${lvl}`, levelName(lvl), levelPath(lvl), ms, () => [...by(ms, (m) => m.kind || 'Not sorted')].sort((a, b) => a[0].localeCompare(b[0])))); n++; }
+      for (const [lvl, ms] of levels) { list.append(section(`l:${lvl}`, levelName(lvl), levelPath(lvl), ms, () => gather([...by(ms, (m) => m.kind || 'Not sorted')].sort((a, b) => a[0].localeCompare(b[0]))))); n++; }
     } else if (state.view === 'kind') {
       const kinds = [...by(vis, (m) => m.kind || 'Not sorted')].sort((a, b) => a[0].localeCompare(b[0]));
       for (const [kind, ms] of kinds) { list.append(section(`k:${kind}`, kind, '', ms, () => [...by(ms, (m) => levelName(m.level))].sort((a, b) => a[0].localeCompare(b[0])))); n++; }

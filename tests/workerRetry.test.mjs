@@ -34,3 +34,14 @@ test('the planet tile read goes through the retry', () => {
   const src = fs.readFileSync(new URL('../worker/index.js', import.meta.url), 'utf8');
   assert.match(src, /readWithRetry\(\(\) => env\.OSM_TILES\.get\(path, \{ range/);
 });
+
+test('the everyone-together limit: one key for all senders; no binding, no limit', async () => {
+  const { overRateAll } = await import('../worker/limits.js');
+  const keys = []; let left = 2;
+  const env = { RL_X: { limit: async ({ key }) => { keys.push(key); return { success: left-- > 0 }; } } };
+  assert.equal(await overRateAll(env, 'RL_X', 'nominatim'), false);
+  assert.equal(await overRateAll(env, 'RL_X', 'nominatim'), false);
+  assert.equal(await overRateAll(env, 'RL_X', 'nominatim'), true);
+  assert.deepEqual([...new Set(keys)], ['nominatim:all']);
+  assert.equal(await overRateAll({}, 'RL_X', 'nominatim'), false);
+});
