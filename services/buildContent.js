@@ -76,6 +76,8 @@ export const CONTENT_GROUPS = [
     { id: 'statues', tags: ['historic=memorial', 'tourism=artwork', 'man_made=obelisk'] },
     { id: 'masts', tags: ['man_made=mast', 'man_made=tower'] },
     { id: 'oilWells', tags: ['man_made=petroleum_well'] },
+    { id: 'storageTanks', tags: ['man_made=storage_tank'] },
+    { id: 'billboards', tags: ['advertising=billboard'] },
     { id: 'windTurbines', tags: ['generator:source=wind'] },
     { id: 'solarFarms', tags: ['generator:source=solar'] },
     { id: 'substations', tags: ['power=substation'] },

@@ -64,6 +64,10 @@
   "/levels/east_coast_usa/art/shapes/clutter/clutter_city_bike_stand.dae": {
    "yaw": 90,
    "note": "a 4.2 m row of hoops along the model's X: turned so the row runs along the kerb, not out into the road (the owner, 2026-11-16)"
+  },
+  "/levels/hirochi_raceway/art/shapes/objects/billboard_10x5.dae": {
+   "lift": 4.4,
+   "note": "modelled round its middle: lifted to stand on its legs"
   }
  },
  "picks": {
@@ -212,6 +216,35 @@
   "power=generator#wind": {
    "any": [
     "/levels/driver_training/art/shapes/objects/turbine.dae"
+   ]
+  },
+  "man_made=water_tower": {
+   "any": [
+    "/levels/automation_test_track/art/shapes/buildings/s_industrial_watertower.dae"
+   ],
+   "north-america": [
+    "/levels/west_coast_usa/art/shapes/objects/industrial_watertower.dae"
+   ]
+  },
+  "advertising=billboard": {
+   "any": [
+    "/levels/hirochi_raceway/art/shapes/objects/billboard_10x5.dae"
+   ],
+   "north-america": [
+    "/levels/west_coast_usa/art/shapes/objects/dragbillboard.dae"
+   ]
+  },
+  "tourism=picnic_site": {
+   "any": [
+    "/levels/Utah/art/shapes/buildings/ut_picnic_table_a.dae"
+   ],
+   "europe": [
+    "/levels/italy/art/shapes/buildings/italy_clutter_pwood_table.dae"
+   ]
+  },
+  "man_made=storage_tank": {
+   "any": [
+    "/levels/west_coast_usa/art/shapes/buildings/s_oil_ref_tank_sml.dae"
    ]
   }
  },
@@ -548,6 +581,72 @@
     ],
     "note": "as the game's own turbines (driver_training's prefabs): the tower, and on it a rotor model that turns by itself (playAmbient), 101.4 m up and 3.5 m in front of the mast"
    }
+  },
+  "waterTower": {
+   "tag": "man_made=water_tower",
+   "unless": {
+    "location": [
+     "roof",
+     "rooftop",
+     "underground"
+    ]
+   },
+   "pick": "man_made=water_tower",
+   "face": "none",
+   "item": "masts",
+   "cap": 300,
+   "beside": 4,
+   "offBuildings": true,
+   "areas": true
+  },
+  "billboard": {
+   "tag": "advertising=billboard",
+   "unless": {
+    "location": [
+     "roof",
+     "rooftop",
+     "wall"
+    ]
+   },
+   "pick": "advertising=billboard",
+   "face": "road",
+   "item": "billboards",
+   "cap": 600,
+   "beside": 3,
+   "offBuildings": true
+  },
+  "picnicSite": {
+   "tag": "tourism=picnic_site",
+   "pick": "tourism=picnic_site",
+   "face": "any",
+   "item": "benches",
+   "cap": 1000,
+   "beside": 3,
+   "offBuildings": true
+  },
+  "storageTank": {
+   "tag": "man_made=storage_tank",
+   "unless": {
+    "location": [
+     "roof",
+     "rooftop",
+     "underground"
+    ]
+   },
+   "pick": "man_made=storage_tank",
+   "face": "any",
+   "item": "storageTanks",
+   "cap": 400,
+   "beside": 6,
+   "offBuildings": true,
+   "fit": {
+    "key": "diameter",
+    "rotor": 12.2,
+    "hub": 16,
+    "min": 0.25,
+    "note": "sized by its mapped diameter or height; the model is 12.2 m across, 16 m high"
+   },
+   "areas": true
   }
  },
  "parts": {

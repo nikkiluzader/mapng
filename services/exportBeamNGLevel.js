@@ -9967,7 +9967,26 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
   // Mapped objects with a picked model: bus stops, post boxes, picnic tables, flagpoles, recycling bins,
   // information boards (data/model-picks.json; services/tagModels.js). Each by its road, clear of the lanes.
   const tagObjectCounts = {};
-  const tagFeatures = (terrainData.osmFeatures || []).filter((f) => f.type === 'tag_object' && f.geometry?.length === 1);
+  // (and for a rule with areas: true, an outline without a building tag stands as a point at its middle: a water
+  // tower or a tank mapped as its outline, which the buildings leave. A tank's diameter, if not mapped, is the outline's)
+  const tagFeatures = (terrainData.osmFeatures || []).flatMap((f) => {
+    if (f.type === 'tag_object' && f.geometry?.length === 1) return [f];
+    const g = f.geometry;
+    if (f.type === 'building' || f.tags?.building || !(g?.length >= 4) || g[0].lat !== g[g.length - 1].lat || g[0].lng !== g[g.length - 1].lng) return [];
+    const rule = tagObjectFor(f.tags);
+    if (!rule?.areas) return [];
+    const kx = 111320 * Math.cos((g[0].lat * Math.PI) / 180); const ky = 110574;
+    let A = 0; let cx = 0; let cy = 0;
+    for (let a = 0, b = g.length - 2; a < g.length - 1; b = a++) {
+      const x0 = g[b].lng * kx; const y0 = g[b].lat * ky; const x1 = g[a].lng * kx; const y1 = g[a].lat * ky; const cr = x0 * y1 - x1 * y0;
+      A += cr; cx += (x0 + x1) * cr; cy += (y0 + y1) * cr;
+    }
+    if (Math.abs(A) < 1e-6) return [];
+    cx /= 3 * A; cy /= 3 * A; A = Math.abs(A) / 2;
+    const tags = { ...f.tags };
+    if (!(Number.parseFloat(tags.diameter) > 0)) tags.diameter = String(Math.round(2 * Math.sqrt(A / Math.PI) * 10) / 10);
+    return [{ ...f, type: 'tag_object', geometry: [{ lat: cy / ky, lng: cx / kx }], tags }];
+  });
   // The building outlines, for the objects that never stand inside one (a cell above a building's box first)
   const bldBoxes = [];
   const tagObjectSkipped = {};

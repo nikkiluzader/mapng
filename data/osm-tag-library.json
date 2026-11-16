@@ -18,14 +18,15 @@
    "count": 121000,
    "group": "furniture",
    "item": "billboards",
-   "status": "planned",
-   "fetched": false,
+   "status": "built",
+   "fetched": true,
    "builds": "A billboard on its support, facing the road",
    "assets": [
     {"shape":"/levels/west_coast_usa/art/shapes/objects/billboard_structure1.dae","region":"north-america","usedToday":false},
-    {"shape":"/levels/hirochi_raceway/art/shapes/objects/billboard_10x5.dae","region":"any","usedToday":false,"is":"A billboard on legs","size":[11.7,0.4,10.3],"seen":"2026-11-15"},
+    {"shape":"/levels/hirochi_raceway/art/shapes/objects/billboard_10x5.dae","region":"any","usedToday":true,"is":"A billboard on legs","size":[11.7,0.4,10.3],"seen":"2026-11-15","pick":1},
     {"shape":"/levels/italy/art/shapes/buildings/italy_billboard_cola_independent.dae","region":"europe","usedToday":false},
     {"shape":"/art/shapes/garage_and_dealership/s_billboard_metal_stand_01.dae","region":"any","usedToday":false,"maybe":true},
+    {"shape":"/levels/west_coast_usa/art/shapes/objects/dragbillboard.dae","region":"north-america","usedToday":true,"is":"Billboard stand with blank face; takes 8x4 advert panels","pick":1},
     {"shape":"/levels/driver_training/art/shapes/objects/s_billboard_drivingschool_01.dae","region":"any","usedToday":false,"is":"Driving-school billboard on steel frame, fictional brand","from":"catalogue"},
     {"shape":"/levels/driver_training/art/shapes/objects/s_billboard_drivingschool_02.dae","region":"any","usedToday":false,"is":"Driving-school billboard on steel frame, fictional brand","from":"catalogue"},
     {"shape":"/levels/driver_training/art/shapes/objects/s_billboard_sponsor_blastr.dae","region":"any","usedToday":false,"is":"Fictional sponsor billboard on two posts; track or roadside","from":"catalogue"},
@@ -45,8 +46,7 @@
     {"shape":"/levels/italy/art/shapes/buildings/italy_billboard_streaming_independent.dae","region":"europe","usedToday":false,"is":"Italian-style billboard on two posts, fictional advert","from":"catalogue"},
     {"shape":"/levels/johnson_valley/art/shapes/building/s_board.dae","region":"north-america","usedToday":false,"is":"Weathered roadside advert board on legs, desert style","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/objects/billboard_structure2.dae","region":"north-america","usedToday":false,"is":"Tall empty billboard structure on single column","from":"catalogue"},
-    {"shape":"/levels/west_coast_usa/art/shapes/objects/dragbillboard_short.dae","region":"north-america","usedToday":false,"is":"Billboard stand with blank face; takes 8x4 advert panels","from":"catalogue"},
-    {"shape":"/levels/west_coast_usa/art/shapes/objects/dragbillboard.dae","region":"north-america","usedToday":false,"is":"Billboard stand with blank face; takes 8x4 advert panels","from":"catalogue"}
+    {"shape":"/levels/west_coast_usa/art/shapes/objects/dragbillboard_short.dae","region":"north-america","usedToday":false,"is":"Billboard stand with blank face; takes 8x4 advert panels","from":"catalogue"}
    ],
    "properties": {
     "direction": {
@@ -74,7 +74,8 @@
      "used": false
     }
    },
-   "note": "Concentrated in France, Poland and a few other countries"
+   "note": "Concentrated in France, Poland and a few other countries",
+   "code": "services/tagModels.js (data/model-picks.json)"
   },
   "advertising=column": {
    "what": "An advertising column",
@@ -1179,7 +1180,7 @@
    "status": "built",
    "fetched": true,
    "builds": "A point: a one-metre concrete cube, left out on roads drawn for traffic as bollards are (bollards.js); a line: concrete barriers",
-   "code": "services/bollards.js",
+   "code": "services/exportBeamNGLevel.js",
    "assets": [
     {"shape":"/levels/hirochi_raceway/art/shapes/objects/concrete_block.dae","region":"any","usedToday":true},
     {"shape":"/levels/east_coast_usa/art/shapes/rocks/eca_rock_medium_1.dae","region":"north-america","usedToday":false},
@@ -1204,8 +1205,7 @@
      "effect": "stone / concrete / rock: a block or a boulder",
      "used": false
     }
-   },
-   "code": "services/exportBeamNGLevel.js"
+   }
   },
   "barrier=bollard": {
    "what": "A bollard",
@@ -6374,8 +6374,8 @@
     "node"
    ],
    "count": 898000,
-   "group": "landmarks",
-   "item": "tanks",
+   "group": "furniture",
+   "item": "storageTanks",
    "status": "partial",
    "fetched": true,
    "fetchedNote": "Areas are fetched; nodes are not",
@@ -6385,6 +6385,7 @@
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_oil_ref_tank.dae","region":"north-america","setting":"industrial","usedToday":false},
     {"shape":"/levels/Industrial/art/shapes/buildings/tankfarm/ind_sphere_tank.dae","region":"any","setting":"industrial","usedToday":false},
     {"shape":"/levels/johnson_valley/art/shapes/building/s_watertank.dae","region":"north-america","setting":"rural","usedToday":true},
+    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_oil_ref_tank_sml.dae","region":"north-america","usedToday":true,"is":"White refinery storage tank with stair","pick":1},
     {"shape":"/levels/east_coast_usa/art/shapes/buildings/eca_gas_tank.dae","region":"north-america","usedToday":false,"is":"Fenced horizontal propane tank, complete","from":"catalogue"},
     {"shape":"/levels/italy/art/shapes/buildings/italy_airport_fueltank.dae","region":"europe","usedToday":false,"is":"Round fuel tank with rim walkway","from":"catalogue"},
     {"shape":"/levels/italy/art/shapes/buildings/s_quarry_tank_4x10.dae","region":"europe","usedToday":false,"is":"Green corrugated vertical tank on concrete base","from":"catalogue"},
@@ -6393,7 +6394,6 @@
     {"shape":"/levels/jungle_rock_island/art/shapes/buildings/tankfarm/ind_long_tank.dae","region":"tropical","usedToday":false,"is":"Horizontal pressure vessel with pipe frames","from":"catalogue"},
     {"shape":"/levels/jungle_rock_island/art/shapes/buildings/tankfarm/ind_small_tank.dae","region":"tropical","usedToday":false,"is":"Rusty vertical tank on octagonal base","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_oil_ref_mod_tank_200x800.dae","region":"north-america","usedToday":false,"is":"Slim vertical capsule tank, 8 m","from":"catalogue"},
-    {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_oil_ref_tank_sml.dae","region":"north-america","usedToday":false,"is":"White refinery storage tank with stair","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_quarry_watertank_01.dae","region":"north-america","usedToday":false,"is":"Green horizontal water tank on frame","from":"catalogue"},
     {"shape":"/levels/west_coast_usa/art/shapes/objects/gas_cylinder.dae","region":"north-america","usedToday":false,"is":"Horizontal gas tank on bunded platform","from":"catalogue"}
    ],
@@ -6417,7 +6417,7 @@
      "used": false
     }
    },
-   "code": "services/beamngBuildings.js",
+   "code": "services/tagModels.js (data/model-picks.json)",
    "note": "Whether a tank without building=* reaches the cylinder builder was not confirmed (osm.js types it as land use)"
   },
   "man_made=street_cabinet": {
@@ -6577,15 +6577,15 @@
     "area"
    ],
    "count": 170000,
-   "group": "landmarks",
-   "item": "towers",
-   "status": "planned",
-   "fetched": false,
+   "group": "furniture",
+   "item": "masts",
+   "status": "built",
+   "fetched": true,
    "fetchedNote": "Areas are fetched; nodes are not",
    "builds": "A water tower",
    "assets": [
-    {"shape":"/levels/west_coast_usa/art/shapes/objects/industrial_watertower.dae","region":"north-america","usedToday":false,"is":"A water tower on legs","size":[7,7,26.2],"seen":"2026-11-15"},
-    {"shape":"/levels/automation_test_track/art/shapes/buildings/s_industrial_watertower.dae","region":"any","usedToday":false},
+    {"shape":"/levels/west_coast_usa/art/shapes/objects/industrial_watertower.dae","region":"north-america","usedToday":true,"is":"A water tower on legs","size":[7,7,26.2],"seen":"2026-11-15","pick":1},
+    {"shape":"/levels/automation_test_track/art/shapes/buildings/s_industrial_watertower.dae","region":"any","usedToday":true,"pick":1},
     {"shape":"/levels/small_island/art/shapes/buildings/si_water_tower.dae","region":"tropical","usedToday":false},
     {"shape":"/levels/west_coast_usa/art/shapes/buildings/s_moviestudio_watertower.dae","region":"north-america","usedToday":false,"maybe":true},
     {"shape":"/levels/jungle_rock_island/art/shapes/buildings/mine_conveyor/water_tank_02.dae","region":"tropical","usedToday":false,"is":"Rusty raised tank on lattice stand, 10 m","from":"catalogue"}
@@ -6596,7 +6596,8 @@
      "used": false
     }
    },
-   "note": "American steel-tank towers; European concrete mushroom towers have no model"
+   "note": "American steel-tank towers; European concrete mushroom towers have no model",
+   "code": "services/tagModels.js (data/model-picks.json)"
   },
   "man_made=windmill": {
    "what": "A traditional windmill",
@@ -9086,19 +9087,20 @@
    ],
    "count": 169000,
    "group": "furniture",
-   "item": "picnic",
-   "status": "planned",
-   "fetched": false,
+   "item": "benches",
+   "status": "built",
+   "fetched": true,
    "fetchedNote": "Areas are fetched; nodes are not",
    "builds": "A few picnic tables, a bin and perhaps a grill",
    "assets": [
-    {"shape":"/levels/Utah/art/shapes/buildings/ut_picnic_table_a.dae","region":"north-america","usedToday":false,"is":"A picnic table with benches","size":[2,1.4,0.9],"seen":"2026-11-15"},
-    {"shape":"/levels/italy/art/shapes/buildings/italy_clutter_pwood_table.dae","region":"europe","usedToday":false},
+    {"shape":"/levels/Utah/art/shapes/buildings/ut_picnic_table_a.dae","region":"north-america","usedToday":true,"is":"A picnic table with benches","size":[2,1.4,0.9],"seen":"2026-11-15","pick":1},
+    {"shape":"/levels/italy/art/shapes/buildings/italy_clutter_pwood_table.dae","region":"europe","usedToday":true,"pick":1},
     {"shape":"/levels/east_coast_usa/art/shapes/buildings/eca_BBQ.dae","region":"north-america","usedToday":false},
     {"shape":"/levels/Utah/art/shapes/buildings/ut_BBQ_roof_a.dae","region":"north-america","usedToday":false,"is":"Roofed picnic shelter with table on a slab","from":"catalogue"},
     {"shape":"/levels/Utah/art/shapes/buildings/ut_BBQ_roof_b.dae","region":"north-america","usedToday":false,"is":"Roofed picnic shelter on a slab","from":"catalogue"},
     {"shape":"/levels/Utah/art/shapes/buildings/ut_picnic_table_b.dae","region":"north-america","usedToday":false,"is":"Picnic table on metal frame","from":"catalogue"}
-   ]
+   ],
+   "code": "services/tagModels.js (data/model-picks.json)"
   },
   "tourism=viewpoint": {
    "what": "A viewpoint",
@@ -9285,9 +9287,10 @@
    "count": 1760000,
    "group": "roads",
    "item": "signs",
-   "status": "partial",
-   "fetched": false,
-   "builds": "The matching native sign on the kerb side, facing its traffic",
+   "status": "built",
+   "fetched": true,
+   "builds": "The matching native sign on the kerb side, facing its traffic, where data/traffic-signs.json maps its code to a model; a path's signs are left off the roads",
+   "code": "services/beamngSignals.js",
    "assets": [
     {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_speed_50.dae","region":"europe","usedToday":true},
     {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_speedlimit_50.dae","region":"north-america","usedToday":true},
@@ -9340,7 +9343,6 @@
      "code": "services/roadSigns.js"
     }
    },
-   "code": "services/beamngSignals.js",
    "note": "osm.js types traffic_sign nodes as street furniture and beamngSignals.js reads them, but OSM_FILTER.nodeTags does not fetch them. Count is of the key on all objects"
   },
   "tunnel=*": {
