@@ -1872,6 +1872,7 @@
     "presetHint_scenery": "Terreno con alberi, erba, rocce e acqua: niente strade né edifici.",
     "presetHint_custom": "La tua scelta di elementi qui sotto.",
     "group_roads": "Strade e segnaletica",
+    "group_signs": "Segnali",
     "group_bridges": "Ponti e dighe",
     "group_tunnels": "Gallerie",
     "group_railways": "Ferrovie",

@@ -1872,6 +1872,7 @@
     "presetHint_scenery": "Teren z drzewami, trawą, skałami i wodą: bez dróg i budynków.",
     "presetHint_custom": "Twój własny wybór obiektów poniżej.",
     "group_roads": "Drogi i oznakowanie",
+    "group_signs": "Znaki",
     "group_bridges": "Mosty i zapory",
     "group_tunnels": "Tunele",
     "group_railways": "Koleje",

@@ -14,6 +14,9 @@ const org = JSON.parse(fs.readFileSync(path.join(cat, 'organizer-data.json'), 'u
 const byPath = new Map(org.models.map((m) => [m.path.toLowerCase(), m]));
 const thumbs = new Set(fs.readdirSync(path.join(cat, 'thumbs')));
 fs.mkdirSync(path.join(out, 't'), { recursive: true });
+const frontFile = path.join(cat, 'front/final.json');
+const fronts = fs.existsSync(frontFile) ? Object.fromEntries(Object.entries(JSON.parse(fs.readFileSync(frontFile, 'utf8'))).map(([k, v]) => [k.toLowerCase(), v])) : {};
+const how = { front: 0, side: 0, pick: 0 };
 const used = new Map();   // shape -> model record of the page
 let missing = 0;
 const modelOf = (shape) => {
@@ -22,11 +25,18 @@ const modelOf = (shape) => {
   const m = byPath.get(key);
   let thumb = null;
   if (m) {
-    const file = [`${m.id}_${m.face}.jpg`, ...[...thumbs].filter((f) => f.startsWith(`${m.id}_`))].find((f) => thumbs.has(f));
+    // The photo that shows the model's front: the one taken facing it where there is one (signs, boards, shop
+    // fronts: 639 models); else of the two corner views the one on the front's side (a camera in the north-east
+    // sees the +x and +y faces, one in the south-west the -x and -y faces); else the catalogue's own pick. The
+    // catalogue's pick alone showed many signs from behind: it goes by how much the picture holds, not by the front.
+    const dir = fronts[key]?.front;
+    const corner = dir === '+x' || dir === '+y' || dir === 'x' || dir === 'y' ? 'ne' : dir === '-x' || dir === '-y' ? 'sw' : null;
+    const file = [`${m.id}_front.jpg`, corner && `${m.id}_${corner}.jpg`, `${m.id}_${m.face}.jpg`, `${m.id}_ne.jpg`, `${m.id}_sw.jpg`].find((f) => f && thumbs.has(f));
+    if (file?.endsWith('_front.jpg')) how.front++; else if (corner && file === `${m.id}_${corner}.jpg`) how.side++; else how.pick++;
     if (file) { thumb = `${m.id}.jpg`; fs.copyFileSync(path.join(cat, 'thumbs', file), path.join(out, 't', thumb)); }
   }
   if (!thumb) missing++;
-  const rec = { shape, name: m?.name || path.basename(shape, '.dae'), level: m?.level || (shape.split('/')[2] || ''), size: m?.size || null, kind: m?.kindName || '', thumb };
+  const rec = { shape, name: m?.name || path.basename(shape, '.dae'), level: m?.level || (shape.split('/')[2] || ''), size: m?.size || null, kind: m?.kindName || '', sign: String(m?.kind || '').startsWith('sign') || undefined, thumb };
   used.set(key, rec); return rec;
 };
 // the models the export places today, by tag (data/tag-models.json: picks per region, and the named parts)
@@ -50,4 +60,5 @@ for (const [id, p] of Object.entries(models.parts || {})) {
 }
 const data = { made: new Date().toISOString().slice(0, 10), libraryVersion: lib.version, regions: lib.regions || null, tags, parts, models: Object.fromEntries([...used.values()].map((m) => [m.shape, m])) };
 fs.writeFileSync(path.join(out, 'data.json'), JSON.stringify(data));
+console.log(`photos: ${how.front} facing the front, ${how.side} from the front's side, ${how.pick} the catalogue's pick`);
 console.log(`${tags.length} tags (${tags.filter((t) => t.assets.length).length} with models), ${parts.length} other parts, ${used.size} models, ${used.size - missing} with a photo, ${missing} without; data.json ${(fs.statSync(path.join(out, 'data.json')).size / 1024).toFixed(0)} KB`);

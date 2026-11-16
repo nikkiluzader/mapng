@@ -16,7 +16,7 @@
     "way"
    ],
    "count": 121000,
-   "group": "furniture",
+   "group": "signs",
    "item": "billboards",
    "status": "built",
    "fetched": true,
@@ -83,7 +83,7 @@
     "node"
    ],
    "count": 31000,
-   "group": "furniture",
+   "group": "signs",
    "item": "billboards",
    "status": "planned",
    "fetched": false,
@@ -97,7 +97,7 @@
     "node"
    ],
    "count": 18000,
-   "group": "furniture",
+   "group": "signs",
    "item": "billboards",
    "status": "planned",
    "fetched": false,
@@ -3593,7 +3593,7 @@
     "node"
    ],
    "count": 1720000,
-   "group": "roads",
+   "group": "signs",
    "item": "signs",
    "status": "built",
    "fetched": true,
@@ -3746,7 +3746,7 @@
     "node"
    ],
    "count": 241000,
-   "group": "roads",
+   "group": "signs",
    "item": "signs",
    "status": "planned",
    "fetched": false,
@@ -4377,7 +4377,7 @@
     "node"
    ],
    "count": 2550000,
-   "group": "roads",
+   "group": "signs",
    "item": "signs",
    "status": "built",
    "fetched": true,
@@ -6064,7 +6064,7 @@
     "way"
    ],
    "count": 35000,
-   "group": "roads",
+   "group": "signs",
    "item": "signs",
    "status": "planned",
    "fetched": true,
@@ -6620,7 +6620,7 @@
    "on": [
     "way"
    ],
-   "group": "roads",
+   "group": "signs",
    "item": "signs",
    "status": "built",
    "fetched": true,
@@ -9050,7 +9050,7 @@
     "node"
    ],
    "count": 1540000,
-   "group": "furniture",
+   "group": "signs",
    "item": "infoBoards",
    "status": "built",
    "fetched": true,
@@ -9285,7 +9285,7 @@
     "node"
    ],
    "count": 1760000,
-   "group": "roads",
+   "group": "signs",
    "item": "signs",
    "status": "built",
    "fetched": true,
@@ -9698,7 +9698,7 @@
    "also": [
     "traffic_sign=hazard"
    ],
-   "group": "roads",
+   "group": "signs",
    "item": "signs",
    "note": "The game's warning signs (bend, double bend, dip, bump, slippery, loose gravel, road narrows, side winds, low aircraft) are listed for when mapped hazards are read",
    "assets": [
@@ -9790,7 +9790,7 @@
    "fetched": true,
    "builds": "Roundabout signs before each entry (and give-way signs at them)",
    "code": "services/roadSigns.js",
-   "group": "roads",
+   "group": "signs",
    "item": "signs",
    "assets": [
     {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_roundabout.dae","region":"any","usedToday":false,"is":"Roundabout mandatory sign, Europe","from":"catalogue"},
@@ -9807,7 +9807,7 @@
    "fetched": true,
    "builds": "Priority-road signs worked out from the road classes at junctions; the tag itself is not read",
    "code": "services/roadSigns.js",
-   "group": "roads",
+   "group": "signs",
    "item": "signs",
    "assets": [
     {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_priorityroad_end.dae","region":"any","usedToday":false,"is":"End of priority road sign, Europe","from":"catalogue"},
@@ -9822,7 +9822,7 @@
    "status": "planned",
    "fetched": true,
    "builds": "No-overtaking signs and their end signs where the value changes",
-   "group": "roads",
+   "group": "signs",
    "item": "signs",
    "assets": [
     {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_no_overtaking_end.dae","region":"any","usedToday":false,"is":"Red-ring overtaking sign; picture looks like the ban, not its end","from":"catalogue"},
@@ -9838,7 +9838,7 @@
    "status": "planned",
    "fetched": false,
    "builds": "A dead-end sign at its entrance",
-   "group": "roads",
+   "group": "signs",
    "item": "signs",
    "assets": [
     {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_dead_end.dae","region":"any","usedToday":false,"is":"Dead end sign, Europe","from":"catalogue"},
@@ -9853,7 +9853,7 @@
    "status": "planned",
    "fetched": true,
    "builds": "An advisory speed plate where it starts",
-   "group": "roads",
+   "group": "signs",
    "item": "signs",
    "assets": [
     {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_speed_adv_100.dae","region":"any","usedToday":false,"is":"Blue advisory speed 100 sign, Europe","from":"catalogue"},
@@ -9869,7 +9869,7 @@
    "status": "planned",
    "fetched": true,
    "builds": "A weight-limit sign at each end",
-   "group": "roads",
+   "group": "signs",
    "item": "signs",
    "assets": [
     {"shape":"/levels/east_coast_usa/art/shapes/signs_usa/sign_weightlimit.dae","region":"north-america","usedToday":false,"is":"US weight limit 10 tons sign on post","from":"catalogue"}
@@ -9883,7 +9883,7 @@
    "status": "planned",
    "fetched": true,
    "builds": "A minimum-speed sign where it starts",
-   "group": "roads",
+   "group": "signs",
    "item": "signs",
    "assets": [
     {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_min30.dae","region":"any","usedToday":false,"is":"Minimum speed 30 sign, Europe","from":"catalogue"}
@@ -9900,7 +9900,7 @@
    "also": [
     "vehicle=no"
    ],
-   "group": "roads",
+   "group": "signs",
    "item": "signs",
    "assets": [
     {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_restricted.dae","region":"any","usedToday":false,"is":"No vehicles sign, Europe","from":"catalogue"}
@@ -10035,7 +10035,7 @@
  "untagged": {
   "curveWarningSigns": {
    "what": "Bend, chevron and winding-road warning signs before sharp curves, worked out from the road's shape",
-   "group": "roads",
+   "group": "signs",
    "item": "signs",
    "code": "services/curveWarningSigns.js, services/beamngPropLibrary.js",
    "assets": [

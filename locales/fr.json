@@ -1872,6 +1872,7 @@
     "presetHint_scenery": "Le terrain avec arbres, herbe, rochers et eau : ni routes ni bâtiments.",
     "presetHint_custom": "Votre propre choix d'éléments ci-dessous.",
     "group_roads": "Routes et marquages",
+    "group_signs": "Panneaux",
     "group_bridges": "Ponts et barrages",
     "group_tunnels": "Tunnels",
     "group_railways": "Voies ferrées",

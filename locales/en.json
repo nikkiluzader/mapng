@@ -1877,6 +1877,7 @@
     "presetHint_scenery": "Terrain with trees, grass, rocks and water: no roads or buildings.",
     "presetHint_custom": "Your own choice of features below.",
     "group_roads": "Roads and markings",
+    "group_signs": "Signs",
     "group_bridges": "Bridges and dams",
     "group_tunnels": "Tunnels",
     "group_railways": "Railways",

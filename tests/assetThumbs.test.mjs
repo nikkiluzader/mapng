@@ -16,3 +16,17 @@ test('the models of an item: one entry per model, the placed ones first, none wi
   assert.deepEqual(out.benches.map((m) => [m.name, m.used]), [['a', true], ['b', true]]);
   assert.equal(out.benches[1].is, 'A bench');
 });
+
+test('a sign model is listed with the signs, not with its tag\'s road item', () => {
+  const data = {
+    tags: [
+      { tag: 'highway=raceway', item: 'roadSurfaces', assets: [{ shape: '/sign.dae', used: true }, { shape: '/kerb.dae', used: true }] },
+      { tag: 'advertising=billboard', item: 'billboards', assets: [{ shape: '/board.dae', used: true }] },
+    ],
+    models: { '/sign.dae': { name: 'sign', thumb: '1.jpg', sign: true }, '/kerb.dae': { name: 'kerb', thumb: '2.jpg' }, '/board.dae': { name: 'board', thumb: '3.jpg', sign: true } },
+  };
+  const out = modelsByItem(data);
+  assert.deepEqual(out.roadSurfaces.map((m) => m.name), ['kerb']);
+  assert.deepEqual(out.signs.map((m) => m.name), ['sign']);
+  assert.deepEqual(out.billboards.map((m) => m.name), ['board']);
+});

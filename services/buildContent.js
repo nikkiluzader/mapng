@@ -28,9 +28,15 @@ export const CONTENT_GROUPS = [
     { id: 'markings' },
     { id: 'crosswalks' },
     { id: 'signals', tags: ['highway=traffic_signals', 'crossing=traffic_signals'] },
-    { id: 'signs', tags: ['highway=stop', 'highway=give_way', 'traffic_sign=*'] },
     { id: 'lamps', tags: ['highway=street_lamp'] },
     { id: 'calming', tags: ['traffic_calming=*'] },
+  ] },
+  // (every kind of sign in one group: traffic signs were an item among the roads, billboards and information boards
+  // among the street furniture, and the models behind them were hard to find: asked for 2026-11-16)
+  { id: 'signs', items: [
+    { id: 'signs', tags: ['highway=stop', 'highway=give_way', 'traffic_sign=*'] },
+    { id: 'infoBoards', tags: ['tourism=information'] },
+    { id: 'billboards', tags: ['advertising=billboard'] },
   ] },
   // (bridges, tunnels and railways each a group of their own, so each has its switch, its count and
   // its colour on the 2D preview in plain sight: asked for 2026-11-15, after a tester could not tell
@@ -68,7 +74,6 @@ export const CONTENT_GROUPS = [
     { id: 'busStops', tags: ['highway=bus_stop'] },
     { id: 'postBoxes', tags: ['amenity=post_box'] },
     { id: 'flagpoles', tags: ['man_made=flagpole'] },
-    { id: 'infoBoards', tags: ['tourism=information'] },
     { id: 'shelters', tags: ['amenity=shelter'] },
     { id: 'toilets', tags: ['amenity=toilets'] },
     { id: 'bikeStands', tags: ['amenity=bicycle_parking'] },
@@ -77,7 +82,6 @@ export const CONTENT_GROUPS = [
     { id: 'masts', tags: ['man_made=mast', 'man_made=tower'] },
     { id: 'oilWells', tags: ['man_made=petroleum_well'] },
     { id: 'storageTanks', tags: ['man_made=storage_tank'] },
-    { id: 'billboards', tags: ['advertising=billboard'] },
     { id: 'windTurbines', tags: ['generator:source=wind'] },
     { id: 'solarFarms', tags: ['generator:source=solar'] },
     { id: 'substations', tags: ['power=substation'] },

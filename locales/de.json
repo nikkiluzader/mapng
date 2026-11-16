@@ -1872,6 +1872,7 @@
     "presetHint_scenery": "Gelände mit Bäumen, Gras, Felsen und Wasser: keine Straßen oder Gebäude.",
     "presetHint_custom": "Deine eigene Auswahl der Features unten.",
     "group_roads": "Straßen und Markierungen",
+    "group_signs": "Schilder",
     "group_bridges": "Brücken und Staumauern",
     "group_tunnels": "Tunnel",
     "group_railways": "Bahnstrecken",

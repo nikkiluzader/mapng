@@ -123,7 +123,7 @@
 (async () => {
   const $ = (id) => document.getElementById(id);
   const el = (tag, attrs = {}, ...kids) => { const n = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'class') n.className = v; else if (k === 'text') n.textContent = v; else n.setAttribute(k, v); } for (const k of kids) if (k) n.append(k); return n; };
-  const GROUPS = { roads: 'Roads', walk: 'Walking and cycling', railways: 'Railways', water: 'Water', buildings: 'Buildings', furniture: 'Street furniture', green: 'Green and land', leisure: 'Leisure and sport', landmarks: 'Landmarks', industry: 'Industry and power', airfields: 'Airfields', parking: 'Parking' };
+  const GROUPS = { roads: 'Roads', signs: 'Signs', walk: 'Walking and cycling', railways: 'Railways', water: 'Water', buildings: 'Buildings', furniture: 'Street furniture', green: 'Green and land', leisure: 'Leisure and sport', landmarks: 'Landmarks', industry: 'Industry and power', airfields: 'Airfields', parking: 'Parking' };
   const STATUS = { built: 'Built', partial: 'Partly built', planned: 'Planned', ignored: 'Left out' };
   const REGION = { any: 'everywhere', 'north-america': 'North America', europe: 'Europe', asia: 'Asia', 'south-america': 'South America', africa: 'Africa', oceania: 'Oceania' };
   let data;

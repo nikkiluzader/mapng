@@ -1872,6 +1872,7 @@
     "presetHint_scenery": "Рельеф с деревьями, травой, камнями и водой: без дорог и зданий.",
     "presetHint_custom": "Ваш собственный набор объектов ниже.",
     "group_roads": "Дороги и разметка",
+    "group_signs": "Знаки",
     "group_bridges": "Мосты и плотины",
     "group_tunnels": "Тоннели",
     "group_railways": "Железные дороги",

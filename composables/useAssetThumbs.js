@@ -6,15 +6,19 @@ import { ref } from 'vue';
 const byItem = ref(null);   // { [itemId]: [{ shape, name, thumb, used, is, tag }] }, or null where there is none
 let asked = false;
 
+const SIGN_ITEMS = new Set(['signs', 'infoBoards', 'billboards']);
+
 /** data.json -> the models of each item, those an export places today first, one entry per model. */
 export function modelsByItem(data) {
   const out = {};
   for (const t of data?.tags || []) {
     if (!t.item) continue;
-    const list = (out[t.item] ||= []);
     for (const a of t.assets || []) {
       const m = data.models?.[a.shape];
       if (!m?.thumb) continue;
+      // (a sign stands with the signs, whatever its tag's item: a race track's or a motorway's signs were listed
+      // among the road surfaces)
+      const list = (out[m.sign && !SIGN_ITEMS.has(t.item) ? 'signs' : t.item] ||= []);
       const have = list.find((x) => x.shape === a.shape);
       if (have) { have.used = have.used || !!a.used; continue; }
       list.push({ shape: a.shape, name: m.name, thumb: m.thumb, used: !!a.used, is: a.is || '', tag: t.tag });
