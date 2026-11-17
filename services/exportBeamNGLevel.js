@@ -109,7 +109,7 @@ import {
   liftFor, rampLength, rampLift, resample, RAMP_SHOULDER_M, RAMP_SIDE_SLOPE, PARAPET_W_M, DECK_MAX_GRADE, DECK_ROAD_CLEAR_M,
 } from './beamngBridges.js';
 import {
-  lowBoxSquareAt, solveTunnel, chainTunnelParts, absorbBranch, nearestOnTunnel, isBoredTunnelTag, isGalleryTag, tunnelRoadZ, tunnelApronLength, tunnelGroundAt, tunnelHoleAt, lowMouthHoleAt, tunnelReach,
+  lowBoxSquareAt, solveTunnel, chainTunnelParts, absorbBranch, nearestOnTunnel, onCuttingFloor, isBoredTunnelTag, isGalleryTag, tunnelRoadZ, tunnelApronLength, tunnelGroundAt, tunnelHoleAt, lowMouthHoleAt, tunnelReach,
   hitsTunnel, buildTubeGeometry, buildPortalGeometry, buildWindowGeometry, buildTunnelObjects, fitBesideRoads, LIGHT_SPACING_M, LINING_M, extraAt,
   galleryRoofHalf,
 } from './beamngTunnels.js';
@@ -2718,6 +2718,12 @@ function getDecalMergeStyleKey(segment) {
     // (a drawbridge span stays its own segment: the structure solver keeps
     // the whole bridge low by it)
     tags.bridge === 'movable' || (!!tags['bridge:movable'] && tags['bridge:movable'] !== 'no'),
+    // (a tunnel or a bridge is its own piece, whatever the layer of the road leading to it: a tunnel and its open
+    // approach, both mapped at layer -1, were joined into one road with the approach's tags; the tunnel was lost
+    // and every street over it was lifted onto decks to cross it, a station square 6 m in the air)
+    tags.tunnel && tags.tunnel !== 'no' ? String(tags.tunnel) : '',
+    tags.bridge && tags.bridge !== 'no' ? 'bridge' : '',
+    tags.covered && tags.covered !== 'no' ? 'covered' : '',
   ]);
 }
 
@@ -6455,7 +6461,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
       const { width, height, minHeight } = terrainData;
       const hmT = heightMapEditor(terrainData);
       const worldSizeT = width * squareSize;
-      const reach = t.W + (t.maxExtra || 0) + CUTTING_FLOOR_PAST_M;
+      const reach = t.headHalf + (t.maxExtra || 0) + CUTTING_FLOOR_PAST_M;
       const c0 = Math.max(0, Math.floor((Math.min(...changed.map((q) => q.x)) - reach) / worldSizeT * width + width / 2));
       const c1 = Math.min(width - 1, Math.ceil((Math.max(...changed.map((q) => q.x)) + reach) / worldSizeT * width + width / 2));
       const r0 = Math.max(0, Math.floor((0.5 - (Math.max(...changed.map((q) => q.y)) + reach) / worldSizeT) * height - 1));
@@ -6464,9 +6470,9 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
         for (let c = c0; c <= c1; c++) {
           const x = ((c / width) - 0.5) * worldSizeT; const y = (0.5 - (r + 1) / height) * worldSizeT;
           const m = nearestOnTunnel(t, x, y, reach);
-          if (!m || m.beyond || m.into >= 0) continue;
+          if (!onCuttingFloor(t, m, squareSize)) continue;
           const st = t.line[m.i];
-          if (st.kind !== 'cut' || !Number.isFinite(st.zDug)) continue;
+          if (!Number.isFinite(st.zDug)) continue;
           const was = m.z - (st.z - st.zDug);
           const idx = r * width + c;
           const h = hmT.at(idx) - minHeight;

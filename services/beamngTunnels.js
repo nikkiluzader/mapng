@@ -1763,6 +1763,14 @@ export function lowBoxSquareAt(t, x, y, lo) {
   return 'open';
 }
 
+/** Is the point nearestOnTunnel found (n) on the floor of the approach cutting: between its walls, pad further? */
+export function onCuttingFloor(t, n, pad = 0) {
+  if (!n || n.beyond || n.into >= 0 || t.line[n.i].kind !== 'cut') return false;
+  const side = Math.sign(n.d) || 1;
+  const half = t.wings?.[side]?.has(n.i) ? wingDAt(t, n.i, side) + t.wingT : t.W + LINING_M;
+  return across(t, n) <= half + pad;
+}
+
 /** Is (x, y, z..zTop) inside a tunnel's structure (tube, headwalls, wingwalls)? */
 export function hitsTunnel(tunnels, x, y, z, zTop = z) {
   for (const t of tunnels) {
