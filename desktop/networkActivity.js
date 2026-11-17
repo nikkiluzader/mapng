@@ -25,7 +25,9 @@ export function noteHost(hostOrUrl, failed = false, blocked = false) {
 export function watchSession(session) {
   session.webRequest.onCompleted((details) => noteHost(details.url));
   // (a request the guard refused ends as an error too: it is already counted as refused)
-  session.webRequest.onErrorOccurred((details) => { if (details.error !== 'net::ERR_BLOCKED_BY_CLIENT') noteHost(details.url, true); });
+  // (... and one the window itself dropped, a map tile no longer needed after a pan or a change of view, is a
+  // request, not a failure: 40 of 65 satellite tiles were shown as "failed" after an ordinary export)
+  session.webRequest.onErrorOccurred((details) => { if (details.error !== 'net::ERR_BLOCKED_BY_CLIENT') noteHost(details.url, details.error !== 'net::ERR_ABORTED'); });
 }
 
 /** The rows as they are shown: [{ host, count, failed, listed, kind, what }], unlisted first, then the busiest. */
