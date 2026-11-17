@@ -64,7 +64,9 @@ section[id], [id].pg-anchor { scroll-margin-top: calc(var(--pg-head, 120px) + 14
 .pg-intro h1 { color: var(--text); margin: 0 0 10px; }
 .pg-intro .lede { color: var(--text-2); margin: 0; }
 /* (the pages' own lists of section links are in the header now) */
-html.pg-ready .toc, html.pg-ready nav.jump { display: none; }
+html.pg-ready .toc, html.pg-ready nav.jump, html.pg-ready nav.chips { display: none; }
+/* (a release page keeps its picture banner under the header; the banner's own small logo is the header's now) */
+html.pg-ready .hero .brand { visibility: hidden; }
 
 /* the app's corners (4 / 8 px) and flat panels; the summary boxes no longer overlap a banner */
 .cards, .tiles { margin-top: 22px !important; }

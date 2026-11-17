@@ -22,7 +22,6 @@ import { signedArea, cleanRing, flat, inRing } from './fountains.js';
 const LINE_WIDTH_M = 8;
 const CREST_PERCENTILE = 0.85;
 const GAP_MIN_M = 2;           // the deepest ground under the crest must be at least this far below it
-const FOOT_M = 1.5;            // the walls reach this far into the ground
 const MAX_AREA_M2 = 400000;
 const SAMPLE_M = 2;
 const CONCRETE = [0.82, 0.81, 0.78];
@@ -91,7 +90,11 @@ export function buildDam(m, d, groundAt) {
   const { ring, crest } = d;
   // (the walls follow the ground every SAMPLE_M, down into the gorge)
   const pts = alongRing(ring, SAMPLE_M);
-  const foot = pts.map(([x, y]) => { const g = groundAt(x, y); return Math.min(crest, (Number.isFinite(g) ? g : crest) - FOOT_M); });
+  // (each wall piece runs into the ground where it stands; where the ground is under the crest the foot is one
+  // level for the whole dam, BURY_M under the lowest ground on its outline, not a foot fitted sample by sample)
+  const grounds = pts.map(([x, y]) => { const g = groundAt(x, y); return Number.isFinite(g) ? g : crest; });
+  const deep = Math.min(...grounds) - BURY_M;
+  const foot = grounds.map((g) => (g >= crest ? crest : deep));
   let walls = 0;
   for (let i = 0; i < pts.length; i++) {
     const j = (i + 1) % pts.length;
@@ -160,6 +163,26 @@ export function damAt(dams, x, y) {
   }
   return null;
 }
+
+/**
+ * The dam a building belongs to: its footprint (ring) reaches into the dam's outline or comes within near metres
+ * of it (a powerhouse stands against the dam's foot, outside the mapped outline). null when none.
+ */
+export function damBeside(dams, ring, near = DAM_BUILDING_NEAR_M) {
+  for (const d of dams || []) {
+    for (const [x, y] of ring) {
+      if (damAt([d], x, y)) return d;
+      for (let i = 0; i < d.ring.length; i++) {
+        const [ax, ay] = d.ring[i]; const [bx, by] = d.ring[(i + 1) % d.ring.length];
+        const L2 = (bx - ax) ** 2 + (by - ay) ** 2 || 1;
+        const u = Math.max(0, Math.min(1, ((x - ax) * (bx - ax) + (y - ay) * (by - ay)) / L2));
+        if (Math.hypot(x - (ax + u * (bx - ax)), y - (ay + u * (by - ay))) <= near) return d;
+      }
+    }
+  }
+  return null;
+}
+const DAM_BUILDING_NEAR_M = 20;
 
 const RAIL_OUT_M = 0.6;       // a guardrail this far past the road's drawn edge
 const RAIL_MIN_M = 8;         // shorter stretches on a dam get none
@@ -501,7 +524,7 @@ function buildAxisDam(m, d, groundAt) {
       if (z <= gz - BURY_M) landed = true;
     }
     // (a wall straight down that the levels did not land: its foot in the ground)
-    if (!landed) { const q = col[col.length - 1]; col[col.length - 1] = [q[0], q[1], Math.min(q[2], g(q[0], q[1]) - FOOT_M)]; }
+    if (!landed) { const q = col[col.length - 1]; col[col.length - 1] = [q[0], q[1], Math.min(q[2], g(q[0], q[1]) - BURY_M)]; }
     return col;
   });
   const sides = [[side, columns(side, outAt(air, side))], [-side, columns(-side, outAt(water, -side))]];

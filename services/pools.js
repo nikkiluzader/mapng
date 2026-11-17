@@ -341,18 +341,21 @@ export function bar(m, mat, p, q, r, col) {
 // The deck: the rectangle round the coping at zDeck, its sides down to the
 // ground; raised: a fence on the raised sides and stairs down from the
 // highest, with handrails.
+const DECK_BURY_M = 0.6;      // a raised deck's side walls end this far under the lowest ground beside the deck
 function deckAround(stone, full, p, cope, zDeck) {
   const rect = p.deckRect || insetRing(p.ring, -p.deck);
   flat(stone, 'poolDeck', rect, [cope.slice().reverse()], zDeck, DECK, 2);
   const sides = p.deckSides || rect.map((a, i) => ({ a, b: rect[(i + 1) % rect.length], pts: [[...a, p.z0], [...rect[(i + 1) % rect.length], p.z0]], drop: zDeck - p.z0 }));
-  // the sides: walls down to the ground under them
+  // the sides: one wall each, from the deck down into the ground. Not fitted to the ground sample by sample (a
+  // foot 0.3 m under each sample, a piece every 0.75 m): each side runs to DECK_BURY_M under the lowest ground
+  // along the whole deck, on its own plane, the foot out of sight
+  const sideLow = Math.min(...sides.flatMap((sd) => sd.pts.map((q) => q[2])));
+  const foot = Math.min(sideLow, zDeck) - DECK_BURY_M;
   for (const sd of sides) {
-    for (let k = 0; k + 1 < sd.pts.length; k++) {
-      const q0 = sd.pts[k]; const q1 = sd.pts[k + 1];
-      const L = Math.hypot(q1[0] - q0[0], q1[1] - q0[1]);
-      stone.quad('poolDeck', [q0[0], q0[1], q0[2] - 0.3], [q1[0], q1[1], q1[2] - 0.3], [q1[0], q1[1], zDeck], [q0[0], q0[1], zDeck],
-        [0, q0[2]], [L / 2, q1[2]], [L / 2, zDeck], [0, zDeck], DECK);
-    }
+    const q0 = sd.pts[0]; const q1 = sd.pts[sd.pts.length - 1];
+    const L = Math.hypot(q1[0] - q0[0], q1[1] - q0[1]);
+    stone.quad('poolDeck', [q0[0], q0[1], foot], [q1[0], q1[1], foot], [q1[0], q1[1], zDeck], [q0[0], q0[1], zDeck],
+      [0, foot / 2], [L / 2, foot / 2], [L / 2, zDeck / 2], [0, zDeck / 2], DECK);
   }
   if (!sides.some((sd) => sd.drop > RAISED_M)) return;
   // stairs from the side that stands highest, at its middle

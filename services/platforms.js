@@ -69,6 +69,7 @@ export function buildPlatformMeshes(platforms, opts = {}) {
     const tz = ring.map(([x, y]) => trackZ(x, y));
     const anyTrack = !Number.isFinite(pl.over) && tz.some((z) => z !== null);
     const g = ring.map(([x, y]) => groundAt(x, y));
+    const lowGround = Math.min(...g.filter(Number.isFinite), Infinity);
     const z = ring.map((_, i) => {
       if (Number.isFinite(pl.over)) return g[i] + pl.over;   // (a set height over the ground: a kerbed island)
       if (anyTrack) { const t = tz[i] ?? tz.find((v) => v !== null); return Math.max(g[i] + 0.1, t + PLATFORM_OVER_RAIL_M); }
@@ -99,7 +100,9 @@ export function buildPlatformMeshes(platforms, opts = {}) {
       const [x0, y0] = ring[i]; const [x1, y1] = ring[j];
       const L = Math.hypot(x1 - x0, y1 - y0);
       // (an elevated station's platform, high over the ground with its track: a slab a metre deep, no wall to the street)
-      const bottom = (k) => (z[k] - g[k] > ELEVATED_M ? z[k] - SLAB_M : g[k] - SIDE_BELOW_M);
+      // (on the ground: one foot for the whole platform, under the lowest ground round it, not a foot fitted to
+      // the ground at each corner, which left the wall's bottom edge in the air where the ground dipped between two)
+      const bottom = (k) => (z[k] - g[k] > ELEVATED_M ? z[k] - SLAB_M : lowGround - SIDE_BELOW_M);
       const b0 = bottom(i); const b1 = bottom(j);
       // (two triangles, outward: the ring runs counter-clockwise)
       const quad = [[x0, y0, b0, 0, b0], [x1, y1, b1, L, b1], [x1, y1, z[j], L, z[j]], [x0, y0, b0, 0, b0], [x1, y1, z[j], L, z[j]], [x0, y0, z[i], 0, z[i]]];

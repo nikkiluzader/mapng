@@ -200,3 +200,13 @@ test('a dam the survey holds: the faces are a skin over the surveyed shape, holl
   const rough = built(axisOf({ ...d }), noisy).pts.filter((q) => Math.abs(q[0]) < 40 && Math.abs(q[2] - 49) < 1.6 && q[1] > 6).map((q) => q[1]);
   assert.ok(rough.length > 10 && Math.max(...rough) - Math.min(...rough) < 0.2, `uniform along the dam: ${Math.min(...rough).toFixed(2)}..${Math.max(...rough).toFixed(2)}`);
 });
+
+test('a building against a dam belongs to it: inside the outline or within reach of it, not one further off', async () => {
+  const { damBeside } = await import('../services/dams.js');
+  const dam = { ring: [[0, 0], [100, 0], [100, 10], [0, 10]] };
+  const box = (x, y) => [[x, y], [x + 8, y], [x + 8, y + 8], [x, y + 8]];
+  assert.equal(damBeside([dam], box(40, 2)), dam, 'on the crest');
+  assert.equal(damBeside([dam], box(40, 22)), dam, 'against its foot, 12 m off the outline');
+  assert.equal(damBeside([dam], box(40, 45)), null, '35 m away');
+  assert.equal(damBeside([], box(40, 2)), null);
+});

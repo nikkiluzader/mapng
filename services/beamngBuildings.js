@@ -33,7 +33,7 @@ import * as THREE from 'three';
 import { buildingUse, businessTagsByBuilding, isHistoricBuilding } from './buildingUses.js';
 import { planFountains, buildFountain, FOUNTAIN_MATERIAL_STAGES } from './fountains.js';
 import { planPools, buildPool, POOL_MATERIAL_STAGES } from './pools.js';
-import { planDams, buildDam } from './dams.js';
+import { planDams, buildDam, damBeside, damKind } from './dams.js';
 import { planPitches, buildPitch, planSeating, buildSeating, drapedMesh, SPORTS_MATERIAL_STAGES, SPORTS_MATERIAL_FLAGS } from './sportsFields.js';
 import { planRaceways, buildRaceway, planRacewayAreas, carriagewayTest, tracksideStands, dragStartFirst } from './racetracks.js';
 import { planFieldPoles, planStandLights, planTrackPoles } from './sportsLights.js';
@@ -516,7 +516,9 @@ export function fortKind(tags = {}) {
  * Returns { kind, floors, floorH, roof, pitch, wall, band, shopFloor, office,
  *           wallTint, roofMat, roofTint, windows }.
  */
-export function planBuilding(tags = {}, { area, seed, lat, lon, rectFill, levelsHint = null }) {
+// (as services/dams.js paints a dam's faces: MASONRY and WEATHERED there)
+const DAM_WALL_TINT = { stone: [0.72, 0.7, 0.66], concrete: [0.62, 0.61, 0.59] };
+export function planBuilding(tags = {}, { area, seed, lat, lon, rectFill, levelsHint = null, partOfDam = null }) {
   const cls = String(tags.building || tags['building:part'] || 'yes').toLowerCase();
   const style = regionStyle(lat, lon);
   const r = (k) => hash01(seed, k);
@@ -599,14 +601,20 @@ export function planBuilding(tags = {}, { area, seed, lat, lon, rectFill, levels
       band = brick ? BAND_BRICK : pick([BAND_SASH, BAND_PANEL, BAND_TALL, BAND_SASH], r('band'));
     }
   }
-  const shopFloor = kind === 'block' && !office && (hasShop || SHOP_CLASSES.has(cls)) && floors >= 1;
+  // A building that stands on a dam (its powerhouse, the towers on its crest) is part of it: plain walls of the
+  // dam's own material, stone or concrete, unless the map says what it is made of. As a town building it stood as
+  // a white block against a masonry dam (Zapora Pilchowice's powerhouse, the lift towers on Hoover Dam's crest).
+  if (partOfDam && !material) { wall = partOfDam === 'concrete' ? 'concrete' : 'stone'; band = null; office = false; }
+  const shopFloor = kind === 'block' && !office && !partOfDam && (hasShop || SHOP_CLASSES.has(cls)) && floors >= 1;
   // the family's texture for this building
   const wallFamily = wall;
   if (wall && WALL_VARIANTS[wall]) wall = pickShare(WALL_VARIANTS[wall], r('variant'));
 
   const wallKey = office ? 'office' : (band ? 'facade' : wall);
   const tagged = parseColour(tags['building:colour'] || tags['building:color'] || tags.colour);
-  const wallTint = tagged || pick(WALL_TINTS[wallKey] || [[1, 1, 1]], r('tint'));
+  let wallTint = tagged || pick(WALL_TINTS[wallKey] || [[1, 1, 1]], r('tint'));
+  // (part of a dam: the dam's own stone or concrete, in the dam's tone, not a lighter variant of it)
+  if (partOfDam && !material) { wall = partOfDam === 'concrete' ? 'concrete' : 'stone'; if (!tagged) wallTint = DAM_WALL_TINT[wall]; }
 
   let roofMat = 'roofFlat';
   let roofTint;
@@ -1555,6 +1563,7 @@ export function buildingContext(features, project, raceways = []) {
  * (fountains, pools) or 'fields' (the rest). tileKeyPrefix keeps two parts'
  * tiles apart.
  */
+const DWELLING_CLASSES = new Set(['house', 'residential', 'apartments', 'detached', 'semidetached_house', 'terrace', 'bungalow', 'cabin', 'hotel', 'dormitory', 'farm', 'hut', 'static_caravan']);
 export function buildTexturedBuildings(features, project, { maxBuildings = 20000, tileM = BUILDING_TILE_M, squareSize = 1, groundAt = null, drape = null, raceways = [], gateRoads = [], dams: damPlan = null, part = 'all', context = null, tileKeyPrefix = '' } = {}) {
   const ctx = context || buildingContext(features, project, raceways);
   features = ctx.features;
@@ -1579,6 +1588,8 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
   let builder = null;
   let detailB = null;
   // For the export report: why footprints were left out, and what was built.
+  // (the dams, for the buildings that stand on one and for their own walls further down)
+  const damsPlanned = groundAt ? (damPlan || planDams(features, project, { groundAt })) : [];
   const stats = {
     footprints: 0,
     skipped: { badGeometry: 0, tiny: 0, oversize: 0, noGround: 0, overCap: 0 },
@@ -1649,7 +1660,10 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     }
     const box = orientedBox(ring);
     const rectFill = box && box.area > 0 ? area / box.area : 0;
-    const plan = planBuilding(tags, { area, seed, lat: c.lat, lon: c.lng, rectFill, levelsHint: levelsHints.get(f) ?? null });
+    // (on or against a dam; never a home or a hotel that happens to stand beside one)
+    const onDam = damsPlanned.length && !DWELLING_CLASSES.has(String(tags.building || '').toLowerCase()) ? damBeside(damsPlanned, ring) : null;
+    const plan = planBuilding(tags, { area, seed, lat: c.lat, lon: c.lng, rectFill, levelsHint: levelsHints.get(f) ?? null, partOfDam: onDam ? damKind(onDam) : null });
+    if (onDam) stats.onDams = (stats.onDams || 0) + 1;
     bump(stats.heightSource, plan.heightSource);
 
     const base = zMax;
@@ -1930,7 +1944,7 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
   const dams = [];
   // (the exporter's plan when it has one: the roads were pinned to its crests)
   if (groundAt) {
-    for (const d of damPlan || planDams(features, project, { groundAt })) {
+    for (const d of damsPlanned) {
       const tile = tileFor(d.ring);
       if (!buildDam(new TeeBuilder(tile.fullB, tile.liteB), d, groundAt)) continue;
       dams.push({ name: d.name, crest: Math.round(d.crest * 10) / 10, gap: Math.round(d.gap) });

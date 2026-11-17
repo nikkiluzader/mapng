@@ -10,20 +10,24 @@
   const root = document.documentElement;
   const PAGES = [['/data.html', 'Your data'], ['/security.html', 'Security'], ['/stats.html', 'Stats'], ['/how-its-built.html', 'How it’s built']];
   const here = location.pathname.replace(/\/$/, '') || '/';
-  const header = document.querySelector('header.top');
-  const wrap = header && header.querySelector('.wrap');
+  // (a page with a picture banner of its own, a release page: the header is added above it and the banner stays)
+  let header = document.querySelector('header.top'); const own = !!header;
+  if (!header) { header = document.createElement('header'); header.className = 'top'; header.innerHTML = '<div class="wrap"></div>'; document.body.insertBefore(header, document.body.firstChild); }
+  const wrap = header.querySelector('.wrap');
   if (!wrap) return;
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   // the title and the opening lines: out of the header, to the top of the page
   const intro = document.createElement('div'); intro.className = 'pg-intro';
   const introWrap = document.createElement('div'); introWrap.className = 'wrap'; intro.appendChild(introWrap);
-  for (const el of [...wrap.querySelectorAll('h1, .lede')]) introWrap.appendChild(el);
-  header.insertAdjacentElement('afterend', intro);
+  if (own) {
+    for (const el of [...wrap.querySelectorAll('h1, .lede')]) introWrap.appendChild(el);
+    header.insertAdjacentElement('afterend', intro);
+  }
 
   // this page's sections
-  const own = new Map([...document.querySelectorAll('.toc a[href^="#"], nav.jump a[href^="#"]')].map((a) => [a.getAttribute('href').slice(1), a.textContent.trim()]));
-  const sections = [...document.querySelectorAll('main section[id]')].map((s) => ({ el: s, id: s.id, name: s.dataset.nav || own.get(s.id) || (s.querySelector('h2')?.textContent || s.id).trim() }));
+  const named = new Map([...document.querySelectorAll('.toc a[href^="#"], nav.jump a[href^="#"], nav.chips a[href^="#"]')].map((a) => [a.getAttribute('href').slice(1), a.textContent.trim()]));
+  const sections = [...document.querySelectorAll('main section[id]')].map((s) => ({ el: s, id: s.id, name: s.dataset.nav || named.get(s.id) || (s.querySelector('h2')?.textContent || s.id).trim() }));
 
   const bar = document.createElement('div'); bar.className = 'pg-bar';
   bar.innerHTML = `
