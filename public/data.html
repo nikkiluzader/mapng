@@ -115,13 +115,13 @@
     <div class="card"><b><span class="tick">✓</span>The counts are public</b><span>On the <a href="/stats.html">stats page</a>, and as raw files, below.</span></div>
   </div>
 
-  <section id="what">
+  <section id="what" data-nav="Hotspot map">
     <h2>What the hotspot map is</h2>
     <p>The 2D map in MapNG has an optional <b>Export hotspots</b> overlay, in the Map layers box. It shows the areas where people export BeamNG levels: a soft glow when you're zoomed out, brighter where more people export, and small dots once you zoom in. Everything on it comes only from people who chose to share. It helps everyone see where the community is building, and helps the developer decide where to improve MapNG next. The same squares, added up by country, are on the public <a href="/stats.html">stats page</a>.</p>
     <p>Sharing is off by default, on the website and in the desktop app. MapNG asks you once, after your first export, and the desktop app has an unticked box on its welcome screen. You can change your answer at any time with <b>Share my exports (anonymous)</b> in the <b>Map layers</b> box on the map.</p>
   </section>
 
-  <section id="report">
+  <section id="report" data-nav="One report">
     <h2>Exactly what one report looks like</h2>
     <p>When sharing is on and a level export finishes, MapNG sends one small message to <code>https://mapng.com/api/hotspots</code>. This is its entire content:</p>
 <pre><code>POST /api/hotspots
@@ -140,7 +140,7 @@ Content-Type: application/json
     <p>That is the whole report: no level name, no settings, no map data, no account, no device or browser ID, no cookies.</p>
   </section>
 
-  <section id="stored">
+  <section id="stored" data-nav="What is stored">
     <h2>Exactly what is stored</h2>
     <p>For the hotspot map, the server keeps one table with one row per grid square that has had at least one shared export. Nothing else about hotspots is written anywhere. (Settings stats, if you opt in to those, are a separate table of totals: <a href="#usage">see below</a>.)</p>
     <div class="table-wrap"><table>
@@ -156,7 +156,7 @@ Content-Type: application/json
     <p>A report adds 1 to <code>web</code> or <code>desktop</code> for its square and sets <code>last_day</code> to today. Nothing records who sent it, and once added, a count cannot be traced back to anyone.</p>
   </section>
 
-  <section id="see">
+  <section id="see" data-nav="See it yourself">
     <h2>See all of it yourself</h2>
     <p>The full table is public. <a href="/api/hotspots">mapng.com/api/hotspots</a> returns every row exactly as stored, with no filtering. It is the same data the overlay draws, refreshed at most 10 minutes behind the database.</p>
     <div class="stats" id="stats" aria-live="polite">
@@ -169,7 +169,7 @@ Content-Type: application/json
     <p>To turn a row into a place: the square's centre is at latitude <code>-90 + (y + 0.5) × 0.05</code> and longitude <code>-180 + (x + 0.5) × 0.05</code>.</p>
   </section>
 
-  <section id="pipeline">
+  <section id="pipeline" data-nav="Pipeline">
     <h2>The whole pipeline, step by step</h2>
     <ol class="flow">
       <li><b>An export finishes</b><span class="where">your computer</span><br>Only BeamNG level exports count. Nothing happens unless sharing is on.</li>
@@ -182,7 +182,7 @@ Content-Type: application/json
     </ol>
   </section>
 
-  <section id="spam">
+  <section id="spam" data-nav="Spam protection">
     <h2>The one thing kept in memory: spam protection</h2>
     <p>Without a limit, one person could fake thousands of exports. So for a short while the server remembers how many reports each address has sent this hour. It never writes this down. It works like this:</p>
     <ul>
@@ -193,7 +193,7 @@ Content-Type: application/json
     <p class="note">Like every request to mapng.com, reports travel through Cloudflare's network, which runs the site. Cloudflare's own handling of traffic is covered by <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare's privacy policy</a>.</p>
   </section>
 
-  <section id="use">
+  <section id="use" data-nav="How it is used">
     <h2>How the developer uses it</h2>
     <p>To look at the same totals everyone can see: which areas people build in. For example, MapNG hosts its own fast copy of OpenStreetMap data for a few regions, and the hotspot map shows which regions deserve that next. And to show them: on the hotspot map, and added up by country on the public <a href="#stats">stats page</a>. MapNG is open source, and the numbers about it are open too. That's it.</p>
     <h3>Things MapNG will never do with it</h3>
@@ -207,7 +207,7 @@ Content-Type: application/json
     </ul>
   </section>
 
-  <section id="control">
+  <section id="control" data-nav="Your controls">
     <h2>Your controls</h2>
     <ul>
       <li><b>Turn it on or off:</b> the <b>Map layers</b> box on the map → <b>Share my exports (anonymous)</b>. Turning it off stops reports immediately.</li>
@@ -217,7 +217,7 @@ Content-Type: application/json
     </ul>
   </section>
 
-  <section id="usage">
+  <section id="usage" data-nav="Settings stats">
     <h2>Settings stats: which settings people use</h2>
     <p>A separate opt-in from the hotspot map, with its own switch (<em>Share which settings I use</em> in the Map layers box, asked once after your first export). It tells the developer which settings people really pick, so defaults can be better and settings nobody uses can go. The totals are public: the public <a href="/stats.html#settings">stats page</a> draws them as charts, most used and least used.</p>
     <p>When it's on and a level export finishes, MapNG sends one message to <code>https://mapng.com/api/usage</code>. A typical one, in full:</p>
@@ -241,7 +241,7 @@ Content-Type: application/json
     <div class="usage-grid" id="u-grid"></div>
   </section>
 
-  <section id="reports">
+  <section id="reports" data-nav="Desktop reports">
     <h2>Problem reports from the desktop app</h2>
     <p>This is separate from the hotspot map. When the desktop app crashes, or an export, terrain generation or update fails, it can offer to send a <strong>problem report</strong> so the developer can fix it. You can also send one from <em>Help → Report a Problem</em>, or for one level from <em>Send report</em> in the levels list.</p>
     <ul>
@@ -258,7 +258,7 @@ Content-Type: application/json
     <p>Crashes are recorded by Electron's built-in crash reporter, which is set to keep crash snapshots on your computer and never upload them itself.</p>
   </section>
 
-  <section id="web-reports">
+  <section id="web-reports" data-nav="Website reports">
     <h2>Problem reports from the website</h2>
     <p>The website can offer the same report when a Generate or an export fails. The rules are the same: <strong>nothing is sent unless you choose Send</strong>, and the window shows what is in it first.</p>
     <ul>
@@ -268,7 +268,7 @@ Content-Type: application/json
     </ul>
   </section>
 
-  <section id="unexpected-close">
+  <section id="unexpected-close" data-nav="Unexpected close">
     <h2>If MapNG closes unexpectedly</h2>
     <p>A browser tab that runs out of memory takes your session with it. So that you don't lose your setup, MapNG leaves itself a note <strong>in your own browser's storage</strong> when a Generate or an export starts: which of the two it was, when, the build, and your settings as a session code. The note is removed when the job ends, and when you close or reload the page in the ordinary way.</p>
     <ul>
@@ -278,7 +278,7 @@ Content-Type: application/json
     </ul>
   </section>
 
-  <section id="send-codes">
+  <section id="send-codes" data-nav="Send codes">
     <h2>Sending a config with a code</h2>
     <p>Under <em>Share &amp; save settings</em>, <strong>Share my settings → Get a code</strong> gives you a short code like <code>K7F2-9QXM</code>, or a link like <code>mapng.com/#K7F2-9QXM</code>, to give someone. They enter it under <strong>Use someone's code</strong>.</p>
     <ul>
@@ -290,7 +290,7 @@ Content-Type: application/json
     </ul>
   </section>
 
-  <section id="stats">
+  <section id="stats" data-nav="Stats page">
     <h2>The public stats page</h2>
     <p><a href="/stats.html">mapng.com/stats.html</a> shows MapNG's numbers to everyone: where people build, which settings they pick, how many visit, what goes wrong. MapNG is open source, built in the open, and there is no reason for its numbers to be private. Every number there is a <strong>count</strong>. None is about a person, and none can be turned back into one.</p>
     <div class="table-wrap"><table>
@@ -307,7 +307,7 @@ Content-Type: application/json
     <p class="note">What never appears there, or anywhere: a name, an account, an internet address, an exact location, a level's name, the text of an error or of anything you wrote, a report ID, your settings as a set (only each setting's own total).</p>
   </section>
 
-  <section id="other">
+  <section id="other" data-nav="Connections">
     <h2>Everything else MapNG connects to</h2>
     <p>MapNG has no accounts and no ads. To build a map it has to download map data, and the only thing those services receive is the area being loaded, like any map website. For completeness, here is every outside service it talks to:</p>
     <div class="table-wrap"><table>
@@ -379,7 +379,7 @@ Content-Type: application/json
     <p>What MapNG does not do: it has no advertising or tracking code, it does not run anything in the background after you close it, and it downloads data only, never programs. The desktop app's own update is the one exception, and it is taken only when it carries MapNG's signature (below).</p>
   </section>
 
-  <section id="files">
+  <section id="files" data-nav="Files written">
     <h2>What the desktop app writes on your computer</h2>
     <p>The website keeps its settings in your browser's storage and writes nothing else. The desktop app writes in three places, and nowhere else:</p>
     <div class="table-wrap"><table>
@@ -393,7 +393,7 @@ Content-Type: application/json
     <p>To remove everything MapNG keeps, uninstall it and delete its own folder above. Keys you enter (a GPXZ key, an Overpass address with a key) stay in the window's storage on your computer and are removed from an export's job files when the export ends.</p>
   </section>
 
-  <section id="download">
+  <section id="download" data-nav="The download">
     <h2>The desktop download: how it is built, and how to check it</h2>
     <p>A program you install can do more than a web page, so it is fair to ask where it came from. You never need it: <a href="/">mapng.com</a> does the same work in the browser, and the desktop app exists for exports too large for a browser tab.</p>
     <ul>
@@ -409,7 +409,7 @@ Content-Type: application/json
     <p>Found a security problem? Please report it privately: <a href="https://github.com/nikkiluzader/mapng/security/advisories/new">open a private report on GitHub</a>.</p>
   </section>
 
-  <section id="source">
+  <section id="source" data-nav="The code">
     <h2>Read the code</h2>
     <p>MapNG is open source, so none of this has to be taken on trust. The hotspot code is small:</p>
     <ul>

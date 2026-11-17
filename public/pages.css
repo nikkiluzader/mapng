@@ -23,27 +23,47 @@ body { background: var(--bg); color: var(--text); }
 ::selection { background: var(--brand); color: #fff; }
 a { text-underline-offset: 2px; }
 
-/* the header: the app's, not a banner */
-header.top { background: var(--surface); color: var(--text); border-bottom: 1px solid var(--border); }
-header.top .wrap { padding-top: 0; padding-bottom: 26px; }
-header.top h1 { color: var(--text); margin-top: 26px; }
-header.top .lede { color: var(--text-2); }
+/* The header: the app's, and it stays at the top of the window. Row one: the logo, the links between the pages, the
+   light / dark switch and the button that folds the header away. Row two: this page's own sections. The page's
+   title and its opening lines are not in it: pages.js moves them to the top of the page, under the header. */
+header.top { position: sticky; top: 0; z-index: 50; background: var(--surface); color: var(--text); border-bottom: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0, 0, 0, .06); }
+header.top .wrap { padding-top: 0; padding-bottom: 0; }
 header.top .brand { color: var(--text); opacity: 1; padding: 14px 0; }
-.pg-bar { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.pg-bar { display: flex; align-items: center; gap: 10px; padding: 10px 0; flex-wrap: wrap; }
 .pg-logo { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); margin-right: auto; }
 .pg-logo .pg-tile { display: inline-flex; padding: 6px; background: var(--brand); border-radius: 8px; }
-.pg-logo .pg-tile svg { width: 26px; height: 26px; display: block; }
-.pg-logo b { display: block; font: 700 18px/1.1 "Overpass", "Noto Sans", system-ui, sans-serif; }
+.pg-logo .pg-tile svg { width: 24px; height: 24px; display: block; }
+.pg-logo b { display: block; font: 700 17px/1.1 "Overpass", "Noto Sans", system-ui, sans-serif; }
 .pg-logo small { display: block; font-size: 11px; line-height: 1.3; color: var(--muted); }
 .pg-nav { display: flex; flex-wrap: wrap; gap: 4px; }
-.pg-nav a { font-size: 13px; font-weight: 600; text-decoration: none; color: var(--text-2); padding: 6px 10px; border-radius: 8px; border: 1px solid transparent; }
+.pg-nav a { font-size: 13px; font-weight: 600; text-decoration: none; color: var(--text-2); padding: 6px 10px; border-radius: 8px; }
 .pg-nav a:hover { background: var(--surface-2); color: var(--text); }
 .pg-nav a[aria-current="page"] { background: var(--brand); color: #fff; }
-.pg-theme { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; }
-.pg-theme:hover { background: var(--surface-2); color: var(--brand); }
-.pg-theme svg { width: 16px; height: 16px; }
-.pg-theme:focus-visible, .pg-nav a:focus-visible, .pg-logo:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.pg-btn { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; padding: 0; }
+.pg-btn:hover { background: var(--surface-2); color: var(--brand); }
+.pg-btn svg { width: 16px; height: 16px; }
+.pg-btn:focus-visible, .pg-nav a:focus-visible, .pg-logo:focus-visible, .pg-sections a:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 :root[data-theme="dark"] .pg-theme .pg-moon, :root[data-theme="light"] .pg-theme .pg-sun { display: none; }
+.pg-fold svg { transition: transform .15s; }
+header.top.pg-collapsed .pg-fold svg { transform: rotate(180deg); }
+/* this page's sections: one row, scrolled sideways when it does not fit */
+.pg-sections { display: flex; gap: 2px; overflow-x: auto; padding: 0 0 8px; margin: 0; scrollbar-width: thin; border-top: 1px solid var(--border); padding-top: 8px; }
+.pg-sections::before { content: attr(data-label); flex: none; align-self: center; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-right: 8px; }
+.pg-sections a { flex: none; font-size: 12.5px; text-decoration: none; color: var(--text-2); padding: 4px 9px; border-radius: 999px; border: 1px solid transparent; white-space: nowrap; }
+.pg-sections a:hover { background: var(--surface-2); color: var(--text); }
+.pg-sections a[aria-current="true"] { border-color: var(--brand); color: var(--brand-ink); background: var(--brand-tint); }
+/* folded: the logo and the two buttons only */
+header.top.pg-collapsed .pg-nav, header.top.pg-collapsed .pg-sections { display: none; }
+header.top.pg-collapsed .pg-bar { padding: 6px 0; }
+header.top.pg-collapsed .pg-logo small { display: none; }
+/* a section reached from a link stops under the header, not behind it */
+section[id], [id].pg-anchor { scroll-margin-top: calc(var(--pg-head, 120px) + 14px); }
+/* the page's title and opening lines, under the header */
+.pg-intro { padding: 30px 0 4px; }
+.pg-intro h1 { color: var(--text); margin: 0 0 10px; }
+.pg-intro .lede { color: var(--text-2); margin: 0; }
+/* (the pages' own lists of section links are in the header now) */
+html.pg-ready .toc, html.pg-ready nav.jump { display: none; }
 
 /* the app's corners (4 / 8 px) and flat panels; the summary boxes no longer overlap a banner */
 .cards, .tiles { margin-top: 22px !important; }
