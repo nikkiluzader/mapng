@@ -242,6 +242,13 @@
                 <input type="radio" v-model="selectedLayer" value="street" class="accent-brand" />
                 <span>{{ t('mapSelector.streetMap') }}</span>
             </label>
+            <!-- the street map's styles: every one the basemap has; none chosen = follows light / dark mode -->
+            <div v-if="ownMap && selectedLayer === 'street'" class="flex flex-wrap gap-1 pl-6 pb-1" data-testid="street-styles">
+                <button v-for="s in OWN_MAP_STYLES" :key="s" type="button" :data-testid="`street-style-${s}`"
+                    class="px-1.5 py-0.5 rounded border text-micro transition-colors"
+                    :class="streetStyleShown === s ? 'border-brand bg-brand text-white' : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'"
+                    :aria-pressed="streetStyleShown === s" @click="streetStyle = s">{{ t(`mapSelector.streetStyle.${s}`) }}</button>
+            </div>
             <label :class="PANEL_ROW">
                 <input type="radio" v-model="selectedLayer" value="osm" class="accent-brand" />
                 <span>{{ t('mapSelector.openStreetMap') }}</span>
@@ -370,7 +377,7 @@
 
 <script setup>
 import { tileRefusalWatch } from '../../services/tileRefusal.js';
-import { ownMapAvailable, createOwnMapLayer } from '../../services/ownBaseMap.js';
+import { ownMapAvailable, createOwnMapLayer, OWN_MAP_STYLES, ownMapStyle } from '../../services/ownBaseMap.js';
 import { osmTilesInUse, osmTilesShown } from '../../services/osmTilesInUse.js';
 // (bundled, not fetched from a CDN: one less outside service)
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -516,7 +523,12 @@ ownMapAvailable().then((there) => {
 // own names, and the dark base never does: labels go only where missing.
 const satelliteNames = ref(readStored('mapng_satelliteLabels') !== 'false');
 const showLabels = computed(() => (selectedLayer.value === 'satellite' ? satelliteNames.value : selectedLayer.value === 'dark' || RELIEF_MODES.includes(selectedLayer.value)));
+// (the street map's style: the one chosen and kept, else light or dark with the app)
+const streetStyle = ref(readStored('mapng_streetStyle') || '');
+const streetStyleShown = computed(() => ownMapStyle(streetStyle.value, props.isDarkMode));
 watch(selectedLayer, (v) => { writeStored('mapng_mapLayer', v); syncReliefLayer(); syncOwnMapLayer(); });
+watch(streetStyle, (v) => { writeStored('mapng_streetStyle', v); });
+watch(streetStyleShown, () => { syncOwnMapLayer(); });
 // OpenStreetMap's tile server refusing this visitor (429 "Access denied" under its usage policy): the topo map
 // stands in for this visit and a line says so. The choice stays "OpenStreetMap": the next visit tries it again.
 const osmRefused = ref(false);
@@ -591,7 +603,7 @@ const syncOwnMapLayer = async () => {
   if (ownMapLayer) { map.removeLayer(ownMapLayer); ownMapLayer = null; }
   if (selectedLayer.value !== 'street' || !ownMap.value) return;
   try {
-    const layer = await createOwnMapLayer({ lang: String(locale.value || 'en').slice(0, 2), leaflet: { ...ONE_WORLD, zIndex: 1 } });
+    const layer = await createOwnMapLayer({ style: streetStyleShown.value, lang: String(locale.value || 'en').slice(0, 2), leaflet: { ...ONE_WORLD, zIndex: 1 } });
     // (the choice changed while the renderer loaded)
     if (turn !== ownMapTurn) return;
     ownMapLayer = layer; layer.addTo(map);

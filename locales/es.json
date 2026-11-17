@@ -834,6 +834,7 @@
     "moveTile": "Mover {label}",
     "mapLayers": "Capas del mapa",
     "streetMap": "Mapa de calles",
+    "streetStyle": { "light": "Claro", "dark": "Oscuro", "white": "Blanco", "grayscale": "Escala de grises", "black": "Negro" },
     "osmRefused": "El servidor de mapas de OpenStreetMap no responde aquí en este momento. Se muestra el mapa topográfico en su lugar.",
     "openStreetMap": "OpenStreetMap",
     "satellite": "Satélite",

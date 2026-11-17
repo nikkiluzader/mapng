@@ -839,6 +839,7 @@
     "moveTile": "Move {label}",
     "mapLayers": "Map layers",
     "streetMap": "Street map",
+    "streetStyle": { "light": "Light", "dark": "Dark", "white": "White", "grayscale": "Greyscale", "black": "Black" },
     "osmRefused": "OpenStreetMap's map server is not answering here right now. Showing the topo map instead.",
     "openStreetMap": "OpenStreetMap",
     "satellite": "Satellite",

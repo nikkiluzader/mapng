@@ -834,6 +834,7 @@
     "moveTile": "Переместить {label}",
     "mapLayers": "Слои карты",
     "streetMap": "Карта улиц",
+    "streetStyle": { "light": "Светлая", "dark": "Тёмная", "white": "Белая", "grayscale": "Оттенки серого", "black": "Чёрная" },
     "osmRefused": "Сервер карт OpenStreetMap сейчас здесь не отвечает. Вместо него показана топографическая карта.",
     "openStreetMap": "OpenStreetMap",
     "satellite": "Спутник",

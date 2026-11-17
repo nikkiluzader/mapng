@@ -834,6 +834,7 @@
     "moveTile": "Przesuń {label}",
     "mapLayers": "Warstwy mapy",
     "streetMap": "Mapa ulic",
+    "streetStyle": { "light": "Jasny", "dark": "Ciemny", "white": "Biały", "grayscale": "Odcienie szarości", "black": "Czarny" },
     "osmRefused": "Serwer map OpenStreetMap nie odpowiada tutaj w tej chwili. Zamiast niego pokazywana jest mapa topograficzna.",
     "openStreetMap": "OpenStreetMap",
     "satellite": "Satelita",

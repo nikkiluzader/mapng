@@ -18,3 +18,13 @@ test('the worker serves the basemap archive by the same rule as the map data arc
   assert.ok(OSM_TILES_KEY_RE.test('osm-all/planet-3-4-2-2026-11-12.pmtiles'));
   for (const bad of ['basemap/../crash-reports/x.pmtiles', 'asset-page/data.json', 'basemap/a/b.pmtiles', 'crash-reports/a.pmtiles', 'basemap/x.json']) assert.ok(!OSM_TILES_KEY_RE.test(bad), bad);
 });
+
+test('street map styles: the chosen one when known, else light or dark with the app', async () => {
+  const { OWN_MAP_STYLES, ownMapStyle } = await import('../services/ownBaseMap.js');
+  assert.deepEqual(OWN_MAP_STYLES, ['light', 'dark', 'white', 'grayscale', 'black']);
+  assert.equal(ownMapStyle('', false), 'light'); assert.equal(ownMapStyle('', true), 'dark'); assert.equal(ownMapStyle(null, true), 'dark');
+  assert.equal(ownMapStyle('grayscale', true), 'grayscale'); assert.equal(ownMapStyle('black', false), 'black');
+  assert.equal(ownMapStyle('neon', false), 'light', 'an unknown stored value is ignored');
+  const fs = await import('node:fs');
+  for (const lang of ['en', 'de', 'es', 'fr', 'it', 'pl', 'ru']) { const t = JSON.parse(fs.readFileSync(new URL(`../locales/${lang}.json`, import.meta.url), 'utf8')).mapSelector.streetStyle; for (const s of OWN_MAP_STYLES) assert.ok(t?.[s], `${lang}: ${s}`); }
+});

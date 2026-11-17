@@ -834,6 +834,7 @@
     "moveTile": "{label} verschieben",
     "mapLayers": "Kartenebenen",
     "streetMap": "Straßenkarte",
+    "streetStyle": { "light": "Hell", "dark": "Dunkel", "white": "Weiß", "grayscale": "Graustufen", "black": "Schwarz" },
     "osmRefused": "Der Kartenserver von OpenStreetMap antwortet hier gerade nicht. Stattdessen wird die Topo-Karte gezeigt.",
     "openStreetMap": "OpenStreetMap",
     "satellite": "Satellit",
