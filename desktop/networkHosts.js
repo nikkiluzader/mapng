@@ -32,8 +32,6 @@ export const NETWORK_HOSTS = [
   // satellite pictures and map backgrounds
   { host: 'server.arcgisonline.com', kind: 'pictures', what: 'Esri satellite imagery and map backgrounds' },
   { host: 'services.arcgisonline.com', kind: 'pictures', what: 'Esri map labels' },
-  { host: '.tile.openstreetmap.org', kind: 'pictures', what: 'OpenStreetMap map tiles (that map layer only)' },
-  { host: 'tile.openstreetmap.org', kind: 'pictures', what: 'OpenStreetMap map tiles (that map layer only)' },
   // roads, buildings, land use
   { host: 'overpass-api.de', kind: 'mapdata', what: 'OpenStreetMap Overpass server' },
   { host: 'lz4.overpass-api.de', kind: 'mapdata', what: 'OpenStreetMap Overpass server' },

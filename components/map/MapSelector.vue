@@ -12,24 +12,7 @@
         @ready="onMapReady"
      >
       <!-- Base Layers (one world: no copies east or west, services/mapView.js) -->
-      <!-- (its server refusing this visitor: the topo map stands in, services/tileRefusal.js) -->
-      <l-tile-layer
-        v-if="selectedLayer === 'osm' && !osmRefused"
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution="&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors"
-        layer-type="base"
-        :options="{ ...ONE_WORLD, maxNativeZoom: 19 }"
-        @ready="watchOsmTiles"
-      />
 
-      <!-- The dark map: a choice of its own (dark mode no longer swaps the user's map) -->
-      <l-tile-layer
-        v-if="selectedLayer === 'dark'"
-        :url="DARK_URL"
-        :attribution="DARK_ATTRIBUTION"
-        layer-type="base"
-        :options="{ ...ONE_WORLD, maxNativeZoom: 16 }"
-      />
 
       <l-tile-layer
         v-if="selectedLayer === 'satellite'"
@@ -41,7 +24,7 @@
       />
 
       <l-tile-layer
-        v-if="selectedLayer === 'topo' || (selectedLayer === 'osm' && osmRefused) || (selectedLayer === 'street' && !ownMap)"
+        v-if="selectedLayer === 'topo' || (selectedLayer === 'street' && !ownMap)"
         url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}"
         attribution="&copy; <a href='https://www.esri.com/'>Esri</a>"
         layer-type="base"
@@ -250,11 +233,6 @@
                     :aria-pressed="streetStyleShown === s" @click="streetStyle = s">{{ t(`mapSelector.streetStyle.${s}`) }}</button>
             </div>
             <label :class="PANEL_ROW">
-                <input type="radio" v-model="selectedLayer" value="osm" class="accent-brand" />
-                <span>{{ t('mapSelector.openStreetMap') }}</span>
-            </label>
-            <p v-if="selectedLayer === 'osm' && osmRefused" class="pl-7 pr-1 text-micro leading-snug text-amber-700 dark:text-amber-300" role="status" data-testid="osm-refused">{{ t('mapSelector.osmRefused') }}</p>
-            <label :class="PANEL_ROW">
                 <input type="radio" v-model="selectedLayer" value="satellite" class="accent-brand" />
                 <span>{{ t('mapSelector.satellite') }}</span>
             </label>
@@ -265,10 +243,6 @@
             <label :class="PANEL_ROW">
                 <input type="radio" v-model="selectedLayer" value="topo" class="accent-brand" />
                 <span>{{ t('mapSelector.topoMap') }}</span>
-            </label>
-            <label :class="PANEL_ROW">
-                <input type="radio" v-model="selectedLayer" value="dark" class="accent-brand" />
-                <span>{{ t('mapSelector.darkMap') }}</span>
             </label>
             <!-- The land's shape, drawn here from the elevation tiles (services/reliefTileLayer.js) -->
             <label :class="PANEL_ROW">
@@ -376,9 +350,7 @@
 </template>
 
 <script setup>
-import { tileRefusalWatch } from '../../services/tileRefusal.js';
 import { ownMapAvailable, createOwnMapLayer, OWN_MAP_STYLES, ownMapStyle } from '../../services/ownBaseMap.js';
-import { osmTilesInUse, osmTilesShown } from '../../services/osmTilesInUse.js';
 // (bundled, not fetched from a CDN: one less outside service)
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -504,38 +476,39 @@ const initialZoom = props.zoom;
 const currentCenter = ref(props.center);
 const currentZoom = ref(props.zoom);
 // Remembered across reloads.
-const MAP_LAYERS = ['street', 'osm', 'satellite', 'topo', 'dark', ...RELIEF_MODES];
+// (no 'osm': the layer that showed OpenStreetMap's own tile pictures is gone. Its tile server is run on donations
+// for the OSM community and turns apps' heavy use away; MapNG's own street map, the same data, stands in its place.
+// A stored 'osm' choice is read as no choice: the street map where it answers, else the topo map.)
+// (no 'dark' either: the street map has a dark style of its own. A stored 'dark' choice becomes the street map in
+// that style, below.)
+const MAP_LAYERS = ['street', 'satellite', 'topo', ...RELIEF_MODES];
 const readStored = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
 const writeStored = (key, value) => { try { localStorage.setItem(key, value); } catch { /* storage blocked */ } };
 const storedLayer = readStored('mapng_mapLayer');
-// (a first visit opens on the topo map: OpenStreetMap's own tile server is volunteer-run and turns heavy use away,
-// so it is a choice, not the default)
+// (a first visit opens on the topo map until MapNG's own street map answers, below)
 const selectedLayer = ref(MAP_LAYERS.includes(storedLayer) ? storedLayer : 'topo');
 // MapNG's own street map (services/ownBaseMap.js): offered where its archive answers, and then what a first visit
 // opens on. Chosen but not there (another site, the archive withdrawn): the topo map stands in.
 const ownMap = ref(false);
 ownMapAvailable().then((there) => {
   ownMap.value = there;
-  if (there && !MAP_LAYERS.includes(storedLayer)) selectedLayer.value = 'street';
+  if (there && !MAP_LAYERS.includes(storedLayer)) {
+    // (the old Dark map was chosen: the street map, dark, unless a style was already picked)
+    if (storedLayer === 'dark' && !streetStyle.value) streetStyle.value = 'dark';
+    selectedLayer.value = 'street';
+  }
   syncOwnMapLayer();
 });
 // Names on satellite imagery (default on). The OSM and topo maps have their
 // own names, and the dark base never does: labels go only where missing.
 const satelliteNames = ref(readStored('mapng_satelliteLabels') !== 'false');
-const showLabels = computed(() => (selectedLayer.value === 'satellite' ? satelliteNames.value : selectedLayer.value === 'dark' || RELIEF_MODES.includes(selectedLayer.value)));
+const showLabels = computed(() => (selectedLayer.value === 'satellite' ? satelliteNames.value : RELIEF_MODES.includes(selectedLayer.value)));
 // (the street map's style: the one chosen and kept, else light or dark with the app)
 const streetStyle = ref(readStored('mapng_streetStyle') || '');
 const streetStyleShown = computed(() => ownMapStyle(streetStyle.value, props.isDarkMode));
 watch(selectedLayer, (v) => { writeStored('mapng_mapLayer', v); syncReliefLayer(); syncOwnMapLayer(); });
 watch(streetStyle, (v) => { writeStored('mapng_streetStyle', v); });
 watch(streetStyleShown, () => { syncOwnMapLayer(); });
-// OpenStreetMap's tile server refusing this visitor (429 "Access denied" under its usage policy): the topo map
-// stands in for this visit and a line says so. The choice stays "OpenStreetMap": the next visit tries it again.
-const osmRefused = ref(false);
-const osmTiles = tileRefusalWatch(() => { osmRefused.value = true; });
-// (while OpenStreetMap's own tiles are on the map, the support options are hidden: services/osmTilesInUse.js)
-watch([selectedLayer, osmRefused], () => { osmTilesInUse.value = osmTilesShown(selectedLayer.value, osmRefused.value); }, { immediate: true });
-const watchOsmTiles = (layer) => { osmTiles.reset(); layer?.on?.('tileerror', osmTiles.error); layer?.on?.('tileload', osmTiles.load); };
 const layerPanelOpen = ref(readStored('mapng_layerPanelOpen') !== 'false');
 watch(layerPanelOpen, (v) => writeStored('mapng_layerPanelOpen', String(v)));
 const PANEL_ROW = 'flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer';
@@ -576,8 +549,6 @@ const ESRI_REFERENCE_ATTRIBUTION = 'Labels &copy; <a href="https://www.esri.com/
 
 // Esri's dark canvas (keyless), with its names as a layer of their own. It
 // stops at z16 ("Map data not yet available" beyond); Leaflet upscales instead.
-const DARK_URL = `${ESRI_TILES}/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}`;
-const DARK_ATTRIBUTION = '&copy; <a href="https://www.esri.com/">Esri</a>, HERE, Garmin &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
 // Height colours, shaded relief and slope: drawn here from the elevation tiles
 // (services/reliefTileLayer.js), so they are not <l-tile-layer>s. Names go on
@@ -613,14 +584,12 @@ const syncOwnMapLayer = async () => {
   }
 };
 
-const labelLayers = computed(() => (selectedLayer.value === 'dark'
-  ? [{ url: `${ESRI_LABEL_TILES}/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}`, maxNativeZoom: 16, opacity: 1 }]
-  : [
+const labelLayers = computed(() => ([
     // Each layer only where it helps (fewer tiles on Esri's 6-connection host):
     // roads and street names from z11, place names up to z15.
     { url: `${ESRI_LABEL_TILES}/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}`, maxNativeZoom: 19, minZoom: 11, opacity: 0.8 },
     { url: `${ESRI_LABEL_TILES}/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}`, maxNativeZoom: 17, maxZoom: 15, opacity: 1 },
-  ]));
+]));
 
 // Calculate bounds from output size and processing meters-per-pixel.
 const activeSelectionSizeMeters = computed(() => {

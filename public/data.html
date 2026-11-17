@@ -310,6 +310,7 @@ Content-Type: application/json
         <tr><td>AWS Terrarium, Mapterhorn, OpenGeoHub (GEDTM30), USGS, GUGiK (Poland)</td><td>Elevation data, and USGS 3DEP lidar for measured bridge heights</td><td>The map tiles for the area you select. If your network cannot reach Amazon's storage, the global elevation tiles are fetched through mapng.com instead, which then sees which tiles were asked for (nothing is stored)</td></tr>
         <tr><td>GPXZ</td><td>Optional premium elevation</td><td>The area, and your own GPXZ key (only if you enter one)</td></tr>
         <tr><td>Esri</td><td>Satellite imagery and map backgrounds</td><td>The map tiles you view or export, and the tiles along the roads when you switch on measuring road widths from the satellite picture</td></tr>
+        <tr><td>MapNG's own street map</td><td>The street map behind the area you pick (OpenStreetMap data, prepared by Protomaps, kept in MapNG's own storage)</td><td>The pieces of the map you look at, asked from mapng.com only. OpenStreetMap's own map servers are not asked for anything.</td></tr>
         <tr><td>MapNG's own OSM tiles, OpenStreetMap Overpass servers, Overture Maps</td><td>Roads, buildings, land use</td><td>The area you select</td></tr>
         <tr><td>openstreetmap.org (Pull and Download only)</td><td>The area's OpenStreetMap data straight from the source, when you click Pull or Download</td><td>The area, one request per click (its <a href="https://operations.osmfoundation.org/policies/api/">API usage policy</a> is yours to follow)</td></tr>
         <tr><td>Nominatim</td><td>Place search and level names</td><td>Your search text, or the area's centre</td></tr>
@@ -348,8 +349,6 @@ Content-Type: application/json
         <tr><td><code>*.geoportal.gov.pl</code></td><td>GUGiK (Poland): download addresses named by its own answers</td></tr>
         <tr><td><code>server.arcgisonline.com</code></td><td>Esri satellite imagery and map backgrounds</td></tr>
         <tr><td><code>services.arcgisonline.com</code></td><td>Esri map labels</td></tr>
-        <tr><td><code>*.tile.openstreetmap.org</code></td><td>OpenStreetMap map tiles (that map layer only)</td></tr>
-        <tr><td><code>tile.openstreetmap.org</code></td><td>OpenStreetMap map tiles (that map layer only)</td></tr>
         <tr><td><code>overpass-api.de</code></td><td>OpenStreetMap Overpass server</td></tr>
         <tr><td><code>lz4.overpass-api.de</code></td><td>OpenStreetMap Overpass server</td></tr>
         <tr><td><code>overpass.private.coffee</code></td><td>OpenStreetMap Overpass server</td></tr>

@@ -222,7 +222,7 @@
 
     <!-- Support Tip Modal -->
     <SupportTipModal
-      v-if="showSupportTip && !osmTilesInUse"
+      v-if="showSupportTip"
       :context="supportPromptContext"
       :kofi-url="KOFI_URL"
       @close="handleSupportTipClose"
@@ -230,7 +230,6 @@
 </template>
 
 <script setup>
-import { osmTilesInUse } from './services/osmTilesInUse.js';
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
@@ -420,8 +419,6 @@ const canAutoShowTip = () => {
 };
 
 const openSupportTip = (context = 'manual') => {
-  // (never while OpenStreetMap's own tiles are on the map: services/osmTilesInUse.js)
-  if (osmTilesInUse.value) return;
   supportPromptContext.value = context;
   showSupportTip.value = true;
 };
@@ -432,13 +429,13 @@ const handleSupportTipClose = () => {
 
 // (after a finished export, at most once a day: TIP_COOLDOWN_MS; the header's heart opens it any time)
 const maybePromptSupportAfterSingleExport = () => {
-  if (osmTilesInUse.value || !canAutoShowTip()) return;
+  if (!canAutoShowTip()) return;
   openSupportTip('single');
   markTipShownNow();
 };
 
 const maybePromptSupportAfterBatchComplete = () => {
-  if (osmTilesInUse.value || !canAutoShowTip()) return;
+  if (!canAutoShowTip()) return;
   openSupportTip('batch');
   markTipShownNow();
 };

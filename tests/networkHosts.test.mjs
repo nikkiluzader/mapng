@@ -27,7 +27,8 @@ test('every address in the app\'s code is on the list of what MapNG connects to,
 test('the list: known kinds, suffix entries, and the page public/data.html names every address', () => {
   for (const e of NETWORK_HOSTS) assert.ok(NETWORK_KINDS.includes(e.kind), `${e.host}: kind ${e.kind}`);
   assert.equal(networkHost('prd-tnm.s3.amazonaws.com')?.kind, 'elevation');
-  assert.equal(networkHost('a.tile.openstreetmap.org')?.kind, 'pictures');
+  assert.equal(networkHost('server.arcgisonline.com')?.kind, 'pictures');
+  assert.equal(networkHost('a.tile.openstreetmap.org'), null, 'the OpenStreetMap tile server is no longer asked');
   assert.equal(networkHost('objects.githubusercontent.com')?.kind, 'updates');
   assert.equal(networkHost('MAPNG.com.')?.kind, 'mapng');
   assert.equal(networkHost('example.com'), null);
@@ -58,9 +59,9 @@ test('the address guard: listed addresses and the user\'s own server pass, every
   const { allowedUrl, setOwnServer } = await import('../desktop/networkGuard.js');
   setOwnServer('');
   for (const ok of ['https://mapng.com/api/osm', 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/1/1/1.png', 'https://prd-tnm.s3.amazonaws.com/x.tif',
-    'https://b.tile.openstreetmap.org/1/1/1.png', 'https://objects.githubusercontent.com/x', 'https://rockyweb.usgs.gov/vdelivery/x', 'app://mapng/index.html',
+    'https://objects.githubusercontent.com/x', 'https://rockyweb.usgs.gov/vdelivery/x', 'app://mapng/index.html',
     'data:text/plain,hi', 'blob:app://mapng/123', 'devtools://devtools/bundled/x', 'http://localhost:5173/', 'ws://127.0.0.1:5173/', 'not an address']) assert.equal(allowedUrl(ok).ok, true, ok);
-  for (const no of ['https://example.com/', 'http://evil.test/x', 'https://mapng.com.evil.test/', 'https://evilmapng.com/', 'wss://tracker.example/', 'https://amazonaws.com.evil.test/x', 'https://192.0.2.7/x']) {
+  for (const no of ['https://example.com/', 'http://evil.test/x', 'https://mapng.com.evil.test/', 'https://evilmapng.com/', 'wss://tracker.example/', 'https://amazonaws.com.evil.test/x', 'https://192.0.2.7/x', 'https://b.tile.openstreetmap.org/1/1/1.png']) {
     const v = allowedUrl(no); assert.equal(v.ok, false, no); assert.ok(v.host, 'the refused host is named');
   }
   assert.equal(allowedUrl('https://my-overpass.example.org/api/interpreter').ok, false, 'not before it is set');
