@@ -6877,6 +6877,8 @@ function shouldPaintCrossing(tags = {}) {
   return true;
 }
 
+const HANGING_STRUCTURES = new Set(['suspension', 'cable-stayed', 'simple-suspension']);
+
 /**
  * Piers and footbridges as deck lines: [{ nodes, half, wood }]. wood: true (a pier, a boardwalk, a
  * wooden surface), false (a paved one), or 'overWater' for a footbridge with no surface tag: planks
@@ -6895,7 +6897,9 @@ function buildDeckPaths(terrainData, squareSize) {
     for (const piece of clipGeometryToMargin(f.geometry, terrainData.bounds)) {
       const nodes = resampleGeometryToSpacing(piece, 2).map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0));
       const layer = Number.parseFloat(tags.layer);
-      out.push({ nodes, half, bridge: !pier, wood: concrete ? false : (pier || tags.surface === 'wood' || tags.bridge === 'boardwalk') ? true : tags.surface ? false : 'overWater', ...(Number.isFinite(layer) ? { layer } : {}) });
+      // (hung from cables, a suspension or cable-stayed footbridge stands on nothing: no posts under it)
+      const hanging = HANGING_STRUCTURES.has(String(tags['bridge:structure'] || '').toLowerCase()) || ['suspension', 'cable-stayed'].includes(String(tags.bridge || '').toLowerCase());
+      out.push({ nodes, half, bridge: !pier, hanging, wood: concrete ? false : (pier || tags.surface === 'wood' || tags.bridge === 'boardwalk') ? true : tags.surface ? false : 'overWater', ...(Number.isFinite(layer) ? { layer } : {}) });
     }
   }
   return out;

@@ -2683,7 +2683,7 @@ export function buildDeckRuns(paths, bridges, { groundAt, seaZ = 0, seaAt = null
       const centre = idx.map((i) => [nodes[i][0], nodes[i][1], z[i]]);
       const flat = centre.map((q) => [q[0], q[1], q[2], 0]);
       const points = offsetLine(flat, half).map((q) => [q[0], q[1], q[2]]);
-      return { points, centre, half, side: -1, width: half * 2, walk: true, deck: true, onBridge, wood, ramps: [false, false], caps: [true, true], highway: 'footway' };
+      return { points, centre, half, side: -1, width: half * 2, walk: true, deck: true, onBridge, wood, footbridge: !!path.bridge, hanging: !!path.hanging, ramps: [false, false], caps: [true, true], highway: 'footway' };
     });
   });
 }
@@ -2955,6 +2955,32 @@ function buildGangways(builder, deckRuns, walkRuns, groundAt) {
     }
   }
   return counts;
+}
+
+// A railing both sides of a footbridge deck along its whole length: a top rail at hand height, a middle rail and
+// posts every GANGWAY_POST_M, on the deck's edge. OpenStreetMap seldom maps a bridge's railings; a footbridge always
+// has them, and decks were built open (a user, 2026-11-17: "we should always add handrails across pedestrian bridges").
+function deckRailings(builder, run) {
+  const c = run.centre; if (c.length < 2) return;
+  const top = WALK_H;   // (the walking surface over the deck's centre line)
+  for (const sg of [1, -1]) {
+    const edge = c.map((p, i) => {
+      const a = c[Math.max(0, i - 1)]; const b = c[Math.min(c.length - 1, i + 1)];
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const nx = -(b[1] - a[1]) / L; const ny = (b[0] - a[0]) / L;
+      return [p[0] + nx * sg * (run.half - 0.06), p[1] + ny * sg * (run.half - 0.06), p[2] + top];
+    });
+    const up = (p, h) => [p[0], p[1], p[2] + h];
+    let s = 0; let next = 0;
+    for (let i = 0; i < edge.length; i++) {
+      if (i) {
+        s += Math.hypot(edge[i][0] - edge[i - 1][0], edge[i][1] - edge[i - 1][1]);
+        metalBar(builder, up(edge[i - 1], GANGWAY_RAIL_M), up(edge[i], GANGWAY_RAIL_M), 0.03);
+        metalBar(builder, up(edge[i - 1], GANGWAY_RAIL_M / 2), up(edge[i], GANGWAY_RAIL_M / 2), 0.015);
+      }
+      if (s >= next || i === edge.length - 1) { metalBar(builder, up(edge[i], -0.02), up(edge[i], GANGWAY_RAIL_M), 0.025); next = s + GANGWAY_POST_M; }
+    }
+  }
 }
 
 // Square posts under a deck, in pairs along it, where it stands clear of the ground.
@@ -3632,7 +3658,10 @@ function* sidewalkMeshes(carriageways, options = {}) {
       for (const run of set) sweepRun(builder, run);
     }
     // (a sidewalk on a road bridge hangs from its deck)
-    for (const run of set) if (!run.onBridge) deckPosts(builder, run, options.groundAt);
+    // (a suspension or cable-stayed footbridge hangs from its cables: nothing stands under it)
+    for (const run of set) if (!run.onBridge && !run.hanging) deckPosts(builder, run, options.groundAt);
+    // every footbridge has a railing both sides, mapped or not (a pier stays open to the water)
+    for (const run of set) if (run.footbridge && !run.onBridge) deckRailings(builder, run);
   }
   const wallDecks = options.groundAt ? planWallDecks(options.wallAreas, options.groundAt, options.seaZ) : [];
   const gangways = options.groundAt ? buildGangways(builder, deckRuns, walkRuns, options.groundAt) : { ramp: 0, stairs: 0 };

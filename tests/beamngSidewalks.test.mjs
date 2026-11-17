@@ -944,3 +944,15 @@ test('a footbridge over an inland gorge spans between its banks; it never follow
   const [pier] = buildDeckRuns([{ nodes, half: 1.2, bridge: false, wood: true }], [], { groundAt: (x) => ground(x), seaZ: -250 });
   assert.ok(Math.min(...pier.centre.map((q) => q[2])) < 20, 'a pier keeps following its ground');
 });
+
+test('a footbridge deck says it is one, and whether it hangs from cables; a pier is neither', async () => {
+  const { buildDeckRuns } = await import('../services/beamngSidewalks.js');
+  const nodes = Array.from({ length: 11 }, (_, i) => [i * 2, 0]);
+  const g = () => 10;
+  const [plain] = buildDeckRuns([{ nodes, half: 1.5, bridge: true, wood: false }], [], { groundAt: g, seaZ: -250 });
+  const [hung] = buildDeckRuns([{ nodes, half: 1.5, bridge: true, hanging: true, wood: false }], [], { groundAt: g, seaZ: -250 });
+  const [pier] = buildDeckRuns([{ nodes, half: 1.2, bridge: false, wood: true }], [], { groundAt: g, seaZ: -250 });
+  assert.deepEqual([plain.footbridge, plain.hanging], [true, false]);
+  assert.deepEqual([hung.footbridge, hung.hanging], [true, true]);
+  assert.deepEqual([pier.footbridge, pier.hanging], [false, false]);
+});
