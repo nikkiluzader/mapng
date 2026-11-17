@@ -1297,7 +1297,8 @@
       "mapPartGone": "MapNG nie ma już części tej mapy (została usunięta z pamięci). Uruchom Generuj ponownie, a potem eksportuj.",
       "fetchTerrain": "Nie udało się pobrać danych terenu. Żądany obszar może być zbyt duży lub usługa jest niedostępna.",
       "usgsFallback": "Dla tego obszaru brakowało danych USGS 1m lub były uszkodzone. Używany jest globalny zestaw danych 30 m.\n\nWyjście pozostaje na obecnej siatce przetwarzania aplikacji.",
-      "kron86Fallback": "Dane NMT EVRF2007 są dostępne tylko dla obsługiwanych kafli w Polsce. Powrót do globalnego zestawu danych 30 m."
+      "kron86Fallback": "Dane NMT EVRF2007 są dostępne tylko dla obsługiwanych kafli w Polsce. Powrót do globalnego zestawu danych 30 m.",
+      "outOfMemoryComputer": "Komputerowi zabrakło pamięci przy tak dużej mapie. Zamknij inne programy albo wybierz mniejszy rozmiar lub mniej dokładną rozdzielczość i spróbuj ponownie."
     },
     "updated": {
       "title": "MapNG został zaktualizowany",

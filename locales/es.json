@@ -1297,7 +1297,8 @@
       "mapPartGone": "MapNG ya no conserva parte de este mapa (se borró de la memoria). Vuelve a pulsar Generar y luego exporta.",
       "fetchTerrain": "No se pudieron obtener los datos del terreno. El área solicitada puede ser demasiado grande o el servicio no está disponible.",
       "usgsFallback": "Los datos USGS 1m de esta zona faltan o están corruptos. Se usará el conjunto global de 30 m.\n\nLa salida se mantiene en la cuadrícula de procesamiento actual de la app.",
-      "kron86Fallback": "Los datos NMT EVRF2007 solo están disponibles para teselas compatibles de Polonia. Se usará el conjunto global de 30 m."
+      "kron86Fallback": "Los datos NMT EVRF2007 solo están disponibles para teselas compatibles de Polonia. Se usará el conjunto global de 30 m.",
+      "outOfMemoryComputer": "El ordenador se quedó sin memoria con un mapa tan grande. Cierra otros programas, o elige un tamaño menor o una resolución más gruesa, e inténtalo de nuevo."
     },
     "updated": {
       "title": "MapNG se ha actualizado",

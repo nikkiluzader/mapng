@@ -18,4 +18,6 @@ export const isMapPartGone = (error) => String(error?.message || error || '').in
  * The page ran out of memory ("RangeError: Array buffer allocation failed", "Out of memory"): a browser tab gets far
  * less than the machine has. A 16 km map at 1 m in Chrome stopped here at the start of its export (report MR-B2ZDBN).
  */
-export const isOutOfMemory = (error) => /array buffer allocation failed|out of memory|allocation size overflow/i.test(String(error?.message || error || ''));
+// ("Create skia surface failed": the desktop app could not get the memory for a picture the size of the map, a
+// 16k map's texture on a computer with 7 GB free: report MR-H6N4BG)
+export const isOutOfMemory = (error) => /array buffer allocation failed|out of memory|allocation size overflow|create skia surface failed/i.test(String(error?.message || error || ''));

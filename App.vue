@@ -247,7 +247,7 @@ import { startNetworkMonitor } from './composables/useNetworkMonitor.js';
 // (counted from the page's first request, whether the panel is open or not)
 startNetworkMonitor();
 import { appUpdated, codeFailed } from './services/appUpdate.js';
-import { isDiskFull } from './services/errorText.js';
+import { isDiskFull, isOutOfMemory } from './services/errorText.js';
 import { useMeasureRoadWidths } from './composables/useMeasureRoadWidths.js';
 import AboutModal from './components/modals/AboutModal.vue';
 import DisclaimerModal from './components/modals/DisclaimerModal.vue';
@@ -1036,6 +1036,8 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
       // (the reason, and the offer to send a report: with the job's log in the desktop app, the page's last lines on the website)
       // (a desktop report read only "ENOSPC: no space left on device, write": the disk was full)
       const message = isDiskFull(byodMessage) ? t('app.error.diskFull')
+        // (the desktop app could not get the memory for a picture the size of the map: "Create skia surface failed")
+        : isOutOfMemory(byodMessage) && /skia surface/i.test(byodMessage) ? t('app.error.outOfMemoryComputer')
         : byodMessage.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') || t('app.error.fetchTerrain');
       markJobEnd();
       openReportDialog('generate', {

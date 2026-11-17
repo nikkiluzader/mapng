@@ -50,8 +50,14 @@ export function modelsInUse(list, present, region = 'any') {
   return (list || []).filter((m) => (m.uses || []).some((u) => u.used && present(u.tag) && (own.has(u.tag) ? u.region === region : (u.region || 'any') === 'any')));
 }
 
+/** Whether this page is one that may serve the model photos: the dev site, or a local server. */
+export const assetDataSite = (host = (typeof location !== 'undefined' ? location.hostname : '')) => host === 'dev.mapng.com' || host === 'localhost' || host === '127.0.0.1';
+
 export function useAssetThumbs() {
-  if (!asked && typeof fetch === 'function') {
+  // (shelved until the game's developers agree to the photos being public: asked for only on the dev site and on
+  // a developer's own machine, so the public site and the desktop app make no request at all. To switch the feature
+  // on for everyone later, drop this test and set ASSET_PAGE on the public worker.)
+  if (!asked && typeof fetch === 'function' && assetDataSite()) {
     asked = true;
     // (a site that does not serve the data says so once: remembered for NONE_FOR_MS, not asked on every visit)
     let none = 0; try { none = Number(localStorage.getItem(NONE_KEY)) || 0; } catch { /* storage blocked */ }

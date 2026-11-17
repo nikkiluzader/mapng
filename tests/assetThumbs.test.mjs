@@ -60,3 +60,12 @@ test('a tag with models of the area\'s own region shows those; else the ones for
   assert.deepEqual(modelsInUse(list, present, 'europe').map((m) => m.shape), ['/any.dae', '/eu-bench.dae']);
   assert.deepEqual(modelsInUse(list, present, 'any').map((m) => m.shape), ['/any.dae', '/bench.dae']);
 });
+
+test('the model photos are asked for only on the dev site or a local server; a failed picture surface is out of memory', async () => {
+  const { assetDataSite } = await import('../composables/useAssetThumbs.js');
+  const { isOutOfMemory } = await import('../services/errorText.js');
+  assert.equal(assetDataSite('dev.mapng.com'), true); assert.equal(assetDataSite('localhost'), true);
+  assert.equal(assetDataSite('mapng.com'), false); assert.equal(assetDataSite(''), false);
+  assert.equal(isOutOfMemory(new Error("Error invoking remote method 'terrain:generate': Error: Create skia surface failed")), true);
+  assert.equal(isOutOfMemory(new Error('Failed to fetch')), false);
+});

@@ -1297,7 +1297,8 @@
       "mapPartGone": "MapNG hat einen Teil dieser Karte nicht mehr (er wurde aus dem Speicher entfernt). Führe „Generieren“ erneut aus und exportiere dann.",
       "fetchTerrain": "Geländedaten konnten nicht geladen werden. Die angeforderte Fläche ist möglicherweise zu groß oder der Dienst ist nicht verfügbar.",
       "usgsFallback": "USGS-1m-Daten für diesen Bereich fehlten oder waren beschädigt. Fallback auf den globalen 30-m-Datensatz.\n\nDie Ausgabe bleibt auf dem aktuellen Verarbeitungsraster der App.",
-      "kron86Fallback": "NMT EVRF2007-Daten sind nur für unterstützte Kacheln in Polen verfügbar. Fallback auf den globalen 30-m-Datensatz."
+      "kron86Fallback": "NMT EVRF2007-Daten sind nur für unterstützte Kacheln in Polen verfügbar. Fallback auf den globalen 30-m-Datensatz.",
+      "outOfMemoryComputer": "Dem Computer ist bei einer so großen Karte der Speicher ausgegangen. Schließe andere Programme oder wähle eine kleinere Größe oder eine gröbere Auflösung und versuche es erneut."
     },
     "updated": {
       "title": "MapNG wurde aktualisiert",
