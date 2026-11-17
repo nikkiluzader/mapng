@@ -29,8 +29,12 @@ You never need the desktop app: the website does the same work in the browser. I
   produced the file.
 - **Updates.** The app accepts an update only when its update file carries MapNG's signature
   (`desktop/updateSignature.js`).
-- **Not yet signed for Windows.** The installer has no Windows code signature, so SmartScreen warns
-  about it. A certificate is planned.
+- **Windows code signature.** From the version after 0.3.2 on, the installer, its uninstaller and
+  `MapNG.exe` are signed (Azure Artifact Signing; publisher `Nikki Luzader`). Check it under the file's
+  Properties > Digital Signatures, or with `Get-AuthenticodeSignature <file>` in PowerShell: the status
+  is `Valid`. The release build fails if a file comes out unsigned. SmartScreen may still warn about a
+  new download until the certificate has a history with Microsoft; the publisher it shows is the thing
+  to check. Version 0.3.2 and older are not signed.
 
 ## What the app can reach
 

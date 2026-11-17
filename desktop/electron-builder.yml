@@ -54,7 +54,8 @@ win:
     # missing uninstaller and points at the download instead)
     - target: zip
       arch: [x64]
-  # (unsigned for now: Windows SmartScreen warns on first run. On Linux,
+  # (signed in the release workflow, which passes azureSignOptions: .github/workflows/desktop-release.yml;
+  # a build made anywhere else is unsigned. On Linux,
   # editing the exe's icon and version needs wine: pass
   # -c.win.signAndEditExecutable=false there, as pack:win does)
   artifactName: MapNG-${version}-windows-portable.${ext}

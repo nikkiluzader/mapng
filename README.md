@@ -33,7 +33,7 @@ The same MapNG, running on your own computer. Free, from [GitHub Releases](https
 - **Update checks.** The welcome screen has a box for automatic update checks (ticked; untick it to opt out), and MapNG asks before it downloads or installs an update. **Help > Get Test Builds** offers the builds made between releases.
 - Cancel an export, see why one failed and open its log, taskbar progress, and a notification when a long export finishes.
 
-The Windows build isn't code-signed yet: on first run Windows SmartScreen may say it "protected your PC". Choose **More info**, then **Run anyway**.
+The Windows build is code-signed from the version after 0.3.2 on (publisher **Nikki Luzader**; right-click the installer > Properties > Digital Signatures to see it). A newly signed program has no download history with Microsoft yet, so on first run Windows SmartScreen may still say it "protected your PC": check the publisher shown, then choose **More info** and **Run anyway**. Version 0.3.2 and older are not signed.
 
 ## Highlights
 
