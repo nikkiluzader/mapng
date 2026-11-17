@@ -22,6 +22,7 @@ const DECK_MIN_H = 1.5;       // lowest a deck stands over the ground (its struc
  *   highway: the edge's class; fine: true on a measured survey (graph.fineGround)
  */
 const VIADUCT_CLASSES = new Set(['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link']);
+const UPPER_STREET_CLASSES = new Set(['secondary', 'secondary_link', 'tertiary', 'tertiary_link']);
 export const STRUCTURE_RULES = [
   { kind: 'deck', overWater: true },
   { kind: 'deck', overRoad: true },
@@ -34,6 +35,8 @@ export const STRUCTURE_RULES = [
   // mapped without bridge tags stood on a grass bank 8 m high beside the lanes under it)
   // (the big roads only: a track or a street the solve carries over a gully is on a fill, as built)
   { kind: 'deck', fine: true, highways: VIADUCT_CLASSES, hMin: 3 },
+  // (a town's through streets from 5 m: an upper-level street over a lower one, mapped as plain ground)
+  { kind: 'deck', fine: true, highways: UPPER_STREET_CLASSES, hMin: 5 },
   { kind: 'embankment', hMin: 0.5 },
   { kind: 'boredTunnel', tag: 'tunnel', coverMin: 8 },
   { kind: 'cutAndCover', tag: 'tunnel', coverMin: 0 },
