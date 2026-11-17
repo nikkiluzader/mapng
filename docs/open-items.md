@@ -198,6 +198,38 @@ Left:
 - Mesh Roads list (underpass clearance, sidewalk slabs across carriageways, 24 to 33 cm steps, junction mouths and
   frame rate): not started.
 
+## Footbridges in Greenville's Falls Park (looked at 2026-11-17)
+
+Every footbridge in a 1 km level of Falls Park on the Reedy (25 mapped, current dev code, area gvl_falls_s with
+Liberty Bridge tagged suspension) was looked at in game, far and close, with each one's match to the road bridges
+and every gangway measured (scratch/devareas/deckrun.mjs, global __MAPNG_DECK_DEBUG). Sheets in scratch/twenty/out
+(fbr_1..5.jpg, fbx.jpg). Already fixed that day: a footbridge spans end to end (it lay on the riverbed), railings
+both sides, no posts under a suspension or cable-stayed footbridge.
+
+Found, worst first:
+
+1. Sidewalks of a road bridge built as their own low bridge beside it. South Main Street's bridge carries angled
+   parking both sides and its sidewalks behind a stone railing, all one deck (Mapillary 2023). The sidewalks are
+   mapped apart (footway=sidewalk, bridge=yes, layer=1) 4.7 and 6.3 m out from the carriageway's edge, past the
+   3.5 m a path may be from a road deck to count as on it, so each became its own deck 2.5 to 2.9 m under the road's,
+   on posts. Fix: a sidewalk-tagged path running along a road deck of its layer, within about 10 m of its edge, is
+   on that bridge: the road's height plus the curb, the gap to the carriageway decked over.
+2. Metal stairs and ramps at footbridge ends (13 here: Spring Falls Bridge 3.9 m of stairs, the Swamp Rabbit Trail
+   bridge, Liberty Bridge's east end, Park Crossing, the boardwalk path). They are the pier gangways: built wherever a
+   deck's end sits under the ground or path beside it. A footbridge's ends take the ground at the end node, not the
+   path it joins, and one path over the falls (37058787) ended in the river (deck 0.7 m against ground 4.7 m: the
+   river counts as sea floor there). Fix: a footbridge's ends take the height of the path they join (else the ground
+   at the end, never the water's), and only piers get gangways.
+3. Quay walls along the whole Reedy in the park (27 runs, 958 m in 1 km): white blocks with jagged tops on natural
+   granite banks, and a box standing in the river below the falls. The park's many mapped paths make it count as
+   built-up ground. Fix: no quay wall where the land behind is a park, wood, grass or rock; a top that does not step.
+4. Sidewalk slabs crossing South Church Street's lanes at both ends of its bridge (the slab runs on past the deck's
+   end, where the street is no longer in the bridge index that keeps slabs off the lanes).
+5. Posts under footbridge decks wear the painted-curb texture (red, yellow and white stripes): plain concrete wanted.
+6. Seen on the way, not a footbridge: a jagged dark seam across South Church Street at both bridge ends (ground
+   through the road at the deck joint).
+7. Not seen: Leap of Faith Overlook (a wooden platform under trees, the camera could not get a clear line).
+
 ## 2. Checks owed on work already on dev
 
 1. "Extremely heavy" card, the Mapterhorn base tile and the new size selector looked at in the running app.

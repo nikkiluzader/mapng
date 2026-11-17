@@ -6899,7 +6899,7 @@ function buildDeckPaths(terrainData, squareSize) {
       const layer = Number.parseFloat(tags.layer);
       // (hung from cables, a suspension or cable-stayed footbridge stands on nothing: no posts under it)
       const hanging = HANGING_STRUCTURES.has(String(tags['bridge:structure'] || '').toLowerCase()) || ['suspension', 'cable-stayed'].includes(String(tags.bridge || '').toLowerCase());
-      out.push({ nodes, half, bridge: !pier, hanging, wood: concrete ? false : (pier || tags.surface === 'wood' || tags.bridge === 'boardwalk') ? true : tags.surface ? false : 'overWater', ...(Number.isFinite(layer) ? { layer } : {}) });
+      out.push({ id: f.id, nodes, half, bridge: !pier, hanging, wood: concrete ? false : (pier || tags.surface === 'wood' || tags.bridge === 'boardwalk') ? true : tags.surface ? false : 'overWater', ...(Number.isFinite(layer) ? { layer } : {}) });
     }
   }
   return out;

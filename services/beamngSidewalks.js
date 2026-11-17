@@ -2665,6 +2665,17 @@ export function buildDeckRuns(paths, bridges, { groundAt, seaZ = 0, seaAt = null
     let z = raw;
     for (let pass = 0; pass < 4; pass++) z = z.map((v, i) => (i === 0 || i === z.length - 1 ? v : (z[i - 1] + 2 * v + z[i + 1]) / 4));
     const onBridge = nodes.some((q) => roadsAt(q).length);
+    // (debug: scratch probes read what each footbridge was matched to; off unless the global is set)
+    if (globalThis.__MAPNG_DECK_DEBUG) {
+      let near = null;
+      if (index) for (const q of nodes) for (const s of index.segments) {
+        const dx = s.bx - s.ax; const dy = s.by - s.ay; const L2 = dx * dx + dy * dy || 1;
+        const t = Math.max(0, Math.min(1, ((q[0] - s.ax) * dx + (q[1] - s.ay) * dy) / L2));
+        const d = Math.hypot(s.ax + t * dx - q[0], s.ay + t * dy - q[1]) - s.half;
+        if (!near || d < near.d) near = { d, roadZ: (s.az ?? 0) + ((s.bz ?? 0) - (s.az ?? 0)) * t, pathZ: z[nodes.indexOf(q)], owner: s.owner, layer: layerByOwner.get(s.owner) };
+      }
+      globalThis.__MAPNG_DECK_DEBUG.push({ id: path.id, n: nodes.length, onRoad: onRoad.filter(Boolean).length, layer: path.layer, near, ends: [z[0], z[z.length - 1]], ground: [ground[0], ground[ground.length - 1]] });
+    }
     // A footbridge with no surface tag: planks only where it crosses water on its own (a park's
     // bridge over a stream, a boardwalk nobody tagged). One that meets a road bridge, or runs over
     // dry ground among roads, is concrete: three untagged foot links up to an elevated rotary
@@ -2683,7 +2694,7 @@ export function buildDeckRuns(paths, bridges, { groundAt, seaZ = 0, seaAt = null
       const centre = idx.map((i) => [nodes[i][0], nodes[i][1], z[i]]);
       const flat = centre.map((q) => [q[0], q[1], q[2], 0]);
       const points = offsetLine(flat, half).map((q) => [q[0], q[1], q[2]]);
-      return { points, centre, half, side: -1, width: half * 2, walk: true, deck: true, onBridge, wood, footbridge: !!path.bridge, hanging: !!path.hanging, ramps: [false, false], caps: [true, true], highway: 'footway' };
+      return { id: path.id, points, centre, half, side: -1, width: half * 2, walk: true, deck: true, onBridge, wood, footbridge: !!path.bridge, hanging: !!path.hanging, ramps: [false, false], caps: [true, true], highway: 'footway' };
     });
   });
 }
@@ -2951,7 +2962,9 @@ function buildGangways(builder, deckRuns, walkRuns, groundAt) {
       // the gentle ramp if the deck has room for its foot, else stairs
       const foot = walk(Math.min(GANGWAY_MAX_RUN_M, drop / GANGWAY_SLOPE) - reach) ?? walk(Math.max(0.3, drop / STAIR_SLOPE - reach));
       if (!foot) continue;
-      counts[buildGangway(builder, top, foot)]++;
+      const kind = buildGangway(builder, top, foot);
+      counts[kind]++;
+      if (globalThis.__MAPNG_DECK_DEBUG) globalThis.__MAPNG_DECK_DEBUG.push({ gangway: kind, id: run.id, end: e === 0 ? 'start' : 'end', at: [end[0], end[1]], deckTop, top: top[2], fromWalk: walkTop(top[0], top[1]) !== null });
     }
   }
   return counts;
