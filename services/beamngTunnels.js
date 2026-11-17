@@ -70,6 +70,7 @@ const APPROACH_CATCH_UP = 0.04;        // on steep ground an approach runs this 
 const APPROACH_FOLLOW_MAX = 0.14;      // an approach follows ground running up to this steep
 const APPROACH_LAND_GRADE = 0.12;      // an approach still off the ground there lands at this grade
 const UNDER_BRIDGE_M = 6.5;            // an approach under a bridge stays this far under the ground there ...
+const UNDER_BRIDGE_HIGH_M = 3;         // a bridge that can reach this far over the ground at the crossing clears the road itself
 const UNDER_BRIDGE_FLAT_M = 10;        // ... this far either side of it
 
 // Gallery windows: where a bore runs this close behind a cliff face (the
@@ -885,7 +886,16 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
     // ground there, then climbs (a depressed freeway goes on under the
     // ramps crossing it before it rises)
     // (terrain shaping off: the ground left as it is, the bridge clears the road on it)
-    const unders = (raw ? [] : a.under || []).map((u) => ({ s: u, cap: groundAt(...stationXY(ap, u)) - UNDER_BRIDGE_M }));
+    // (a bridge that can stand UNDER_BRIDGE_HIGH_M or more over the ground there, a viaduct or a raised deck: the
+    // road stays a deck's clearance under the height the bridge reaches, which may be no limit at all. Held to
+    // the ground's height, the approach dived away from its portal to pass under a deck 9 m overhead, and its
+    // roads were laid 5 m over the trench dug for them.)
+    const unders = (raw ? [] : a.under || []).map((u, k) => {
+      const gHere = groundAt(...stationXY(ap, u));
+      const reach = a.underReach?.[k];
+      const top = Number.isFinite(reach) || reach === Infinity ? (reach - gHere >= UNDER_BRIDGE_HIGH_M ? reach : gHere) : gHere;
+      return { s: u, cap: top - UNDER_BRIDGE_M };
+    }).filter((u) => Number.isFinite(u.cap));
     // The road eases back to the ground no steeper than MAX_GRADE, measured
     // against the ground's own run: a mountain road climbing away from its
     // portal at 10 % is on the ground all the way, and a limit under that

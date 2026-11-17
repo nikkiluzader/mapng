@@ -4241,6 +4241,8 @@ function landOnBerms(parts, lowerRoads, groundAt) {
 const CARRY_MIN_SHORTFALL_M = 0.5;   // short by less than this: left as it is
 const CARRY_MAX_M = 300;             // never carried on further than this (per round)
 const CARRY_ROUNDS = 3;
+const BRIDGE_REACH_MAX_M = 400;     // a bridge's ends on the ground looked for this far along it
+const BRIDGE_REACH_GRADE = 0.06;    // ... and the bridge climbs from them at this grade
 const CARRY_CLEAR_M = 25;           // stops this far short of another deck over (or under) the approach
 const CARRY_MIN_M = 20;              // shorter than this: not worth carrying on
 
@@ -5303,6 +5305,37 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
     return { xy: line };
   };
   const dirOut = (a, b) => { const L = Math.hypot(a[0] - b[0], a[1] - b[1]) || 1; return [(a[0] - b[0]) / L, (a[1] - b[1]) / L]; };
+  // The height a bridge road could reach over (px, py) on it: from the ground at each end of its run of bridge
+  // roads (the nearest end on the ground each way, through the bridge roads joined end to end), climbing at a
+  // bridge's grade. Infinity where no end on the ground is found within BRIDGE_REACH_MAX_M on either side.
+  const bridgeRoads = others.filter((o) => o.bridgeRoad);
+  const bridgeReachAt = (r, px, py) => {
+    let k = 0; let best = Infinity;
+    for (let i = 0; i + 1 < r.xy.length; i++) {
+      const [ax, ay] = r.xy[i]; const [bx, by] = r.xy[i + 1];
+      const L2 = (bx - ax) ** 2 + (by - ay) ** 2 || 1;
+      const u = Math.max(0, Math.min(1, ((px - ax) * (bx - ax) + (py - ay) * (by - ay)) / L2));
+      const d = Math.hypot(px - (ax + u * (bx - ax)), py - (ay + u * (by - ay)));
+      if (d < best) { best = d; k = i + u; }
+    }
+    const lenTo = (xy, from, to) => { let L = 0; for (let i = Math.floor(Math.min(from, to)); i < Math.ceil(Math.max(from, to)) && i + 1 < xy.length; i++) { const f0 = Math.max(i, Math.min(from, to)) - i; const f1 = Math.min(i + 1, Math.max(from, to)) - i; L += Math.hypot(xy[i + 1][0] - xy[i][0], xy[i + 1][1] - xy[i][1]) * Math.max(0, f1 - f0); } return L; };
+    // (one way out of the crossing: along r to its end, then on through the bridge roads that touch it)
+    const walk = (road, end, dist, seen) => {
+      if (dist > BRIDGE_REACH_MAX_M) return Infinity;
+      const tip = end === 0 ? road.xy[0] : road.xy[road.xy.length - 1];
+      const next = bridgeRoads.filter((o) => !seen.has(o) && (Math.hypot(o.xy[0][0] - tip[0], o.xy[0][1] - tip[1]) < TUNNEL_TOUCH_M || Math.hypot(o.xy[o.xy.length - 1][0] - tip[0], o.xy[o.xy.length - 1][1] - tip[1]) < TUNNEL_TOUCH_M));
+      if (!next.length) return groundAt(tip[0], tip[1]) + BRIDGE_REACH_GRADE * dist;
+      let low = Infinity;
+      for (const o of next) {
+        seen.add(o);
+        const far = Math.hypot(o.xy[0][0] - tip[0], o.xy[0][1] - tip[1]) < TUNNEL_TOUCH_M ? 1 : 0;
+        low = Math.min(low, walk(o, far, dist + pathLength(o.xy), seen));
+      }
+      return low;
+    };
+    const seen = new Set([r]);
+    return Math.min(walk(r, 0, lenTo(r.xy, 0, k), seen), walk(r, 1, lenTo(r.xy, k, r.xy.length - 1), seen));
+  };
   // roads an approach runs on (the rest meeting its cutting are side ramps)
   const usedByApproach = new Set();
   // Ramps joining an approach in its cutting (a freeway's on-ramp meeting it
@@ -5345,11 +5378,16 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
       const sAlong = [0];
       for (let i = 1; i < a.xy.length; i++) sAlong.push(sAlong[i - 1] + Math.hypot(a.xy[i][0] - a.xy[i - 1][0], a.xy[i][1] - a.xy[i - 1][1]));
       a.under = [];
+      // (how high each could stand over the approach: a street bridge between two banks is held at the ground and
+      // the road goes under it in its cutting; a viaduct that is still climbing from far-off ends, or part of a
+      // raised deck, clears the road on its own and the road has no reason to dive)
+      a.underReach = [];
       for (const r of others) {
         if (!r.bridgeRoad) continue;
         for (let i = 0; i + 1 < a.xy.length; i++) {
           for (const [px, py] of planCrossingPoints([a.xy[i], a.xy[i + 1]], r.xy)) {
             a.under.push(sAlong[i] + Math.hypot(px - a.xy[i][0], py - a.xy[i][1]));
+            a.underReach.push(bridgeReachAt(r, px, py));
           }
         }
       }
@@ -6203,19 +6241,27 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
         structureGraph.edges.forEach((e, k) => {
           const t = tunnels.bySeg.get(e.seg);
           if (!t) return;
-          const out = tunnelApronLength(t) + 1;
-          for (const nodeId of [e.from, e.to]) {
+          // ... and on along the whole approach cutting, road after road: the cutting's floor is dug at the tunnel's
+          // own heights, and a road left to the solve past the slab was laid on a bank of its own up to 1.5 m over
+          // the floor dug beside it (two carriageways and a median strip in one cutting, each on its own shelf)
+          const seenEdges = new Set([k]);
+          const queue = [e.from, e.to];
+          while (queue.length) {
+            const nodeId = queue.shift();
             for (const { edge: k2, end } of structureGraph.nodes.get(nodeId)?.edges || []) {
               const o = structureGraph.edges[k2];
-              if (k2 === k || tunnels.bySeg.get(o.seg) || o.bridge || o.tunnel || !!o.rail !== !!e.rail) continue;
+              if (seenEdges.has(k2) || tunnels.bySeg.get(o.seg) || o.bridge || o.tunnel || !!o.rail !== !!e.rail) continue;
+              seenEdges.add(k2);
               const n = o.s.length;
+              let whole = true;
               for (let j = 0; j < n; j++) {
                 const i = end === 0 ? j : n - 1 - j;
                 // (beside the main road too: a ramp in the bore's widening shares its floor)
                 const near = nearestOnTunnel(t, o.x[i], o.y[i], t.W + (t.maxExtra || 0) + 2);
-                if (!near || near.beyond || near.into < -out) break;
+                if (!near || near.beyond) { whole = false; break; }
                 if (!pinnedAt.has(`${k2}:${i}`)) { pinnedAt.add(`${k2}:${i}`); structureGraph.pins.push([k2, i, near.z + (o.rail ? RAIL_DEPTH_M : 0)]); }
               }
+              if (whole) queue.push(end === 0 ? o.to : o.from);
             }
           }
         });
