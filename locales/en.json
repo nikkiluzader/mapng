@@ -2238,5 +2238,36 @@
     "compressStart": "Compressing {n} files ({size}) into the level ZIP",
     "compress": "Compressing the level ZIP ({size}, {n} files)",
     "compressFile": "Compressing the level ZIP ({size}, {n} files): {file}"
+  },
+  "net": {
+    "live": "Live",
+    "panelTitle": "Network activity",
+    "since": "Every address this window has connected to since it opened.",
+    "sinceApp": "Every address the app has connected to since it started, exports included.",
+    "clear": "Clear",
+    "noteNothing": "Nothing here is sent anywhere.",
+    "listLink": "The full list of addresses",
+    "sidebar": "Network activity",
+    "data": "Data",
+    "close": "Close",
+    "address": "Address",
+    "requests": "Requests",
+    "purpose": "What for",
+    "failed": "failed",
+    "refused": "refused",
+    "none": "Nothing yet.",
+    "notListed": "Not on MapNG's list (your own Overpass server, if you set one)",
+    "kinds": {
+      "mapng": "MapNG's own server",
+      "elevation": "Elevation data",
+      "pictures": "Satellite pictures and map backgrounds",
+      "mapdata": "Roads, buildings and land use (OpenStreetMap, Overture)",
+      "search": "Place search",
+      "landcover": "Land cover",
+      "trees": "Tree species in the area",
+      "projection": "Projection of an uploaded file",
+      "updates": "App updates (GitHub)",
+      "analytics": "Page view counting (website only)"
+    }
   }
 }

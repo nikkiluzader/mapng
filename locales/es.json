@@ -2238,5 +2238,36 @@
     "compressStart": "Comprimiendo {n} archivos ({size}) en el ZIP del nivel",
     "compress": "Comprimiendo el ZIP del nivel ({size}, {n} archivos)",
     "compressFile": "Comprimiendo el ZIP del nivel ({size}, {n} archivos): {file}"
+  },
+  "net": {
+    "live": "En vivo",
+    "panelTitle": "Actividad de red",
+    "since": "Todas las direcciones a las que se ha conectado esta ventana desde que se abrió.",
+    "sinceApp": "Todas las direcciones a las que se ha conectado la app desde que se inició, incluidas las exportaciones.",
+    "clear": "Borrar",
+    "noteNothing": "Nada de esto se envía a ningún sitio.",
+    "listLink": "La lista completa de direcciones",
+    "sidebar": "Actividad de red",
+    "data": "Datos",
+    "close": "Cerrar",
+    "address": "Dirección",
+    "requests": "Solicitudes",
+    "purpose": "Para qué",
+    "failed": "fallidas",
+    "refused": "rechazadas",
+    "none": "Nada todavía.",
+    "notListed": "No está en la lista de MapNG (tu propio servidor Overpass, si configuraste uno)",
+    "kinds": {
+      "mapng": "El servidor de MapNG",
+      "elevation": "Datos de elevación",
+      "pictures": "Imágenes de satélite y fondos de mapa",
+      "mapdata": "Carreteras, edificios y uso del suelo (OpenStreetMap, Overture)",
+      "search": "Búsqueda de lugares",
+      "landcover": "Cobertura del suelo",
+      "trees": "Especies de árboles de la zona",
+      "projection": "Proyección de un archivo subido",
+      "updates": "Actualizaciones de la aplicación (GitHub)",
+      "analytics": "Recuento de visitas (solo el sitio web)"
+    }
   }
 }

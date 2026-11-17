@@ -3,7 +3,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, Notification, protocol, screen, session as electronSession, shell } from 'electron';
 import { missingParts, incompleteMessage, inArchiveTemp, softwareGraphics } from './installCheck.js';
 import { menuText, updaterText, networkText, startText } from './menuText.js';
-import { activityHtml, noteHost, watchSession } from './networkActivity.js';
+import { activityHtml, activityRows, noteHost, watchSession } from './networkActivity.js';
 import { allowedUrl, setOwnServer } from './networkGuard.js';
 import { fork } from 'node:child_process';
 import crypto from 'node:crypto';
@@ -517,6 +517,8 @@ setInterval(() => {
   for (const win of BrowserWindow.getAllWindows()) win.webContents.send('desktop:usage', usage);
 }, 1000).unref();
 
+// the live Network activity panel in the window: the app's own count, the export runner's requests included
+ipcMain.handle('network:activity', () => activityRows());
 ipcMain.handle('desktop:info', () => ({
   version: app.getVersion(),
   platform: process.platform,

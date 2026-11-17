@@ -110,6 +110,8 @@
         </div>
         <MemoryWidget />
       </div>
+      <!-- the live Network activity panel, docked at the map area's lower left (above the map, below dialogs) -->
+      <NetworkMonitor />
       <ViewTabs
         :view-mode="viewMode"
         :can-preview="!!terrainData"
@@ -240,6 +242,10 @@ import { useMainStore } from './stores/mainStore';
 import { Loader2, AlertTriangle } from 'lucide-vue-next';
 import MobileRestrictionOverlay from './components/modals/MobileRestrictionOverlay.vue';
 import MemoryWidget from './components/ui/MemoryWidget.vue';
+import NetworkMonitor from './components/ui/NetworkMonitor.vue';
+import { startNetworkMonitor } from './composables/useNetworkMonitor.js';
+// (counted from the page's first request, whether the panel is open or not)
+startNetworkMonitor();
 import { appUpdated, codeFailed } from './services/appUpdate.js';
 import { isDiskFull } from './services/errorText.js';
 import { useMeasureRoadWidths } from './composables/useMeasureRoadWidths.js';

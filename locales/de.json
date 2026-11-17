@@ -2238,5 +2238,36 @@
     "compressStart": "{n} Dateien ({size}) werden in die Level-ZIP komprimiert",
     "compress": "Die Level-ZIP wird komprimiert ({size}, {n} Dateien)",
     "compressFile": "Die Level-ZIP wird komprimiert ({size}, {n} Dateien): {file}"
+  },
+  "net": {
+    "live": "Live",
+    "panelTitle": "Netzwerkaktivität",
+    "since": "Jede Adresse, mit der sich dieses Fenster seit dem Öffnen verbunden hat.",
+    "sinceApp": "Jede Adresse, mit der sich die App seit dem Start verbunden hat, Exporte eingeschlossen.",
+    "clear": "Leeren",
+    "noteNothing": "Nichts davon wird irgendwohin gesendet.",
+    "listLink": "Die vollständige Adressliste",
+    "sidebar": "Netzwerkaktivität",
+    "data": "Daten",
+    "close": "Schließen",
+    "address": "Adresse",
+    "requests": "Anfragen",
+    "purpose": "Wofür",
+    "failed": "fehlgeschlagen",
+    "refused": "abgelehnt",
+    "none": "Noch nichts.",
+    "notListed": "Nicht auf MapNGs Liste (dein eigener Overpass-Server, falls eingerichtet)",
+    "kinds": {
+      "mapng": "MapNGs eigener Server",
+      "elevation": "Höhendaten",
+      "pictures": "Satellitenbilder und Kartenhintergründe",
+      "mapdata": "Straßen, Gebäude und Landnutzung (OpenStreetMap, Overture)",
+      "search": "Ortssuche",
+      "landcover": "Bodenbedeckung",
+      "trees": "Baumarten im Gebiet",
+      "projection": "Projektion einer hochgeladenen Datei",
+      "updates": "App-Updates (GitHub)",
+      "analytics": "Seitenaufrufe zählen (nur Website)"
+    }
   }
 }

@@ -2238,5 +2238,36 @@
     "compressStart": "Kompresowanie plików ({n}, {size}) do ZIP poziomu",
     "compress": "Kompresowanie ZIP poziomu ({size}, plików: {n})",
     "compressFile": "Kompresowanie ZIP poziomu ({size}, plików: {n}): {file}"
+  },
+  "net": {
+    "live": "Na żywo",
+    "panelTitle": "Aktywność sieciowa",
+    "since": "Każdy adres, z którym to okno połączyło się od otwarcia.",
+    "sinceApp": "Każdy adres, z którym aplikacja połączyła się od uruchomienia, łącznie z eksportami.",
+    "clear": "Wyczyść",
+    "noteNothing": "Nic z tego nie jest nigdzie wysyłane.",
+    "listLink": "Pełna lista adresów",
+    "sidebar": "Aktywność sieciowa",
+    "data": "Dane",
+    "close": "Zamknij",
+    "address": "Adres",
+    "requests": "Zapytania",
+    "purpose": "Do czego",
+    "failed": "nieudane",
+    "refused": "odrzucone",
+    "none": "Jeszcze nic.",
+    "notListed": "Nie ma na liście MapNG (twój własny serwer Overpass, jeśli go ustawiono)",
+    "kinds": {
+      "mapng": "Własny serwer MapNG",
+      "elevation": "Dane wysokościowe",
+      "pictures": "Zdjęcia satelitarne i podkłady mapy",
+      "mapdata": "Drogi, budynki i użytkowanie terenu (OpenStreetMap, Overture)",
+      "search": "Wyszukiwanie miejsc",
+      "landcover": "Pokrycie terenu",
+      "trees": "Gatunki drzew w okolicy",
+      "projection": "Odwzorowanie przesłanego pliku",
+      "updates": "Aktualizacje aplikacji (GitHub)",
+      "analytics": "Liczenie odsłon (tylko strona)"
+    }
   }
 }

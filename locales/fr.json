@@ -2238,5 +2238,36 @@
     "compressStart": "Compression de {n} fichiers ({size}) dans le ZIP du niveau",
     "compress": "Compression du ZIP du niveau ({size}, {n} fichiers)",
     "compressFile": "Compression du ZIP du niveau ({size}, {n} fichiers) : {file}"
+  },
+  "net": {
+    "live": "En direct",
+    "panelTitle": "Activité réseau",
+    "since": "Toutes les adresses auxquelles cette fenêtre s'est connectée depuis son ouverture.",
+    "sinceApp": "Toutes les adresses auxquelles l'application s'est connectée depuis son démarrage, exports compris.",
+    "clear": "Effacer",
+    "noteNothing": "Rien de ceci n'est envoyé où que ce soit.",
+    "listLink": "La liste complète des adresses",
+    "sidebar": "Activité réseau",
+    "data": "Données",
+    "close": "Fermer",
+    "address": "Adresse",
+    "requests": "Requêtes",
+    "purpose": "Pour quoi",
+    "failed": "échouées",
+    "refused": "refusées",
+    "none": "Rien pour l'instant.",
+    "notListed": "Absente de la liste de MapNG (votre propre serveur Overpass, si vous en avez défini un)",
+    "kinds": {
+      "mapng": "Le serveur de MapNG",
+      "elevation": "Données d'altitude",
+      "pictures": "Images satellite et fonds de carte",
+      "mapdata": "Routes, bâtiments et occupation du sol (OpenStreetMap, Overture)",
+      "search": "Recherche de lieux",
+      "landcover": "Couverture du sol",
+      "trees": "Espèces d'arbres de la zone",
+      "projection": "Projection d'un fichier importé",
+      "updates": "Mises à jour de l'application (GitHub)",
+      "analytics": "Comptage des pages vues (site web uniquement)"
+    }
   }
 }

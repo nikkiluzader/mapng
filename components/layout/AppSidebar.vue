@@ -83,7 +83,8 @@
           class="mapng-foot-icon"
           :data-tip="link.label"
           :aria-label="link.title || link.label"
-          @click="link.emit && $emit(link.emit)"
+          :data-testid="`foot-${link.key}`"
+          @click="link.onClick ? link.onClick() : (link.emit && $emit(link.emit))"
         >
           <component :is="link.icon" :size="15" />
         </component>
@@ -121,13 +122,14 @@
 </template>
 
 <script setup>
+import { netPanelOpen } from '../../composables/useNetworkMonitor.js';
 import { computed, onMounted, ref } from 'vue';
 import { desktopApp, DESKTOP_DOWNLOAD_URL } from '../../services/platform/desktop.js';
 import { useI18n } from 'vue-i18n';
 import BaseButton from '../base/BaseButton.vue';
 import ModeToggle from '../ui/ModeToggle.vue';
 import { getSupportedLocales, setI18nLanguage } from '../../i18n';
-import { CircleHelp, Heart, Sun, Moon, Code, Download, RotateCw, Globe, Github, MessageCircle, Mail, Database, Shield, ShieldCheck, Share2, FlaskConical, BarChart3 } from 'lucide-vue-next';
+import { CircleHelp, Heart, Sun, Moon, Code, Download, RotateCw, Globe, Github, MessageCircle, Mail, Database, Shield, ShieldCheck, Activity, Share2, FlaskConical, BarChart3 } from 'lucide-vue-next';
 import { openShareDialog } from '../../composables/useShareDialog.js';
 
 const { t, locale } = useI18n({ useScope: 'global' });
@@ -148,6 +150,8 @@ const footerLinks = computed(() => [
   { key: 'data', icon: Database, label: t('sidebar.yourData'), href: pageLink('data') },
   // (what limits the app and how to check it: public/security.html)
   { key: 'security', icon: ShieldCheck, label: t('sidebar.security'), href: pageLink('security') },
+  // (the live Network activity panel at the map's lower left: components/ui/NetworkMonitor.vue)
+  { key: 'network', icon: Activity, label: t('net.sidebar'), onClick: () => { netPanelOpen.value = !netPanelOpen.value; } },
   // (the public counts: where people build, which settings, what goes wrong: public/stats.html)
   { key: 'stats', icon: BarChart3, label: t('sidebar.stats'), href: pageLink('stats') },
   // (who writes the code, how it is tested, what the tests miss: public/how-its-built.html)

@@ -4,6 +4,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('mapngDesktop', {
   info: () => ipcRenderer.invoke('desktop:info'),
+  // what the app has connected to since it started: [{ host, count, failed, blocked, listed, kind }]
+  networkActivity: () => ipcRenderer.invoke('network:activity'),
   // the first-run welcome is answered (updates: check automatically or not)
   welcomeDone: (answers) => ipcRenderer.invoke('desktop:welcomeDone', answers),
   // (the window's language, for the app's own menu)

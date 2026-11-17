@@ -226,6 +226,9 @@ const buildPreparedTileGroups = async (tiles, epsgDefs, noDataValue) => {
                             proj4.defs(epsgKey, builtIn);
                         } else {
                             const response = await fetch(`https://epsg.io/${tile.epsgCode}.proj4`);
+                            // (a worker's requests are not in the page's own record: this one is told to the live
+                            // Network activity panel, composables/useNetworkMonitor.js)
+                            try { const ch = new BroadcastChannel('mapng-net'); ch.postMessage({ url: `https://epsg.io/${tile.epsgCode}.proj4` }); ch.close(); } catch { /* not counted */ }
                             if (response.ok) {
                                 const def = await response.text();
                                 proj4.defs(epsgKey, def);

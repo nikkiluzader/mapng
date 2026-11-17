@@ -61,7 +61,7 @@ export const NETWORK_HOSTS = [
 export const LINKS_ONLY = [
   'www.openstreetmap.org', 'operations.osmfoundation.org', 'www.esri.com', 'www.gpxz.io', 'mapterhorn.com', 'registry.opendata.aws',
   'protomaps.com', 'ko-fi.com', 'zenodo.org', 'tracestrack.com', 'api.tracestrack.com', 'overspan.dev', 'esa-worldcover.org', 'discord.gg',
-  'www.w3.org', 'www.khronos.org', 'www.opengis.net', 'www.collada.org', 'x.invalid',
+  'www.w3.org', 'www.khronos.org', 'www.opengis.net', 'www.collada.org', 'x.invalid', 'tiles.mapng.invalid',
 ];
 
 /** The list's entry for a host name (exact, or by a ".suffix" entry), or null when MapNG does not list it. */
