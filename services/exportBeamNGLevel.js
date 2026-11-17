@@ -4257,6 +4257,7 @@ const CUTTING_FLOOR_PAST_M = 6;     // the cutting's floor reaches this far past
 const CUTTING_FLOOR_TOL_M = 0.6;    // a square within this of the height the cutting was dug to is its floor
 const ROOFED_MIN_M = 5;             // a street's ground this far over a built tunnel's road: the tunnel has its roof under it ...
 const ROOF_SLAB_M = 0.5;            // ... or, from the tube's own crown, this much for its slab
+const CUTTING_WALL_MIN_M = 0.4;     // a cutting wall lower than this over its road is left out
 const CARRY_CLEAR_M = 25;           // stops this far short of another deck over (or under) the approach
 const CARRY_MIN_M = 20;              // shorter than this: not worth carrying on
 
@@ -6479,6 +6480,17 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
       }
       // ... and the floor dug at the old heights goes with it: every square of the cutting's floor (within the
       // road's width and its walkways, standing at the height it was dug to) to the road's height there
+      // (the walls' tops are kept as heights over the line: they stay at the hillside they were read from; a wall
+      // the road has come up to within CUTTING_WALL_MIN_M of its top ends there)
+      t.line.forEach((st, i) => {
+        if (!Number.isFinite(st.zDug)) return;
+        for (const side of [-1, 1]) {
+          const top = t.wings?.[side]?.get(i);
+          if (top === undefined) continue;
+          const now = top - (st.z - st.zDug);
+          if (now < CUTTING_WALL_MIN_M) t.wings[side].delete(i); else t.wings[side].set(i, now);
+        }
+      });
       const changed = t.line.filter((st) => Number.isFinite(st.zDug) && Math.abs(st.z - st.zDug) > 0.02);
       if (!changed.length || !shaping.tunnels) continue;
       const { width, height, minHeight } = terrainData;
@@ -6494,9 +6506,13 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
           const x = ((c / width) - 0.5) * worldSizeT; const y = (0.5 - (r + 1) / height) * worldSizeT;
           const m = nearestOnTunnel(t, x, y, reach);
           if (!onCuttingFloor(t, m, squareSize)) continue;
-          const st = t.line[m.i];
-          if (!Number.isFinite(st.zDug)) continue;
-          const was = m.z - (st.z - st.zDug);
+          // (the height it was dug to here: between the two stations either side, as the line's own height is read)
+          const j0 = m.s >= t.line[m.i].s ? m.i : m.i - 1;
+          const A = t.line[Math.max(0, j0)]; const B = t.line[Math.min(t.line.length - 1, Math.max(0, j0) + 1)];
+          const fAB = B.s > A.s ? Math.max(0, Math.min(1, (m.s - A.s) / (B.s - A.s))) : 0;
+          const dugA = Number.isFinite(A.zDug) ? A.zDug : A.z; const dugB = Number.isFinite(B.zDug) ? B.zDug : B.z;
+          if (!Number.isFinite(A.zDug) && !Number.isFinite(B.zDug)) continue;
+          const was = dugA + (dugB - dugA) * fAB;
           const idx = r * width + c;
           const h = hmT.at(idx) - minHeight;
           if (Math.abs(h - was) <= CUTTING_FLOOR_TOL_M) hmT.set(idx, m.z + minHeight);
