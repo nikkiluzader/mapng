@@ -395,3 +395,31 @@ test('profile: with "Every road follows the lidar survey" a main road follows th
     assert.ok(off(highway, false) > off(highway, true) + 1, `${highway}, off: ${off(highway, false).toFixed(2)} m (its class grade)`);
   }
 });
+
+test('coarse elevation: a short street between two junctions follows a steady hillside; a step in a level street is still cut through', async () => {
+  const { solveProfiles } = await import('../services/structures/profileSolve.js');
+  const make = (pieces, highway) => {
+    const x = [0]; const g = [100];
+    for (const [len, grade] of pieces) for (let d = 4; d <= len; d += 4) { x.push(x.at(-1) + 4); g.push(g.at(-1) - 4 * grade); }
+    const n = x.length;
+    return { x: Float64Array.from(x), y: new Float64Array(n), s: Float64Array.from(x), g: Float64Array.from(g), from: 'A', to: 'B', highway, layer: 0, half: 3.5, bridge: false, tunnel: false };
+  };
+  const off = (e) => {
+    const nodes = new Map([['A', { edges: [{ edge: 0, end: 0 }] }], ['B', { edges: [{ edge: 0, end: 1 }] }]]);
+    const { z } = solveProfiles({ edges: [e], nodes, pins: [], fineGround: false, crossings: { crossings: [], water: [] } });
+    let worst = 0; for (let i = 0; i < e.s.length; i++) worst = Math.max(worst, Math.abs(z[0][i] - e.g[i]));
+    return worst;
+  };
+  // 88 m down a steady 21% hill (Agios Tychonas on 30 m data: dug 6 m in from end to end)
+  const hill = off(make([[88, 0.21]], 'tertiary'));
+  assert.ok(hill < 0.6, `a tertiary street on a steady 21% hillside: ${hill.toFixed(2)} m off its ground`);
+  assert.ok(off(make([[88, 0.21]], 'residential')) < 0.6, 'a residential street too');
+  // a main road keeps its class
+  assert.ok(off(make([[88, 0.21]], 'secondary')) > hill + 0.5, 'a secondary road is held to its grade');
+  // a level street 284 m long with a 6 m step over 24 m in the data (a plateau's edge, 25%): not followed, eased
+  // at the class's grade as before; a street that is 25% from end to end is followed
+  const step = off(make([[130, 0], [24, 0.25], [130, 0]], 'residential'));
+  const steady = off(make([[88, 0.25]], 'residential'));
+  assert.ok(steady < 0.6, `a steady 25% street: ${steady.toFixed(2)} m off its ground`);
+  assert.ok(step > steady + 0.3, `the step is eased (${step.toFixed(2)} m off the data), the steady street is not (${steady.toFixed(2)} m)`);
+});

@@ -74,6 +74,9 @@ const FINE_CLEAR_OF_STRUCTURE_M = 60;
 // lifted 1.8 m at a small bridge stayed 1.8 m over the hillside for the 306 m to the map's edge. (Over the long
 // slope only: added to a short one it let a ramp up a canal bridge's quay run steeper, Amsterdam 18 to 19%)
 const FINE_REJOIN = 0.02;
+// (coarse elevation: see allowedRise)
+const COARSE_WHOLE_MIN_M = 40;
+const COARSE_OVER_WHOLE = 1.25;
 // (nor a primary or secondary road: built to its grade, and where the survey shows more along its mapped line the
 // line is off the road, on the slope beside it)
 const MAIN_ROADS = new Set(['primary', 'primary_link', 'secondary', 'secondary_link']);
@@ -167,7 +170,10 @@ function allowedRise(e, structure = !!(e.bridge || e.tunnel), fine = false, stru
   const rail = railKindOfClass(e.highway);
   const ceiling = (GRADE_CEILING[e.highway] ?? RAIL_GRADE_CEILING[rail] ?? GRADE_CEILING_DEFAULT) * 0.97;   // (a margin under the checks)
   // (everyClass: the export's "Every road follows the lidar survey", primary and secondary roads too)
-  const follows = fine && !rail && !NEVER_FOLLOWS.has(e.highway) && (everyClass || !MAIN_ROADS.has(e.highway));
+  const follows = !rail && !NEVER_FOLLOWS.has(e.highway) && (everyClass || !MAIN_ROADS.has(e.highway));
+  // (coarse elevation: the slope of the whole stretch between its two ends, where it is long enough to say)
+  const wholeSpan = n > 1 ? e.s[n - 1] - e.s[0] : 0;
+  const whole = wholeSpan >= COARSE_WHOLE_MIN_M ? Math.abs(g(n - 1) - g(0)) / wholeSpan : 0;
   let a = 0; let b = 0; let a2 = 0; let b2 = 0; let a3 = 0; let b3 = 0;
   for (let i = 0; i + 1 < n; i++) {
     const ds = e.s[i + 1] - e.s[i];
@@ -181,9 +187,19 @@ function allowedRise(e, structure = !!(e.bridge || e.tunnel), fine = false, stru
     let measured = 0;
     if (follows && !((structureAt?.[0] && mid - e.s[0] < FINE_CLEAR_OF_STRUCTURE_M) || (structureAt?.[1] && e.s[n - 1] - mid < FINE_CLEAR_OF_STRUCTURE_M)
       || (structureAt?.[2] || []).some(([s0, s1]) => mid > s0 - FINE_CLEAR_OF_STRUCTURE_M && mid < s1 + FINE_CLEAR_OF_STRUCTURE_M))) {
-      while (a3 + 1 < n && e.s[a3 + 1] <= mid - FINE_GRADE_M) a3++;
-      while (b3 + 1 < n && e.s[b3] < mid + FINE_GRADE_M) b3++;
-      measured = Math.min(FINE_FOLLOW_MAX, Math.max(terrain + FINE_REJOIN, Math.min(slope(a3, b3, 8), terrain * FINE_SHORT_OVER_LONG)));
+      if (fine) {
+        while (a3 + 1 < n && e.s[a3 + 1] <= mid - FINE_GRADE_M) a3++;
+        while (b3 + 1 < n && e.s[b3] < mid + FINE_GRADE_M) b3++;
+        measured = Math.min(FINE_FOLLOW_MAX, Math.max(terrain + FINE_REJOIN, Math.min(slope(a3, b3, 8), terrain * FINE_SHORT_OVER_LONG)));
+      } else if (whole > 0) {
+        // Coarse elevation (30 m): a small street between two junctions on a steady hillside follows it too. The
+        // hillside rule below reads +-HILLSIDE_M, more road than a town's street has between two corners, so a
+        // street 87 m long down a 21% hill was held to its class grade and dug 6 m into the hill from end to end,
+        // its junctions with it (Agios Tychonas on 30 m data). Believed only as far as the stretch's own end to
+        // end slope bears it out (COARSE_OVER_WHOLE): a step the coarse data has at a plateau's edge, a few
+        // dozen metres of a long level street, is still cut or filled through.
+        measured = Math.min(FINE_FOLLOW_MAX, Math.min(terrain, whole * COARSE_OVER_WHOLE) + FINE_REJOIN);
+      }
     }
     // a hillside steeper than the class ceiling, as steep over +-HILLSIDE_M:
     // the road may run steeper than it, so a lift or cut near a structure
