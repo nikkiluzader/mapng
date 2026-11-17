@@ -24,7 +24,8 @@ import { carveLakeBeds, carveWaterUnderDecks, fillRemnants, levelUnderDecks, low
 import { tunnelDryZones, tunnelsBelow, planSeaBlocks, clipRiverNodes, clipLakeTile, splitLakeTile, hasInlandBelowSea } from './beamngWaterClip.js';
 import { placeCurveWarnings } from './curveWarningSigns.js';
 import { chooseTreeGroupAllowed, chooseTreeItem, sanitizeTreeKindsOff, sanitizeTreeModelsOff, sanitizeTreeSwaps, treeHintFromTags, treeItemHeight, treeSwapMap, understoryGroup } from './beamngTrees.js';
-import { openWaterAtEdge, plantAllowed, WORLDCOVER_ATTRIBUTION } from './worldCover.js';
+import { openWaterAtEdge, plantAllowed, landCoverAt, WC, WORLDCOVER_ATTRIBUTION } from './worldCover.js';
+import { planQuayWalls, buildQuayWallMesh } from './quayWalls.js';
 import { TREE_MIX_CREDIT } from './treeSpecies.js';
 import { placeBoats } from './boats.js';
 import { GROUND_CLASSES, satelliteGroundClasses } from './osmTexture.js';
@@ -4243,6 +4244,11 @@ const CARRY_MAX_M = 300;             // never carried on further than this (per 
 const CARRY_ROUNDS = 3;
 const BRIDGE_REACH_MAX_M = 400;     // a bridge's ends on the ground looked for this far along it
 const BRIDGE_REACH_GRADE = 0.06;    // ... and the bridge climbs from them at this grade
+const QUAY_TOWN_REACH_M = 10;       // a mapped way or a building this near a bank (to twice this): a town's ground, a quay wall may stand
+const CUTTING_ROAD_REACH_M = 2.5;   // a road this near a tunnel's approach line is the road in its cutting
+const CUTTING_SAMPLE_REACH_M = 6;   // a cutting station takes the road's height from a road station this near along the line
+const CUTTING_FLOOR_PAST_M = 3;     // the cutting's floor reaches this far past the road's edge (walkways, the gap to the walls)
+const CUTTING_FLOOR_TOL_M = 0.6;    // a square within this of the height the cutting was dug to is its floor
 const CARRY_CLEAR_M = 25;           // stops this far short of another deck over (or under) the approach
 const CARRY_MIN_M = 20;              // shorter than this: not worth carrying on
 
@@ -6241,27 +6247,19 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
         structureGraph.edges.forEach((e, k) => {
           const t = tunnels.bySeg.get(e.seg);
           if (!t) return;
-          // ... and on along the whole approach cutting, road after road: the cutting's floor is dug at the tunnel's
-          // own heights, and a road left to the solve past the slab was laid on a bank of its own up to 1.5 m over
-          // the floor dug beside it (two carriageways and a median strip in one cutting, each on its own shelf)
-          const seenEdges = new Set([k]);
-          const queue = [e.from, e.to];
-          while (queue.length) {
-            const nodeId = queue.shift();
+          const out = tunnelApronLength(t) + 1;
+          for (const nodeId of [e.from, e.to]) {
             for (const { edge: k2, end } of structureGraph.nodes.get(nodeId)?.edges || []) {
               const o = structureGraph.edges[k2];
-              if (seenEdges.has(k2) || tunnels.bySeg.get(o.seg) || o.bridge || o.tunnel || !!o.rail !== !!e.rail) continue;
-              seenEdges.add(k2);
+              if (k2 === k || tunnels.bySeg.get(o.seg) || o.bridge || o.tunnel || !!o.rail !== !!e.rail) continue;
               const n = o.s.length;
-              let whole = true;
               for (let j = 0; j < n; j++) {
                 const i = end === 0 ? j : n - 1 - j;
                 // (beside the main road too: a ramp in the bore's widening shares its floor)
                 const near = nearestOnTunnel(t, o.x[i], o.y[i], t.W + (t.maxExtra || 0) + 2);
-                if (!near || near.beyond) { whole = false; break; }
+                if (!near || near.beyond || near.into < -out) break;
                 if (!pinnedAt.has(`${k2}:${i}`)) { pinnedAt.add(`${k2}:${i}`); structureGraph.pins.push([k2, i, near.z + (o.rail ? RAIL_DEPTH_M : 0)]); }
               }
-              if (whole) queue.push(end === 0 ? o.to : o.from);
             }
           }
         });
@@ -6399,6 +6397,83 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
       console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Structure solver profile skipped: ${err?.message || err}`);
       structureGraph.profile = null; structureGraph.classes = null;
     }
+  }
+  // An approach cutting's floor is the road's. The cutting is dug at the tunnel's own line, eased back to the
+  // ground by the tunnel's rules; the road in it is the solve's past the portal's slab, with its class's grade and
+  // the junctions it has to meet. Where the two differed the road lay on a shelf over the trench dug beside it
+  // (two carriageways 1.5 m over their cutting's floor at a station's road tunnel). The cutting's line takes
+  // the solved road's heights, station by station, from the slab out.
+  if (opts.structureSolver === 'v2' && structureGraph?.profile?.z) {
+    let moved = 0; let most = 0;
+    const samplesOf = new Map();   // tunnel -> [[s along its line, road z]]
+    structureGraph.edges.forEach((e, k) => {
+      const t = tunnels.bySeg.get(e.seg);
+      if (!t || t.kind === 'gallery') return;
+      const out = tunnelApronLength(t) + 1;
+      const seenEdges = new Set([k]);
+      const queue = [e.from, e.to];
+      while (queue.length) {
+        const nodeId = queue.shift();
+        for (const { edge: k2, end } of structureGraph.nodes.get(nodeId)?.edges || []) {
+          const o = structureGraph.edges[k2];
+          if (seenEdges.has(k2) || tunnels.bySeg.get(o.seg) || o.bridge || o.tunnel || !!o.rail !== !!e.rail) continue;
+          seenEdges.add(k2);
+          const n = o.s.length;
+          let whole = true;
+          for (let j = 0; j < n; j++) {
+            const i = end === 0 ? j : n - 1 - j;
+            const near = nearestOnTunnel(t, o.x[i], o.y[i], CUTTING_ROAD_REACH_M);
+            if (!near || near.beyond) { whole = false; break; }
+            if (near.into >= -out) continue;   // (on the slab: pinned to the line already)
+            if (!samplesOf.has(t)) samplesOf.set(t, []);
+            samplesOf.get(t).push([near.s, structureGraph.profile.z[k2][i] - (o.rail ? RAIL_DEPTH_M : 0)]);
+          }
+          if (whole) queue.push(end === 0 ? o.to : o.from);
+        }
+      }
+    });
+    for (const [t, samples] of samplesOf) {
+      samples.sort((a, b) => a[0] - b[0]);
+      for (const st of t.line) {
+        if (st.kind !== 'cut') continue;
+        // (the road's height at this station: between the two samples either side of it, no further than a few metres off)
+        let lo = -1; let hi = samples.length;
+        while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (samples[mid][0] <= st.s) lo = mid; else hi = mid; }
+        const a = samples[Math.max(0, lo)]; const b = samples[Math.min(samples.length - 1, hi)];
+        if (Math.min(Math.abs(a[0] - st.s), Math.abs(b[0] - st.s)) > CUTTING_SAMPLE_REACH_M) continue;
+        const f = b[0] > a[0] ? Math.max(0, Math.min(1, (st.s - a[0]) / (b[0] - a[0]))) : 0;
+        const z = a[1] + (b[1] - a[1]) * f;
+        if (Math.abs(z - st.z) > 0.02) { moved++; most = Math.max(most, Math.abs(z - st.z)); }
+        st.zDug = st.z;
+        st.z = z;
+      }
+      // ... and the floor dug at the old heights goes with it: every square of the cutting's floor (within the
+      // road's width and its walkways, standing at the height it was dug to) to the road's height there
+      const changed = t.line.filter((st) => Number.isFinite(st.zDug) && Math.abs(st.z - st.zDug) > 0.02);
+      if (!changed.length || !shaping.tunnels) continue;
+      const { width, height, minHeight } = terrainData;
+      const hmT = heightMapEditor(terrainData);
+      const worldSizeT = width * squareSize;
+      const reach = t.W + (t.maxExtra || 0) + CUTTING_FLOOR_PAST_M;
+      const c0 = Math.max(0, Math.floor((Math.min(...changed.map((q) => q.x)) - reach) / worldSizeT * width + width / 2));
+      const c1 = Math.min(width - 1, Math.ceil((Math.max(...changed.map((q) => q.x)) + reach) / worldSizeT * width + width / 2));
+      const r0 = Math.max(0, Math.floor((0.5 - (Math.max(...changed.map((q) => q.y)) + reach) / worldSizeT) * height - 1));
+      const r1 = Math.min(height - 1, Math.ceil((0.5 - (Math.min(...changed.map((q) => q.y)) - reach) / worldSizeT) * height - 1));
+      for (let r = r0; r <= r1; r++) {
+        for (let c = c0; c <= c1; c++) {
+          const x = ((c / width) - 0.5) * worldSizeT; const y = (0.5 - (r + 1) / height) * worldSizeT;
+          const m = nearestOnTunnel(t, x, y, reach);
+          if (!m || m.beyond || m.into >= 0) continue;
+          const st = t.line[m.i];
+          if (st.kind !== 'cut' || !Number.isFinite(st.zDug)) continue;
+          const was = m.z - (st.z - st.zDug);
+          const idx = r * width + c;
+          const h = hmT.at(idx) - minHeight;
+          if (Math.abs(h - was) <= CUTTING_FLOOR_TOL_M) hmT.set(idx, m.z + minHeight);
+        }
+      }
+    }
+    if (moved) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Tunnel approaches: ${moved} cutting station(s) set to their road's solved height (up to ${most.toFixed(2)} m).`);
   }
   // a road reaching into a tube it is no part of (a ramp OSM ends a few
   // metres into a tunnel's mouth, where the tube widens for it): on the
@@ -14361,6 +14436,40 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       sidewalks.meshes.push(mesh);
       const len = runs.reduce((s, r) => s + r.stations.slice(1).reduce((q, st, i) => q + Math.hypot(st.x - r.stations[i].x, st.y - r.stations[i].y), 0), 0);
       console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Wing walls: ${runs.length} run(s), ${Math.round(len)} m, beside raised roads at bridge ends.`);
+    }
+  }
+  // quay walls: the wall a town's ground stands behind at the water's edge (quayWalls.js). In the terrain a river
+  // wall or a canal's quay is a steep bank of ground, smeared and toothed; a block stands over it.
+  if (includeRoads && shaping.bridges !== false && Array.isArray(sidewalks.meshes) && exportTerrainData.heightMap !== terrainData?.heightMap) {
+    // (a town's ground: every mapped way, walked or driven, and every building, marked on a coarse grid)
+    const town = new Set();
+    const markTown = (x, y) => town.add(`${Math.floor(x / QUAY_TOWN_REACH_M)},${Math.floor(y / QUAY_TOWN_REACH_M)}`);
+    for (const f of exportTerrainData.osmFeatures || []) {
+      if (!((f.type === 'road' && !f.tags?.tunnel && !f.tags?.railway) || f.type === 'building') || !(f.geometry?.length > 1)) continue;
+      const q = f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0));
+      for (let i = 0; i + 1 < q.length; i++) {
+        const L = Math.hypot(q[i + 1][0] - q[i][0], q[i + 1][1] - q[i][1]);
+        const n = Math.max(1, Math.ceil(L / (QUAY_TOWN_REACH_M / 2)));
+        for (let k = 0; k <= n; k++) markTown(q[i][0] + ((q[i + 1][0] - q[i][0]) * k) / n, q[i][1] + ((q[i + 1][1] - q[i][1]) * k) / n);
+      }
+    }
+    const nearTown = (x, y) => { const cx = Math.floor(x / QUAY_TOWN_REACH_M); const cy = Math.floor(y / QUAY_TOWN_REACH_M); for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) if (town.has(`${cx + dx},${cy + dy}`)) return true; return false; };
+    const lines = (exportTerrainData.osmFeatures || [])
+      .filter((f) => (f.type === 'water' || f.type === 'coastline') && f.geometry?.length > 2 && !isUndergroundWater(f.tags) && !WATERWAY_HALF_M[f.tags?.waterway])
+      .map((f) => ({ xy: f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0)) }));
+    const edge = worldSize / 2 - 2 * squareSize;
+    const runs = planQuayWalls(lines, {
+      groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
+      surveyAt: (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize),
+      // (built-up land cover, or a mapped way or building within reach)
+      hardAt: (x, y) => landCoverAt(exportTerrainData.landCover, worldSize, x, y) === WC.BUILT || nearTown(x, y),
+      skipAt: (x, y) => Math.abs(x) > edge || Math.abs(y) > edge,
+    });
+    if (typeof globalThis.__MAPNG_QUAY_DEBUG === 'function') globalThis.__MAPNG_QUAY_DEBUG(runs);
+    const mesh = buildQuayWallMesh(runs, PLAZA_MATERIAL('flagstone'), plazaTileM('flagstone'));
+    if (mesh) {
+      sidewalks.meshes.push(mesh);
+      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Quay walls: ${runs.length} run(s), ${runs.reduce((s, r) => s + (r.stations.length - 1) * 2, 0)} m, at the water's edge in built-up ground.`);
     }
   }
   // (a world point inside a mapped water area: nothing stands there. A memorial or a block mapped in a basin by

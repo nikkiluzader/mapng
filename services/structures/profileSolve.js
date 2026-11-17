@@ -77,6 +77,8 @@ const FINE_REJOIN = 0.02;
 // (coarse elevation: see allowedRise)
 const COARSE_WHOLE_MIN_M = 40;
 const COARSE_OVER_WHOLE = 1.25;
+const COARSE_STEADY_M = 1.5;      // ... on ground this near the straight line between its ends all the way
+const COARSE_FOLLOW_MAX = 0.25;   // ... and no steeper than this (coarse data says less than a survey does)
 // (nor a primary or secondary road: built to its grade, and where the survey shows more along its mapped line the
 // line is off the road, on the slope beside it)
 const MAIN_ROADS = new Set(['primary', 'primary_link', 'secondary', 'secondary_link']);
@@ -173,7 +175,15 @@ function allowedRise(e, structure = !!(e.bridge || e.tunnel), fine = false, stru
   const follows = !rail && !NEVER_FOLLOWS.has(e.highway) && (everyClass || !MAIN_ROADS.has(e.highway));
   // (coarse elevation: the slope of the whole stretch between its two ends, where it is long enough to say)
   const wholeSpan = n > 1 ? e.s[n - 1] - e.s[0] : 0;
-  const whole = wholeSpan >= COARSE_WHOLE_MIN_M ? Math.abs(g(n - 1) - g(0)) / wholeSpan : 0;
+  let whole = wholeSpan >= COARSE_WHOLE_MIN_M ? Math.abs(g(n - 1) - g(0)) / wholeSpan : 0;
+  // (... and only a steady one: the ground along it within COARSE_STEADY_M of the straight line between its ends.
+  // A street across a gully or over a spur is held to its class as before)
+  if (whole > 0 && !fine) {
+    for (let i = 1; i + 1 < n && whole > 0; i++) {
+      const chord = g(0) + ((g(n - 1) - g(0)) * (e.s[i] - e.s[0])) / wholeSpan;
+      if (Math.abs(g(i) - chord) > COARSE_STEADY_M) whole = 0;
+    }
+  }
   let a = 0; let b = 0; let a2 = 0; let b2 = 0; let a3 = 0; let b3 = 0;
   for (let i = 0; i + 1 < n; i++) {
     const ds = e.s[i + 1] - e.s[i];
@@ -198,7 +208,7 @@ function allowedRise(e, structure = !!(e.bridge || e.tunnel), fine = false, stru
         // its junctions with it (Agios Tychonas on 30 m data). Believed only as far as the stretch's own end to
         // end slope bears it out (COARSE_OVER_WHOLE): a step the coarse data has at a plateau's edge, a few
         // dozen metres of a long level street, is still cut or filled through.
-        measured = Math.min(FINE_FOLLOW_MAX, Math.min(terrain, whole * COARSE_OVER_WHOLE) + FINE_REJOIN);
+        measured = Math.min(COARSE_FOLLOW_MAX, Math.min(terrain, whole * COARSE_OVER_WHOLE) + FINE_REJOIN);
       }
     }
     // a hillside steeper than the class ceiling, as steep over +-HILLSIDE_M:
