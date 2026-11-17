@@ -716,7 +716,8 @@
       "curbHeight_standard": "Standard (15 cm)",
       "curbHeight_low": "Basso (8 cm)",
       "curbHeight_flush": "A raso (3 cm)",
-      "curbHeightHint": "Di quanto i marciapiedi rialzati sporgono sulla strada. Standard è un vero cordolo; Basso e A raso sono più gentili con le auto basse e facili da salire."
+      "curbHeightHint": "Di quanto i marciapiedi rialzati sporgono sulla strada. Standard è un vero cordolo; Basso e A raso sono più gentili con le auto basse e facili da salire.",
+      "viewDistanceShort": "Fin dove il gioco disegna il livello."
     },
     "weight": {
       "title": "Quanto è pesante questo livello?",
@@ -742,7 +743,8 @@
       "squareCropTip": "Per conservarlo tutto, generalo di nuovo a {mpp} m/px ({size} px)."
     },
     "downloadReady": "Download pronto: {name}",
-    "viewDistance": "Distanza visiva"
+    "viewDistance": "Distanza visiva",
+    "gameTextureBlendShort": "Quanto dell'immagine satellitare prende la texture di gioco."
   },
   "controlPanel": {
     "resolutionOutputSize": "Risoluzione (dimensione output)",
@@ -1618,7 +1620,8 @@
     "genLowerWaterHint": "Solo 30 m globale: misura le chiome degli alberi lungo i fiumi",
     "genSmoothRoads": "Strade levigate nel terreno",
     "genSmoothRoadsHint": "Piane in larghezza, lisce in lunghezza, unite agli incroci",
-    "customExportTitle": "Nell'esportazione del livello"
+    "customExportTitle": "Nell'esportazione del livello",
+    "readyShort": "Le strade vengono adattate al terreno. Con i dati globali a 30 m vengono anche tolti dal suolo edifici e alberi."
   },
   "panelSteps": {
     "where": "Luogo",
@@ -1805,7 +1808,8 @@
     "spawnHere": "Parti da qui",
     "quicktravelHere": "Aggiungi punto Quicktravel qui",
     "spawnName": "Partenza",
-    "aimHandle": "Trascina per orientare"
+    "aimHandle": "Trascina per orientare",
+    "introShort": "Scegli dove parte l'auto e aggiungi luoghi a cui saltare."
   },
   "backgroundAreas": {
     "title": "Maschera delle aree",
@@ -1879,7 +1883,8 @@
     "statRaw": "Senza levigatura sul {pct}% del quadrato",
     "lockedPinned": "Il riquadro è bloccato qui così puoi zoomare e spostarti per disegnare (tieni premuto Spazio e trascina per muovere la mappa con uno strumento scelto).",
     "unlock": "Sblocca",
-    "hintTooSmall": "Questa linea chiude un'area, ma troppo piccola per essere ombreggiata su una mappa di queste dimensioni. Disegna attorno a un'area più grande (circa {metres} m di larghezza o più)."
+    "hintTooSmall": "Questa linea chiude un'area, ma troppo piccola per essere ombreggiata su una mappa di queste dimensioni. Disegna attorno a un'area più grande (circa {metres} m di larghezza o più).",
+    "introShort": "Ombreggia le colline su cui non guiderai: mantengono la forma, ma non vi si costruisce nulla."
   },
   "build": {
     "title": "Cosa costruire",

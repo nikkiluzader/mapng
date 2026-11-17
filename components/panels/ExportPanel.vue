@@ -30,7 +30,7 @@
                 class="w-44 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
               />
             </SettingRow>
-            <SettingRow v-if="advancedMode" :label="t('exportPanel.viewDistance')" :hint="t('exportPanel.ui.viewDistanceHint')">
+            <SettingRow v-if="advancedMode" :label="t('exportPanel.viewDistance')" :hint="t('exportPanel.ui.viewDistanceShort')" :more="t('exportPanel.ui.viewDistanceHint')" :more-label="t('build.tune.more')" :less-label="t('build.tune.less')">
               <select v-model="beamNGViewDistance" :class="SELECT_XS">
                 <option :value="AUTO_VIEW_DISTANCE">{{ t('exportPanel.ui.viewDistanceAuto', { km: autoViewDistanceKm }) }}</option>
                 <option v-for="m in VIEW_DISTANCES_M" :key="m" :value="m">{{ m / 1000 }} km</option>
@@ -63,7 +63,8 @@
               v-if="beamNGBaseTexture === 'game'"
               indent
               :label="t('exportPanel.gameTextureBlend')"
-              :hint="isRepaintingGameTexture ? t('exportPanel.gameTextureBlendRepainting') : isPreparingBlend ? t('exportPanel.gameTextureBlendPreparing') : t('exportPanel.gameTextureBlendHint')"
+              :hint="isRepaintingGameTexture ? t('exportPanel.gameTextureBlendRepainting') : isPreparingBlend ? t('exportPanel.gameTextureBlendPreparing') : t('exportPanel.gameTextureBlendShort')"
+              :more="t('exportPanel.gameTextureBlendHint')" :more-label="t('build.tune.more')" :less-label="t('build.tune.less')"
             >
               <input
                 type="range" min="0" max="100" step="1"
@@ -124,9 +125,8 @@
           <!-- Terrain: chosen once, in the elevation section (TerrainChoice); here only what this level gets -->
           <SettingCard v-if="advancedMode" :title="t('exportPanel.ui.cardTerrain')">
             <p class="text-caption leading-snug text-gray-700 dark:text-gray-200">{{ t(`exportPanel.ui.terrainSummary_${terrainMode}`) }}</p>
-            <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.terrainChangeHere') }}</p>
             <p v-if="terrainChoiceChangedSinceGenerate" class="text-caption leading-snug text-amber-700 dark:text-amber-300">{{ t('exportPanel.ui.terrainRegenerate') }}</p>
-            <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.reportNote') }}</p>
+            <ShortHint :more="`${t('exportPanel.ui.terrainChangeHere')} ${t('exportPanel.ui.reportNote')}`" />
           </SettingCard>
 
           <!-- Elevation around the map, beyond its edges -->
@@ -677,6 +677,7 @@
 </style>
 
 <script setup>
+import ShortHint from '../base/ShortHint.vue';
 import { backdropSourceCovers, effectiveBackdropSource } from '../../services/backdropSources.js';
 import { isDiskFull, isBrowserStorageGone, isMapPartGone, isOutOfMemory } from '../../services/errorText.js';
 import { ref, shallowRef, computed, watch, nextTick, onUnmounted, toRaw } from 'vue';

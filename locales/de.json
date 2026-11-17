@@ -716,7 +716,8 @@
       "curbHeight_standard": "Standard (15 cm)",
       "curbHeight_low": "Niedrig (8 cm)",
       "curbHeight_flush": "Bündig (3 cm)",
-      "curbHeightHint": "Wie weit die erhöhten Gehwege über der Straße stehen. Standard ist ein echter Bordstein; Niedrig und Bündig schonen tiefe Autos und lassen sich leicht befahren."
+      "curbHeightHint": "Wie weit die erhöhten Gehwege über der Straße stehen. Standard ist ein echter Bordstein; Niedrig und Bündig schonen tiefe Autos und lassen sich leicht befahren.",
+      "viewDistanceShort": "Wie weit das Spiel das Level zeichnet."
     },
     "weight": {
       "title": "Wie schwer ist dieses Level?",
@@ -742,7 +743,8 @@
       "squareCropTip": "Um alles zu behalten, erzeuge es erneut mit {mpp} m/px ({size} px)."
     },
     "downloadReady": "Download bereit: {name}",
-    "viewDistance": "Sichtweite"
+    "viewDistance": "Sichtweite",
+    "gameTextureBlendShort": "Wie viel vom Satellitenbild die Spieltextur übernimmt."
   },
   "controlPanel": {
     "resolutionOutputSize": "Auflösung (Ausgabegröße)",
@@ -1618,7 +1620,8 @@
     "genLowerWaterHint": "Nur globales 30 m: es misst die Baumkronen an Flüssen",
     "genSmoothRoads": "Straßen ins Gelände geglättet",
     "genSmoothRoadsHint": "Quer eben, längs glatt, an Kreuzungen verbunden",
-    "customExportTitle": "Im Level-Export"
+    "customExportTitle": "Im Level-Export",
+    "readyShort": "Straßen werden ans Gelände angepasst. Bei den globalen 30-m-Daten werden außerdem Gebäude und Bäume aus dem Boden entfernt."
   },
   "panelSteps": {
     "where": "Ort",
@@ -1805,7 +1808,8 @@
     "spawnHere": "Hier starten",
     "quicktravelHere": "Quicktravel-Punkt hier hinzufügen",
     "spawnName": "Start",
-    "aimHandle": "Zum Ausrichten ziehen"
+    "aimHandle": "Zum Ausrichten ziehen",
+    "introShort": "Wähle, wo das Auto startet, und füge Sprungziele hinzu."
   },
   "backgroundAreas": {
     "title": "Flächenmaske",
@@ -1879,7 +1883,8 @@
     "statRaw": "Nicht geglättet: {pct}% des Quadrats",
     "lockedPinned": "Der Bereichsrahmen ist hier fixiert, damit du zum Zeichnen zoomen und verschieben kannst (Leertaste halten und ziehen, um die Karte mit gewähltem Werkzeug zu bewegen).",
     "unlock": "Lösen",
-    "hintTooSmall": "Diese Linie schließt eine Fläche, aber sie ist zu klein, um sie bei dieser Kartengröße zu schattieren. Zeichne um eine größere Fläche (etwa {metres} m breit oder mehr)."
+    "hintTooSmall": "Diese Linie schließt eine Fläche, aber sie ist zu klein, um sie bei dieser Kartengröße zu schattieren. Zeichne um eine größere Fläche (etwa {metres} m breit oder mehr).",
+    "introShort": "Schattiere die Hügel, die du nicht befährst: Sie behalten ihre Form, aber es wird nichts darauf gebaut."
   },
   "build": {
     "title": "Was gebaut wird",

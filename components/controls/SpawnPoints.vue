@@ -3,7 +3,7 @@
        map's Quicktravel list jumps to. The map side: components/map/spawnPointLayer.js. -->
   <SettingSection id="mapng-sec-points" :title="t('spawnPoints.title')" :icon="Navigation" storage-key="mapng_ui_sec_points">
     <template #aside>{{ asideText }}</template>
-    <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t('spawnPoints.intro') }}</p>
+    <ShortHint :short="t('spawnPoints.introShort')" :more="t('spawnPoints.intro')" />
 
     <button
       type="button"
@@ -92,6 +92,7 @@
 </template>
 
 <script setup>
+import ShortHint from '../base/ShortHint.vue';
 import { computed, onMounted, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Navigation, MapPinPlus, Star, Trash2, Compass, AlertTriangle, Car } from 'lucide-vue-next';

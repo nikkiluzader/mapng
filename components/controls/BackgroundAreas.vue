@@ -3,7 +3,7 @@
        square nobody drives. The map side: components/map/backgroundLayer.js. -->
   <SettingSection id="mapng-sec-background" :title="t('backgroundAreas.title')" :icon="Mountain" storage-key="mapng_ui_sec_background">
     <template #aside>{{ asideText }}</template>
-    <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t('backgroundAreas.intro') }}</p>
+    <ShortHint :short="t('backgroundAreas.introShort')" :more="t('backgroundAreas.intro')" />
 
     <div class="flex flex-col gap-1.5">
       <button
@@ -110,6 +110,7 @@
 </template>
 
 <script setup>
+import ShortHint from '../base/ShortHint.vue';
 import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Mountain, MountainSnow, Spline, PaintBucket, Eraser, Route, Undo2, Trash2, Lock, Hand, Paintbrush, Brush, Square, Lasso } from 'lucide-vue-next';

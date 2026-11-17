@@ -716,7 +716,8 @@
       "curbHeight_standard": "Estándar (15 cm)",
       "curbHeight_low": "Bajo (8 cm)",
       "curbHeight_flush": "A ras (3 cm)",
-      "curbHeightHint": "Cuánto sobresalen las aceras elevadas sobre la calzada. Estándar es un bordillo real; Bajo y A ras son más amables con los coches bajos y fáciles de subir."
+      "curbHeightHint": "Cuánto sobresalen las aceras elevadas sobre la calzada. Estándar es un bordillo real; Bajo y A ras son más amables con los coches bajos y fáciles de subir.",
+      "viewDistanceShort": "Hasta dónde dibuja el juego el nivel."
     },
     "weight": {
       "title": "¿Cuánto pesa este nivel?",
@@ -742,7 +743,8 @@
       "squareCropTip": "Para conservarlo todo, genéralo de nuevo a {mpp} m/px ({size} px)."
     },
     "downloadReady": "Descarga lista: {name}",
-    "viewDistance": "Distancia de visión"
+    "viewDistance": "Distancia de visión",
+    "gameTextureBlendShort": "Cuánto toma la textura del juego de la imagen de satélite."
   },
   "controlPanel": {
     "resolutionOutputSize": "Resolución (tamaño de salida)",
@@ -1618,7 +1620,8 @@
     "genLowerWaterHint": "Solo 30 m global: mide las copas de los árboles junto a los ríos",
     "genSmoothRoads": "Carreteras suavizadas en el terreno",
     "genSmoothRoadsHint": "Planas a lo ancho, suaves a lo largo, unidas en los cruces",
-    "customExportTitle": "En la exportación del nivel"
+    "customExportTitle": "En la exportación del nivel",
+    "readyShort": "Las carreteras se ajustan al terreno. Con los datos globales de 30 m también se quitan del suelo edificios y árboles."
   },
   "panelSteps": {
     "where": "Ubicación",
@@ -1805,7 +1808,8 @@
     "spawnHere": "Empezar aquí",
     "quicktravelHere": "Añadir punto de Quicktravel aquí",
     "spawnName": "Inicio",
-    "aimHandle": "Arrastra para orientar"
+    "aimHandle": "Arrastra para orientar",
+    "introShort": "Elige dónde arranca el coche y añade lugares a los que saltar."
   },
   "backgroundAreas": {
     "title": "Máscara de zonas",
@@ -1879,7 +1883,8 @@
     "statRaw": "Sin suavizar en el {pct}% del cuadrado",
     "lockedPinned": "El recuadro está fijado aquí para que puedas hacer zoom y moverte al dibujar (mantén Espacio y arrastra para mover el mapa con una herramienta elegida).",
     "unlock": "Desbloquear",
-    "hintTooSmall": "Esta línea sí cierra una zona, pero es demasiado pequeña para sombrearla en un mapa de este tamaño. Dibuja alrededor de una zona mayor (de unos {metres} m de ancho o más)."
+    "hintTooSmall": "Esta línea sí cierra una zona, pero es demasiado pequeña para sombrearla en un mapa de este tamaño. Dibuja alrededor de una zona mayor (de unos {metres} m de ancho o más).",
+    "introShort": "Sombrea las colinas por las que no vas a conducir: conservan su forma, pero no se construye nada en ellas."
   },
   "build": {
     "title": "Qué crear",

@@ -716,7 +716,8 @@
       "curbHeight_standard": "Standardowa (15 cm)",
       "curbHeight_low": "Niska (8 cm)",
       "curbHeight_flush": "Na równo (3 cm)",
-      "curbHeightHint": "Jak wysoko podniesione chodniki wystają nad jezdnię. Standardowa to prawdziwy krawężnik; Niska i Na równo są łagodniejsze dla niskich aut i łatwe do wjechania."
+      "curbHeightHint": "Jak wysoko podniesione chodniki wystają nad jezdnię. Standardowa to prawdziwy krawężnik; Niska i Na równo są łagodniejsze dla niskich aut i łatwe do wjechania.",
+      "viewDistanceShort": "Jak daleko gra rysuje poziom."
     },
     "weight": {
       "title": "Jak ciężki jest ten poziom?",
@@ -742,7 +743,8 @@
       "squareCropTip": "Aby zachować całość, wygeneruj go ponownie przy {mpp} m/px ({size} px)."
     },
     "downloadReady": "Gotowe do pobrania: {name}",
-    "viewDistance": "Zasięg widzenia"
+    "viewDistance": "Zasięg widzenia",
+    "gameTextureBlendShort": "Ile obrazu satelitarnego przejmuje tekstura gry."
   },
   "controlPanel": {
     "resolutionOutputSize": "Rozdzielczość (rozmiar wyjścia)",
@@ -1618,7 +1620,8 @@
     "genLowerWaterHint": "Tylko globalne 30 m: mierzy korony drzew wzdłuż rzek",
     "genSmoothRoads": "Drogi wygładzone w terenie",
     "genSmoothRoadsHint": "Płaskie w poprzek, gładkie wzdłuż, połączone na skrzyżowaniach",
-    "customExportTitle": "W eksporcie poziomu"
+    "customExportTitle": "W eksporcie poziomu",
+    "readyShort": "Drogi są dopasowane do terenu. Przy globalnych danych 30 m z gruntu usuwane są też budynki i drzewa."
   },
   "panelSteps": {
     "where": "Lokalizacja",
@@ -1805,7 +1808,8 @@
     "spawnHere": "Startuj tutaj",
     "quicktravelHere": "Dodaj tutaj punkt Quicktravel",
     "spawnName": "Start",
-    "aimHandle": "Przeciągnij, aby skierować"
+    "aimHandle": "Przeciągnij, aby skierować",
+    "introShort": "Wybierz, gdzie startuje auto, i dodaj miejsca, do których można przeskoczyć."
   },
   "backgroundAreas": {
     "title": "Maska obszarów",
@@ -1879,7 +1883,8 @@
     "statRaw": "Bez wygładzania na {pct}% kwadratu",
     "lockedPinned": "Ramka obszaru jest tu zablokowana, więc możesz przybliżać i przesuwać mapę podczas rysowania (przytrzymaj Spację i przeciągnij, aby przesunąć mapę z wybranym narzędziem).",
     "unlock": "Odblokuj",
-    "hintTooSmall": "Ta linia zamyka obszar, ale zbyt mały, by go zacieniować na mapie tej wielkości. Narysuj linię wokół większego obszaru (około {metres} m szerokości lub więcej)."
+    "hintTooSmall": "Ta linia zamyka obszar, ale zbyt mały, by go zacieniować na mapie tej wielkości. Narysuj linię wokół większego obszaru (około {metres} m szerokości lub więcej).",
+    "introShort": "Zacieniuj wzgórza, po których nie będziesz jeździć: zachowują kształt, ale nic na nich nie powstaje."
   },
   "build": {
     "title": "Co budować",

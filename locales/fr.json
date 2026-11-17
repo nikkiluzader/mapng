@@ -716,7 +716,8 @@
       "curbHeight_standard": "Standard (15 cm)",
       "curbHeight_low": "Basse (8 cm)",
       "curbHeight_flush": "À ras (3 cm)",
-      "curbHeightHint": "La hauteur des trottoirs surélevés au-dessus de la chaussée. Standard est une vraie bordure ; Basse et À ras ménagent les voitures basses et se franchissent facilement."
+      "curbHeightHint": "La hauteur des trottoirs surélevés au-dessus de la chaussée. Standard est une vraie bordure ; Basse et À ras ménagent les voitures basses et se franchissent facilement.",
+      "viewDistanceShort": "Jusqu'où le jeu dessine le niveau."
     },
     "weight": {
       "title": "Quel est le poids de ce niveau ?",
@@ -742,7 +743,8 @@
       "squareCropTip": "Pour tout garder, générez-le à nouveau à {mpp} m/px ({size} px)."
     },
     "downloadReady": "Téléchargement prêt : {name}",
-    "viewDistance": "Distance d'affichage"
+    "viewDistance": "Distance d'affichage",
+    "gameTextureBlendShort": "La part de l'image satellite que prend la texture du jeu."
   },
   "controlPanel": {
     "resolutionOutputSize": "Résolution (taille de sortie)",
@@ -1618,7 +1620,8 @@
     "genLowerWaterHint": "30 m global seulement : il mesure la cime des arbres le long des rivières",
     "genSmoothRoads": "Routes lissées dans le terrain",
     "genSmoothRoadsHint": "Plates en travers, lisses en long, raccordées aux carrefours",
-    "customExportTitle": "À l'export du niveau"
+    "customExportTitle": "À l'export du niveau",
+    "readyShort": "Les routes sont ajustées au terrain. Avec les données mondiales à 30 m, les bâtiments et les arbres sont aussi retirés du sol."
   },
   "panelSteps": {
     "where": "Lieu",
@@ -1805,7 +1808,8 @@
     "spawnHere": "Démarrer ici",
     "quicktravelHere": "Ajouter un point Quicktravel ici",
     "spawnName": "Départ",
-    "aimHandle": "Faites glisser pour orienter"
+    "aimHandle": "Faites glisser pour orienter",
+    "introShort": "Choisissez où la voiture démarre et ajoutez des lieux où sauter."
   },
   "backgroundAreas": {
     "title": "Masque de zones",
@@ -1879,7 +1883,8 @@
     "statRaw": "Sans lissage sur {pct} % du carré",
     "lockedPinned": "Le cadre est verrouillé ici pour zoomer et vous déplacer en dessinant (maintenez Espace et faites glisser pour bouger la carte avec un outil choisi).",
     "unlock": "Déverrouiller",
-    "hintTooSmall": "Cette ligne ferme bien une zone, mais trop petite pour être ombrée sur une carte de cette taille. Entourez une zone plus grande (environ {metres} m de large ou plus)."
+    "hintTooSmall": "Cette ligne ferme bien une zone, mais trop petite pour être ombrée sur une carte de cette taille. Entourez une zone plus grande (environ {metres} m de large ou plus).",
+    "introShort": "Ombrez les collines où vous ne roulerez pas : elles gardent leur forme, mais rien n'y est construit."
   },
   "build": {
     "title": "Que construire",

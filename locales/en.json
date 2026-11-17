@@ -721,7 +721,8 @@
       "curbHeight_standard": "Standard (15 cm)",
       "curbHeight_low": "Low (8 cm)",
       "curbHeight_flush": "Flush (3 cm)",
-      "curbHeightHint": "How far the raised sidewalks stand over the road. Standard is a real curb; Low and Flush are kinder to low cars and easy to drive onto."
+      "curbHeightHint": "How far the raised sidewalks stand over the road. Standard is a real curb; Low and Flush are kinder to low cars and easy to drive onto.",
+      "viewDistanceShort": "How far the game draws the level."
     },
     "weight": {
       "title": "How heavy is this level?",
@@ -747,7 +748,8 @@
       "squareCropTip": "To keep all of it, generate again at {mpp} m/px ({size} px)."
     },
     "downloadReady": "Download ready: {name}",
-    "viewDistance": "View distance"
+    "viewDistance": "View distance",
+    "gameTextureBlendShort": "How much of the satellite picture the Game texture takes."
   },
   "controlPanel": {
     "resolutionOutputSize": "Resolution (output size)",
@@ -1623,7 +1625,8 @@
     "genLowerWaterHint": "Global 30 m only: it reads the tree tops along rivers",
     "genSmoothRoads": "Roads smoothed into the terrain",
     "genSmoothRoadsHint": "Level across, smooth along, joined at junctions",
-    "customExportTitle": "In the level export"
+    "customExportTitle": "In the level export",
+    "readyShort": "Roads are fitted to the terrain. On the global 30 m data, buildings and trees are also taken out of the ground."
   },
   "panelSteps": {
     "where": "Location",
@@ -1810,7 +1813,8 @@
     "spawnHere": "Spawn here",
     "quicktravelHere": "Add quicktravel point here",
     "spawnName": "Spawn",
-    "aimHandle": "Drag to aim"
+    "aimHandle": "Drag to aim",
+    "introShort": "Pick where the car starts and add places to jump to."
   },
   "backgroundAreas": {
     "title": "Area Mask",
@@ -1884,7 +1888,8 @@
     "statRaw": "No smoothing on {pct}% of the square",
     "lockedPinned": "The area box is locked here so you can zoom and pan to draw (hold Space and drag to move the map with a tool picked).",
     "unlock": "Unlock",
-    "hintTooSmall": "This line does close an area, but one too small to shade on a map this size. Draw round a bigger area (about {metres} m across or more)."
+    "hintTooSmall": "This line does close an area, but one too small to shade on a map this size. Draw round a bigger area (about {metres} m across or more).",
+    "introShort": "Shade the hills you won't drive: they keep their shape but get nothing built on them."
   },
   "build": {
     "title": "What to build",

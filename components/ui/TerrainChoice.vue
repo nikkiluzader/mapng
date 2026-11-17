@@ -29,7 +29,8 @@
           <span v-if="option.value === 'ready'" class="ml-1 text-micro font-semibold text-brand">{{ t('terrainChoice.recommended') }}</span>
         </span>
         <!-- (the picked one says what it does; the others only their name) -->
-        <span v-if="terrainMode === option.value" class="block text-caption leading-snug text-gray-500 dark:text-gray-400">{{ option.hint }}</span>
+        <ShortHint v-if="terrainMode === option.value && option.short" :short="option.short" :more="option.hint" />
+        <span v-else-if="terrainMode === option.value" class="block text-caption leading-snug text-gray-500 dark:text-gray-400">{{ option.hint }}</span>
       </span>
     </label>
 
@@ -56,6 +57,7 @@
 </template>
 
 <script setup>
+import ShortHint from '../base/ShortHint.vue';
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { AlertTriangle } from 'lucide-vue-next';
@@ -73,7 +75,7 @@ const { t } = useI18n({ useScope: 'global' });
 // (the global 30 m could be what the level is built from: Best free where there is no lidar)
 const coarse = computed(() => !props.upload && ['mapterhorn', 'default'].includes(String(props.elevationSource || 'mapterhorn')));
 const options = computed(() => [
-  { value: 'ready', label: t('terrainChoice.ready'), hint: t(coarse.value ? 'terrainChoice.readyHint30' : 'terrainChoice.readyHintFine') },
+  { value: 'ready', label: t('terrainChoice.ready'), short: t('terrainChoice.readyShort'), hint: t(coarse.value ? 'terrainChoice.readyHint30' : 'terrainChoice.readyHintFine') },
   { value: 'custom', label: t('terrainChoice.custom'), hint: t('terrainChoice.customHint') },
   { value: 'untouched', label: t('terrainChoice.untouched'), hint: t('terrainChoice.untouchedHint') },
 ]);
