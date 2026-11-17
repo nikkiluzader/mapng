@@ -46,12 +46,13 @@ header.top .brand { color: var(--text); opacity: 1; padding: 14px 0; }
 :root[data-theme="dark"] .pg-theme .pg-moon, :root[data-theme="light"] .pg-theme .pg-sun { display: none; }
 .pg-fold svg { transition: transform .15s; }
 header.top.pg-collapsed .pg-fold svg { transform: rotate(180deg); }
-/* this page's sections: one row, scrolled sideways when it does not fit */
-.pg-sections { display: flex; gap: 2px; overflow-x: auto; padding: 0 0 8px; margin: 0; scrollbar-width: thin; border-top: 1px solid var(--border); padding-top: 8px; }
-.pg-sections::before { content: attr(data-label); flex: none; align-self: center; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-right: 8px; }
-.pg-sections a { flex: none; font-size: 12.5px; text-decoration: none; color: var(--text-2); padding: 4px 9px; border-radius: 999px; border: 1px solid transparent; white-space: nowrap; }
-.pg-sections a:hover { background: var(--surface-2); color: var(--text); }
-.pg-sections a[aria-current="true"] { border-color: var(--brand); color: var(--brand-ink); background: var(--brand-tint); }
+/* this page's sections: every one shown as a pill, on as many rows as they need (no sideways scrolling); the
+   one being read is the orange pill */
+.pg-sections { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; padding: 8px 0 10px; border-top: 1px solid var(--border); }
+.pg-sections::before { content: attr(data-label); flex: none; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-right: 4px; }
+.pg-sections a { flex: none; font-size: 12.5px; line-height: 1.3; text-decoration: none; color: var(--text-2); padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); white-space: nowrap; }
+.pg-sections a:hover { border-color: var(--brand); color: var(--text); }
+.pg-sections a[aria-current="true"] { border-color: var(--brand); background: var(--brand); color: #fff; }
 /* folded: the logo and the two buttons only */
 header.top.pg-collapsed .pg-nav, header.top.pg-collapsed .pg-sections { display: none; }
 header.top.pg-collapsed .pg-bar { padding: 6px 0; }

@@ -1,7 +1,7 @@
 // The info pages' header, as in the app, built here from what each page already holds:
 //   row one: the logo, the links between the pages, the light / dark switch, and a button that folds the header;
-//   row two: this page's own sections (every <section id>: its data-nav name, else the page's own short name for
-//            it, else its heading), the one being read marked.
+//   below:   this page's own sections as pills, all of them, on as many rows as they need (every <section id>:
+//            its data-nav name, else the page's own short name for it, else its heading), the one being read orange.
 // The header stays at the top of the window. The page's title and opening lines are moved out of it, to the top of
 // the page. Folded or not is kept (and a narrow screen starts folded). The theme itself is set before the first
 // paint by the short script in each page's head: ?theme=dark|light from the app's link, else the app's own choice
@@ -90,8 +90,6 @@
       if (at === current) return;
       current = at;
       links.forEach((a, i) => { if (i === at) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current'); });
-      // (kept in view in its row, without moving the page)
-      if (at >= 0 && !header.classList.contains('pg-collapsed')) { const a = links[at]; const target = a.offsetLeft - (list.clientWidth - a.offsetWidth) / 2; list.scrollTo({ left: Math.max(0, target), behavior: 'smooth' }); }
     };
     let waiting = false;
     window.addEventListener('scroll', () => { if (waiting) return; waiting = true; requestAnimationFrame(() => { waiting = false; mark(); }); }, { passive: true });
