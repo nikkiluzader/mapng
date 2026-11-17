@@ -879,6 +879,9 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
     const a = approaches[e];
     if (!a?.xy || a.xy.length < 2 || Number.isFinite(a.deckZ) || a.onBridge || free[e]) return [];
     const ap = stations(a.xy).slice(1);
+    // (an approach shorter than one station has nothing to grade: with a bridge over it the height under that
+    // bridge was read from no station at all and the export stopped, "reading 'x'": report MR-MFZMCA, New York)
+    if (!ap.length) return [];
     const z0 = e === 0 ? z[0] : z[n - 1];
     const out = [];
     let calm = 0;
