@@ -273,6 +273,15 @@
             </div>
           </div>
 
+          <!-- (the website: what was saved, kept in the panel after the window is closed) -->
+          <div v-if="beamNGWebSaved" id="mapng-export-outcome-saved-web" class="w-full flex items-start gap-2 p-2 rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50">
+            <CheckCircle2 :size="14" class="shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
+            <div class="min-w-0 flex-1 space-y-1">
+              <div class="text-caption font-medium text-gray-700 dark:text-gray-200 [overflow-wrap:anywhere]">{{ t(beamNGWebSaved.where === 'download' ? 'exportPanel.done.panelReady' : 'exportPanel.done.panelSaved', { name: beamNGWebSaved.filename }) }}</div>
+              <div class="text-micro text-gray-500 dark:text-gray-400">{{ t(beamNGWebSaved.where === 'download' ? 'exportPanel.done.whereDownload' : beamNGWebSaved.where === 'downloaded' ? 'exportPanel.done.whereDownloaded' : 'exportPanel.done.whereChosen') }}</div>
+            </div>
+          </div>
+
           <div
             v-if="beamNGDesktopSaved"
             id="mapng-export-outcome-saved"
@@ -582,12 +591,47 @@
   <Teleport to="body">
     <Transition name="fade">
       <div
-        v-if="isExportingBeamNGLevel"
+        v-if="isExportingBeamNGLevel || exportDone"
         class="fixed inset-0 z-[9999] flex items-center justify-center p-4 pb-28 overflow-y-auto bg-gray-900/10 dark:bg-black/25"
+        @click.self="exportDone && closeExportDone()"
       >
         <!-- the stage card (components/ui/StageLoader.vue), fed by the exporter's
              phases (EXPORT_STEP_GROUPS) -->
+        <!-- Done: the window stays until it is closed, and says what was saved and where. It used to close by
+             itself, and on the website nothing then said the level had been saved. -->
+        <div v-if="exportDone && !isExportingBeamNGLevel" data-testid="export-done" role="dialog" aria-modal="true" :aria-label="t('exportPanel.done.title')"
+          class="w-full max-w-md rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-2xl p-5 space-y-3">
+          <div class="flex items-center gap-3">
+            <span class="flex items-center justify-center w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 shrink-0"><CheckCircle2 :size="22" /></span>
+            <div class="min-w-0">
+              <h3 class="font-display text-base font-bold text-gray-900 dark:text-white">{{ t('exportPanel.done.title') }}</h3>
+              <p class="text-caption text-gray-500 dark:text-gray-400">{{ t('exportPanel.done.summary', { size: formatBytes(exportDone.size || 0), time: formatExportTime(exportDone.ms) }) }}</p>
+            </div>
+          </div>
+          <div class="rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-3 space-y-1.5">
+            <p class="text-micro font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t(exportDone.where === 'download' ? 'exportPanel.done.readyLabel' : 'exportPanel.done.savedLabel') }}</p>
+            <p class="font-mono text-caption text-gray-900 dark:text-gray-100 [overflow-wrap:anywhere]" data-testid="export-done-name">{{ exportDone.filename }}</p>
+            <p class="text-caption text-gray-600 dark:text-gray-300 [overflow-wrap:anywhere]" data-testid="export-done-where">
+              <template v-if="exportDone.where === 'mods'">{{ t('exportPanel.done.whereMods', { path: exportDone.folder }) }}</template>
+              <template v-else-if="exportDone.where === 'chosen'">{{ t('exportPanel.done.whereChosen') }}</template>
+              <template v-else-if="exportDone.where === 'downloaded'">{{ t('exportPanel.done.whereDownloaded') }}</template>
+              <template v-else>{{ t('exportPanel.done.whereDownload') }}</template>
+            </p>
+          </div>
+          <p class="text-caption text-gray-500 dark:text-gray-400">{{ t(exportDone.where === 'mods' ? 'exportPanel.desktopLoadHint' : 'exportPanel.done.nextWeb') }}</p>
+          <div class="flex flex-wrap items-center justify-end gap-2 pt-1">
+            <a v-if="exportDone.where === 'download' && beamNGPendingDownloadUrl" :href="beamNGPendingDownloadUrl" :download="beamNGPendingDownloadName || 'beamng_level.zip'" data-testid="export-done-download"
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-caption font-medium transition-colors" @click="handleBeamNGPendingDownloadClick">
+              <Download :size="14" />{{ t('exportPanel.done.download') }}
+            </a>
+            <button v-if="exportDone.where === 'mods'" type="button" class="flex items-center gap-1.5 px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 text-caption text-gray-700 dark:text-gray-200 hover:border-brand hover:text-brand transition-colors" @click="showDesktopSavedLevel">
+              <FolderOpen :size="14" />{{ t('exportPanel.desktopShowInFolder') }}
+            </button>
+            <button type="button" data-testid="export-done-close" ref="exportDoneCloseButton" class="px-4 py-1.5 rounded bg-brand hover:bg-brand-500 text-white text-caption font-semibold transition-colors" @click="closeExportDone">{{ t('exportPanel.done.close') }}</button>
+          </div>
+        </div>
         <StageLoader
+          v-else
           :title="t('exportPanel.exportingBeamng')"
           :finished="exportFinished"
           :steps="exportSteps"
@@ -726,6 +770,25 @@ const isExportingDAE = ref(false);
 const isExportingTER = ref(false);
 const isExportingOSM = ref(false);
 const isExportingBeamNGLevel = ref(false);
+// The export's "done" window: { filename, size, ms, where: 'mods' | 'chosen' | 'download', folder }. It stays until
+// closed. 'chosen' is the file the visitor picked in the browser's save window: a page is told the file's name,
+// never its folder, so the window says "the folder you picked". 'download' is a browser with no save window: the
+// level waits behind a Download button and lands in the browser's downloads folder.
+const exportDone = ref(null);
+const beamNGWebSaved = ref(null);
+const exportDoneCloseButton = ref(null);
+// (what follows a finished export, the support card among it, waits for this window to be closed: it came up
+// underneath it)
+let announceWhenClosed = null;
+const closeExportDone = () => {
+  exportDone.value = null;
+  if (announceWhenClosed) { const [type, filename] = announceWhenClosed; announceWhenClosed = null; notifyExportSuccess(type, filename); }
+};
+const formatExportTime = (ms) => { const s = Math.max(1, Math.round((ms || 0) / 1000)); return s >= 60 ? `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s` : `${s} s`; };
+const onExportDoneKey = (ev) => { if (ev.key === 'Escape' && exportDone.value && !isExportingBeamNGLevel.value) closeExportDone(); };
+if (typeof window !== 'undefined') window.addEventListener('keydown', onExportDoneKey);
+onUnmounted(() => { if (typeof window !== 'undefined') window.removeEventListener('keydown', onExportDoneKey); });
+watch(exportDone, (v) => { if (v) nextTick(() => exportDoneCloseButton.value?.focus?.()); });
 const beamNGProgressStep = ref('');
 const beamNGProgressPct  = ref(0);
 // Finished export steps ({ step, durationMs }) and the time since export began.
@@ -1152,6 +1215,7 @@ const clearPendingBeamNGDownload = () => {
   beamNGPendingDownloadUrl.value = '';
   beamNGPendingDownloadName.value = '';
   beamNGDesktopSaved.value = null;
+  beamNGWebSaved.value = null; exportDone.value = null;
   beamNGDesktopFailed.value = null;
 };
 
@@ -2190,6 +2254,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
   // (a note that an export is running, with the settings as they are: services/sessionGuard.js)
   currentSessionCode().then((code) => { if (isExportingBeamNGLevel.value) markJobStart('export', { code, build: typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : '' }); }).catch(() => {});
   let exportSucceeded = false;
+  let doneInfo = null;   // (what the "done" window says: set where the level is written)
   beamNGProgressStep.value = `${t('progressStages.export.prepare')}…`;
   beamNGProgressPct.value  = 0;
   beamNGProgressDone.value = [];
@@ -2366,9 +2431,10 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       exportSucceeded = true;
       console.log(`${BEAMNG_EXPORT_UI_LOG} Desktop export written:`, saved);
       beamNGDesktopSaved.value = { path: saved.path, filename: saved.filename };
+      doneInfo = { filename: saved.filename, size: saved.size, where: 'mods', folder: String(saved.path || '').replace(/[\\/][^\\/]*$/, '') };
       lastExport.value = { inputs: inputsAtStart, at: Date.now(), filename: saved.filename, desktop: { path: saved.path, size: saved.size }, blob: null };
       showExportOutcome('mapng-export-outcome-saved');
-      notifyExportSuccess('beamng_level_zip', saved.filename);
+      announceWhenClosed = ['beamng_level_zip', saved.filename];
       onLevelExported(props.center);
       return;
     }
@@ -2409,13 +2475,16 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       await writable.write(blob);
       await writable.close();
       console.log(`${BEAMNG_EXPORT_UI_LOG} Download written via File System Access API.`);
-      notifyExportSuccess('beamng_level_zip', filename);
+      // (the name the visitor gave it in the save window)
+      doneInfo = { filename: beamNGSaveHandle.name || filename, size: blob.size, where: 'chosen' };
+      announceWhenClosed = ['beamng_level_zip', filename];
       console.log(`${BEAMNG_EXPORT_UI_LOG} Export success notification emitted.`);
     } else {
       // Stage a blob URL and expose a real user-clicked anchor download link.
       beamNGPendingDownloadUrl.value = URL.createObjectURL(blob);
       beamNGPendingDownloadName.value = filename;
       console.warn(`${BEAMNG_EXPORT_UI_LOG} Auto-download fallback blocked risk detected; awaiting explicit anchor click.`);
+      doneInfo = { filename, size: blob.size, where: 'download' };
     }
     exportSucceeded = true;
   } catch (error) {
@@ -2436,6 +2505,11 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
     clearInterval(elapsedTimer);
     // (done: the card runs on to 100 % before it goes)
     if (exportSucceeded) { exportFinished.value = true; await new Promise((resolve) => setTimeout(resolve, 450)); exportFinished.value = false; }
+    // (the window stays, as "done": what was saved and where, until it is closed)
+    if (exportSucceeded && doneInfo) {
+      exportDone.value = { ...doneInfo, ms: performance.now() - startedAt };
+      beamNGWebSaved.value = doneInfo.where === 'mods' ? null : { filename: doneInfo.filename, where: doneInfo.where };
+    }
     isExportingBeamNGLevel.value = false;
     beamNGProgressStep.value = '';
     beamNGProgressPct.value  = 0;
@@ -2466,7 +2540,10 @@ const handleBeamNGPendingDownloadClick = () => {
     }
   }, 120_000);
 
-  notifyExportSuccess('beamng_level_zip', filename);
+  // (the browser has it now: the window and the panel say "saved", not "ready")
+  if (exportDone.value?.where === 'download') exportDone.value = { ...exportDone.value, where: 'downloaded' };
+  if (beamNGWebSaved.value?.where === 'download') beamNGWebSaved.value = { ...beamNGWebSaved.value, where: 'downloaded' };
+  announceWhenClosed = ['beamng_level_zip', filename];
   console.log(`${BEAMNG_EXPORT_UI_LOG} Export success notification emitted after explicit anchor click.`);
 };
 

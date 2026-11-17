@@ -565,6 +565,7 @@
     "cleanupToolLinkLabel": "BeamNG Level Cleanup",
     "cleanupToolCredit": " to generate a much more detailed map. Tool by AlexKidd.",
     "exportingBeamng": "Exporting BeamNG level",
+    "done": {"title": "Export complete", "summary": "{size}, built in {time}", "savedLabel": "Saved", "readyLabel": "Ready to save", "whereMods": "In your BeamNG mods folder: {path}", "whereChosen": "It is in the folder you picked in the save window. (A browser tells a page the file's name, not its folder, so MapNG cannot show the path.)", "whereDownload": "Click Download to save it. Your browser puts it in its downloads folder.", "nextWeb": "To play it: move the zip into BeamNG.drive's mods folder, then choose Freeroam and pick the level.", "download": "Download", "close": "Close", "panelSaved": "Saved: {name}", "panelReady": "Ready to save: {name}", "whereDownloaded": "Your browser saved it to its downloads folder."},
     "mayTakeWhile": "This may take a while for large maps",
     "elapsed": "Elapsed",
     "hybrid": "Hybrid",

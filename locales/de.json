@@ -560,6 +560,7 @@
     "cleanupToolLinkLabel": "BeamNG Level Cleanup",
     "cleanupToolCredit": ", um eine viel detailliertere Karte zu erzeugen. Tool von AlexKidd.",
     "exportingBeamng": "BeamNG-Level wird exportiert",
+    "done": {"title": "Export abgeschlossen", "summary": "{size}, erstellt in {time}", "savedLabel": "Gespeichert", "readyLabel": "Bereit zum Speichern", "whereMods": "In deinem BeamNG-Mods-Ordner: {path}", "whereChosen": "Sie liegt in dem Ordner, den du im Speichern-Fenster gewählt hast. (Ein Browser nennt einer Seite nur den Dateinamen, nicht den Ordner, daher kann MapNG den Pfad nicht anzeigen.)", "whereDownload": "Klicke auf Herunterladen, um sie zu speichern. Dein Browser legt sie in seinem Download-Ordner ab.", "nextWeb": "Zum Spielen: Verschiebe die Zip-Datei in den Mods-Ordner von BeamNG.drive, wähle dann Freeroam und das Level.", "download": "Herunterladen", "close": "Schließen", "panelSaved": "Gespeichert: {name}", "panelReady": "Bereit zum Speichern: {name}", "whereDownloaded": "Dein Browser hat sie in seinem Download-Ordner gespeichert."},
     "mayTakeWhile": "Das kann bei großen Karten etwas dauern",
     "elapsed": "Verstrichen",
     "hybrid": "Hybrid",
