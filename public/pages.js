@@ -83,14 +83,26 @@
   if (list) {
     const links = [...list.querySelectorAll('a')];
     let current = -1;
+    // A link that was clicked is the section being read, until the reader scrolls by hand: the last sections of a
+    // page cannot reach the top of the window (the page ends first), so by position alone they never lit up.
+    let chosen = -1;
     const mark = () => {
       const line = header.offsetHeight + 24;
       let at = -1;
       sections.forEach((s, i) => { if (s.el.getBoundingClientRect().top <= line) at = i; });
+      // (at the very end of the page: the last section, whatever its position)
+      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2) at = sections.length - 1;
+      if (chosen >= 0) at = chosen;
       if (at === current) return;
       current = at;
       links.forEach((a, i) => { if (i === at) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current'); });
     };
+    links.forEach((a, i) => a.addEventListener('click', () => { chosen = i; mark(); }));
+    const byHand = () => { if (chosen >= 0) { chosen = -1; mark(); } };
+    for (const kind of ['wheel', 'touchmove']) window.addEventListener(kind, byHand, { passive: true });
+    window.addEventListener('keydown', (ev) => { if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(ev.key)) byHand(); });
+    // (the scrollbar dragged: a press on the page that is not on a link)
+    window.addEventListener('mousedown', (ev) => { if (!ev.target.closest || !ev.target.closest('.pg-sections a')) byHand(); });
     let waiting = false;
     window.addEventListener('scroll', () => { if (waiting) return; waiting = true; requestAnimationFrame(() => { waiting = false; mark(); }); }, { passive: true });
     mark();
