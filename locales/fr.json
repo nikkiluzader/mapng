@@ -2069,7 +2069,8 @@
       "capsShort": "Lève les limites sur les bâtiments, clôtures, lampadaires et arbres.",
       "showModels": "Afficher les modèles de {kind}",
       "on": "oui",
-      "off": "non"
+      "off": "non",
+      "widthsOffShort": "Désactivé : chaque route prend la largeur habituelle de sa classe."
     }
   },
   "backupData": {

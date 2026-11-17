@@ -2069,7 +2069,8 @@
       "capsShort": "Hebt die Grenzen für Gebäude, Zäune, Laternen und Bäume auf.",
       "showModels": "Modelle von {kind} anzeigen",
       "on": "an",
-      "off": "aus"
+      "off": "aus",
+      "widthsOffShort": "Aus: Jede Straße bekommt die übliche Breite ihrer Klasse."
     }
   },
   "backupData": {

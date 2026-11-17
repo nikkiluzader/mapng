@@ -2074,7 +2074,8 @@
       "capsShort": "Lifts the limits on buildings, fences, lamps and trees.",
       "showModels": "Show the models of {kind}",
       "on": "on",
-      "off": "off"
+      "off": "off",
+      "widthsOffShort": "Off: each road gets its class's usual width."
     }
   },
   "statusLines": {

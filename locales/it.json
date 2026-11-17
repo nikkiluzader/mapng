@@ -2069,7 +2069,8 @@
       "capsShort": "Toglie i limiti a edifici, recinzioni, lampioni e alberi.",
       "showModels": "Mostra i modelli di {kind}",
       "on": "sì",
-      "off": "no"
+      "off": "no",
+      "widthsOffShort": "Disattivato: ogni strada prende la larghezza abituale della sua classe."
     }
   },
   "backupData": {

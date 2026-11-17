@@ -2069,7 +2069,8 @@
       "capsShort": "Quita los límites de edificios, vallas, farolas y árboles.",
       "showModels": "Mostrar los modelos de {kind}",
       "on": "sí",
-      "off": "no"
+      "off": "no",
+      "widthsOffShort": "Desactivado: cada carretera usa el ancho habitual de su clase."
     }
   },
   "backupData": {

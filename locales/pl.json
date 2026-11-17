@@ -2069,7 +2069,8 @@
       "capsShort": "Znosi limity budynków, ogrodzeń, latarni i drzew.",
       "showModels": "Pokaż modele: {kind}",
       "on": "wł.",
-      "off": "wył."
+      "off": "wył.",
+      "widthsOffShort": "Wyłączone: każda droga dostaje typową szerokość swojej klasy."
     }
   },
   "backupData": {

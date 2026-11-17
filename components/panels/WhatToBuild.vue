@@ -226,7 +226,7 @@
             </TuneRow>
             <!-- road widths measured from the satellite picture: set before Generate (it downloads), so only pointed to here -->
             <TuneRow :title="t('exportPanel.ui.measuredWidths')" :short="measuredWidthsShort" :more="measuredWidthsShort === measuredWidthsNote ? '' : measuredWidthsNote" :more-label="t('build.tune.more')" :less-label="t('build.tune.less')" data-testid="measured-widths-note">
-              <template #control><button type="button" class="shrink-0 text-caption font-medium text-brand hover:underline" @click="showMeasureSetting">{{ t('exportPanel.ui.measuredWidthsChange') }}</button></template>
+              <button type="button" class="block text-caption font-medium text-brand hover:underline" @click="showMeasureSetting">{{ t('exportPanel.ui.measuredWidthsChange') }}</button>
             </TuneRow>
             <!-- sidewalks as flat decals on the ground instead of raised meshes (exportBeamNGLevel.js sidewalkStyle) -->
             <TuneRow :title="t('exportPanel.ui.decalSidewalks')" :short="t('build.tune.walksShort')" :more="t('exportPanel.ui.decalSidewalksHint')" :more-label="t('build.tune.more')" :less-label="t('build.tune.less')">
@@ -239,9 +239,10 @@
                   v-for="k in CURB_HEIGHT_KEYS" :key="k" type="button" role="radio"
                   :aria-checked="curbHeight === k" :disabled="!roadsBuilt || !hasOsmData || decalSidewalks"
                   @click="$emit('update:curbHeight', k)"
-                  class="px-1 py-1 rounded text-caption transition-colors disabled:cursor-not-allowed"
+                  :aria-label="t(`exportPanel.ui.curbHeight_${k}`)"
+                  class="px-1 py-1 rounded text-caption leading-tight transition-colors disabled:cursor-not-allowed"
                   :class="curbHeight === k ? 'bg-brand text-white shadow-sm font-medium' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700'"
-                >{{ t(`exportPanel.ui.curbHeight_${k}`) }}</button>
+                ><span class="block truncate">{{ twoLines(t(`exportPanel.ui.curbHeight_${k}`))[0] }}</span><span class="block text-micro opacity-80 tabular-nums">{{ twoLines(t(`exportPanel.ui.curbHeight_${k}`))[1] }}</span></button>
               </div>
             </TuneRow>
           </div>
@@ -388,7 +389,10 @@ const setTreeChoice = (group, choice) => {
   emit('update:treeSwaps', swaps);
 };
 // (the note's first sentence on the row, the whole of it behind the info button)
-const measuredWidthsShort = computed(() => { const s = String(measuredWidthsNote.value || ''); const i = s.search(/[.。](\s|$)/); return i > 0 && i < s.length - 1 ? s.slice(0, i + 1) : s; });
+const measuredWidthsShort = computed(() => (measuredRoads.value > 0 ? t('exportPanel.ui.measuredWidthsUsedOf', { n: measuredRoads.value, total: roadPieces.value }) : measureWidthsOn.value ? firstSentence(t('exportPanel.ui.measuredWidthsOnNone')) : t('build.tune.widthsOffShort')));
+const firstSentence = (s0) => { const s = String(s0 || ''); const k = s.search(/[.。](\s|$)/); return k > 0 && k < s.length - 1 ? s.slice(0, k + 1) : s; };
+// (a choice's label in two lines: "Standard (15 cm)" is its name and, smaller, its measure)
+const twoLines = (label) => { const m = String(label).match(/^(.*?)\s*\(([^)]*)\)\s*$/); return m ? [m[1], m[2]] : [String(label), '']; };
 // Fine-tuning's groups fold; which are open is kept for the next visit (none at first: four rows, each with what is set)
 const TUNE_OPEN_KEY = 'mapng_tune_open';
 const tuneOpen = reactive({ green: false, roads: false, bridges: false, limits: false });
