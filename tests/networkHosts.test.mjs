@@ -53,3 +53,31 @@ test('network activity: requests are counted by host, unlisted addresses come fi
   }
   noteHost('<img src=x onerror=1>.example'); assert.ok(!activityHtml(networkText('en'), '1').includes('<img'), 'names are escaped');
 });
+
+test('the address guard: listed addresses and the user\'s own server pass, everything else is refused', async () => {
+  const { allowedUrl, setOwnServer } = await import('../desktop/networkGuard.js');
+  setOwnServer('');
+  for (const ok of ['https://mapng.com/api/osm', 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/1/1/1.png', 'https://prd-tnm.s3.amazonaws.com/x.tif',
+    'https://b.tile.openstreetmap.org/1/1/1.png', 'https://objects.githubusercontent.com/x', 'https://rockyweb.usgs.gov/vdelivery/x', 'app://mapng/index.html',
+    'data:text/plain,hi', 'blob:app://mapng/123', 'devtools://devtools/bundled/x', 'http://localhost:5173/', 'ws://127.0.0.1:5173/', 'not an address']) assert.equal(allowedUrl(ok).ok, true, ok);
+  for (const no of ['https://example.com/', 'http://evil.test/x', 'https://mapng.com.evil.test/', 'https://evilmapng.com/', 'wss://tracker.example/', 'https://amazonaws.com.evil.test/x', 'https://192.0.2.7/x']) {
+    const v = allowedUrl(no); assert.equal(v.ok, false, no); assert.ok(v.host, 'the refused host is named');
+  }
+  assert.equal(allowedUrl('https://my-overpass.example.org/api/interpreter').ok, false, 'not before it is set');
+  assert.equal(setOwnServer('https://user:key@my-overpass.example.org/overpass/KEY/interpreter'), 'my-overpass.example.org');
+  assert.equal(allowedUrl('https://my-overpass.example.org/api/interpreter').ok, true);
+  assert.equal(allowedUrl('https://other.example.org/api/interpreter').ok, false);
+  assert.equal(setOwnServer('http://insecure.example.org/'), '', 'https only');
+  assert.equal(allowedUrl('https://my-overpass.example.org/api/interpreter').ok, false, 'cleared with the setting');
+  setOwnServer('');
+});
+
+test('network activity: a refused address is counted apart and shown as refused', async () => {
+  const { noteHost, activityRows, activityHtml, resetActivity } = await import('../desktop/networkActivity.js');
+  const { networkText } = await import('../desktop/menuText.js');
+  resetActivity();
+  noteHost('mapng.com'); noteHost('tracker.example', false, true); noteHost('tracker.example', false, true);
+  const rows = activityRows();
+  assert.deepEqual(rows.map((r) => [r.host, r.count, r.blocked]), [['tracker.example', 0, 2], ['mapng.com', 1, 0]]);
+  for (const lang of ['en', 'de', 'es', 'fr', 'it', 'pl', 'ru']) { const t = networkText(lang); assert.ok(activityHtml(t, '1').includes(t.blocked.replace(/'/g, '&#39;')), lang); assert.ok(t.blockedDetail.includes('{host}') && t.blockedTitle && t.refused, lang); }
+});

@@ -2,9 +2,11 @@
 //   - the page public/data.html (its table of exact addresses: tests/networkHosts.test.mjs keeps the two in step);
 //   - the desktop app's Help > Network Activity window, which shows what was contacted in this session and marks
 //     anything that is not on this list;
+//   - the desktop app's address guard (networkGuard.js): it refuses any address that is not on this list;
 //   - the test that reads the code for addresses and fails when one is added without being listed here.
 // A host starting with a dot stands for every name ending in it (".amazonaws.com": the buckets USGS hands out).
-// Not on the list by design: the Overpass server a user sets as their own (their choice of address), and pages
+// Not on the list by design: the Overpass server a user sets as their own (their choice of address: the guard
+// lets that one host through), and pages
 // that only open in the user's browser when they click a link (LINKS_ONLY below).
 
 export const NETWORK_KINDS = ['mapng', 'elevation', 'pictures', 'mapdata', 'search', 'landcover', 'trees', 'projection', 'updates', 'analytics'];
@@ -19,11 +21,14 @@ export const NETWORK_HOSTS = [
   { host: 's3.opengeohub.org', kind: 'elevation', what: 'OpenGeoHub GEDTM30' },
   { host: 'tnmaccess.nationalmap.gov', kind: 'elevation', what: 'USGS: which lidar files cover an area' },
   { host: 'elevation.nationalmap.gov', kind: 'elevation', what: 'USGS 3DEP elevation' },
+  { host: '.nationalmap.gov', kind: 'elevation', what: 'USGS (The National Map)' },
+  { host: '.usgs.gov', kind: 'elevation', what: 'USGS: download addresses named by its own answers' },
   { host: 's3-us-west-2.amazonaws.com', kind: 'elevation', what: 'USGS lidar point clouds (measured bridge heights)' },
   { host: '.amazonaws.com', kind: 'elevation', what: 'USGS download buckets named by its own answers' },
   { host: 'api.gpxz.io', kind: 'elevation', what: 'GPXZ, with your own key' },
   { host: 'mapy.geoportal.gov.pl', kind: 'elevation', what: 'GUGiK (Poland)' },
   { host: 'opendata.geoportal.gov.pl', kind: 'elevation', what: 'GUGiK (Poland)' },
+  { host: '.geoportal.gov.pl', kind: 'elevation', what: 'GUGiK (Poland): download addresses named by its own answers' },
   // satellite pictures and map backgrounds
   { host: 'server.arcgisonline.com', kind: 'pictures', what: 'Esri satellite imagery and map backgrounds' },
   { host: 'services.arcgisonline.com', kind: 'pictures', what: 'Esri map labels' },

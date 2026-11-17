@@ -36,9 +36,14 @@ You never need the desktop app: the website does the same work in the browser. I
 
 - Every address in the code is listed in [`desktop/networkHosts.js`](desktop/networkHosts.js) and on
   [mapng.com/data.html](https://mapng.com/data.html#addresses); a test fails when one is added without
-  being listed. The desktop app shows what it has contacted under **Help > Network Activity** and marks
-  anything that is not on the list. The list is documentation and a check, not a block: the app can
-  also reach an Overpass server you set as your own.
+  being listed.
+- **The desktop app connects only to that list** (from the version after 0.3.3-dev.7), plus the Overpass
+  server you set as your own. Any other address is refused before a request is made, in the window and
+  in the export process ([`desktop/networkGuard.js`](desktop/networkGuard.js)); the app names what it
+  refused, and **Help > Network Activity** shows every address contacted or refused. You can lift this
+  yourself with `"allowUnlistedAddresses": true` in the app's `settings.json`; nothing else does.
+- The website runs in your browser and is not fenced in this way; there the list documents what the
+  code contains.
 - The desktop window runs sandboxed with context isolation and no Node access. Only MapNG's own pages
   may call the app's native side, the window cannot navigate elsewhere, and file writes are confined to
   the app's own folder, your Downloads folder and the BeamNG mods folder you chose.

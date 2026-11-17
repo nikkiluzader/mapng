@@ -3,6 +3,7 @@
 // Image, ImageData and createImageBitmap, and blob: URLs kept in memory so
 // images and fetch() can read them back. (scripts/sweep/polyfill.mjs stubs
 // the images instead; the desktop app needs the real ones.)
+import { allowedUrl, setOwnServer } from '../networkGuard.js';
 import { canvasToPng, encodeGray16 } from './fastPng.mjs';
 // (the level export's heightmap picture, written on many cores in this process: exportBeamNGLevel.js asks for it here)
 globalThis.__mapngEncodeGray16 = encodeGray16;
@@ -180,8 +181,20 @@ export function installBrowserShims({ assetsDir, apiOrigin = 'https://mapng.com'
       const blob = blobs.get(url);
       return Promise.resolve(blob ? new Response(blob) : new Response(null, { status: 404 }));
     }
-    // (the address goes to the app for Help > Network Activity: the host name only, never the path)
-    if (/^https?:/i.test(url || '') && process.send) { try { process.send({ type: 'net-host', host: new URL(url).hostname }); } catch { /* not an address */ } }
+    if (/^https?:/i.test(url || '')) {
+      // (only addresses on MapNG's list, and the user's own Overpass server, are asked: ../networkGuard.js.
+      // On when the app started this runner; a script that uses these shims by itself is not held to it)
+      if (process.env.MAPNG_NET_GUARD === '1') {
+        try { setOwnServer(globalThis.localStorage?.getItem('mapng_customOverpassUrl') || ''); } catch { /* none */ }
+        const verdict = allowedUrl(url);
+        if (!verdict.ok) {
+          if (process.send) process.send({ type: 'net-refused', host: verdict.host });
+          return Promise.reject(new TypeError(`MapNG did not connect to ${verdict.host}: it is not on MapNG's list of addresses (mapng.com/data.html#addresses)`));
+        }
+      }
+      // (the address goes to the app for Help > Network Activity: the host name only, never the path)
+      if (process.send) { try { process.send({ type: 'net-host', host: new URL(url).hostname }); } catch { /* not an address */ } }
+    }
     if (url?.startsWith('/api/') && apiFetch) return apiFetch(url, init);
     if (url?.startsWith('/api/')) {
       const headers = new Headers(init?.headers || undefined);

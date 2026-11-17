@@ -27,6 +27,7 @@ files:
   - updateSignature.js
   - networkHosts.js
   - networkActivity.js
+  - networkGuard.js
   - package.json
 extraResources:
   - from: ../dist

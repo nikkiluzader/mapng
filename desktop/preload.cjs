@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('mapngDesktop', {
   welcomeDone: (answers) => ipcRenderer.invoke('desktop:welcomeDone', answers),
   // (the window's language, for the app's own menu)
   setLanguage: (language) => ipcRenderer.invoke('desktop:setLanguage', language),
+  // (the origin of the user's own Overpass server, so the app's address guard lets it through)
+  setOwnServer: (origin) => ipcRenderer.invoke('desktop:setOwnServer', origin),
   chooseModsFolder: () => ipcRenderer.invoke('desktop:chooseModsFolder'),
   showItem: (file) => ipcRenderer.invoke('desktop:showItem', file),
   // a batch job's file was saved into Downloads/MapNG Batch: { name, path, state }

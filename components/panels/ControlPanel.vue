@@ -517,7 +517,11 @@ const customOverpassValid = computed(() => /^https:\/\/\S+$/.test(customOverpass
 watch(customOverpassUrl, (newVal) => {
   if (newVal) localStorage.setItem(CUSTOM_OVERPASS_STORAGE_KEY, newVal);
   else localStorage.removeItem(CUSTOM_OVERPASS_STORAGE_KEY);
-});
+  // (the desktop app asks only listed addresses: it is told this server's origin, never its key)
+  let origin = '';
+  try { if (/^https:\/\/\S+$/.test(newVal || '')) origin = new URL(newVal).origin; } catch { /* not an address yet */ }
+  window.mapngDesktop?.setOwnServer?.(origin);
+}, { immediate: true });
 
 watch(fetchOSM, (newVal) => {
   localStorage.setItem('mapng_fetchOSM', String(newVal));

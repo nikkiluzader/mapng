@@ -157,16 +157,17 @@ Open, by how often it was measured:
 7. Junction mouths in the road solve (still behind its switch): the right fix for side roads that arrive under
    the through road's edge, which decks now cover with a ramp of up to 0.75 m over their own line.
 
-## Trust: blocking addresses that are not on the list (agreed 2026-11-16, two steps)
+## Trust: the desktop app asks only listed addresses (done 2026-11-16, both steps)
 
-1. Now: the list documents and flags. `desktop/networkHosts.js` is every address in the code; Help > Network
-   Activity marks any address the app contacts that is not on it. Ship this in a release or two and watch for
-   unlisted addresses in real use (the sources no test here reaches: GUGiK, GPXZ with a key, USGS download
-   buckets, Overture, iNaturalist). Also owed on the next tag: the first run of the workflow's Checksums and
-   Build provenance steps.
-2. Then: the desktop app refuses any address not on the list, plus the user's own Overpass server when one is
-   set; a refused address is named in a clear message. After that the pages may say "it cannot connect anywhere
-   else" (public/data.html #addresses and SECURITY.md say today that the list is not a block).
+`desktop/networkHosts.js` is every address in the code; `desktop/networkGuard.js` refuses anything else in the
+window and in the export runner, except the user's own Overpass server. Help > Network Activity shows what was
+contacted and what was refused; a refused host is named in a message. The user's own way round it:
+`"allowUnlistedAddresses": true` in settings.json. Checked in the running app: unlisted addresses refused, own
+server let through and refused again once cleared, Generate and export unchanged.
+
+Watch after it ships: a data source whose downloads come from an address no test here reaches (GUGiK, GPXZ with a
+key, USGS download buckets, Overture, iNaturalist) would show as "A connection was refused" naming the host; add
+that host to the list and the data page.
 
 ## 2. Checks owed on work already on dev
 

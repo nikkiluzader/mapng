@@ -338,11 +338,14 @@ Content-Type: application/json
         <tr><td><code>s3.opengeohub.org</code></td><td>OpenGeoHub GEDTM30</td></tr>
         <tr><td><code>tnmaccess.nationalmap.gov</code></td><td>USGS: which lidar files cover an area</td></tr>
         <tr><td><code>elevation.nationalmap.gov</code></td><td>USGS 3DEP elevation</td></tr>
+        <tr><td><code>*.nationalmap.gov</code></td><td>USGS (The National Map)</td></tr>
+        <tr><td><code>*.usgs.gov</code></td><td>USGS: download addresses named by its own answers</td></tr>
         <tr><td><code>s3-us-west-2.amazonaws.com</code></td><td>USGS lidar point clouds (measured bridge heights)</td></tr>
         <tr><td><code>*.amazonaws.com</code></td><td>USGS download buckets named by its own answers</td></tr>
         <tr><td><code>api.gpxz.io</code></td><td>GPXZ, with your own key</td></tr>
         <tr><td><code>mapy.geoportal.gov.pl</code></td><td>GUGiK (Poland)</td></tr>
         <tr><td><code>opendata.geoportal.gov.pl</code></td><td>GUGiK (Poland)</td></tr>
+        <tr><td><code>*.geoportal.gov.pl</code></td><td>GUGiK (Poland): download addresses named by its own answers</td></tr>
         <tr><td><code>server.arcgisonline.com</code></td><td>Esri satellite imagery and map backgrounds</td></tr>
         <tr><td><code>services.arcgisonline.com</code></td><td>Esri map labels</td></tr>
         <tr><td><code>*.tile.openstreetmap.org</code></td><td>OpenStreetMap map tiles (that map layer only)</td></tr>
@@ -366,7 +369,8 @@ Content-Type: application/json
         <tr><td><code>cloudflareinsights.com</code></td><td>Cloudflare Web Analytics (website only)</td></tr>
       </tbody>
     </table></div>
-    <p>The desktop app shows this for itself: <b>Help &gt; Network Activity</b> lists every address it has connected to since it started, with the number of requests, and marks any address that is not on this list. A name with a star stands for every address ending in it (the storage addresses that USGS and GitHub hand out for a download).</p>
+    <p><b>The desktop app connects to nothing else.</b> From the version after 0.3.3-dev.7 on, it refuses any address that is not on this list, in its window and in its export process alike; the one addition is your own Overpass server, when you set one. A refused address is named in a message and nothing is sent to it. <b>Help &gt; Network Activity</b> lists every address the app has connected to since it started, with the number of requests, and shows anything it refused. A name with a star stands for every address ending in it (the storage addresses that USGS, GUGiK and GitHub hand out for a download). The only way to lift this is yours: a line in the app's own <code>settings.json</code> (<code>"allowUnlistedAddresses": true</code>).</p>
+    <p>The website runs in your browser, which MapNG cannot fence in the same way; there the list is what the code contains, checked by the test above.</p>
     <p>What MapNG does not do: it has no advertising or tracking code, it does not run anything in the background after you close it, and it downloads data only, never programs. The desktop app's own update is the one exception, and it is taken only when it carries MapNG's signature (below).</p>
   </section>
 

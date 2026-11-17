@@ -4,6 +4,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, net, Notification, protocol,
 import { missingParts, incompleteMessage } from './installCheck.js';
 import { menuText, updaterText, networkText } from './menuText.js';
 import { activityHtml, noteHost, watchSession } from './networkActivity.js';
+import { allowedUrl, setOwnServer } from './networkGuard.js';
 import { fork } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -335,6 +336,8 @@ function spawnRunner(script, dir) {
     // (UV_THREADPOOL_SIZE: native zlib compresses on that many threads, 4 by default)
     env: {
       ...process.env, MAPNG_ASSETS: DIST, MAPNG_API_ORIGIN: API_ORIGIN, MAPNG_VERSION: app.getVersion(),
+      // (the runner refuses addresses that are not on MapNG's list, as the window does: runner/browserShims.mjs)
+      MAPNG_NET_GUARD: guardOn() ? '1' : '0',
       ELECTRON_RUN_AS_NODE: undefined, UV_THREADPOOL_SIZE: String(Math.min(64, os.cpus().length)),
     },
     // (JSON messages: Electron's V8 and the bundled Node's write different
@@ -343,6 +346,7 @@ function spawnRunner(script, dir) {
   });
   // (every address the runner asks, for Help > Network Activity: networkActivity.js)
   child.on('message', (msg) => { if (msg?.type === 'net-host' && typeof msg.host === 'string') noteHost(msg.host.slice(0, 255)); });
+  child.on('message', (msg) => { if (msg?.type === 'net-refused' && typeof msg.host === 'string') refusedAddress(msg.host.slice(0, 255)); });
   // its mapng.com /api/* requests, made here (desktop/runner/common.mjs appApiFetch)
   child.on('message', async (msg) => {
     if (msg?.type !== 'api-fetch' || typeof msg.url !== 'string' || !msg.url.startsWith('/api/')) return;
@@ -1228,6 +1232,20 @@ ipcMain.handle('levels:cancel', (_event, levelName) => {
 
 const REPO = 'https://github.com/nikkiluzader/mapng';
 
+// (the user's own switch, in settings.json only: "allowUnlistedAddresses": true lets the app ask any address)
+const guardOn = () => readSettings().allowUnlistedAddresses !== true;
+const toldRefused = new Set();
+/** An address the guard refused: counted for Network Activity, and said once (the first few hosts of a session). */
+function refusedAddress(host) {
+  noteHost(host, false, true);
+  if (!host || toldRefused.has(host) || toldRefused.size >= 3 || process.env.MAPNG_TEST_NO_BROWSER) { toldRefused.add(host); return; }
+  toldRefused.add(host);
+  const text = networkText(readSettings().language || app.getLocale());
+  const win = BrowserWindow.getAllWindows()[0];
+  const box = { type: 'warning', title: 'MapNG', noLink: true, message: text.blockedTitle, detail: text.blockedDetail.replace('{host}', host) };
+  (win ? dialog.showMessageBox(win, box) : dialog.showMessageBox(box)).catch(() => {});
+}
+
 /** Help > Network Activity: a window with the list as it is now (no script, no preload; links cannot leave it). */
 function showNetworkActivity() {
   const text = networkText(readSettings().language || app.getLocale());
@@ -1370,6 +1388,12 @@ app.on('second-instance', () => {
 app.whenReady().then(() => {
   // (every address asked from here on is counted for Help > Network Activity)
   watchSession(electronSession.defaultSession);
+  // Only the addresses on MapNG's list (and the user's own Overpass server) are asked: networkGuard.js.
+  electronSession.defaultSession.webRequest.onBeforeRequest((details, callback) => {
+    const verdict = guardOn() ? allowedUrl(details.url) : { ok: true };
+    if (!verdict.ok) refusedAddress(verdict.host);
+    callback({ cancel: !verdict.ok });
+  });
   // (Windows: notifications name the app by this)
   if (process.platform === 'win32') app.setAppUserModelId('com.mapng.desktop');
   // (started from inside the zip, or with files missing: say so now, not at the first Generate)
@@ -1393,6 +1417,8 @@ app.whenReady().then(() => {
     ready: () => !!readSettings().welcomed,
   });
   // (the window's language: the menu follows it)
+  // (the user's own Overpass server: its host name joins the addresses the app may ask; only the origin is sent here)
+  ipcMain.handle('desktop:setOwnServer', (_event, origin) => { setOwnServer(typeof origin === 'string' ? origin.slice(0, 300) : ''); });
   ipcMain.handle('desktop:setLanguage', (_event, language) => {
     const lang = String(language || '').slice(0, 5);
     if (lang && readSettings().language !== lang) { writeSettings({ language: lang }); if (menuUpdater) buildMenu(menuUpdater); }
