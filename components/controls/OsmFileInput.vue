@@ -30,7 +30,7 @@
 
     <!-- none yet: pull the area from openstreetmap.org, save it as a file, or look at it there; or drop a file -->
     <div v-else class="mt-1 space-y-1.5">
-      <p class="leading-snug">{{ t('osmFile.hint') }}</p>
+      <p class="leading-snug">{{ t('osmFile.hintShort') }}</p>
       <div class="grid grid-cols-3 gap-1.5">
         <button
           type="button"
@@ -71,15 +71,14 @@
       <p v-if="!areaOk" class="flex items-start gap-1.5 leading-snug text-amber-700 dark:text-amber-300">
         <AlertTriangle :size="12" class="shrink-0 mt-px" />{{ t('osmFile.tooBig') }}
       </p>
-      <p v-else class="flex items-start gap-1.5 leading-snug text-micro text-gray-400 dark:text-gray-500">
-        <Info :size="11" class="shrink-0 mt-px" />{{ t('osmFile.limitNote') }}
-      </p>
-      <!-- Pull and Download ask the OSM editing API once per click: its usage
-           policy is the user's to follow (OSMF API Usage Policy) -->
-      <p class="leading-snug text-micro text-gray-400 dark:text-gray-500">
-        {{ t('osmFile.policyNote') }}
+      <!-- Pull and Download ask the OSM editing API once per click: its usage policy is the user's to follow
+           (OSMF API Usage Policy). One line with the policy's link; the limit and the full note behind "More" -->
+      <p v-if="areaOk" class="leading-snug text-micro text-gray-500 dark:text-gray-400">
+        {{ t('osmFile.policyShort') }}
         <a href="https://operations.osmfoundation.org/policies/api/" target="_blank" rel="noopener" class="text-brand hover:underline">{{ t('osmFile.policyLink') }}</a>
+        · <button type="button" class="text-brand hover:underline" :aria-expanded="more" data-testid="osmfile-more" @click="more = !more">{{ more ? t('build.tune.less') : t('build.tune.more') }}</button>
       </p>
+      <p v-if="more" class="leading-snug text-micro rounded bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 px-2 py-1.5 text-gray-600 dark:text-gray-300">{{ t('osmFile.hint') }} {{ t('osmFile.limitNote') }} {{ t('osmFile.policyNote') }}</p>
       <label
         class="flex flex-col items-center justify-center gap-0.5 rounded-lg border-2 border-dashed px-3 py-3 text-center cursor-pointer transition-colors"
         :class="dragging ? 'border-brand bg-brand-50/60 dark:bg-brand/10 text-brand' : 'border-gray-300 dark:border-gray-600 hover:border-brand hover:text-brand'"
@@ -121,6 +120,7 @@ const { t, locale } = useI18n({ useScope: 'global' });
 const file = shallowRef(getLoadedOsmFile());
 // (open while a file is loaded, and stays open when it is removed)
 const open = ref(!!file.value);
+const more = ref(false);
 const stop = onOsmFileChange((f) => { file.value = f; if (f) open.value = true; });
 onBeforeUnmount(stop);
 

@@ -238,7 +238,8 @@
             check
             v-model="osmTilesFirst"
             :label="t('controlPanel.osmTilesFirst')"
-            :hint="t('controlPanel.osmTilesFirstHint')"
+            :hint="t('controlPanel.osmTilesFirstShort')"
+            :more="t('controlPanel.osmTilesFirstHint')" :more-label="t('build.tune.more')" :less-label="t('build.tune.less')"
             :disabled="!fetchOSM"
             :disabled-reason="t('controlPanel.ui.needsOsmOn')"
           />
@@ -253,7 +254,10 @@
               class="mt-1 w-full px-1.5 py-1 rounded border border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-800 text-caption text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
             />
             <p v-if="customOverpassUrl && !customOverpassValid" class="mt-0.5 text-amber-600 dark:text-amber-400">{{ t('controlPanel.customOverpassInvalid') }}</p>
-            <p class="mt-0.5 leading-snug">{{ t('controlPanel.customOverpassHint') }} <a href="https://tracestrack.com/2026/08/07/using-overpass-api-in-turbo-or-josm/" target="_blank" rel="noopener" class="text-brand hover:underline">Tracestrack</a> · <a href="https://overspan.dev/" target="_blank" rel="noopener" class="text-brand hover:underline">Overspan</a></p>
+            <p class="mt-0.5 leading-snug">{{ t('controlPanel.customOverpassShort') }} <a href="https://tracestrack.com/2026/08/07/using-overpass-api-in-turbo-or-josm/" target="_blank" rel="noopener" class="text-brand hover:underline">Tracestrack</a> · <a href="https://overspan.dev/" target="_blank" rel="noopener" class="text-brand hover:underline">Overspan</a>
+              <button type="button" class="ml-1 text-brand hover:underline" :aria-expanded="overpassMore" data-testid="overpass-more" @click="overpassMore = !overpassMore">{{ overpassMore ? t('build.tune.less') : t('build.tune.more') }}</button>
+            </p>
+            <p v-if="overpassMore" class="mt-1 leading-snug rounded bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 px-2 py-1.5 text-gray-600 dark:text-gray-300">{{ t('controlPanel.customOverpassHint') }}</p>
           </details>
           <OsmFileInput v-if="fetchOSM" :area="selectionArea" />
           <!-- (services/overtureTiles.js) -->
@@ -271,7 +275,8 @@
             data-testid="measure-road-widths"
             v-model="measureRoadWidths"
             :label="t('controlPanel.measureRoadWidths')"
-            :hint="t('controlPanel.measureRoadWidthsHint')"
+            :hint="t('controlPanel.measureRoadWidthsShort')"
+            :more="t('controlPanel.measureRoadWidthsHint')" :more-label="t('build.tune.more')" :less-label="t('build.tune.less')"
             :disabled="!fetchOSM"
             :disabled-reason="t('controlPanel.ui.needsOsmOn')"
           />
@@ -594,6 +599,7 @@ watch(() => props.terrainData, (newData) => {
 // Sections that differ from the defaults (a dot by the title) and their Reset
 const elevationChanged = computed(() => elevationSource.value !== 'mapterhorn' || (store.advancedMode && terrainMode.value !== 'ready'));
 const resetElevation = () => { elevationSource.value = 'mapterhorn'; setTerrainMode('ready'); };
+const overpassMore = ref(false);
 const mapDataChanged = computed(() => !fetchOSM.value || !overtureBuildings.value || !osmTilesFirst.value || measureRoadWidths.value);
 const resetMapData = () => { fetchOSM.value = true; overtureBuildings.value = true; osmTilesFirst.value = true; measureRoadWidths.value = false; };
 

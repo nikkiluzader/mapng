@@ -807,7 +807,10 @@
     "bigAreaOsm": "Duży obszar ({km} km szerokości). Teren w tym rozmiarze nie stanowi problemu, ale dużo danych OpenStreetMap (miejscowości, gęste drogi) niemal na pewno sprawi kłopoty: powolne lub nieudane generowanie i eksport oraz ciężki poziom. Najlepiej tam, gdzie danych mapy jest mało (pustynie, góry); w innym razie wyłącz dane OSM albo wybierz mniejszy obszar.",
     "farShake": "Części tego poziomu leżą ponad 30 km od jego środka: w BeamNG obiekty tak daleko mogą zacząć drgać.",
     "osmTilesFirst": "Najpierw własna kopia OpenStreetMap w MapNG",
-    "osmTilesFirstHint": "Szybka i bez limitów zapytań: cała planeta, kopiowana z OpenStreetMap co pewien czas. Wyłącz, aby najpierw pytać serwery OpenStreetMap na żywo (mają dzisiejsze zmiany, ale są wolniejsze i czasem niedostępne); kopia MapNG jest wtedy rezerwą."
+    "osmTilesFirstHint": "Szybka i bez limitów zapytań: cała planeta, kopiowana z OpenStreetMap co pewien czas. Wyłącz, aby najpierw pytać serwery OpenStreetMap na żywo (mają dzisiejsze zmiany, ale są wolniejsze i czasem niedostępne); kopia MapNG jest wtedy rezerwą.",
+    "osmTilesFirstShort": "Szybko i bez limitów zapytań. Wyłącz, aby najpierw pytać serwery na żywo.",
+    "measureRoadWidthsShort": "Odczytuje szerokość jezdni ze zdjęcia satelitarnego dla dróg, które jej nie mają.",
+    "customOverpassShort": "Twój adres Overpass z kluczem. Zostaje tylko w tej przeglądarce."
   },
   "batchExport": {
     "title": "Opcje eksportu",
@@ -1683,7 +1686,9 @@
     "err_network": "Nie można połączyć się z openstreetmap.org. Sprawdź połączenie albo użyj Zobacz w OSM.",
     "err_http": "openstreetmap.org nie mógł wydać tego obszaru. Najedź kursorem, aby zobaczyć szczegóły.",
     "policyNote": "Pobierz teraz i Zapisz wysyłają jedno zapytanie na kliknięcie do API openstreetmap.org, przeznaczonego do edycji, a nie do samego odczytu. Odpowiadasz za przestrzeganie jego zasad korzystania.",
-    "policyLink": "Zasady korzystania z API OSM"
+    "policyLink": "Zasady korzystania z API OSM",
+    "hintShort": "Pobierz ten obszar z openstreetmap.org albo upuść plik .osm. MapNG czyta go zamiast pobierać.",
+    "policyShort": "Jedno zapytanie na kliknięcie do openstreetmap.org."
   },
   "wizard": {
     "steps": "Kroki",

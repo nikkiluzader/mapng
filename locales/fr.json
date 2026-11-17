@@ -807,7 +807,10 @@
     "bigAreaOsm": "Grande zone ({km} km de côté). Le terrain ne pose pas de problème à cette taille, mais beaucoup de données OpenStreetMap (villes, routes denses) causeront très probablement des soucis : génération et exports lents ou en échec, et un niveau lourd. Idéal là où les données sont rares (déserts, montagnes) ; sinon désactivez les données OSM ou choisissez une zone plus petite.",
     "farShake": "Des parties de ce niveau sont à plus de 30 km de son centre : dans BeamNG, les objets aussi loin peuvent commencer à trembler.",
     "osmTilesFirst": "D'abord la copie d'OpenStreetMap de MapNG",
-    "osmTilesFirstHint": "Rapide et sans limite de requêtes : la planète entière, copiée d'OpenStreetMap de temps en temps. Désactivez pour interroger d'abord les serveurs en direct d'OpenStreetMap (ils ont les modifications du jour, mais sont plus lents et parfois indisponibles) ; la copie de MapNG sert alors de secours."
+    "osmTilesFirstHint": "Rapide et sans limite de requêtes : la planète entière, copiée d'OpenStreetMap de temps en temps. Désactivez pour interroger d'abord les serveurs en direct d'OpenStreetMap (ils ont les modifications du jour, mais sont plus lents et parfois indisponibles) ; la copie de MapNG sert alors de secours.",
+    "osmTilesFirstShort": "Rapide et sans limite de requêtes. Désactivez pour interroger d'abord les serveurs en direct.",
+    "measureRoadWidthsShort": "Lit la largeur revêtue sur l'image satellite pour les routes qui n'en ont pas.",
+    "customOverpassShort": "Votre URL Overpass avec sa clé. Conservée uniquement dans ce navigateur."
   },
   "batchExport": {
     "title": "Options d'export",
@@ -1683,7 +1686,9 @@
     "err_network": "openstreetmap.org est injoignable. Vérifiez votre connexion ou utilisez Voir sur OSM.",
     "err_http": "openstreetmap.org n'a pas pu fournir cette zone. Survolez pour les détails.",
     "policyNote": "Récupérer et Télécharger envoient une requête par clic à l’API d’openstreetmap.org, prévue pour l’édition plutôt que pour la lecture seule. Tu es responsable du respect de sa politique d’utilisation.",
-    "policyLink": "Politique d’utilisation de l’API OSM"
+    "policyLink": "Politique d’utilisation de l’API OSM",
+    "hintShort": "Récupérez cette zone sur openstreetmap.org ou déposez un fichier .osm. MapNG le lit au lieu de télécharger.",
+    "policyShort": "Une requête par clic vers openstreetmap.org."
   },
   "wizard": {
     "steps": "Étapes",

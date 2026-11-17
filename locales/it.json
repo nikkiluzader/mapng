@@ -807,7 +807,10 @@
     "bigAreaOsm": "Area grande ({km} km di lato). Il terreno va bene a queste dimensioni, ma molti dati OpenStreetMap (paesi, strade fitte) causeranno quasi certamente problemi: generazione ed esportazioni lente o fallite, e un livello pesante. Ideale dove i dati della mappa sono pochi (deserti, montagne); altrimenti disattiva i dati OSM o scegli un'area più piccola.",
     "farShake": "Parti di questo livello sono a più di 30 km dal centro: in BeamNG gli oggetti così lontani possono iniziare a tremare.",
     "osmTilesFirst": "Prima la copia di OpenStreetMap di MapNG",
-    "osmTilesFirstHint": "Veloce e senza limiti di richieste: l'intero pianeta, copiato da OpenStreetMap di tanto in tanto. Disattiva per chiedere prima ai server live di OpenStreetMap (hanno le modifiche di oggi, ma sono più lenti e a volte non rispondono); la copia di MapNG resta come riserva."
+    "osmTilesFirstHint": "Veloce e senza limiti di richieste: l'intero pianeta, copiato da OpenStreetMap di tanto in tanto. Disattiva per chiedere prima ai server live di OpenStreetMap (hanno le modifiche di oggi, ma sono più lenti e a volte non rispondono); la copia di MapNG resta come riserva.",
+    "osmTilesFirstShort": "Veloce e senza limiti di richieste. Disattiva per chiedere prima ai server in tempo reale.",
+    "measureRoadWidthsShort": "Legge la larghezza asfaltata dall'immagine satellitare per le strade che non ne hanno una.",
+    "customOverpassShort": "Il tuo URL Overpass con la chiave. Resta solo in questo browser."
   },
   "batchExport": {
     "title": "Opzioni di esportazione",
@@ -1683,7 +1686,9 @@
     "err_network": "Impossibile raggiungere openstreetmap.org. Controlla la connessione o usa Vedi su OSM.",
     "err_http": "openstreetmap.org non ha potuto fornire quest'area. Passa il mouse per i dettagli.",
     "policyNote": "Prendi e Scarica inviano una richiesta per clic all’API di openstreetmap.org, pensata per la modifica e non per l’uso in sola lettura. Sei responsabile del rispetto della sua politica d’uso.",
-    "policyLink": "Politica d’uso dell’API OSM"
+    "policyLink": "Politica d’uso dell’API OSM",
+    "hintShort": "Scarica quest'area da openstreetmap.org o trascina un file .osm. MapNG lo legge invece di scaricare.",
+    "policyShort": "Una richiesta per clic a openstreetmap.org."
   },
   "wizard": {
     "steps": "Passaggi",

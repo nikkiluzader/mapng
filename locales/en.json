@@ -812,7 +812,10 @@
     "bigAreaOsm": "Big area ({km} km across). The terrain is fine at this size, but lots of OpenStreetMap data (towns, dense roads) will very likely cause problems: slow or failed generating and exports, and a heavy level. Best where map data is sparse (deserts, mountains); otherwise turn off OSM features or pick a smaller area.",
     "farShake": "Parts of this level are more than 30 km from its centre: in BeamNG, objects that far out can start to shake.",
     "osmTilesFirst": "MapNG's own copy of OpenStreetMap first",
-    "osmTilesFirstHint": "Fast and never rate limited: the whole planet, copied from OpenStreetMap every so often. Switch off to ask the live OpenStreetMap servers first (they have today's edits, and are slower and sometimes down); MapNG's copy is then the fallback."
+    "osmTilesFirstHint": "Fast and never rate limited: the whole planet, copied from OpenStreetMap every so often. Switch off to ask the live OpenStreetMap servers first (they have today's edits, and are slower and sometimes down); MapNG's copy is then the fallback.",
+    "osmTilesFirstShort": "Fast and never rate limited. Switch off to ask the live servers first.",
+    "measureRoadWidthsShort": "Reads the paved width off the satellite picture for roads that have none.",
+    "customOverpassShort": "Your Overpass URL with its key. Kept in this browser only."
   },
   "batchExport": {
     "title": "Export options",
@@ -1688,7 +1691,9 @@
     "err_network": "openstreetmap.org could not be reached. Check your connection, or use View on OSM.",
     "err_http": "openstreetmap.org couldn't hand out this area. Hover for details.",
     "policyNote": "Pull and Download send one request per click to openstreetmap.org's API, which is meant for editing rather than read-only use. You are responsible for following its usage policy.",
-    "policyLink": "OSM API usage policy"
+    "policyLink": "OSM API usage policy",
+    "hintShort": "Pull this area from openstreetmap.org, or drop an .osm file. MapNG reads it instead of fetching.",
+    "policyShort": "One request per click to openstreetmap.org."
   },
   "wizard": {
     "steps": "Steps",
