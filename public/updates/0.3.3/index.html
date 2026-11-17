@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MapNG 0.3.3: Signed, and Closer to the Real World</title>
+<meta name="description" content="MapNG 0.3.3: a code-signed Windows app, a desktop app that only connects to a published list of addresses, MapNG's own street map, quay walls, viaducts from the lidar survey, rebuilt dams, streets that follow the hill and dozens more mapped objects.">
+<link rel="canonical" href="https://mapng.com/updates/0.3.3/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MapNG 0.3.3: signed, and closer to the real world">
+<meta property="og:description" content="A signed Windows app, MapNG's own street map, quay walls, viaducts, rebuilt dams and dozens more mapped objects.">
+<meta property="og:url" content="https://mapng.com/updates/0.3.3/">
+<meta property="og:image" content="https://mapng.com/updates/0.3.3/images/london-wharf.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<script>
+  // the theme before the first paint: the app's link (?theme=), else this visit's, else the app's own choice, else the system's
+  (function () { var t; try { var q = new URLSearchParams(location.search).get('theme'); if (q === 'dark' || q === 'light') sessionStorage.setItem('mapng_page_theme', q); t = sessionStorage.getItem('mapng_page_theme') || localStorage.getItem('theme'); } catch (e) { /* storage blocked */ } if (t !== 'dark' && t !== 'light') t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; document.documentElement.setAttribute('data-theme', t); })();
+</script>
+<style>
+  /* BeamNG.drive's UI fonts, as the app (public/fonts, SIL OFL) */
+  @font-face { font-family: "Noto Sans"; src: url(/fonts/noto-sans-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass"; src: url(/fonts/overpass-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass Mono"; src: url(/fonts/overpass-mono-latin-wght-normal.woff2) format("woff2"); font-weight: 300 700; font-display: swap; }
+  :root {
+    --bg: #f7f7f8; --surface: #ffffff; --surface-2: #f2f2f4; --border: #e3e3e8;
+    --text: #1d1d22; --text-2: #4a4a55; --muted: #6e6e7a;
+    --brand: #ff6600; --brand-ink: #c2410c; --brand-tint: #fff4ec;
+    --ok: #15803d; --code-bg: #1d1d22; --code-text: #f4f4f6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+      --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+      --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+      --ok: #4ade80; --code-bg: #0b0b0e; --code-text: #ececf0;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+    --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+    --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+    --ok: #4ade80; --code-bg: #0b0b0e; --code-text: #ececf0;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--brand-ink); }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 0 16px; }
+  header.top { background: linear-gradient(90deg, #ff6600, #f59e0b); color: #fff; }
+  header.top .wrap { padding-top: 20px; padding-bottom: 36px; }
+  .brand { display: inline-flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; opacity: .95; }
+  .brand img { width: 22px; height: 22px; }
+  h1, h2, h3 { font-family: "Overpass", "Noto Sans", system-ui, sans-serif; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.15; margin: 22px 0 10px; letter-spacing: -0.01em; }
+  .lede { font-size: 18px; max-width: 640px; margin: 0; color: rgba(255,255,255,.95); }
+  main { padding: 0 0 64px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: -22px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .card b { display: block; font-size: 15px; margin-bottom: 2px; }
+  .card span { color: var(--text-2); font-size: 14px; }
+  .card .tick { color: var(--ok); font-weight: 700; margin-right: 4px; }
+  section { margin-top: 44px; }
+  h2 { font-size: 24px; line-height: 1.25; margin: 0 0 10px; }
+  h3 { font-size: 17px; margin: 22px 0 6px; }
+  p, li { color: var(--text-2); }
+  .note { background: var(--brand-tint); border-left: 3px solid var(--brand); border-radius: 0 8px 8px 0; padding: 10px 14px; color: var(--text); font-size: 15px; }
+  pre { background: var(--code-bg); color: var(--code-text); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-size: 14px; line-height: 1.5; }
+  code { font-family: "Overpass Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; }
+  p code, li code, td code { background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; color: var(--text); }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; color: var(--text); white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  td { color: var(--text-2); }
+  .flow { list-style: none; padding: 0; margin: 14px 0 0; counter-reset: step; }
+  .flow li { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px 12px 52px; margin: 0 0 22px; counter-increment: step; }
+  .flow li::before { content: counter(step); position: absolute; left: 14px; top: 12px; width: 26px; height: 26px; border-radius: 50%; background: var(--brand); color: #fff; font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+  .flow li:not(:last-child)::after { content: ""; position: absolute; left: 26px; bottom: -22px; width: 2px; height: 22px; background: var(--border); }
+  .flow b { color: var(--text); }
+  .flow .where { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .02em; color: var(--brand-ink); background: var(--brand-tint); border-radius: 999px; padding: 1px 8px; margin-left: 6px; vertical-align: 1px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 12px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .stat .v { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
+  .stat .k { font-size: 13px; color: var(--muted); }
+  .usage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 12px; }
+  .usage-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
+  .usage-card h3 { font-size: 14px; margin: 0 0 6px; }
+  .usage-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; font-size: 13px; margin: 4px 0; }
+  .usage-row .bar { grid-column: 1 / -1; height: 4px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
+  .usage-row .bar span { display: block; height: 100%; background: var(--brand); border-radius: 2px; }
+  .usage-row .n { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .never { columns: 2 240px; column-gap: 24px; padding-left: 20px; }
+  .never li { break-inside: avoid; margin-bottom: 6px; }
+  footer { border-top: 1px solid var(--border); margin-top: 56px; padding-top: 18px; font-size: 14px; color: var(--muted); }
+  footer p { color: var(--muted); }
+
+  /* this page's own pieces */
+  .pill { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .02em; border-radius: 999px; padding: 1px 9px; margin-right: 6px; vertical-align: 1px; white-space: nowrap; }
+  .pill.desk { color: var(--brand-ink); background: var(--brand-tint); }
+  .pill.web { color: var(--text); background: var(--surface-2); border: 1px solid var(--border); }
+  .pill.both { color: #fff; background: var(--brand); }
+  .measures { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 14px; }
+  .measure { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .measure h3 { margin: 6px 0 4px; font-size: 16px; }
+  .measure p { margin: 0; font-size: 14.5px; }
+  .measure .how { margin-top: 8px; font-size: 13px; color: var(--muted); }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-top: 12px; }
+  .two > div { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .two h3 { margin-top: 0; }
+  .two ul { padding-left: 18px; margin: 6px 0 0; }
+  .two li { font-size: 14.5px; margin-bottom: 4px; }
+  .limits li { margin-bottom: 8px; }
+  .toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; padding: 0; list-style: none; }
+  .toc a { display: inline-block; font-size: 14px; text-decoration: none; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; color: var(--text); }
+  .toc a:hover { border-color: var(--brand); }
+
+  /* this page: pictures and the summary tiles */
+  section { padding-top: 34px; }
+  section h2 { font-size: 24px; line-height: 1.25; margin: 0 0 10px; }
+  section p, section li { color: var(--text-2); }
+  section p { margin: 0 0 12px; max-width: 70ch; }
+  section ul { margin: 0 0 12px; padding-left: 20px; max-width: 70ch; }
+  section li { margin-bottom: 6px; }
+  figure { margin: 16px 0 20px; }
+  figure img { display: block; width: 100%; height: auto; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+  figcaption { font-size: 13.5px; color: var(--muted); margin-top: 6px; max-width: 78ch; }
+  .kicker { font: 700 11px/1 "Overpass", "Noto Sans", sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--brand-ink); margin-bottom: 8px; }
+  .cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  .btn { display: inline-block; padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 14px; text-decoration: none; border: 1px solid var(--border); color: var(--text); background: var(--surface); }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .note { border-left: 3px solid var(--brand); background: var(--brand-tint); padding: 10px 14px; margin: 14px 0; color: var(--text-2); max-width: 74ch; }
+  footer { border-top: 1px solid var(--border); margin-top: 40px; padding: 20px 0 0; font-size: 13.5px; color: var(--muted); }
+</style>
+<link rel="stylesheet" href="/pages.css">
+<script src="/pages.js" defer></script>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/favicon.svg" alt="">MapNG</a>
+    <h1>MapNG 0.3.3: signed, and closer to the real world</h1>
+    <p class="lede">The Windows app is now code-signed, and the desktop app can only talk to a published list of addresses. MapNG draws its own street map. And the levels themselves gained a lot: quay walls, viaducts where the survey shows nothing under a road, rebuilt dams, streets that follow the hill, and dozens of mapped objects from wind turbines to post boxes.</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="cards">
+    <div class="card"><b><span class="tick">✓</span>Signed</b><span>The Windows build carries a code signature.</span></div>
+    <div class="card"><b><span class="tick">✓</span>A fixed list</b><span>The desktop app refuses any address not on it.</span></div>
+    <div class="card"><b><span class="tick">✓</span>Own street map</b><span>Five styles, light and dark.</span></div>
+    <div class="card"><b><span class="tick">✓</span>Real structures</b><span>Quays, viaducts, dams, tunnel ramps.</span></div>
+    <div class="card"><b><span class="tick">✓</span>More of the map</b><span>Turbines, power lines, signs, platforms.</span></div>
+  </div>
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>
+    <a class="btn" href="/">Open MapNG in the browser</a>
+    <a class="btn" href="/security.html">Read the security page</a>
+  </div>
+
+  <section id="signed" data-nav="Signed app">
+    <div class="kicker">Trust</div>
+    <h2>The Windows app is signed</h2>
+    <p>From this version on, <b>MapNG-Setup.exe</b> and the portable <b>MapNG.exe</b> carry a code signature. Right-click the file, choose <b>Properties</b>, then <b>Digital Signatures</b>: the signer is <b>Nikki Luzader</b>. A file that was changed after it was built no longer has a valid signature.</p>
+    <p>Each release also comes with checksum files (<code>SHA256SUMS</code>) and a build record that ties every download to the public build that made it. Updates were already signed in 0.3.2; they still are.</p>
+    <div class="note">Windows SmartScreen may still show its blue window for a while. It goes by how many people have run a signed file, and that count starts now.</div>
+  </section>
+
+  <section id="addresses" data-nav="A fixed list of addresses">
+    <div class="kicker">Trust</div>
+    <h2>The desktop app connects only to a published list</h2>
+    <p>Every address MapNG can connect to is listed on <a href="/data.html#addresses">Your data and MapNG</a>, with what each is for. The desktop app now enforces that list: a request to anything else is refused, in the window and in the export, and the app tells you which address it was. Your own Overpass server, if you set one, is allowed.</p>
+    <p><b>Help &gt; Network Activity</b> shows every address the app has reached since it started, and how often.</p>
+    <figure><img src="images/network-activity.jpg" alt="A small window titled Network activity with a table of three addresses, the number of requests to each and what each is for" loading="lazy"><figcaption>Help &gt; Network Activity in the desktop app: the addresses reached since start, with what each is for.</figcaption></figure>
+    <p>A new <a href="/security.html">security page</a> lists every measure in the app and the site, how to check each one yourself, and what none of them cover. It has its own shield icon at the foot of the control panel.</p>
+    <figure><img src="images/security-page.jpg" alt="The Security in MapNG page in dark mode: a header with links to the other info pages, a row of section links, five summary tiles and the first section" loading="lazy"><figcaption>The security page. All the info pages now share the app's look, a header that stays in place with links to each section, and a light / dark switch that follows the app.</figcaption></figure>
+  </section>
+
+  <section id="map" data-nav="Own street map">
+    <div class="kicker">The map</div>
+    <h2>MapNG draws its own street map</h2>
+    <p>The street map behind the selection box is now MapNG's own: OpenStreetMap data, kept in MapNG's storage and drawn in your browser. It replaces both the OpenStreetMap tile layer and the old dark map, so the map no longer leans on OpenStreetMap's public tile servers, which are not meant for an app this busy.</p>
+    <figure><img src="images/street-map.jpg" alt="The MapNG window twice, in light and in dark mode, each showing a street map of London around Tower Bridge with the Map layers box open" loading="lazy"><figcaption>The street map in light and in dark mode. With no style chosen it follows the app.</figcaption></figure>
+    <p>It comes in five styles, as switches under the layer: light, dark, white, greyscale and black. If you had the OpenStreetMap layer or the dark map selected, MapNG moves you to the street map (in its dark style, for the dark map).</p>
+    <figure><img src="images/street-styles.jpg" alt="Three views of the same map in the white, greyscale and black styles" loading="lazy"><figcaption>The white, greyscale and black styles.</figcaption></figure>
+    <p>Also: the location search now runs when you press Enter, not while you type, as the search service asks of its users.</p>
+  </section>
+
+  <section id="export" data-nav="Export window">
+    <div class="kicker">The app</div>
+    <h2>The export says when it is done, and where the file went</h2>
+    <p>The progress window now stays open when a level is finished. It shows the file's name and where it was saved: your BeamNG mods folder in the desktop app, the folder you picked in the browser's save window, or the browser's downloads folder. You close it yourself.</p>
+    <figure><img src="images/export-done.jpg" alt="The MapNG window with a card titled Export complete, the saved file&#x27;s name, where it was saved and a Close button" loading="lazy"><figcaption>The done window on the website.</figcaption></figure>
+    <p><b>What to build</b> has new groups of its own for bridges, tunnels and railways, each with its own switches.</p>
+    <figure><img src="images/what-to-build.jpg" alt="The What to build list with groups for roads, bridges and dams, tunnels and railways; the railways group is open with switches for railways, disused lines and abandoned lines" loading="lazy"><figcaption>Railways open in What to build: disused lines are built, abandoned ones are off unless you switch them on.</figcaption></figure>
+  </section>
+
+  <section id="quays" data-nav="Quay walls">
+    <div class="kicker">What gets built</div>
+    <h2>Quay walls at the water's edge</h2>
+    <p>A river wall or a canal quay is vertical. A heightmap can only draw it as a steep bank of ground, so city waterfronts came out as smeared earth sliding into the water. MapNG now finds that bank along every mapped water's edge in built-up ground and stands a stone wall over it: its top level with the ground behind, its face straight down into the water.</p>
+    <figure><img src="images/london-wharf.jpg" alt="Two game views of the Tower of London&#x27;s wharf from the river: on the left a grassy earth slope into the water, on the right a pale stone river wall with a paved walk on top" loading="lazy"><figcaption>The Tower of London's wharf, before and after.</figcaption></figure>
+    <figure><img src="images/diagram-london.jpg" alt="Two side views of a river bank. Before: the ground slopes from the walk down under the water. After: a wall stands over the slope, its top level with the walk and its face in the water" loading="lazy"><figcaption>Behind the scenes. The ground in the level is unchanged; the wall is built over the bank and runs two metres under the river bed.</figcaption></figure>
+    <figure><img src="images/quays.jpg" alt="Three game views: a harbour basin in Hamburg with a wall under a row of warehouses, a canal in Utrecht with walls on both sides, and London&#x27;s south bank" loading="lazy"><figcaption>Hamburg, Utrecht and London's south bank. One square kilometre of central Hamburg gets 6.6 km of wall.</figcaption></figure>
+    <p>Walls are built on lidar elevation, where the survey shows the bank. Open country keeps its natural banks.</p>
+  </section>
+
+  <section id="viaducts" data-nav="Viaducts">
+    <div class="kicker">What gets built</div>
+    <h2>Viaducts where the survey shows nothing under the road</h2>
+    <p>A lidar survey of the bare earth contains every real embankment and leaves every bridge out. So when a big road comes out several metres above that ground, there is no earth under it in reality, whatever the map's tags say. Those stretches are now decks: motorways, trunk and primary roads from 3 m, secondary and tertiary streets from 5 m, and a monorail whenever it is off the ground.</p>
+    <figure><img src="images/diagram-dallas.jpg" alt="Two side views across a freeway in Dallas. Before: the road sits on a mound of earth five metres high. After: the road is on a bridge deck and the ground under it is flat, as surveyed" loading="lazy"><figcaption>Dallas. The elevated freeway stood on a five-metre bank of earth; now it is a deck over the ground the survey measured.</figcaption></figure>
+    <figure><img src="images/diagram-chicago.jpg" alt="Two side views across a street in Chicago. Before: two carriageways on towers of earth seven metres high. After: two bridge decks over the lower street" loading="lazy"><figcaption>Chicago. North LaSalle Drive is an upper-level street over a lower one. It stood on two towers of earth.</figcaption></figure>
+    <figure><img src="images/viaducts.jpg" alt="Three game views: a freeway viaduct among other ramps in Dallas, an upper-level street on a deck between buildings in Chicago, and a monorail beam between towers in Miami" loading="lazy"><figcaption>Dallas, Chicago and Miami in the game.</figcaption></figure>
+  </section>
+
+  <section id="tunnels" data-nav="Tunnel ramps">
+    <div class="kicker">What gets built</div>
+    <h2>Tunnel ramps that sit in their cutting</h2>
+    <p>Where a road goes down into a tunnel, the cutting was dug at one set of heights and the road laid at another. At a station's road tunnel the two carriageways lay on shelves up to five metres above a trench dug beside them. The cutting's floor now takes the road's height, and its walls stay at the ground they were measured from.</p>
+    <figure><img src="images/diagram-amsterdam.jpg" alt="Two side views across the ramps of a road tunnel. Before: two roads on raised shelves with deep trenches beside them. After: one flat floor between the walls with both roads on it" loading="lazy"><figcaption>Amsterdam Centraal, across the ramps of the tunnel under the station.</figcaption></figure>
+    <figure><img src="images/amsterdam-drive.jpg" alt="Four driver&#x27;s views of a concrete ramp going down into a tunnel under a curved bus deck" loading="lazy"><figcaption>The same ramps from the driver's seat.</figcaption></figure>
+    <p>Two more causes of trouble near tunnels are gone. A tunnel is no longer joined to the open road leading to it, which could lose the tunnel and lift every street above it onto decks. And a street over a tunnel's roof stays on its ground.</p>
+  </section>
+
+  <section id="dams" data-nav="Dams">
+    <div class="kicker">What gets built</div>
+    <h2>Dams, rebuilt</h2>
+    <p>A dam's faces now come from its mapped outline and, where the survey holds the dam, from the surveyed shape: one even profile swept along the crest. The crest meets its road with no kerb across it, a path or service road is carried over, and the faces run into the ground instead of being fitted to it. A building on or against a dam, such as a powerhouse or a tower on the crest, takes the dam's own stone or concrete.</p>
+    <figure><img src="images/dams.jpg" alt="Three game views: the curved concrete face of a large arch dam seen from above, a stone powerhouse at the foot of a masonry dam, and a tower on a dam&#x27;s crest road" loading="lazy"><figcaption>An arch dam's face, a powerhouse in its dam's stone, and a tower on a crest.</figcaption></figure>
+  </section>
+
+  <section id="streets" data-nav="Streets on hills">
+    <div class="kicker">Roads</div>
+    <h2>Streets follow the hill</h2>
+    <p>On lidar elevation, every road except a motorway now follows the height the survey measured, unless you switch that off. A steep village street stays steep instead of being cut into the hillside to meet a class's grade. The rule steps back beside bridges and tunnels, where a road crosses another at a different level, and at water.</p>
+    <p>On 30 m elevation, a small street on a steady hillside now follows it too, up to a 25% grade.</p>
+    <figure><img src="images/diagram-steep-street.jpg" alt="Two long sections of a street going downhill. Before: the street runs up to six metres under the surveyed ground. After: the street lies on the ground" loading="lazy"><figcaption>A village street on 30 m data. It was dug up to six metres into the hill.</figcaption></figure>
+    <p>If the elevation source you chose has nothing for your area, MapNG now tries a fallback source and says which one it used.</p>
+  </section>
+
+  <section id="objects" data-nav="Mapped objects">
+    <div class="kicker">What gets built</div>
+    <h2>Dozens more mapped objects</h2>
+    <p>MapNG now places the game's own models for many more things on the map:</p>
+    <ul>
+      <li><b>Energy:</b> wind turbines that turn, solar farms, substations, high-voltage lines on lattice towers with their wires, utility poles, pumpjacks, storage tanks.</li>
+      <li><b>Streets:</b> bus shelters, post boxes, recycling bins, picnic tables, flagpoles, information boards, bike stands, billboards, and traffic signs where the map has them.</li>
+      <li><b>Rail:</b> platforms raised beside their track, tram rails blended into the street, and disused or preserved lines as track.</li>
+      <li><b>Land:</b> vineyards, water towers, monuments and memorial stones, kerbed traffic islands.</li>
+    </ul>
+    <figure><img src="images/objects.jpg" alt="Six game views: a row of wind turbines on a ridge, a solar farm, a vineyard, pumpjacks in a dry field, power lines on lattice towers over a hillside, and tram rails across a street junction" loading="lazy"><figcaption>Wind turbines, a solar farm, a vineyard, pumpjacks, a high-voltage line and tram rails.</figcaption></figure>
+    <p>Benches now face the water they stand by, or the path or street beside them. Objects keep clear of walls and footpaths and are never placed twice.</p>
+  </section>
+
+  <section id="water" data-nav="Water and bridges">
+    <div class="kicker">Fixes</div>
+    <h2>Water and bridges</h2>
+    <ul>
+      <li>Wing walls stand at the ends of bridges, where a road's fill has steep sides.</li>
+      <li>A reservoir or tidal river surveyed at two water levels is one flat water surface, with no dry shelf or blocks left in it.</li>
+      <li>City blocks beside a big river are no longer dug down to the water.</li>
+      <li>Piers and breakwaters that a survey left out are stood up again; no earth columns are left standing in a dug riverbed.</li>
+      <li>Bridge towers and piers mapped as buildings are left to the bridge, so a road no longer drives into a house on a suspension bridge.</li>
+      <li>Buildings under a raised deck are held below it.</li>
+    </ul>
+  </section>
+
+  <section id="desktop" data-nav="Desktop app">
+    <div class="kicker">The desktop app</div>
+    <h2>Clearer messages</h2>
+    <ul>
+      <li>If you start MapNG from inside a zip or rar file, it says so and asks you to extract it first.</li>
+      <li>If Windows is drawing MapNG without a graphics driver, it tells you once, and why that matters.</li>
+      <li>Running out of memory is said in plain words.</li>
+      <li>The update window shows its notes correctly.</li>
+      <li>A problem report's log never contains a key.</li>
+    </ul>
+    <p>An export that stopped on some dense city maps with the message “Cannot read properties of undefined” is fixed. It came in through a problem report; thank you to whoever sent it.</p>
+  </section>
+
+  <section id="know" data-nav="Good to know">
+    <div class="kicker">Good to know</div>
+    <h2>What is not done yet</h2>
+    <ul>
+      <li><b>Quay walls</b> are one pale stone everywhere, also where the real ones are brick, and they are only built on lidar elevation.</li>
+      <li><b>Viaducts from the survey</b> also need lidar. On 30 m data a raised road without bridge tags is still an embankment.</li>
+      <li><b>Station squares over road tunnels</b> can still come out a metre or two high on low decks where the tunnel is very shallow.</li>
+      <li><b>Sidewalk slabs between two ramps at different heights</b> can show toothed edges.</li>
+      <li>Your old levels are untouched. Export again to get the changes.</li>
+    </ul>
+    <p>Thank you to everyone who sent reports and exports, and to the BeamNG developers whose test areas are now part of MapNG's own checks.</p>
+  </section>
+
+  <footer>
+    <p>MapNG is free and open source: <a href="https://github.com/nikkiluzader/mapng">github.com/nikkiluzader/mapng</a>. Earlier updates: <a href="/updates/0.3.2/">0.3.2</a>, <a href="/updates/0.3.1/">0.3.1</a>, <a href="/updates/0.3.0/">0.3.0</a>.</p>
+  </footer>
+</main>
+</body>
+</html>
