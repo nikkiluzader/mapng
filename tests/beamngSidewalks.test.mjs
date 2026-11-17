@@ -956,3 +956,30 @@ test('a footbridge deck says it is one, and whether it hangs from cables; a pier
   assert.deepEqual([hung.footbridge, hung.hanging], [true, true]);
   assert.deepEqual([pier.footbridge, pier.hanging], [false, false]);
 });
+
+test('a mapped sidewalk held out from its road bridge (parking between) is on that bridge at the road height', async () => {
+  const { buildDeckRuns } = await import('../services/beamngSidewalks.js');
+  // a road deck along y = 0 at 30 m, half width 3.25; the sidewalk along y = 9.5 (6.25 m out past the deck's edge)
+  const bridges = [{ owner: 'deck_a', half: 3.25, tags: { layer: '1' }, nodes: [[-60, 0, 30], [60, 0, 30]] }];
+  const nodes = Array.from({ length: 41 }, (_, i) => [-40 + i * 2, 9.5]);
+  const ground = () => 20;
+  const [side] = buildDeckRuns([{ nodes, half: 1.0, bridge: true, sidewalk: true, layer: 1, wood: false }], bridges, { groundAt: ground, seaZ: -250 });
+  assert.ok(side.onBridge, 'on the road bridge');
+  for (const q of side.centre) assert.ok(Math.abs(q[2] - 30) < 0.2, `at the road's height: ${q[2].toFixed(2)}`);
+  // an untagged footway as far out is a footbridge of its own
+  const [own] = buildDeckRuns([{ nodes, half: 1.0, bridge: true, layer: 1, wood: false }], bridges, { groundAt: ground, seaZ: -250 });
+  assert.ok(!own.onBridge, 'an untagged path 6 m out is not on it');
+});
+
+test('a footbridge\'s ends meet the walks they join; an end on dug ground takes the survey', async () => {
+  const { buildDeckRuns } = await import('../services/beamngSidewalks.js');
+  const nodes = Array.from({ length: 16 }, (_, i) => [i * 2, 0]);
+  // ground 12 at the west end, a walk there raised to 13.5; ground 15 at the east end, dug to 11 under a survey of 15
+  const groundAt = (x) => (x < 1 ? 12 : x > 29 ? 11 : 9);
+  const walkTop = (x) => (x < 1 ? 13.5 : null);
+  const surveyAt = (x) => (x > 29 ? 15 : groundAt(x));
+  const [r] = buildDeckRuns([{ nodes, half: 1.2, bridge: true, wood: false }], [], { groundAt, walkTop, surveyAt, seaZ: -250 });
+  const z = r.centre.map((q) => q[2]);
+  assert.ok(Math.abs(z[0] + 0.1 - 13.5) < 0.05, `west end at the walk's top: ${z[0].toFixed(2)}`);
+  assert.ok(Math.abs(z[z.length - 1] - 15) < 0.05, `east end on the surveyed bank: ${z[z.length - 1].toFixed(2)}`);
+});

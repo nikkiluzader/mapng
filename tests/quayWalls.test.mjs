@@ -43,3 +43,10 @@ test('quay walls: a second outline of the same water adds no second wall', () =>
   const runs = planQuayWalls([line[0], { xy: [[0, 0.4], [60, 0.4]] }], scene(12, 2));
   assert.equal(runs.length, 1);
 });
+
+test('quay walls: none on a bank that slopes in the survey (a planted or rocky river bank), one on a wall face', () => {
+  // a 1.5 m bank reached over 4 m: within the block's reach, but no face rises 0.6 m within a metre
+  assert.equal(planQuayWalls(line, scene(11.5, 4)).length, 0, 'a bank rising 0.38 m a metre');
+  // the same height reached over 1 m: a wall
+  assert.equal(planQuayWalls(line, scene(11.5, 1)).length, 1, 'a face rising 1.5 m within a metre');
+});

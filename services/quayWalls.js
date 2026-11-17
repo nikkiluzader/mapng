@@ -29,6 +29,12 @@ const QUAY_BURY_M = 2;            // its face ends this far under the lowest bed
 const RUN_MIN_M = 8;              // shorter runs are left out
 const GAP_STATIONS = 1;           // a run carries on over this many stations without a bank
 const SMOOTH = 2;                 // stations either way a run's lines are evened over
+// A wall's face: the surveyed ground rises this much within FACE_WINDOW_M across the bank, at the run's median
+// station. A planted or rocky bank slopes (Greenville's Reedy, 0.15 to 0.56 m); quays rise at once (London's river
+// walls 0.8, Hamburg's 1.8, Copenhagen's 0.8 m at the median).
+const FACE_RISE_M = 0.6;
+const FACE_WINDOW_M = 1;
+const FACE_STEP_M = 0.25;
 
 const median = (a) => { const s = [...a].sort((p, q) => p - q); return s[s.length >> 1]; };
 
@@ -91,7 +97,7 @@ export function planQuayWalls(lines, { groundAt, surveyAt, hardAt = () => true, 
     // runs of stations on one side, carried over short gaps
     let cur = [];
     const close = () => {
-      if (cur.length * STEP_M >= RUN_MIN_M) runs.push({ stations: evened(cur) });
+      if (cur.length * STEP_M >= RUN_MIN_M && median(cur.map((f) => faceRise(f, surveyAt))) >= FACE_RISE_M) runs.push({ stations: evened(cur) });
       cur = [];
     };
     let gap = 0;
@@ -109,6 +115,16 @@ export function planQuayWalls(lines, { groundAt, surveyAt, hardAt = () => true, 
     }
   }
   return runs;
+}
+
+/** The steepest rise of the surveyed ground within FACE_WINDOW_M across a station's bank. */
+function faceRise(f, surveyAt) {
+  const k = Math.round(FACE_WINDOW_M / FACE_STEP_M);
+  const h = [];
+  for (let t = f.outer - 1; t <= f.inner + 1; t += FACE_STEP_M) h.push(surveyAt(f.x + f.nx * t, f.y + f.ny * t));
+  let best = 0;
+  for (let i = k; i < h.length; i++) if (Number.isFinite(h[i]) && Number.isFinite(h[i - k])) best = Math.max(best, h[i] - h[i - k]);
+  return best;
 }
 
 /** A run's lines evened along it: the top by its median, the block as wide as its neighbours need, one foot. */

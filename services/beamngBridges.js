@@ -880,6 +880,10 @@ export function pierSites(part, { groundAt, roadLines = [], decks = [] }) {
 // met it with a step. At a fork the outermost branches widen on their outer
 // side to the incoming deck's edge, tapering back over their overlap; at a
 // plain join the narrower part tapers up to the wider one.
+// a footway mapped along a deck this far out from its edge (its centre line, past its own half) widens it; a way
+// tagged footway=sidewalk further
+const WALK_DECK_REACH_M = 5;
+const SIDEWALK_DECK_REACH_M = 10;
 const TAPER_MIN_M = 25;
 const TAPER_MAX_M = 90;
 
@@ -899,7 +903,10 @@ export function widenDecksForSidewalks(decks, footways) {
         const a = part.xy[Math.max(0, k - 1)]; const b = part.xy[Math.min(part.xy.length - 1, k + 1)];
         const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; const t = [(b[0] - a[0]) / L, (b[1] - a[1]) / L];
         const best = {};
-        for (const { nodes, half } of footways) {
+        for (const { nodes, half, sidewalk } of footways) {
+          // (a way tagged as the street's sidewalk reaches further: parking or a verge between, South Main Street's
+          // sidewalks over the Reedy stand 5 to 7 m out past angled parking, one deck with the street)
+          const far = sidewalk ? SIDEWALK_DECK_REACH_M : WALK_DECK_REACH_M;
           for (let i = 0; i + 1 < nodes.length; i++) {
             const q = nodes[i]; const r = nodes[i + 1]; const dx = r[0] - q[0]; const dy = r[1] - q[1]; const l = Math.hypot(dx, dy) || 1;
             if (Math.abs((dx * t[0] + dy * t[1]) / l) < 0.9) continue;
@@ -907,7 +914,7 @@ export function widenDecksForSidewalks(decks, footways) {
             if (u < 0 || u > 1) continue;
             const ox = q[0] + dx * u - p[0]; const oy = q[1] + dy * u - p[1];
             const across = t[0] * oy - t[1] * ox; const off = Math.abs(across);
-            if (off < part.half - 1 || off > part.half + 6) continue;
+            if (off < part.half - 1 || off > part.half + half + far) continue;
             const side = across > 0 ? 1 : -1;
             if (!best[side] || off + half < best[side]) best[side] = off + half;
           }

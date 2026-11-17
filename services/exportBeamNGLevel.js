@@ -4250,6 +4250,12 @@ const CARRY_MAX_M = 300;             // never carried on further than this (per 
 const CARRY_ROUNDS = 3;
 const BRIDGE_REACH_MAX_M = 400;     // a bridge's ends on the ground looked for this far along it
 const BRIDGE_REACH_GRADE = 0.06;    // ... and the bridge climbs from them at this grade
+const QUAY_PATH_CLASSES = new Set(['footway', 'path', 'cycleway', 'steps', 'bridleway', 'track', 'pedestrian']);
+const QUAY_GREEN = [
+  ['leisure', new Set(['park', 'garden', 'nature_reserve'])],
+  ['natural', new Set(['wood', 'scrub', 'grassland', 'heath', 'bare_rock', 'rock', 'scree', 'wetland'])],
+  ['landuse', new Set(['grass', 'meadow', 'forest', 'recreation_ground', 'village_green'])],
+];
 const QUAY_TOWN_REACH_M = 10;       // a mapped way or a building this near a bank (to twice this): a town's ground, a quay wall may stand
 const CUTTING_ROAD_REACH_M = 2.5;   // a road this near a tunnel's approach line is the road in its cutting
 const CUTTING_SAMPLE_REACH_M = 6;   // a cutting station takes the road's height from a road station this near along the line
@@ -6899,7 +6905,7 @@ function buildDeckPaths(terrainData, squareSize) {
       const layer = Number.parseFloat(tags.layer);
       // (hung from cables, a suspension or cable-stayed footbridge stands on nothing: no posts under it)
       const hanging = HANGING_STRUCTURES.has(String(tags['bridge:structure'] || '').toLowerCase()) || ['suspension', 'cable-stayed'].includes(String(tags.bridge || '').toLowerCase());
-      out.push({ id: f.id, nodes, half, bridge: !pier, hanging, wood: concrete ? false : (pier || tags.surface === 'wood' || tags.bridge === 'boardwalk') ? true : tags.surface ? false : 'overWater', ...(Number.isFinite(layer) ? { layer } : {}) });
+      out.push({ id: f.id, nodes, half, bridge: !pier, hanging, sidewalk: tags.footway === 'sidewalk', wood: concrete ? false : (pier || tags.surface === 'wood' || tags.bridge === 'boardwalk') ? true : tags.surface ? false : 'overWater', ...(Number.isFinite(layer) ? { layer } : {}) });
     }
   }
   return out;
@@ -10793,6 +10799,21 @@ function pointInPolygonLatLng(point, ring) {
 /**
  * Point-in-polygon test in world XY coordinates using ray casting.
  */
+/** inside(x, y): whether a world point lies inside any of the rings (bounding boxes on a 50 m grid first). */
+function pointInRings(rings) {
+  const CELL = 50; const cells = new Map();
+  for (const ring of rings) {
+    let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
+    for (const [x, y] of ring) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+    const item = { ring, x0, y0, x1, y1 };
+    for (let cx = Math.floor(x0 / CELL); cx <= Math.floor(x1 / CELL); cx++) for (let cy = Math.floor(y0 / CELL); cy <= Math.floor(y1 / CELL); cy++) {
+      const k = `${cx},${cy}`; if (!cells.has(k)) cells.set(k, []); cells.get(k).push(item);
+    }
+  }
+  return (x, y) => (cells.get(`${Math.floor(x / CELL)},${Math.floor(y / CELL)}`) || [])
+    .some((it) => x >= it.x0 && x <= it.x1 && y >= it.y0 && y <= it.y1 && pointInPolygonWorld(x, y, it.ring));
+}
+
 function pointInPolygonWorld(x, y, ring) {
   let inside = false;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -13580,6 +13601,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       // (paving stones laid as the streets' decals lay them: red brick in the Americas)
       americas: getMarkingStyle(exportTerrainData.roadRules) === 'americas',
       groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
+      // (the ground as surveyed, before beds were dug: where a footbridge's end lands)
+      surveyAt: (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize),
     })
     : { meshes: [], runs: [], triangles: 0 };
   // (the grid points graded for a sidewalk's slab: later passes that raise the
@@ -14473,7 +14496,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // wing walls: the walls a road's fill stands behind beside a bridge's end (structures/wingWalls.js). The terrain
   // there has steep sides by design; bare, they showed as rows of teeth at every raised bridge approach
   if (includeRoads && sg?.classes && sg.profile?.z && Array.isArray(sidewalks.meshes)) {
-    const cwIndexW = buildCarriagewayIndex(groundCarriageways);
+    // (every carriageway, decks too: at a divided street's bridge end the other carriageway is still on its deck,
+    // and the walls of the one beside it stood across its lanes, South Church Street over the Reedy)
+    const cwIndexW = buildCarriagewayIndex((decalRoads.carriageways || groundCarriageways).filter((cw) => !cw.tunnel));
     const runs = wingWallRuns(sg, {
       groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
       onOtherRoad: (x, y) => isOnOtherCarriageway(cwIndexW, x, y, 0, () => false),
@@ -14495,7 +14520,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     const town = new Set();
     const markTown = (x, y) => town.add(`${Math.floor(x / QUAY_TOWN_REACH_M)},${Math.floor(y / QUAY_TOWN_REACH_M)}`);
     for (const f of exportTerrainData.osmFeatures || []) {
-      if (!((f.type === 'road' && !f.tags?.tunnel && !f.tags?.railway) || f.type === 'building') || !(f.geometry?.length > 1)) continue;
+      // (paths do not make a town: a park's footways along a natural river counted as built-up ground, and Falls
+      // Park's granite banks got 958 m of quay wall)
+      if (!((f.type === 'road' && !f.tags?.tunnel && !f.tags?.railway && !QUAY_PATH_CLASSES.has(f.tags?.highway)) || f.type === 'building') || !(f.geometry?.length > 1)) continue;
       const q = f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0));
       for (let i = 0; i + 1 < q.length; i++) {
         const L = Math.hypot(q[i + 1][0] - q[i][0], q[i + 1][1] - q[i][1]);
@@ -14503,6 +14530,10 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         for (let k = 0; k <= n; k++) markTown(q[i][0] + ((q[i + 1][0] - q[i][0]) * k) / n, q[i][1] + ((q[i + 1][1] - q[i][1]) * k) / n);
       }
     }
+    const greenRings = (exportTerrainData.osmFeatures || [])
+      .filter((f) => f.geometry?.length > 3 && QUAY_GREEN.some(([k, vals]) => vals.has(f.tags?.[k])))
+      .map((f) => f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0)));
+    const inGreen = greenRings.length ? pointInRings(greenRings) : () => false;
     const nearTown = (x, y) => { const cx = Math.floor(x / QUAY_TOWN_REACH_M); const cy = Math.floor(y / QUAY_TOWN_REACH_M); for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) if (town.has(`${cx + dx},${cy + dy}`)) return true; return false; };
     const lines = (exportTerrainData.osmFeatures || [])
       .filter((f) => (f.type === 'water' || f.type === 'coastline') && f.geometry?.length > 2 && !isUndergroundWater(f.tags) && !WATERWAY_HALF_M[f.tags?.waterway])
@@ -14512,7 +14543,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
       surveyAt: (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize),
       // (built-up land cover, or a mapped way or building within reach)
-      hardAt: (x, y) => landCoverAt(exportTerrainData.landCover, worldSize, x, y) === WC.BUILT || nearTown(x, y),
+      // (never land mapped green: a park, a garden, a wood, grass or rock behind the bank is a natural bank)
+      hardAt: (x, y) => !inGreen(x, y) && (landCoverAt(exportTerrainData.landCover, worldSize, x, y) === WC.BUILT || nearTown(x, y)),
       skipAt: (x, y) => Math.abs(x) > edge || Math.abs(y) > edge,
     });
     if (typeof globalThis.__MAPNG_QUAY_DEBUG === 'function') globalThis.__MAPNG_QUAY_DEBUG(runs);

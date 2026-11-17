@@ -105,7 +105,14 @@ const DECK_CLEAR_M = 1.2;     // a deck over the water
 const DECK_SHORE_M = 0.8;     // ground this far over the deck level is land, not a shallow
 const DECK_LAND_NODES = 4;    // ... along this many of a deck's 2 m points together
 const DECK_ROAD_M = 3.5;      // a footway this near a bridge's road is on that bridge
-const DECK_LANE_OVERLAP_M = 0.5; // ... but not where its slab overlaps the road's lanes more than this
+const DECK_LANE_OVERLAP_M = 0.5;
+// A mapped sidewalk along a road bridge is on that bridge this far out from its deck's edge (the parking, verge or
+// cycle lane between: South Main Street over the Reedy, angled parking both sides, the sidewalks 5 to 7 m out),
+// when it runs along it (within SIDEWALK_DECK_COS): at the road's height (the deck is widened to it,
+// beamngBridges.js widenDecksForSidewalks, so the parking between stays at road level on the deck).
+const SIDEWALK_DECK_M = 10;
+const SIDEWALK_DECK_COS = Math.cos((30 * Math.PI) / 180);
+const DECK_DUG_M = 0.5;          // a footbridge end this far under the survey stands on the surveyed ground // ... but not where its slab overlaps the road's lanes more than this
 const DECK_POST_M = 4;
 const WALL_WATER_M = 0.5;      // ground this little over the water is the water's side
 const WALL_INNER_LIFT_M = 0.5; // the deck's land edge over the highest ground along it
@@ -2606,10 +2613,12 @@ const WALK_ATTACH_CLEAR_M = 0.3;
  * carriageways. Their posts stand wherever the deck is clear of the ground.
  */
 const DECK_PATH_BRIDGE_GAP_M = 250;   // a bridge sidewalk off its deck this long at most is carried across
-export function buildDeckRuns(paths, bridges, { groundAt, seaZ = 0, seaAt = null } = {}) {
+export function buildDeckRuns(paths, bridges, opts = {}) {
+  const { groundAt, seaZ = 0, seaAt = null } = opts;
   if (!groundAt) return [];
   const index = bridges?.length ? buildCarriagewayIndex(bridges) : null;
   const layerByOwner = new Map((bridges || []).map((cw) => [cw.owner, Number.parseFloat(cw.tags?.layer)]));
+  if (globalThis.__MAPNG_DECK_DEBUG && index) globalThis.__MAPNG_DECK_DEBUG.push({ roadDecks: index.segments.map((s) => [s.ax, s.ay, s.bx, s.by, s.half, s.owner]) });
   const least = seaZ + DECK_CLEAR_M;
   return (paths || []).filter((p) => p.nodes.length > 1).flatMap((path) => {
     const { nodes, half } = path;
@@ -2629,7 +2638,30 @@ export function buildDeckRuns(paths, bridges, { groundAt, seaZ = 0, seaAt = null
     // the upper deck's median)
     const ours = (hit) => { const l = layerByOwner.get(hit.owner); return !Number.isFinite(path.layer) || !Number.isFinite(l) || l === path.layer; };
     const roadsAt = (q) => (index ? carriagewaysAt(index, q[0], q[1], DECK_ROAD_M).filter(ours) : []);
-    const onRoad = nodes.map((q) => roadsAt(q)[0] || null);
+    // the nearest road deck of this path's layer at a point: its z, how far out from its edge, its edge point there
+    const deckNear = (q, i) => {
+      if (!index) return null;
+      const a = nodes[Math.max(0, i - 1)]; const b = nodes[Math.min(nodes.length - 1, i + 1)];
+      const pl = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      let best = null;
+      for (const s of index.segments) {
+        if (!ours(s)) continue;
+        const dx = s.bx - s.ax; const dy = s.by - s.ay; const L2 = dx * dx + dy * dy || 1;
+        const tt = Math.max(0, Math.min(1, ((q[0] - s.ax) * dx + (q[1] - s.ay) * dy) / L2));
+        const px = s.ax + tt * dx; const py = s.ay + tt * dy;
+        const r = Math.hypot(q[0] - px, q[1] - py);
+        const d = r - s.half;
+        if (d > SIDEWALK_DECK_M || (best && d >= best.gap)) continue;
+        const along = Math.abs(((b[0] - a[0]) * dx + (b[1] - a[1]) * dy) / (pl * Math.sqrt(L2)));
+        const ux = r > 1e-6 ? (q[0] - px) / r : 0; const uy = r > 1e-6 ? (q[1] - py) / r : 0;
+        best = { owner: s.owner, z: (s.az ?? 0) + ((s.bz ?? 0) - (s.az ?? 0)) * tt, gap: d, along, edge: [px + ux * s.half, py + uy * s.half] };
+      }
+      return best;
+    };
+    const near = nodes.map((q, i) => deckNear(q, i));
+    // (a mapped sidewalk running along a road deck within SIDEWALK_DECK_M of its edge is on it)
+    const onRoad = nodes.map((q, i) => roadsAt(q)[0]
+      || (path.sidewalk && near[i] && near[i].gap < SIDEWALK_DECK_M && near[i].along > SIDEWALK_DECK_COS ? near[i] : null));
     const raw = nodes.map((q, i) => {
       const road = onRoad[i];
       if (road) return road.z + CURB_H - WALK_H;
@@ -2640,6 +2672,18 @@ export function buildDeckRuns(paths, bridges, { groundAt, seaZ = 0, seaAt = null
     // sea, the piers' rule; inland every point is land, and a footbridge over a river 250 m above the sea lay on
     // the riverbed, 14 m under its banks (Liberty Bridge, Greenville, a user's level).
     if (path.bridge && !onRoad[0] && !onRoad[nodes.length - 1]) {
+      // (its ends land where the paths it joins are: a raised walk's top, else the ground at the end; never the
+      // water: an end inside a river's outline took the dug bed, 4 m under the bank, and the pier rule's sea level)
+      for (const e of [0, nodes.length - 1]) {
+        const w = opts.walkTop ? opts.walkTop(nodes[e][0], nodes[e][1]) : null;
+        raw[e] = w !== null && w !== undefined ? w - WALK_H : Math.max(raw[e], groundAt(nodes[e][0], nodes[e][1]));
+        // (an end where the level's ground was dug under the survey (a river's bed carved along its line) stands
+        // at the surveyed height: the Swamp Rabbit Trail's bridge below the falls ended 3 m under the trail it joins)
+        if ((w === null || w === undefined) && opts.surveyAt) {
+          const sv = opts.surveyAt(nodes[e][0], nodes[e][1]);
+          if (Number.isFinite(sv) && sv - groundAt(nodes[e][0], nodes[e][1]) > DECK_DUG_M) raw[e] = Math.max(raw[e], sv);
+        }
+      }
       const sAt = [0]; for (let i = 1; i < nodes.length; i++) sAt.push(sAt[i - 1] + Math.hypot(nodes[i][0] - nodes[i - 1][0], nodes[i][1] - nodes[i - 1][1]));
       const total = sAt[nodes.length - 1] || 1; const z0 = raw[0]; const z1 = raw[nodes.length - 1];
       for (let i = 1; i + 1 < nodes.length; i++) {
@@ -2664,7 +2708,8 @@ export function buildDeckRuns(paths, bridges, { groundAt, seaZ = 0, seaAt = null
     }
     let z = raw;
     for (let pass = 0; pass < 4; pass++) z = z.map((v, i) => (i === 0 || i === z.length - 1 ? v : (z[i - 1] + 2 * v + z[i + 1]) / 4));
-    const onBridge = nodes.some((q) => roadsAt(q).length);
+    // (on a road bridge: within reach of its deck, or a sidewalk held out from it along its length)
+    const onBridge = onRoad.some(Boolean);
     // (debug: scratch probes read what each footbridge was matched to; off unless the global is set)
     if (globalThis.__MAPNG_DECK_DEBUG) {
       let near = null;
@@ -2674,7 +2719,19 @@ export function buildDeckRuns(paths, bridges, { groundAt, seaZ = 0, seaAt = null
         const d = Math.hypot(s.ax + t * dx - q[0], s.ay + t * dy - q[1]) - s.half;
         if (!near || d < near.d) near = { d, roadZ: (s.az ?? 0) + ((s.bz ?? 0) - (s.az ?? 0)) * t, pathZ: z[nodes.indexOf(q)], owner: s.owner, layer: layerByOwner.get(s.owner) };
       }
-      globalThis.__MAPNG_DECK_DEBUG.push({ id: path.id, n: nodes.length, onRoad: onRoad.filter(Boolean).length, layer: path.layer, near, ends: [z[0], z[z.length - 1]], ground: [ground[0], ground[ground.length - 1]] });
+      // (per point: x, y, deck z, ground, the nearest road deck's z and how far out from its edge)
+      const pts = nodes.map((q, i) => {
+        let best = null;
+        if (index) for (const s of index.segments) {
+          const dx = s.bx - s.ax; const dy = s.by - s.ay; const L2 = dx * dx + dy * dy || 1;
+          const tt = Math.max(0, Math.min(1, ((q[0] - s.ax) * dx + (q[1] - s.ay) * dy) / L2));
+          const d = Math.hypot(s.ax + tt * dx - q[0], s.ay + tt * dy - q[1]) - s.half;
+          if (!best || d < best[1]) best = [(s.az ?? 0) + ((s.bz ?? 0) - (s.az ?? 0)) * tt, d];
+        }
+        return [q[0], q[1], z[i], groundAt(q[0], q[1]), best ? best[0] : null, best ? best[1] : null, onRoad[i] ? 1 : 0];
+      });
+      const wt = (q) => (opts.walkTop ? opts.walkTop(q[0], q[1]) : null);
+      globalThis.__MAPNG_DECK_DEBUG.push({ id: path.id, n: nodes.length, onRoad: onRoad.filter(Boolean).length, layer: path.layer, near, sidewalk: !!path.sidewalk, ends: [z[0], z[z.length - 1]], ground: [ground[0], ground[ground.length - 1]], walkEnds: [wt(nodes[0]), wt(nodes[nodes.length - 1])], pts });
     }
     // A footbridge with no surface tag: planks only where it crosses water on its own (a park's
     // bridge over a stream, a boardwalk nobody tagged). One that meets a road bridge, or runs over
@@ -2694,7 +2751,9 @@ export function buildDeckRuns(paths, bridges, { groundAt, seaZ = 0, seaAt = null
       const centre = idx.map((i) => [nodes[i][0], nodes[i][1], z[i]]);
       const flat = centre.map((q) => [q[0], q[1], q[2], 0]);
       const points = offsetLine(flat, half).map((q) => [q[0], q[1], q[2]]);
-      return { id: path.id, points, centre, half, side: -1, width: half * 2, walk: true, deck: true, onBridge, wood, footbridge: !!path.bridge, hanging: !!path.hanging, ramps: [false, false], caps: [true, true], highway: 'footway' };
+      const width = half * 2; const side = -1;
+      if (globalThis.__MAPNG_DECK_DEBUG) globalThis.__MAPNG_DECK_DEBUG.push({ piece: path.id, points, width, side, onBridge });
+      return { id: path.id, points, centre, half, side, width, walk: true, deck: true, onBridge, wood, footbridge: !!path.bridge, hanging: !!path.hanging, ramps: [false, false], caps: [true, true], highway: 'footway' };
     });
   });
 }
@@ -2926,6 +2985,23 @@ function shoreAbove(end, prev, z, walkTop, groundAt) {
 }
 
 // Gangways at the ends of decks below the shore: the number of each kind.
+// The top of the raised walk at (x, y), or null: walkTop(x, y) over the given walk runs.
+function walkTopOver(walkRuns) {
+  const cells = new Map();
+  for (const run of walkRuns) {
+    for (const q of run.centre || []) {
+      const key = `${Math.floor(q[0] / 4)},${Math.floor(q[1] / 4)}`;
+      if (!cells.has(key)) cells.set(key, []);
+      cells.get(key).push([q[0], q[1], q[2] + WALK_H, run.half + 0.3]);
+    }
+  }
+  return (x, y) => {
+    const cx = Math.floor(x / 4); const cy = Math.floor(y / 4);
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (const q of cells.get(`${cx + i},${cy + j}`) || []) if (Math.hypot(q[0] - x, q[1] - y) < q[3]) return q[2];
+    return null;
+  };
+}
+
 function buildGangways(builder, deckRuns, walkRuns, groundAt) {
   const cells = new Map();
   for (const run of walkRuns) {
@@ -2942,7 +3018,9 @@ function buildGangways(builder, deckRuns, walkRuns, groundAt) {
   };
   const counts = { ramp: 0, stairs: 0 };
   for (const run of deckRuns) {
-    if (run.onBridge) continue;
+    // (a footbridge meets its paths at its ends: stairs and ramps are for piers below a quay. Run on footbridges,
+    // they stood at any end with rising ground past it: an ordinary path going on uphill got 4 m of metal stairs)
+    if (run.onBridge || run.footbridge) continue;
     const c = run.centre; const n = c.length;
     for (const [e, step] of [[0, 1], [n - 1, -1]]) {
       const end = c[e]; const deckTop = end[2] + WALK_H;
@@ -3016,8 +3094,11 @@ function deckPosts(builder, run, groundAt) {
       box.forEach((q, k) => {
         const w = box[(k + 1) % 4];
         const out = [(q[0] + w[0]) / 2 - x, (q[1] + w[1]) / 2 - y, 0];
-        builder.tri(mat, [...q, low], [...w, low], [...w, high], [0, 0], [0.2, 0], [0.2, 1], out);
-        builder.tri(mat, [...q, low], [...w, high], [...q, high], [0, 0], [0.2, 1], [0, 1], out);
+        // (wood: the plank; concrete: the curb sheet's light rows only. Over the whole sheet a post wore its painted
+        // bands: red, yellow and white stripes up every post)
+        const [v0, v1] = run.wood ? [0, 1] : [V_LIGHT_LOW, V_BAND_TOP];
+        builder.tri(mat, [...q, low], [...w, low], [...w, high], [0, v0], [0.2, v0], [0.2, v1], out);
+        builder.tri(mat, [...q, low], [...w, high], [...q, high], [0, v0], [0.2, v1], [0, v1], out);
       });
     }
   });
@@ -3661,7 +3742,7 @@ function* sidewalkMeshes(carriageways, options = {}) {
     for (const run of walkRuns) sweepRun(builder, run);
   }
   flush();
-  const deckRuns = buildDeckRuns(options.decks, options.bridgeRoads, options);
+  const deckRuns = buildDeckRuns(options.decks, options.bridgeRoads, { ...options, walkTop: walkTopOver(walkRuns) });
   for (const wood of [true, false]) {
     const set = deckRuns.filter((r) => r.wood === wood);
     try {
