@@ -4247,7 +4247,7 @@ const BRIDGE_REACH_GRADE = 0.06;    // ... and the bridge climbs from them at th
 const QUAY_TOWN_REACH_M = 10;       // a mapped way or a building this near a bank (to twice this): a town's ground, a quay wall may stand
 const CUTTING_ROAD_REACH_M = 2.5;   // a road this near a tunnel's approach line is the road in its cutting
 const CUTTING_SAMPLE_REACH_M = 6;   // a cutting station takes the road's height from a road station this near along the line
-const CUTTING_FLOOR_PAST_M = 3;     // the cutting's floor reaches this far past the road's edge (walkways, the gap to the walls)
+const CUTTING_FLOOR_PAST_M = 6;     // the cutting's floor reaches this far past the road's edge (walkways, the gap to the walls)
 const CUTTING_FLOOR_TOL_M = 0.6;    // a square within this of the height the cutting was dug to is its floor
 const CARRY_CLEAR_M = 25;           // stops this far short of another deck over (or under) the approach
 const CARRY_MIN_M = 20;              // shorter than this: not worth carrying on
@@ -6408,7 +6408,8 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     const samplesOf = new Map();   // tunnel -> [[s along its line, road z]]
     structureGraph.edges.forEach((e, k) => {
       const t = tunnels.bySeg.get(e.seg);
-      if (!t || t.kind === 'gallery') return;
+      // (roads: a railway's cutting is its track bed's, laid by the rail builder on the line as dug)
+      if (!t || t.kind === 'gallery' || e.rail) return;
       const out = tunnelApronLength(t) + 1;
       const seenEdges = new Set([k]);
       const queue = [e.from, e.to];

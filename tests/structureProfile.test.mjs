@@ -423,3 +423,20 @@ test('coarse elevation: a short street between two junctions follows a steady hi
   assert.ok(steady < 0.6, `a steady 25% street: ${steady.toFixed(2)} m off its ground`);
   assert.ok(step > steady + 0.3, `the step is eased (${step.toFixed(2)} m off the data), the steady street is not (${steady.toFixed(2)} m)`);
 });
+
+test('rules: on a measured survey a big road standing 3 m over the ground is a viaduct, a monorail off the ground always; a street on its fill stays', async () => {
+  const { STRUCTURE_RULES } = await import('../services/structures/structureRules.js');
+  const pick = (st) => {
+    const ok = (r) => (!r.tag || st.tags[r.tag]) && (!r.highway || r.highway === st.highway) && (!r.fine || st.fine) && (!r.highways || r.highways.has(st.highway))
+      && (!r.overWater || st.overWater) && (!r.overRoad || st.overRoad) && (r.hMin === undefined || st.h >= r.hMin) && (r.hMax === undefined || st.h <= r.hMax)
+      && (r.coverMin === undefined || st.cover >= r.coverMin);
+    return STRUCTURE_RULES.find(ok).kind;
+  };
+  const st = (highway, h, fine) => ({ tags: {}, highway, h, fine, cover: -h - 6 });
+  assert.equal(pick(st('motorway', 6, true)), 'deck');
+  assert.equal(pick(st('motorway', 6, false)), 'embankment', 'coarse elevation says nothing of what is under the road');
+  assert.equal(pick(st('motorway', 2, true)), 'embankment');
+  assert.equal(pick(st('residential', 6, true)), 'embankment');
+  assert.equal(pick(st('railway:monorail', 4, false)), 'deck');
+  assert.equal(pick(st('railway:rail', 4, true)), 'embankment');
+});

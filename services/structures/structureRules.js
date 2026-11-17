@@ -19,12 +19,21 @@ const DECK_MIN_H = 1.5;       // lowest a deck stands over the ground (its struc
  *   overWater / overRoad: true
  *   hMin / hMax: height of the road over the untouched ground (m)
  *   coverMin / coverMax: ground over a tunnel's roof (m)
+ *   highway: the edge's class; fine: true on a measured survey (graph.fineGround)
  */
+const VIADUCT_CLASSES = new Set(['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link']);
 export const STRUCTURE_RULES = [
   { kind: 'deck', overWater: true },
   { kind: 'deck', overRoad: true },
   { kind: 'deck', hMin: 8 },
   { kind: 'deck', tag: 'bridge', hMin: 1.5 },
+  // a monorail runs on a beam on columns wherever it is off the ground: never on an earth bank
+  { kind: 'deck', highway: 'railway:monorail', hMin: 1.5 },
+  // a measured survey (bare earth) holds every embankment there is and leaves every bridge out: a road standing
+  // FINE_VIADUCT_M or more over that ground has no earth under it, whatever its tags say (an elevated freeway
+  // mapped without bridge tags stood on a grass bank 8 m high beside the lanes under it)
+  // (the big roads only: a track or a street the solve carries over a gully is on a fill, as built)
+  { kind: 'deck', fine: true, highways: VIADUCT_CLASSES, hMin: 3 },
   { kind: 'embankment', hMin: 0.5 },
   { kind: 'boredTunnel', tag: 'tunnel', coverMin: 8 },
   { kind: 'cutAndCover', tag: 'tunnel', coverMin: 0 },
@@ -40,6 +49,9 @@ const RANK = { external: 9, dam: 8, deck: 6, boredTunnel: 5, cutAndCover: 4, emb
 
 function matches(rule, st) {
   if (rule.tag && !st.tags[rule.tag]) return false;
+  if (rule.highway && st.highway !== rule.highway) return false;
+  if (rule.fine && !st.fine) return false;
+  if (rule.highways && !rule.highways.has(st.highway)) return false;
   if (rule.overWater && !st.overWater) return false;
   if (rule.overRoad && !st.overRoad) return false;
   if (rule.hMin !== undefined && !(st.h >= rule.hMin)) return false;
@@ -143,7 +155,7 @@ export function classifyStructures(graph, { rules = STRUCTURE_RULES } = {}) {
     const why = new Uint8Array(e.s.length);   // 3 water, 2 road, 1 carried, 0 height / tag
     for (let i = 0; i < e.s.length; i++) {
       const h = z[k][i] - e.g[i];
-      const st = { tags, h, cover: -h - ROOF_M, overRoad: !!overRoad[k][i], overWater: !!overWater[k][i] };
+      const st = { tags, h, cover: -h - ROOF_M, overRoad: !!overRoad[k][i], overWater: !!overWater[k][i], highway: e.highway, fine: !!graph.fineGround };
       kinds[i] = (rules.find((r) => matches(r, st)) || { kind: 'ground' }).kind;
       why[i] = st.overWater ? 3 : st.overRoad ? 2 : 0;
       if (kinds[i] === 'embankment' && crowded[k][i] && h >= DECK_MIN_H) { kinds[i] = 'deck'; stats.carried++; why[i] = 1; }
