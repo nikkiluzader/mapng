@@ -24,8 +24,11 @@ export const OWN_MAP_STYLES = ['light', 'dark', 'white', 'grayscale', 'black'];
 /** The style to draw: the chosen one when it is a known style, else by the app's dark mode. */
 export const ownMapStyle = (chosen, darkMode) => (OWN_MAP_STYLES.includes(chosen) ? chosen : darkMode ? 'dark' : 'light');
 
+let ownArchive = null;
 /** The Leaflet layer (the renderer is loaded when first needed: it is not in the page's first script). */
 export async function createOwnMapLayer(options = {}) {
-  const { leafletLayer } = await import('protomaps-leaflet');
-  return leafletLayer({ url: OWN_MAP_URL, flavor: OWN_MAP_STYLES.includes(options.style) ? options.style : options.dark ? 'dark' : 'light', lang: options.lang || 'en', maxDataZoom: OWN_MAP_MAX_DATA_ZOOM, attribution: OWN_MAP_ATTRIBUTION, ...options.leaflet });
+  const [{ leafletLayer }, { PMTiles }, { cachedTileSource }] = await Promise.all([import('protomaps-leaflet'), import('pmtiles'), import('./tileByteCache.js')]);
+  // (one archive reader for every style of the map, its pieces kept by the browser: services/tileByteCache.js)
+  ownArchive ||= new PMTiles(cachedTileSource(OWN_MAP_URL));
+  return leafletLayer({ url: ownArchive, flavor: OWN_MAP_STYLES.includes(options.style) ? options.style : options.dark ? 'dark' : 'light', lang: options.lang || 'en', maxDataZoom: OWN_MAP_MAX_DATA_ZOOM, attribution: OWN_MAP_ATTRIBUTION, ...options.leaflet });
 }

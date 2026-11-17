@@ -16372,6 +16372,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Completed exportBeamNGLevel`);
   return {
     blob: zipBlob, filename: `${levelName}.zip`, structureChecks, ingameProbes,
+    // (the level's export_report.txt, for the "done" window: read there without opening the zip again)
+    report: reportContents,
     // (for the export history: each step's time, and the steps reused from the last export)
     steps: processingLog.map((e) => ({ step: e.step, ms: Math.round(e.durationMs) })),
     reused: [...reusedSteps],

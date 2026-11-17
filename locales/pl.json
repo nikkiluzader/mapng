@@ -573,7 +573,11 @@
       "close": "Zamknij",
       "panelSaved": "Zapisano: {name}",
       "panelReady": "Gotowe do zapisania: {name}",
-      "whereDownloaded": "Przeglądarka zapisała go w swoim folderze pobierania."
+      "whereDownloaded": "Przeglądarka zapisała go w swoim folderze pobierania.",
+      "report": "Raport eksportu",
+      "reportHide": "Ukryj raport",
+      "reportDownload": "Pobierz raport",
+      "reportMissing": "Nie udało się odczytać raportu."
     },
     "mayTakeWhile": "Przy dużych mapach może to chwilę potrwać",
     "elapsed": "Upłynęło",

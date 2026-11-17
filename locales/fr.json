@@ -573,7 +573,11 @@
       "close": "Fermer",
       "panelSaved": "Enregistré : {name}",
       "panelReady": "Prêt à enregistrer : {name}",
-      "whereDownloaded": "Votre navigateur l'a enregistré dans son dossier de téléchargements."
+      "whereDownloaded": "Votre navigateur l'a enregistré dans son dossier de téléchargements.",
+      "report": "Rapport d'export",
+      "reportHide": "Masquer le rapport",
+      "reportDownload": "Télécharger le rapport",
+      "reportMissing": "Le rapport n'a pas pu être lu."
     },
     "mayTakeWhile": "Cela peut prendre un moment pour les grandes cartes",
     "elapsed": "Écoulé",

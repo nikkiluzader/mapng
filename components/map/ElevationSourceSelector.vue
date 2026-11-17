@@ -53,10 +53,7 @@
 
         <!-- Mapterhorn -->
         <!-- (folded: the hint above already says what this area gets) -->
-        <details v-else-if="localElevationSource === 'mapterhorn'" class="text-micro text-gray-500 dark:text-gray-400 leading-tight">
-            <summary class="cursor-pointer select-none hover:text-brand w-fit">{{ t('sections.more') }}</summary>
-            <p class="mt-1">{{ t('map.mapterhornDescription') }} <a href="https://mapterhorn.com/coverage" target="_blank" rel="noopener" class="text-brand hover:underline">{{ t('map.checkCoverage') }}</a></p>
-        </details>
+        <ShortHint v-else-if="localElevationSource === 'mapterhorn'" :more="t('map.mapterhornDescription')"><a href="https://mapterhorn.com/coverage" target="_blank" rel="noopener" class="text-brand hover:underline">{{ t('map.checkCoverage') }}</a></ShortHint>
 
         <!-- None / Flat -->
         <span v-else-if="localElevationSource === 'none'" class="block text-micro text-gray-500 dark:text-gray-400 leading-tight">
@@ -137,6 +134,7 @@
 </template>
 
 <script setup>
+import ShortHint from '../base/ShortHint.vue';
 import SettingSection from '../base/SettingSection.vue';
 import { SELECT_SM } from '../base/controlStyles.js';
 import { computed, ref, watch } from 'vue';

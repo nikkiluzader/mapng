@@ -573,7 +573,11 @@
       "close": "Cerrar",
       "panelSaved": "Guardado: {name}",
       "panelReady": "Listo para guardar: {name}",
-      "whereDownloaded": "Tu navegador lo guardó en su carpeta de descargas."
+      "whereDownloaded": "Tu navegador lo guardó en su carpeta de descargas.",
+      "report": "Informe de exportación",
+      "reportHide": "Ocultar informe",
+      "reportDownload": "Descargar informe",
+      "reportMissing": "No se pudo leer el informe."
     },
     "mayTakeWhile": "Esto puede tardar en mapas grandes",
     "elapsed": "Transcurrido",

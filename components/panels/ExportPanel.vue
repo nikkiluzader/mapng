@@ -619,6 +619,17 @@
             </p>
           </div>
           <p class="text-caption text-gray-500 dark:text-gray-400">{{ t(exportDone.where === 'mods' ? 'exportPanel.desktopLoadHint' : 'exportPanel.done.nextWeb') }}</p>
+          <!-- the level's export report: to read here, or to save as a text file -->
+          <div class="space-y-1.5">
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-caption">
+              <button type="button" data-testid="export-done-report" class="flex items-center gap-1 text-brand hover:underline" :aria-expanded="reportShown" @click="toggleExportReport">
+                <FileText :size="13" />{{ reportShown ? t('exportPanel.done.reportHide') : t('exportPanel.done.report') }}
+              </button>
+              <a v-if="reportUrl" :href="reportUrl" :download="reportFileName" data-testid="export-done-report-download" class="flex items-center gap-1 text-brand hover:underline"><Download :size="13" />{{ t('exportPanel.done.reportDownload') }}</a>
+            </div>
+            <p v-if="reportShown && reportText === null" class="text-caption text-amber-700 dark:text-amber-300">{{ t('exportPanel.done.reportMissing') }}</p>
+            <pre v-else-if="reportShown" data-testid="export-done-report-text" tabindex="0" class="max-h-64 overflow-auto rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-2 font-mono text-micro leading-snug text-gray-700 dark:text-gray-200 whitespace-pre-wrap [overflow-wrap:anywhere]">{{ reportText }}</pre>
+          </div>
           <div class="flex flex-wrap items-center justify-end gap-2 pt-1">
             <a v-if="exportDone.where === 'download' && beamNGPendingDownloadUrl" :href="beamNGPendingDownloadUrl" :download="beamNGPendingDownloadName || 'beamng_level.zip'" data-testid="export-done-download"
               class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-caption font-medium transition-colors" @click="handleBeamNGPendingDownloadClick">
@@ -781,6 +792,23 @@ const exportDoneCloseButton = ref(null);
 // (what follows a finished export, the support card among it, waits for this window to be closed: it came up
 // underneath it)
 let announceWhenClosed = null;
+// The finished level's export report in the done window: the web export hands its text over; the desktop app reads
+// it from the zip it wrote. Shown on request, and offered as a text file.
+const reportShown = ref(false);
+const reportText = ref('');      // '' not asked yet, null not readable
+const reportUrl = ref('');
+const reportFileName = computed(() => `${String(exportDone.value?.filename || 'level').replace(/\.zip$/i, '')}_export_report.txt`);
+const loadExportReport = async () => {
+  if (reportText.value) return;
+  let text = exportDone.value?.report || null;
+  if (!text && desktopApp?.levelExportReport) { try { text = await desktopApp.levelExportReport(exportDone.value?.filename); } catch { text = null; } }
+  reportText.value = text || null;
+  if (text && !reportUrl.value) reportUrl.value = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+};
+const toggleExportReport = async () => { reportShown.value = !reportShown.value; if (reportShown.value) await loadExportReport(); };
+const forgetExportReport = () => { reportShown.value = false; reportText.value = ''; if (reportUrl.value) { URL.revokeObjectURL(reportUrl.value); reportUrl.value = ''; } };
+// (read as soon as the window is up, so Download report is there without opening it; forgotten with the window)
+watch(exportDone, (now, was) => { if (!now) forgetExportReport(); else if (!was) loadExportReport(); });
 const closeExportDone = () => {
   exportDone.value = null;
   if (announceWhenClosed) { const [type, filename] = announceWhenClosed; announceWhenClosed = null; notifyExportSuccess(type, filename); }
@@ -2442,7 +2470,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
 
     // (under the download guard: anything still downloaded is logged, services/dataCache.js;
     // the steps nothing changed for since the last export reused: services/stepCache.js)
-    const { blob, filename } = await withDownloadGuard(() => exportBeamNGLevel(td, props.center, { ...levelOptions, stepCache: pageStepCache() }));
+    const { blob, filename, report: exportReportText } = await withDownloadGuard(() => exportBeamNGLevel(td, props.center, { ...levelOptions, stepCache: pageStepCache() }));
 
     if (effectiveBackdropSource === 'gpxz' && !effectiveBackdropGpxzApiKey) {
       console.warn(`${BEAMNG_EXPORT_UI_LOG} GPXZ backdrop selected but no GPXZ key was passed to export.`);
@@ -2477,7 +2505,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       await writable.close();
       console.log(`${BEAMNG_EXPORT_UI_LOG} Download written via File System Access API.`);
       // (the name the visitor gave it in the save window)
-      doneInfo = { filename: beamNGSaveHandle.name || filename, size: blob.size, where: 'chosen' };
+      doneInfo = { filename: beamNGSaveHandle.name || filename, size: blob.size, where: 'chosen', report: exportReportText };
       announceWhenClosed = ['beamng_level_zip', filename];
       console.log(`${BEAMNG_EXPORT_UI_LOG} Export success notification emitted.`);
     } else {
@@ -2485,7 +2513,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       beamNGPendingDownloadUrl.value = URL.createObjectURL(blob);
       beamNGPendingDownloadName.value = filename;
       console.warn(`${BEAMNG_EXPORT_UI_LOG} Auto-download fallback blocked risk detected; awaiting explicit anchor click.`);
-      doneInfo = { filename, size: blob.size, where: 'download' };
+      doneInfo = { filename, size: blob.size, where: 'download', report: exportReportText };
     }
     exportSucceeded = true;
   } catch (error) {

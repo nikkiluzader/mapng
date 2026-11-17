@@ -35,10 +35,7 @@
       {{ t(perTile ? 'controlPanel.processingResolutionCoverageTile' : 'controlPanel.processingResolutionCoverage', { km: coverageKm, px: resolution, mpp: current }) }}
       · {{ t(detailKey) }}
     </p>
-    <details class="text-micro text-gray-500 dark:text-gray-400">
-      <summary class="cursor-pointer select-none hover:text-brand w-fit">{{ t('sections.more') }}</summary>
-      <p class="mt-1">{{ t('controlPanel.processingResolutionGuide') }}</p>
-    </details>
+    <ShortHint :more="t('controlPanel.processingResolutionGuide')" />
     <p v-if="current > COARSE_MPP" class="flex items-start gap-1 text-micro text-amber-600 dark:text-amber-400 font-medium">
       <AlertTriangle :size="11" class="shrink-0 mt-px" />
       <span>
@@ -50,6 +47,7 @@
 </template>
 
 <script setup>
+import ShortHint from '../base/ShortHint.vue';
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { AlertTriangle } from 'lucide-vue-next';

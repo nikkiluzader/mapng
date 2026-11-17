@@ -578,7 +578,11 @@
       "close": "Close",
       "panelSaved": "Saved: {name}",
       "panelReady": "Ready to save: {name}",
-      "whereDownloaded": "Your browser saved it to its downloads folder."
+      "whereDownloaded": "Your browser saved it to its downloads folder.",
+      "report": "Export report",
+      "reportHide": "Hide report",
+      "reportDownload": "Download report",
+      "reportMissing": "The report could not be read."
     },
     "mayTakeWhile": "This may take a while for large maps",
     "elapsed": "Elapsed",

@@ -573,7 +573,11 @@
       "close": "Chiudi",
       "panelSaved": "Salvato: {name}",
       "panelReady": "Pronto da salvare: {name}",
-      "whereDownloaded": "Il browser lo ha salvato nella sua cartella dei download."
+      "whereDownloaded": "Il browser lo ha salvato nella sua cartella dei download.",
+      "report": "Rapporto di esportazione",
+      "reportHide": "Nascondi rapporto",
+      "reportDownload": "Scarica rapporto",
+      "reportMissing": "Impossibile leggere il rapporto."
     },
     "mayTakeWhile": "Per le mappe di grandi dimensioni potrebbe essere necessario del tempo",
     "elapsed": "Tempo trascorso",

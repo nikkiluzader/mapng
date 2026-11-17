@@ -573,7 +573,11 @@
       "close": "Schließen",
       "panelSaved": "Gespeichert: {name}",
       "panelReady": "Bereit zum Speichern: {name}",
-      "whereDownloaded": "Dein Browser hat sie in seinem Download-Ordner gespeichert."
+      "whereDownloaded": "Dein Browser hat sie in seinem Download-Ordner gespeichert.",
+      "report": "Exportbericht",
+      "reportHide": "Bericht ausblenden",
+      "reportDownload": "Bericht herunterladen",
+      "reportMissing": "Der Bericht konnte nicht gelesen werden."
     },
     "mayTakeWhile": "Das kann bei großen Karten etwas dauern",
     "elapsed": "Verstrichen",

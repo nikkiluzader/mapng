@@ -1054,6 +1054,14 @@ ipcMain.handle('levels:verify', (_event, file, expectedSize) => {
   return { ok: problems.length === 0, problems, changed };
 });
 
+// The export report of a level in the mods folder, for the "done" window after an export: its text, or null.
+ipcMain.handle('levels:exportReport', (_event, zipName) => {
+  const folder = modsFolder();
+  if (!folder) return null;
+  const name = path.basename(String(zipName || ''));
+  const level = listMapngLevels(folder).find((l) => l.zipName === name);
+  return level ? (levelExportReport(name, level.levelName)?.text ?? null) : null;
+});
 ipcMain.handle('levels:showInFolder', (_event, zipName) => {
   const folder = modsFolder();
   const file = folder && path.join(folder, path.basename(String(zipName)));
