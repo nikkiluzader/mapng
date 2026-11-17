@@ -17,6 +17,21 @@ const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
  * settings: { read(), write(patch) } — the app's settings.json.
  * busy(): true while an export runs (no restart then).
  */
+/**
+ * Release notes as plain text for the update dialog: GitHub hands them over as HTML, so the tags go and the
+ * character references it wrote are read back ("Help &gt; Get Test Builds" was shown as typed here).
+ */
+export function plainNotes(html) {
+  const named = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
+  return String(html || '').replace(/<[^>]+>/g, '')
+    .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (whole, ref) => {
+      if (ref[0] !== '#') return Object.hasOwn(named, ref.toLowerCase()) ? named[ref.toLowerCase()] : whole;
+      const code = ref[1].toLowerCase() === 'x' ? parseInt(ref.slice(2), 16) : parseInt(ref.slice(1), 10);
+      return Number.isFinite(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : whole;
+    })
+    .replace(/\n{3,}/g, '\n\n').trim().slice(0, 1200);
+}
+
 export function startUpdater({ settings, busy, ready = () => true }) {
   // (only a packaged build updates; the Linux build only as an AppImage)
   // (the Windows portable zip: no installer put it there, so there is no
@@ -121,7 +136,7 @@ export function startUpdater({ settings, busy, ready = () => true }) {
     const s = settings.read();
     if (!manual && s.skipVersion === info.version) { state = 'idle'; return; }
     const notes = typeof info.releaseNotes === 'string'
-      ? info.releaseNotes.replace(/<[^>]+>/g, '').replace(/\n{3,}/g, '\n\n').trim().slice(0, 1200)
+      ? plainNotes(info.releaseNotes)
       : '';
     const { response } = await ask({
       message: fill(u().available, { new: info.version, have: app.getVersion() }),
