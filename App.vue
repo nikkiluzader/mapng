@@ -87,7 +87,10 @@
     </AppSidebar>
 
     <!-- Main Content Area -->
-    <main class="flex-1 relative flex flex-col h-full bg-gray-100 dark:bg-gray-950">
+    <!-- (isolate: the map and the previews stack among themselves. Their own controls sit at z 500 to 1000, as
+         Leaflet's do, and without this they lay on top of every window that opens over the page: the 2D
+         preview's settings box over the export's "done" window and the support card) -->
+    <main class="flex-1 relative isolate flex flex-col h-full bg-gray-100 dark:bg-gray-950">
       <!-- Memory widget: centred on the map area (not the window, where it covered
            the elevation minimap's legend), above the map, below dialogs -->
       <div class="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
