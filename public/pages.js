@@ -107,6 +107,31 @@
     window.addEventListener('scroll', () => { if (waiting) return; waiting = true; requestAnimationFrame(() => { waiting = false; mark(); }); }, { passive: true });
     mark();
   }
+  // Room under the last section, so that it too can be scrolled up to just under the header like every other one
+  // (a page ends where its content ends, and the last sections stopped short). The room goes between the last
+  // section and the page's foot, so at the very end the foot sits at the bottom of the window. Only as much as is
+  // needed: none on a page whose last section is already taller than the window.
+  if (sections.length) {
+    const last = sections[sections.length - 1].el;
+    const space = document.createElement('div'); space.className = 'pg-end-space'; space.setAttribute('aria-hidden', 'true');
+    last.insertAdjacentElement('afterend', space);
+    let fitting = false;
+    const fit = () => {
+      if (fitting) return; fitting = true;
+      space.style.height = '0px';
+      const margin = parseFloat(getComputedStyle(last).scrollMarginTop) || header.offsetHeight + 14;
+      const lastTop = last.getBoundingClientRect().top + window.scrollY;
+      const need = (lastTop - margin) - (document.documentElement.scrollHeight - window.innerHeight);
+      space.style.height = `${Math.max(0, Math.ceil(need))}px`;
+      fitting = false;
+    };
+    fit();
+    window.addEventListener('resize', fit); window.addEventListener('load', fit);
+    fold.addEventListener('click', () => requestAnimationFrame(fit));
+    // (a page that fills itself in later, the stats page: its height changes)
+    if (typeof ResizeObserver === 'function') { let h = 0; new ResizeObserver(() => { const now = document.querySelector('main')?.offsetHeight - space.offsetHeight; if (Math.abs(now - h) > 1) { h = now; fit(); } }).observe(document.querySelector('main')); }
+  }
+
   // (a page opened at a section: under the header, now that its height is known)
   if (location.hash.length > 1) { const el = document.getElementById(decodeURIComponent(location.hash.slice(1))); if (el) requestAnimationFrame(() => el.scrollIntoView()); }
 })();
