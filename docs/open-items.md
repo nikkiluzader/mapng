@@ -169,6 +169,35 @@ Watch after it ships: a data source whose downloads come from an address no test
 key, USGS download buckets, Overture, iNaturalist) would show as "A connection was refused" naming the host; add
 that host to the list and the data page.
 
+## Night of 2026-11-17: what was done and what is left
+
+Done (each drawn before and after, then looked at in game):
+
+- Amsterdam Centraal: the road tunnel's approach no longer dives away from its portal under the bus deck, and the
+  cutting's floor takes its road's solved height (two carriageways stood on shelves over the trench beside them).
+- Quay walls (services/quayWalls.js): a block over the bank at a mapped water's edge in built-up ground. London's
+  river walls, Hamburg's and Utrecht's canal quays, Copenhagen's harbour.
+- Viaducts on a measured survey (structureRules.js): a motorway / trunk / primary standing 3 m over the surveyed
+  ground, a secondary / tertiary 5 m, a monorail off the ground always. Dallas, Miami, Chicago's upper LaSalle Drive.
+- A tunnel or a bridge stays its own piece when ways are joined (Zurich: a tunnel joined to its open approach was
+  lost and the station square was lifted 6 m onto decks); a street over a built tunnel's roof stays on its ground.
+- tychonas on 30 m data: a small street on a steady hillside follows it (to 25%).
+- Buildings on or against a dam take its stone or concrete; pool deck sides, platform sides and a dam's ring walls
+  end on one buried foot; the update dialog reads character references; planet and release pages got the header.
+- Minneapolis "floating boards": shop awnings seen from a camera that stood inside a building. Nothing to fix.
+
+Left:
+
+- Zurich: the square still stands 1 to 3.6 m high on low decks over the Bahnhofquai road tunnel. The tunnel's box
+  comes out too shallow (its roof over the square): its approaches are held to the tunnels' 6 % and the ramps there
+  are short. Needs the cut-and-cover solve to take a steeper approach when the room is short.
+- Copenhagen: teeth along a sidewalk slab between two ramps at different heights (the higher ramp's ground steps
+  onto the slab, 0.3 to 0.8 m: under the wing walls' 0.8 m). Needs a low edge wall rule that does not bury the slab.
+- Quay walls: a toothed strip of ground behind some quays where a sidewalk slab lies under the ground (Hamburg);
+  the wall's material is one stone everywhere (brick quays in the Netherlands and Hamburg).
+- Mesh Roads list (underpass clearance, sidewalk slabs across carriageways, 24 to 33 cm steps, junction mouths and
+  frame rate): not started.
+
 ## 2. Checks owed on work already on dev
 
 1. "Extremely heavy" card, the Mapterhorn base tile and the new size selector looked at in the running app.
