@@ -157,6 +157,17 @@ Open, by how often it was measured:
 7. Junction mouths in the road solve (still behind its switch): the right fix for side roads that arrive under
    the through road's edge, which decks now cover with a ramp of up to 0.75 m over their own line.
 
+## Trust: blocking addresses that are not on the list (agreed 2026-11-16, two steps)
+
+1. Now: the list documents and flags. `desktop/networkHosts.js` is every address in the code; Help > Network
+   Activity marks any address the app contacts that is not on it. Ship this in a release or two and watch for
+   unlisted addresses in real use (the sources no test here reaches: GUGiK, GPXZ with a key, USGS download
+   buckets, Overture, iNaturalist). Also owed on the next tag: the first run of the workflow's Checksums and
+   Build provenance steps.
+2. Then: the desktop app refuses any address not on the list, plus the user's own Overpass server when one is
+   set; a refused address is named in a clear message. After that the pages may say "it cannot connect anywhere
+   else" (public/data.html #addresses and SECURITY.md say today that the list is not a block).
+
 ## 2. Checks owed on work already on dev
 
 1. "Extremely heavy" card, the Mapterhorn base tile and the new size selector looked at in the running app.
