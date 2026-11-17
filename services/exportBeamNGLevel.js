@@ -4255,6 +4255,8 @@ const CUTTING_ROAD_REACH_M = 2.5;   // a road this near a tunnel's approach line
 const CUTTING_SAMPLE_REACH_M = 6;   // a cutting station takes the road's height from a road station this near along the line
 const CUTTING_FLOOR_PAST_M = 6;     // the cutting's floor reaches this far past the road's edge (walkways, the gap to the walls)
 const CUTTING_FLOOR_TOL_M = 0.6;    // a square within this of the height the cutting was dug to is its floor
+const ROOFED_MIN_M = 5;             // a street's ground this far over a built tunnel's road: the tunnel has its roof under it ...
+const ROOF_SLAB_M = 0.5;            // ... or, from the tube's own crown, this much for its slab
 const CARRY_CLEAR_M = 25;           // stops this far short of another deck over (or under) the approach
 const CARRY_MIN_M = 20;              // shorter than this: not worth carrying on
 
@@ -6240,6 +6242,27 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
         const lift = e.rail ? RAIL_DEPTH_M : 0;
         for (let i = 0; i < e.s.length; i++) structureGraph.pins.push([k, i, tunnelRoadZ(t, e.x[i], e.y[i]) + lift]);
       });
+      // A street over a built tunnel stands on its roof. The clearance two crossing roads need (a deck over an open
+      // road, more over a railway) is not owed over a tube with the ground on top of it: asked for all the same,
+      // every street and tram line over a road tunnel 6 m under a station square was lifted 1 to 2 m onto a deck
+      // of its own. Where the street's ground is over the tube's roof, no more is asked than what there is.
+      if (opts.structureSolver === 'v2' && structureGraph.crossings?.crossings) {
+        let eased = 0;
+        for (const c of structureGraph.crossings.crossings) {
+          const up = c[c.upper]; const lo = c[c.upper === 'a' ? 'b' : 'a'];
+          const U = structureGraph.edges[up.edge]; const L = structureGraph.edges[lo.edge];
+          const tun = tunnels.bySeg.get(L.seg);
+          if (!tun || tun.kind === 'gallery' || U.bridge || U.tunnel || tunnels.bySeg.get(U.seg)) continue;
+          const near = nearestOnTunnel(tun, c.x, c.y, tun.W + (tun.maxExtra || 0) + 2);
+          if (!near || near.beyond || near.into < 0) continue;   // (over the tube itself, not its open approach)
+          const i = Math.min(U.g.length - 1, Math.max(0, up.i));
+          const over = U.g[i] - (near.z + (L.rail ? RAIL_DEPTH_M : 0));
+          // (the tube's own roof under the street: its crown and lining, the street on top)
+          const roof = Number.isFinite(tun.crown) ? tun.crown + ROOF_SLAB_M : ROOFED_MIN_M;
+          if (over >= roof && c.sep > over) { c.sep = over; eased++; }
+        }
+        if (eased) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Structure solver: ${eased} street crossing(s) over a built tunnel stay on the ground over its roof.`);
+      }
       // A bore can start before its mapped tunnel does (a ramp joining inside
       // it moves the portal out along the main road): the open road from the
       // mapped tunnel's end out to the face, and over the floor slab in front
