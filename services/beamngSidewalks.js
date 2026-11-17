@@ -2635,6 +2635,19 @@ export function buildDeckRuns(paths, bridges, { groundAt, seaZ = 0, seaAt = null
       if (road) return road.z + CURB_H - WALK_H;
       return onLand(i) ? ground[i] : least;
     });
+    // A footbridge spans from end to end: on a line between the heights it starts and ends at, never down to the
+    // ground under it (only up onto ground that stands higher than that line). "Land" above is ground over the
+    // sea, the piers' rule; inland every point is land, and a footbridge over a river 250 m above the sea lay on
+    // the riverbed, 14 m under its banks (Liberty Bridge, Greenville, a user's level).
+    if (path.bridge && !onRoad[0] && !onRoad[nodes.length - 1]) {
+      const sAt = [0]; for (let i = 1; i < nodes.length; i++) sAt.push(sAt[i - 1] + Math.hypot(nodes[i][0] - nodes[i - 1][0], nodes[i][1] - nodes[i - 1][1]));
+      const total = sAt[nodes.length - 1] || 1; const z0 = raw[0]; const z1 = raw[nodes.length - 1];
+      for (let i = 1; i + 1 < nodes.length; i++) {
+        if (onRoad[i]) continue;
+        const line = z0 + ((z1 - z0) * sAt[i]) / total;
+        raw[i] = Math.max(line, onLand(i) ? ground[i] : least);
+      }
+    }
     // a road bridge's sidewalk leaving its deck's edge for a stretch (round a tower's legs, a
     // cantilevered walkway past the cable planes): on a line between its heights either side, not
     // down to the water and up again (the Golden Gate's sidewalks)

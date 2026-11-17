@@ -931,3 +931,16 @@ test('a pier over sea floor that coarse elevation holds up at the shore\'s heigh
   assert.equal(plan.under(-16, 0), true, 'the carried ground just off the shore goes under');
   assert.equal(plan.under(500, 0), false, 'off the map');
 });
+
+test('a footbridge over an inland gorge spans between its banks; it never follows the riverbed down', async () => {
+  const { buildDeckRuns } = await import('../services/beamngSidewalks.js');
+  // banks at 30 m and 28 m, a river 14 m down between them; the sea far below (seaZ -250: 250 m inland)
+  const ground = (x) => (x < 10 ? 30 : x > 90 ? 28 : 14);
+  const nodes = Array.from({ length: 51 }, (_, i) => [i * 2, 0]);
+  const [r] = buildDeckRuns([{ nodes, half: 1.5, bridge: true, wood: false }], [], { groundAt: (x) => ground(x), seaZ: -250 });
+  const zs = r.centre.map((q) => q[2]);
+  assert.ok(Math.min(...zs) > 27.5, `lowest point of the deck ${Math.min(...zs).toFixed(1)} m (the river is at 14 m)`);
+  // a pier (not a bridge) still sits on its land and over the sea at the clearance
+  const [pier] = buildDeckRuns([{ nodes, half: 1.2, bridge: false, wood: true }], [], { groundAt: (x) => ground(x), seaZ: -250 });
+  assert.ok(Math.min(...pier.centre.map((q) => q[2])) < 20, 'a pier keeps following its ground');
+});
