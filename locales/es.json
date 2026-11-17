@@ -560,7 +560,21 @@
     "cleanupToolLinkLabel": "BeamNG Level Cleanup",
     "cleanupToolCredit": " para generar un mapa mucho más detallado. Herramienta de AlexKidd.",
     "exportingBeamng": "Exportando nivel BeamNG",
-    "done": {"title": "Exportación completa", "summary": "{size}, creado en {time}", "savedLabel": "Guardado", "readyLabel": "Listo para guardar", "whereMods": "En tu carpeta de mods de BeamNG: {path}", "whereChosen": "Está en la carpeta que elegiste en la ventana de guardado. (Un navegador le dice a la página el nombre del archivo, no su carpeta, así que MapNG no puede mostrar la ruta.)", "whereDownload": "Haz clic en Descargar para guardarlo. Tu navegador lo deja en su carpeta de descargas.", "nextWeb": "Para jugarlo: mueve el zip a la carpeta de mods de BeamNG.drive, luego elige Freeroam y selecciona el nivel.", "download": "Descargar", "close": "Cerrar", "panelSaved": "Guardado: {name}", "panelReady": "Listo para guardar: {name}", "whereDownloaded": "Tu navegador lo guardó en su carpeta de descargas."},
+    "done": {
+      "title": "Exportación completa",
+      "summary": "{size}, creado en {time}",
+      "savedLabel": "Guardado",
+      "readyLabel": "Listo para guardar",
+      "whereMods": "En tu carpeta de mods de BeamNG: {path}",
+      "whereChosen": "Está en la carpeta que elegiste en la ventana de guardado. (Un navegador le dice a la página el nombre del archivo, no su carpeta, así que MapNG no puede mostrar la ruta.)",
+      "whereDownload": "Haz clic en Descargar para guardarlo. Tu navegador lo deja en su carpeta de descargas.",
+      "nextWeb": "Para jugarlo: mueve el zip a la carpeta de mods de BeamNG.drive, luego elige Freeroam y selecciona el nivel.",
+      "download": "Descargar",
+      "close": "Cerrar",
+      "panelSaved": "Guardado: {name}",
+      "panelReady": "Listo para guardar: {name}",
+      "whereDownloaded": "Tu navegador lo guardó en su carpeta de descargas."
+    },
     "mayTakeWhile": "Esto puede tardar en mapas grandes",
     "elapsed": "Transcurrido",
     "hybrid": "Híbrida",
@@ -836,7 +850,13 @@
     "moveTile": "Mover {label}",
     "mapLayers": "Capas del mapa",
     "streetMap": "Mapa de calles",
-    "streetStyle": { "light": "Claro", "dark": "Oscuro", "white": "Blanco", "grayscale": "Escala de grises", "black": "Negro" },
+    "streetStyle": {
+      "light": "Claro",
+      "dark": "Oscuro",
+      "white": "Blanco",
+      "grayscale": "Escala de grises",
+      "black": "Negro"
+    },
     "satellite": "Satélite",
     "topoMap": "Mapa topográfico",
     "osmCoverage": "Cobertura OSM de MapNG",
@@ -2033,7 +2053,24 @@
       "resetHint": "Volver a Mantener todos los tipos y activar todos los modelos",
       "takesIn": "También se planta en lugar de: {kinds}"
     },
-    "decalSidewalks": "aceras planas"
+    "decalSidewalks": "aceras planas",
+    "tune": {
+      "more": "Más sobre esto",
+      "less": "Ocultar",
+      "kinds": "{n} tipos",
+      "models": "{n} modelos",
+      "parkingShort": "Un carril de aparcamiento a cada lado de las calles urbanas sin etiquetas de aparcamiento.",
+      "followShort": "Las carreteras siguen la pendiente que midió el lidar.",
+      "surface_decal": "Las carreteras normales de MapNG, pintadas sobre el terreno.",
+      "surface_mesh": "Experimental: cada carretera asfaltada lleva además una Mesh Road de BeamNG debajo, para una conducción más suave.",
+      "surface_hero": "Experimental: las Hero Roads de BeamNG se construyen la primera vez que se carga el nivel (uno o dos minutos). Los cruces aún no se unen.",
+      "walksShort": "Aceras planas pintadas, sin bordillo, en lugar de losas elevadas.",
+      "curbShort": "Cuánto sobresalen las aceras elevadas sobre la calzada.",
+      "capsShort": "Quita los límites de edificios, vallas, farolas y árboles.",
+      "showModels": "Mostrar los modelos de {kind}",
+      "on": "sí",
+      "off": "no"
+    }
   },
   "backupData": {
     "title": "Este mapa se construyó con datos de reserva.",

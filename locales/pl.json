@@ -560,7 +560,21 @@
     "cleanupToolLinkLabel": "BeamNG Level Cleanup",
     "cleanupToolCredit": ", aby wygenerować znacznie bardziej szczegółową mapę. Narzędzie autorstwa AlexKidd.",
     "exportingBeamng": "Eksportowanie poziomu BeamNG",
-    "done": {"title": "Eksport zakończony", "summary": "{size}, utworzono w {time}", "savedLabel": "Zapisano", "readyLabel": "Gotowe do zapisania", "whereMods": "W twoim folderze modów BeamNG: {path}", "whereChosen": "Jest w folderze wybranym w oknie zapisu. (Przeglądarka podaje stronie nazwę pliku, a nie folder, więc MapNG nie może pokazać ścieżki.)", "whereDownload": "Kliknij Pobierz, aby go zapisać. Przeglądarka umieści go w swoim folderze pobierania.", "nextWeb": "Aby zagrać: przenieś plik zip do folderu modów BeamNG.drive, potem wybierz Freeroam i poziom.", "download": "Pobierz", "close": "Zamknij", "panelSaved": "Zapisano: {name}", "panelReady": "Gotowe do zapisania: {name}", "whereDownloaded": "Przeglądarka zapisała go w swoim folderze pobierania."},
+    "done": {
+      "title": "Eksport zakończony",
+      "summary": "{size}, utworzono w {time}",
+      "savedLabel": "Zapisano",
+      "readyLabel": "Gotowe do zapisania",
+      "whereMods": "W twoim folderze modów BeamNG: {path}",
+      "whereChosen": "Jest w folderze wybranym w oknie zapisu. (Przeglądarka podaje stronie nazwę pliku, a nie folder, więc MapNG nie może pokazać ścieżki.)",
+      "whereDownload": "Kliknij Pobierz, aby go zapisać. Przeglądarka umieści go w swoim folderze pobierania.",
+      "nextWeb": "Aby zagrać: przenieś plik zip do folderu modów BeamNG.drive, potem wybierz Freeroam i poziom.",
+      "download": "Pobierz",
+      "close": "Zamknij",
+      "panelSaved": "Zapisano: {name}",
+      "panelReady": "Gotowe do zapisania: {name}",
+      "whereDownloaded": "Przeglądarka zapisała go w swoim folderze pobierania."
+    },
     "mayTakeWhile": "Przy dużych mapach może to chwilę potrwać",
     "elapsed": "Upłynęło",
     "hybrid": "Hybrydowa",
@@ -836,7 +850,13 @@
     "moveTile": "Przesuń {label}",
     "mapLayers": "Warstwy mapy",
     "streetMap": "Mapa ulic",
-    "streetStyle": { "light": "Jasny", "dark": "Ciemny", "white": "Biały", "grayscale": "Odcienie szarości", "black": "Czarny" },
+    "streetStyle": {
+      "light": "Jasny",
+      "dark": "Ciemny",
+      "white": "Biały",
+      "grayscale": "Odcienie szarości",
+      "black": "Czarny"
+    },
     "satellite": "Satelita",
     "topoMap": "Mapa topograficzna",
     "osmCoverage": "Zasięg OSM MapNG",
@@ -2033,7 +2053,24 @@
       "resetHint": "Przywróć wszystkie rodzaje na Zachowaj i włącz wszystkie modele",
       "takesIn": "Sadzone także zamiast: {kinds}"
     },
-    "decalSidewalks": "płaskie chodniki"
+    "decalSidewalks": "płaskie chodniki",
+    "tune": {
+      "more": "Więcej o tym",
+      "less": "Ukryj",
+      "kinds": "{n} rodzajów",
+      "models": "{n} modeli",
+      "parkingShort": "Pas postojowy po każdej stronie ulic miejskich bez tagów parkowania.",
+      "followShort": "Drogi biegną ze spadkiem zmierzonym przez pomiar lidarowy.",
+      "surface_decal": "Zwykłe drogi MapNG, namalowane na terenie.",
+      "surface_mesh": "Eksperymentalne: pod każdą utwardzoną drogą powstaje też Mesh Road z BeamNG, dla płynniejszej jazdy.",
+      "surface_hero": "Eksperymentalne: Hero Roads z BeamNG są budowane przy pierwszym wczytaniu poziomu (minuta lub dwie). Skrzyżowania nie są jeszcze połączone.",
+      "walksShort": "Płaskie, malowane chodniki bez krawężników zamiast podniesionych płyt.",
+      "curbShort": "Jak wysoko podniesione chodniki wystają nad jezdnię.",
+      "capsShort": "Znosi limity budynków, ogrodzeń, latarni i drzew.",
+      "showModels": "Pokaż modele: {kind}",
+      "on": "wł.",
+      "off": "wył."
+    }
   },
   "backupData": {
     "title": "Ta mapa została zbudowana z danych zapasowych.",

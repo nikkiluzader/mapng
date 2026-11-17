@@ -560,7 +560,21 @@
     "cleanupToolLinkLabel": "BeamNG Level Cleanup",
     "cleanupToolCredit": ", um eine viel detailliertere Karte zu erzeugen. Tool von AlexKidd.",
     "exportingBeamng": "BeamNG-Level wird exportiert",
-    "done": {"title": "Export abgeschlossen", "summary": "{size}, erstellt in {time}", "savedLabel": "Gespeichert", "readyLabel": "Bereit zum Speichern", "whereMods": "In deinem BeamNG-Mods-Ordner: {path}", "whereChosen": "Sie liegt in dem Ordner, den du im Speichern-Fenster gewählt hast. (Ein Browser nennt einer Seite nur den Dateinamen, nicht den Ordner, daher kann MapNG den Pfad nicht anzeigen.)", "whereDownload": "Klicke auf Herunterladen, um sie zu speichern. Dein Browser legt sie in seinem Download-Ordner ab.", "nextWeb": "Zum Spielen: Verschiebe die Zip-Datei in den Mods-Ordner von BeamNG.drive, wähle dann Freeroam und das Level.", "download": "Herunterladen", "close": "Schließen", "panelSaved": "Gespeichert: {name}", "panelReady": "Bereit zum Speichern: {name}", "whereDownloaded": "Dein Browser hat sie in seinem Download-Ordner gespeichert."},
+    "done": {
+      "title": "Export abgeschlossen",
+      "summary": "{size}, erstellt in {time}",
+      "savedLabel": "Gespeichert",
+      "readyLabel": "Bereit zum Speichern",
+      "whereMods": "In deinem BeamNG-Mods-Ordner: {path}",
+      "whereChosen": "Sie liegt in dem Ordner, den du im Speichern-Fenster gewählt hast. (Ein Browser nennt einer Seite nur den Dateinamen, nicht den Ordner, daher kann MapNG den Pfad nicht anzeigen.)",
+      "whereDownload": "Klicke auf Herunterladen, um sie zu speichern. Dein Browser legt sie in seinem Download-Ordner ab.",
+      "nextWeb": "Zum Spielen: Verschiebe die Zip-Datei in den Mods-Ordner von BeamNG.drive, wähle dann Freeroam und das Level.",
+      "download": "Herunterladen",
+      "close": "Schließen",
+      "panelSaved": "Gespeichert: {name}",
+      "panelReady": "Bereit zum Speichern: {name}",
+      "whereDownloaded": "Dein Browser hat sie in seinem Download-Ordner gespeichert."
+    },
     "mayTakeWhile": "Das kann bei großen Karten etwas dauern",
     "elapsed": "Verstrichen",
     "hybrid": "Hybrid",
@@ -836,7 +850,13 @@
     "moveTile": "{label} verschieben",
     "mapLayers": "Kartenebenen",
     "streetMap": "Straßenkarte",
-    "streetStyle": { "light": "Hell", "dark": "Dunkel", "white": "Weiß", "grayscale": "Graustufen", "black": "Schwarz" },
+    "streetStyle": {
+      "light": "Hell",
+      "dark": "Dunkel",
+      "white": "Weiß",
+      "grayscale": "Graustufen",
+      "black": "Schwarz"
+    },
     "satellite": "Satellit",
     "topoMap": "Topokarte",
     "osmCoverage": "MapNG-OSM-Abdeckung",
@@ -2033,7 +2053,24 @@
       "resetHint": "Alle Arten wieder auf Behalten und alle Modelle wieder an",
       "takesIn": "Wird auch gepflanzt anstelle von: {kinds}"
     },
-    "decalSidewalks": "flache Gehwege"
+    "decalSidewalks": "flache Gehwege",
+    "tune": {
+      "more": "Mehr dazu",
+      "less": "Ausblenden",
+      "kinds": "{n} Arten",
+      "models": "{n} Modelle",
+      "parkingShort": "Ein Parkstreifen auf jeder Seite von Ortsstraßen ohne Park-Tags.",
+      "followShort": "Straßen verlaufen mit der Neigung, die die Lidar-Vermessung gemessen hat.",
+      "surface_decal": "Die normalen Straßen von MapNG, auf das Gelände gemalt.",
+      "surface_mesh": "Experimentell: Unter jeder befestigten Straße liegt zusätzlich eine BeamNG Mesh Road, für ruhigeres Fahren.",
+      "surface_hero": "Experimentell: BeamNGs Hero Roads werden beim ersten Laden des Levels gebaut (ein bis zwei Minuten). Kreuzungen sind noch nicht verbunden.",
+      "walksShort": "Flache, gemalte Gehwege ohne Bordstein statt erhöhter Platten.",
+      "curbShort": "Wie hoch erhöhte Gehwege über der Straße liegen.",
+      "capsShort": "Hebt die Grenzen für Gebäude, Zäune, Laternen und Bäume auf.",
+      "showModels": "Modelle von {kind} anzeigen",
+      "on": "an",
+      "off": "aus"
+    }
   },
   "backupData": {
     "title": "Diese Karte wurde aus Ersatzdaten gebaut.",

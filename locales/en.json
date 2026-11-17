@@ -565,7 +565,21 @@
     "cleanupToolLinkLabel": "BeamNG Level Cleanup",
     "cleanupToolCredit": " to generate a much more detailed map. Tool by AlexKidd.",
     "exportingBeamng": "Exporting BeamNG level",
-    "done": {"title": "Export complete", "summary": "{size}, built in {time}", "savedLabel": "Saved", "readyLabel": "Ready to save", "whereMods": "In your BeamNG mods folder: {path}", "whereChosen": "It is in the folder you picked in the save window. (A browser tells a page the file's name, not its folder, so MapNG cannot show the path.)", "whereDownload": "Click Download to save it. Your browser puts it in its downloads folder.", "nextWeb": "To play it: move the zip into BeamNG.drive's mods folder, then choose Freeroam and pick the level.", "download": "Download", "close": "Close", "panelSaved": "Saved: {name}", "panelReady": "Ready to save: {name}", "whereDownloaded": "Your browser saved it to its downloads folder."},
+    "done": {
+      "title": "Export complete",
+      "summary": "{size}, built in {time}",
+      "savedLabel": "Saved",
+      "readyLabel": "Ready to save",
+      "whereMods": "In your BeamNG mods folder: {path}",
+      "whereChosen": "It is in the folder you picked in the save window. (A browser tells a page the file's name, not its folder, so MapNG cannot show the path.)",
+      "whereDownload": "Click Download to save it. Your browser puts it in its downloads folder.",
+      "nextWeb": "To play it: move the zip into BeamNG.drive's mods folder, then choose Freeroam and pick the level.",
+      "download": "Download",
+      "close": "Close",
+      "panelSaved": "Saved: {name}",
+      "panelReady": "Ready to save: {name}",
+      "whereDownloaded": "Your browser saved it to its downloads folder."
+    },
     "mayTakeWhile": "This may take a while for large maps",
     "elapsed": "Elapsed",
     "hybrid": "Hybrid",
@@ -841,7 +855,13 @@
     "moveTile": "Move {label}",
     "mapLayers": "Map layers",
     "streetMap": "Street map",
-    "streetStyle": { "light": "Light", "dark": "Dark", "white": "White", "grayscale": "Greyscale", "black": "Black" },
+    "streetStyle": {
+      "light": "Light",
+      "dark": "Dark",
+      "white": "White",
+      "grayscale": "Greyscale",
+      "black": "Black"
+    },
     "satellite": "Satellite",
     "topoMap": "Topo map",
     "osmCoverage": "MapNG OSM coverage",
@@ -2038,7 +2058,24 @@
       "resetHint": "Put every kind back to Keep and every model back on",
       "takesIn": "Also planted in place of: {kinds}"
     },
-    "decalSidewalks": "flat sidewalks"
+    "decalSidewalks": "flat sidewalks",
+    "tune": {
+      "more": "More about this",
+      "less": "Hide",
+      "kinds": "{n} kinds",
+      "models": "{n} models",
+      "parkingShort": "A parking lane each side of town streets that have no parking tags.",
+      "followShort": "Roads run at the slope the lidar survey measured.",
+      "surface_decal": "MapNG's normal roads, painted on the terrain.",
+      "surface_mesh": "Experimental: each paved road also gets a BeamNG Mesh Road under it, for a smoother ride.",
+      "surface_hero": "Experimental: BeamNG's Hero Roads are built the first time the level loads (a minute or two). Junctions are not joined yet.",
+      "walksShort": "Flat painted sidewalks with no curbs, instead of raised slabs.",
+      "curbShort": "How far raised sidewalks stand over the road.",
+      "capsShort": "Lifts the limits on buildings, fences, lamps and trees.",
+      "showModels": "Show the models of {kind}",
+      "on": "on",
+      "off": "off"
+    }
   },
   "statusLines": {
     "mhCheck": "Checking Mapterhorn lidar coverage",

@@ -115,161 +115,164 @@
       </p>
     </template>
 
-    <!-- Fine-tuning (Advanced) -->
+    <!-- Fine-tuning (Advanced): groups that fold, each setting one short line with the rest behind its info button -->
     <template v-if="advanced && contentTab === 'tune'">
-      <section class="space-y-1.5" :class="treesBuilt ? '' : 'opacity-50'">
-        <h4 class="text-micro font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('build.group_green') }}</h4>
-        <div class="flex items-center justify-between gap-2">
-          <span class="text-xs font-medium text-gray-800 dark:text-gray-100">{{ t('exportPanel.ui.forestDensity') }}</span>
-          <span v-if="!treesBuilt" class="text-micro text-gray-500">{{ t('build.offInFeatures', { what: t('build.item_trees') }) }}</span>
-        </div>
-        <div role="radiogroup" :aria-label="t('exportPanel.ui.forestDensity')" class="grid grid-cols-4 gap-1 p-1 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-          <button
-            v-for="k in FOREST_DENSITY_KEYS" :key="k" type="button" role="radio"
-            :aria-checked="forestDensity === k" :disabled="!treesBuilt || !hasOsmData"
-            @click="$emit('update:forestDensity', k)"
-            class="px-1 py-1 rounded text-caption transition-colors disabled:cursor-not-allowed"
-            :class="forestDensity === k ? 'bg-brand text-white shadow-sm font-medium' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700'"
-          >{{ t(`exportPanel.ui.forestDensity_${k}`) }}</button>
-        </div>
-        <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t(`exportPanel.ui.forestDensityHint_${forestDensity}`) }}</p>
-        <!-- Which trees this area gets (services/treeTable.js): shown, not yet chosen -->
-        <div v-if="trees && trees.rows.length" class="space-y-1 pt-1" data-testid="tree-table">
-          <div class="flex items-center justify-between gap-2">
-            <span class="text-xs font-medium text-gray-800 dark:text-gray-100">{{ t('build.trees.title') }}</span>
-            <!-- every kind back to Keep, every model back on: what the data picked -->
-            <button
-              v-if="treeChoicesMade" type="button" data-testid="tree-reset"
-              class="text-micro text-brand hover:underline" :title="t('build.trees.resetHint')"
-              @click="resetTreeChoices"
-            >{{ t('build.trees.reset') }}</button>
-          </div>
-          <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">
-            {{ trees.source === 'records' ? t('build.trees.fromRecords', { count: trees.records }) : t('build.trees.fromClimate') }}
-          </p>
-          <ul class="rounded border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-700">
-            <li v-for="row in trees.rows" :key="row.group" class="px-2 py-1" :class="row.off || row.swappedTo ? 'opacity-70' : ''" :data-tree-kind="row.group">
-              <div class="flex items-center justify-between gap-2 text-caption">
-                <span class="font-medium text-gray-800 dark:text-gray-100 truncate">{{ treeGroupName(row.group) }}</span>
-                <span class="flex items-center gap-2 shrink-0">
-                  <span v-if="!row.off && !row.swappedTo" class="tabular-nums text-gray-600 dark:text-gray-300">{{ treeShare(row.share) }}</span>
-                  <!-- keep the kind, leave it out (its trees become the others), or plant another kind in its place -->
-                  <select
-                    :value="row.off ? 'off' : row.swappedTo ? `to:${row.swappedTo}` : 'keep'"
-                    :disabled="!treesBuilt" :aria-label="t('build.trees.choiceFor', { kind: treeGroupName(row.group) })"
-                    :class="[SELECT_XS, 'max-w-[9.5rem]']"
-                    @change="setTreeChoice(row.group, $event.target.value)"
-                  >
-                    <option value="keep">{{ t('build.trees.keepIt') }}</option>
-                    <option value="off" :disabled="!row.off && !row.swappedTo && treeKindsOn <= 1">{{ t('build.trees.leaveOut') }}</option>
-                    <optgroup :label="t('build.trees.replaceWith')">
-                      <option v-for="k in TREE_KIND_IDS.filter((id) => id !== row.group)" :key="k" :value="`to:${k}`">{{ treeGroupName(k) }}</option>
-                    </optgroup>
-                  </select>
-                </span>
-              </div>
-              <!-- its models, each to switch off (the last one stays) -->
-              <div v-if="!row.off && !row.swappedTo" class="mt-0.5 flex flex-wrap gap-1">
+      <div class="rounded border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-700" data-testid="tune-groups">
+        <!-- trees and ground -->
+        <section :class="treesBuilt ? '' : 'opacity-60'">
+          <button type="button" class="w-full flex items-center gap-2 px-2 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60" :aria-expanded="tuneOpen.green" data-testid="tune-group-green" @click="toggleTune('green')">
+            <ChevronRight :size="14" class="shrink-0 text-gray-400 transition-transform" :class="tuneOpen.green ? 'rotate-90' : ''" />
+            <span class="text-xs font-semibold text-gray-800 dark:text-gray-100">{{ t('build.group_green') }}</span>
+            <span class="ml-auto text-micro text-gray-500 dark:text-gray-400 truncate">{{ treesBuilt ? tuneSummary.green : t('build.off') }}</span>
+          </button>
+          <div v-if="tuneOpen.green" class="px-2 pb-2.5 space-y-2.5">
+            <TuneRow :title="t('exportPanel.ui.forestDensity')" :short="treesBuilt ? t(`exportPanel.ui.forestDensityHint_${forestDensity}`) : t('build.offInFeatures', { what: t('build.item_trees') })">
+              <div role="radiogroup" :aria-label="t('exportPanel.ui.forestDensity')" class="grid grid-cols-4 gap-1 p-1 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
                 <button
-                  v-for="m in row.models" :key="m.type" type="button" :disabled="!treesBuilt || (!m.off && row.models.filter((x) => !x.off).length <= 1)"
-                  :aria-pressed="!m.off" :title="m.off ? t('build.trees.modelOff') : t('build.trees.modelOn')" :data-tree-model="m.type"
-                  class="px-1 rounded border text-micro leading-snug transition-colors disabled:cursor-not-allowed"
-                  :class="m.off ? 'border-gray-200 dark:border-gray-700 text-gray-400 line-through' : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-brand'"
-                  @click="toggleTreeModel(m.type)"
-                >{{ treeModelLabel(m.type) }}</button>
+                  v-for="k in FOREST_DENSITY_KEYS" :key="k" type="button" role="radio"
+                  :aria-checked="forestDensity === k" :disabled="!treesBuilt || !hasOsmData"
+                  @click="$emit('update:forestDensity', k)"
+                  class="px-1 py-1 rounded text-caption transition-colors disabled:cursor-not-allowed"
+                  :class="forestDensity === k ? 'bg-brand text-white shadow-sm font-medium' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700'"
+                >{{ t(`exportPanel.ui.forestDensity_${k}`) }}</button>
               </div>
-              <div v-else-if="row.swappedTo" class="text-micro leading-snug text-gray-500 dark:text-gray-400">{{ t('build.trees.plantedAs', { kind: treeGroupName(row.swappedTo) }) }}</div>
-              <!-- (a kind others were swapped into says so: its share is not only its own) -->
-              <div v-if="!row.off && !row.swappedTo && treeTakesIn(row.group).length" class="mt-0.5 text-micro leading-snug text-amber-700 dark:text-amber-300" data-tree-takes-in>{{ t('build.trees.takesIn', { kinds: treeTakesIn(row.group).map(treeGroupName).join(', ') }) }}</div>
-            </li>
-          </ul>
-          <p class="text-micro leading-snug text-gray-500 dark:text-gray-400">{{ t('build.trees.switchHint') }} {{ t('build.trees.note') }}</p>
-        </div>
-      </section>
-      <section class="space-y-1.5 pt-1" :class="roadsBuilt ? '' : 'opacity-50'">
-        <h4 class="text-micro font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('build.group_roads') }}</h4>
-        <div class="flex items-start gap-2">
-          <div class="flex-1 min-w-0">
-            <div class="text-xs font-medium text-gray-800 dark:text-gray-100">{{ t('exportPanel.ui.assumeParking') }}</div>
-            <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ roadsBuilt ? t('exportPanel.ui.assumeParkingHint') : t('build.offInFeatures', { what: t('build.item_roadSurfaces') }) }}</p>
+            </TuneRow>
+            <!-- Which trees this area gets (services/treeTable.js): one row a kind; its models open on a click -->
+            <div v-if="trees && trees.rows.length" data-testid="tree-table">
+              <TuneRow
+                :title="t('build.trees.title')" :more="`${t('build.trees.switchHint')} ${t('build.trees.note')}`" :more-label="t('build.tune.more')" :less-label="t('build.tune.less')"
+                :short="trees.source === 'records' ? t('build.trees.fromRecords', { count: trees.records }) : t('build.trees.fromClimate')"
+              >
+                <template #control>
+                  <!-- every kind back to Keep, every model back on: what the data picked -->
+                  <button v-if="treeChoicesMade" type="button" data-testid="tree-reset" class="shrink-0 text-micro text-brand hover:underline" :title="t('build.trees.resetHint')" @click="resetTreeChoices">{{ t('build.trees.reset') }}</button>
+                </template>
+                <ul class="rounded border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-700">
+                  <li v-for="row in trees.rows" :key="row.group" class="px-1.5 py-1" :class="row.off || row.swappedTo ? 'opacity-70' : ''" :data-tree-kind="row.group">
+                    <div class="flex items-center justify-between gap-1.5 text-caption">
+                      <button
+                        type="button" class="flex items-center gap-1 min-w-0 text-left disabled:cursor-default" :disabled="row.off || !!row.swappedTo"
+                        :aria-expanded="treeOpen.has(row.group)" :aria-label="t('build.tune.showModels', { kind: treeGroupName(row.group) })" :data-tree-open="row.group"
+                        @click="toggleTreeOpen(row.group)"
+                      >
+                        <ChevronRight :size="12" class="shrink-0 text-gray-400 transition-transform" :class="[treeOpen.has(row.group) && !row.off && !row.swappedTo ? 'rotate-90' : '', row.off || row.swappedTo ? 'invisible' : '']" />
+                        <span class="font-medium text-gray-800 dark:text-gray-100 truncate">{{ treeGroupName(row.group) }}</span>
+                      </button>
+                      <span class="flex items-center gap-2 shrink-0">
+                        <span v-if="!row.off && !row.swappedTo" class="tabular-nums text-gray-600 dark:text-gray-300">{{ treeShare(row.share) }}</span>
+                        <!-- keep the kind, leave it out (its trees become the others), or plant another kind in its place -->
+                        <select
+                          :value="row.off ? 'off' : row.swappedTo ? `to:${row.swappedTo}` : 'keep'"
+                          :disabled="!treesBuilt" :aria-label="t('build.trees.choiceFor', { kind: treeGroupName(row.group) })"
+                          :class="[SELECT_XS, 'max-w-[8.5rem]']"
+                          @change="setTreeChoice(row.group, $event.target.value)"
+                        >
+                          <option value="keep">{{ t('build.trees.keepIt') }}</option>
+                          <option value="off" :disabled="!row.off && !row.swappedTo && treeKindsOn <= 1">{{ t('build.trees.leaveOut') }}</option>
+                          <optgroup :label="t('build.trees.replaceWith')">
+                            <option v-for="k in TREE_KIND_IDS.filter((id) => id !== row.group)" :key="k" :value="`to:${k}`">{{ treeGroupName(k) }}</option>
+                          </optgroup>
+                        </select>
+                      </span>
+                    </div>
+                    <!-- its models, each to switch off (the last one stays): shown when the kind is opened, or when one is off -->
+                    <div v-if="!row.off && !row.swappedTo && (treeOpen.has(row.group) || row.models.some((m) => m.off))" class="mt-1 ml-4 flex flex-wrap gap-1">
+                      <button
+                        v-for="m in row.models" :key="m.type" type="button" :disabled="!treesBuilt || (!m.off && row.models.filter((x) => !x.off).length <= 1)"
+                        :aria-pressed="!m.off" :title="m.off ? t('build.trees.modelOff') : t('build.trees.modelOn')" :data-tree-model="m.type"
+                        class="px-1 rounded border text-micro leading-snug transition-colors disabled:cursor-not-allowed"
+                        :class="m.off ? 'border-gray-200 dark:border-gray-700 text-gray-400 line-through' : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-brand'"
+                        @click="toggleTreeModel(m.type)"
+                      >{{ treeModelLabel(m.type) }}</button>
+                    </div>
+                    <div v-else-if="row.swappedTo" class="ml-4 text-micro leading-snug text-gray-500 dark:text-gray-400">{{ t('build.trees.plantedAs', { kind: treeGroupName(row.swappedTo) }) }}</div>
+                    <!-- (a kind others were swapped into says so: its share is not only its own) -->
+                    <div v-if="!row.off && !row.swappedTo && treeTakesIn(row.group).length" class="mt-0.5 ml-4 text-micro leading-snug text-amber-700 dark:text-amber-300" data-tree-takes-in>{{ t('build.trees.takesIn', { kinds: treeTakesIn(row.group).map(treeGroupName).join(', ') }) }}</div>
+                  </li>
+                </ul>
+              </TuneRow>
+            </div>
           </div>
-          <BaseSwitch :on="assumeParking && roadsBuilt" :label="t('exportPanel.ui.assumeParking')" :disabled="!roadsBuilt || !hasOsmData" @toggle="$emit('update:assumeParking', !assumeParking)" />
-        </div>
-        <!-- every road at the slope the lidar survey measured along it (structures/profileSolve.js); off: tertiary roads and smaller only -->
-        <div class="flex items-start gap-2">
-          <div class="flex-1 min-w-0">
-            <div class="text-xs font-medium text-gray-800 dark:text-gray-100">{{ t('exportPanel.ui.followSurvey') }}</div>
-            <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ roadsBuilt ? t('exportPanel.ui.followSurveyHint') : t('build.offInFeatures', { what: t('build.item_roadSurfaces') }) }}</p>
+        </section>
+        <!-- roads and markings -->
+        <section :class="roadsBuilt ? '' : 'opacity-60'">
+          <button type="button" class="w-full flex items-center gap-2 px-2 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60" :aria-expanded="tuneOpen.roads" data-testid="tune-group-roads" @click="toggleTune('roads')">
+            <ChevronRight :size="14" class="shrink-0 text-gray-400 transition-transform" :class="tuneOpen.roads ? 'rotate-90' : ''" />
+            <span class="text-xs font-semibold text-gray-800 dark:text-gray-100">{{ t('build.group_roads') }}</span>
+            <span class="ml-auto text-micro text-gray-500 dark:text-gray-400 truncate">{{ roadsBuilt ? tuneSummary.roads : t('build.off') }}</span>
+          </button>
+          <div v-if="tuneOpen.roads" class="px-2 pb-2.5 space-y-2.5">
+            <p v-if="!roadsBuilt" class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t('build.offInFeatures', { what: t('build.item_roadSurfaces') }) }}</p>
+            <!-- road surfaces: MapNG's decal roads, or (experimental) Mesh Roads / Hero Roads; only the chosen one is described -->
+            <TuneRow :title="t('exportPanel.ui.roadSurface')" :short="t(`build.tune.surface_${roadSurface}`)">
+              <template #control>
+                <select
+                  data-testid="road-surface" :value="roadSurface" :disabled="!roadsBuilt || !hasOsmData" :aria-label="t('exportPanel.ui.roadSurface')"
+                  :class="[SELECT_XS, 'max-w-[9.5rem]']"
+                  @change="$emit('update:roadSurface', $event.target.value)"
+                >
+                  <option value="decal">{{ t('exportPanel.ui.roadSurface_decal') }}</option>
+                  <option value="mesh">{{ t('exportPanel.ui.roadSurface_mesh') }}</option>
+                  <option value="hero">{{ t('exportPanel.ui.roadSurface_hero') }}</option>
+                </select>
+              </template>
+            </TuneRow>
+            <!-- every road at the slope the lidar survey measured along it (structures/profileSolve.js); off: tertiary roads and smaller only -->
+            <TuneRow :title="t('exportPanel.ui.followSurvey')" :short="t('build.tune.followShort')" :more="t('exportPanel.ui.followSurveyHint')" :more-label="t('build.tune.more')" :less-label="t('build.tune.less')">
+              <template #control><BaseSwitch :on="followSurvey && roadsBuilt" :label="t('exportPanel.ui.followSurvey')" :disabled="!roadsBuilt || !hasOsmData" data-testid="follow-survey" @toggle="$emit('update:followSurvey', !followSurvey)" /></template>
+            </TuneRow>
+            <TuneRow :title="t('exportPanel.ui.assumeParking')" :short="t('build.tune.parkingShort')" :more="t('exportPanel.ui.assumeParkingHint')" :more-label="t('build.tune.more')" :less-label="t('build.tune.less')">
+              <template #control><BaseSwitch :on="assumeParking && roadsBuilt" :label="t('exportPanel.ui.assumeParking')" :disabled="!roadsBuilt || !hasOsmData" @toggle="$emit('update:assumeParking', !assumeParking)" /></template>
+            </TuneRow>
+            <!-- road widths measured from the satellite picture: set before Generate (it downloads), so only pointed to here -->
+            <TuneRow :title="t('exportPanel.ui.measuredWidths')" :short="measuredWidthsShort" :more="measuredWidthsShort === measuredWidthsNote ? '' : measuredWidthsNote" :more-label="t('build.tune.more')" :less-label="t('build.tune.less')" data-testid="measured-widths-note">
+              <template #control><button type="button" class="shrink-0 text-caption font-medium text-brand hover:underline" @click="showMeasureSetting">{{ t('exportPanel.ui.measuredWidthsChange') }}</button></template>
+            </TuneRow>
+            <!-- sidewalks as flat decals on the ground instead of raised meshes (exportBeamNGLevel.js sidewalkStyle) -->
+            <TuneRow :title="t('exportPanel.ui.decalSidewalks')" :short="t('build.tune.walksShort')" :more="t('exportPanel.ui.decalSidewalksHint')" :more-label="t('build.tune.more')" :less-label="t('build.tune.less')">
+              <template #control><BaseSwitch :on="decalSidewalks && roadsBuilt" :label="t('exportPanel.ui.decalSidewalks')" :disabled="!roadsBuilt || !hasOsmData" @toggle="$emit('update:decalSidewalks', !decalSidewalks)" /></template>
+            </TuneRow>
+            <!-- the raised sidewalks' height over the road (beamngSidewalks.js CURB_HEIGHTS_M); nothing to set for decals -->
+            <TuneRow :title="t('exportPanel.ui.curbHeight')" :short="t('build.tune.curbShort')" :more="t('exportPanel.ui.curbHeightHint')" :more-label="t('build.tune.more')" :less-label="t('build.tune.less')" :dim="decalSidewalks">
+              <div role="radiogroup" :aria-label="t('exportPanel.ui.curbHeight')" class="grid grid-cols-3 gap-1 p-1 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                <button
+                  v-for="k in CURB_HEIGHT_KEYS" :key="k" type="button" role="radio"
+                  :aria-checked="curbHeight === k" :disabled="!roadsBuilt || !hasOsmData || decalSidewalks"
+                  @click="$emit('update:curbHeight', k)"
+                  class="px-1 py-1 rounded text-caption transition-colors disabled:cursor-not-allowed"
+                  :class="curbHeight === k ? 'bg-brand text-white shadow-sm font-medium' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700'"
+                >{{ t(`exportPanel.ui.curbHeight_${k}`) }}</button>
+              </div>
+            </TuneRow>
           </div>
-          <BaseSwitch :on="followSurvey && roadsBuilt" :label="t('exportPanel.ui.followSurvey')" :disabled="!roadsBuilt || !hasOsmData" data-testid="follow-survey" @toggle="$emit('update:followSurvey', !followSurvey)" />
-        </div>
-        <!-- road surfaces: MapNG's decal roads, or (experimental) BeamNG Hero Roads built by a script when the level loads (heroRoadsLua.js) -->
-        <div class="flex items-start gap-2">
-          <div class="flex-1 min-w-0">
-            <div class="text-xs font-medium text-gray-800 dark:text-gray-100">{{ t('exportPanel.ui.roadSurface') }}</div>
-            <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ roadsBuilt ? t('exportPanel.ui.roadSurfaceHint') : t('build.offInFeatures', { what: t('build.item_roadSurfaces') }) }}</p>
+        </section>
+        <!-- bridges -->
+        <section :class="bridgesBuilt ? '' : 'opacity-60'">
+          <button type="button" class="w-full flex items-center gap-2 px-2 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60" :aria-expanded="tuneOpen.bridges" data-testid="tune-group-bridges" @click="toggleTune('bridges')">
+            <ChevronRight :size="14" class="shrink-0 text-gray-400 transition-transform" :class="tuneOpen.bridges ? 'rotate-90' : ''" />
+            <span class="text-xs font-semibold text-gray-800 dark:text-gray-100">{{ t('build.group_bridges') }}</span>
+            <span class="ml-auto text-micro text-gray-500 dark:text-gray-400 truncate">{{ bridgesBuilt ? tuneSummary.bridges : t('build.off') }}</span>
+          </button>
+          <div v-if="tuneOpen.bridges" class="px-2 pb-2.5 space-y-2.5">
+            <TuneRow :title="t('exportPanel.lidarDecks')" :short="bridgesBuilt ? t('exportPanel.ui.lidarDecksHint') : t('build.offInFeatures', { what: t('build.item_bridges') })">
+              <template #control><BaseSwitch :on="lidarDecks && bridgesBuilt" :label="t('exportPanel.lidarDecks')" :disabled="!bridgesBuilt || !hasOsmData" @toggle="$emit('update:lidarDecks', !lidarDecks)" /></template>
+            </TuneRow>
           </div>
-          <select
-            data-testid="road-surface" :value="roadSurface" :disabled="!roadsBuilt || !hasOsmData" :aria-label="t('exportPanel.ui.roadSurface')"
-            :class="[SELECT_XS, 'max-w-[11rem]']"
-            @change="$emit('update:roadSurface', $event.target.value)"
-          >
-            <option value="decal">{{ t('exportPanel.ui.roadSurface_decal') }}</option>
-            <option value="mesh">{{ t('exportPanel.ui.roadSurface_mesh') }}</option>
-            <option value="hero">{{ t('exportPanel.ui.roadSurface_hero') }}</option>
-          </select>
-        </div>
-        <!-- road widths measured from the satellite picture: set before Generate (it downloads), so only pointed to here -->
-        <div class="flex items-start gap-2" data-testid="measured-widths-note">
-          <div class="flex-1 min-w-0">
-            <div class="text-xs font-medium text-gray-800 dark:text-gray-100">{{ t('exportPanel.ui.measuredWidths') }}</div>
-            <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ measuredWidthsNote }}</p>
+        </section>
+        <!-- limits -->
+        <section>
+          <button type="button" class="w-full flex items-center gap-2 px-2 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60" :aria-expanded="tuneOpen.limits" data-testid="tune-group-limits" @click="toggleTune('limits')">
+            <ChevronRight :size="14" class="shrink-0 text-gray-400 transition-transform" :class="tuneOpen.limits ? 'rotate-90' : ''" />
+            <span class="text-xs font-semibold text-gray-800 dark:text-gray-100">{{ t('build.limits') }}</span>
+            <span class="ml-auto text-micro text-gray-500 dark:text-gray-400 truncate">{{ tuneSummary.limits }}</span>
+          </button>
+          <div v-if="tuneOpen.limits" class="px-2 pb-2.5 space-y-2.5">
+            <TuneRow :title="t('exportPanel.ui.buildEverything')" :short="t('build.tune.capsShort')" :more="t('exportPanel.ui.buildEverythingHint')" :more-label="t('build.tune.more')" :less-label="t('build.tune.less')">
+              <template #control><BaseSwitch :on="!safeCaps" :label="t('exportPanel.ui.buildEverything')" @toggle="$emit('update:safeCaps', !safeCaps)" /></template>
+            </TuneRow>
           </div>
-          <button type="button" class="shrink-0 text-caption font-medium text-brand hover:underline" @click="showMeasureSetting">{{ t('exportPanel.ui.measuredWidthsChange') }}</button>
-        </div>
-        <!-- sidewalks as flat decals on the ground instead of raised meshes (exportBeamNGLevel.js sidewalkStyle) -->
-        <div class="flex items-start gap-2">
-          <div class="flex-1 min-w-0">
-            <div class="text-xs font-medium text-gray-800 dark:text-gray-100">{{ t('exportPanel.ui.decalSidewalks') }}</div>
-            <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ roadsBuilt ? t('exportPanel.ui.decalSidewalksHint') : t('build.offInFeatures', { what: t('build.item_roadSurfaces') }) }}</p>
-          </div>
-          <BaseSwitch :on="decalSidewalks && roadsBuilt" :label="t('exportPanel.ui.decalSidewalks')" :disabled="!roadsBuilt || !hasOsmData" @toggle="$emit('update:decalSidewalks', !decalSidewalks)" />
-        </div>
-        <!-- the raised sidewalks' height over the road (beamngSidewalks.js CURB_HEIGHTS_M); nothing to set for decals -->
-        <div :class="decalSidewalks ? 'opacity-50' : ''">
-          <span class="text-xs font-medium text-gray-800 dark:text-gray-100">{{ t('exportPanel.ui.curbHeight') }}</span>
-          <div role="radiogroup" :aria-label="t('exportPanel.ui.curbHeight')" class="mt-1 grid grid-cols-3 gap-1 p-1 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-            <button
-              v-for="k in CURB_HEIGHT_KEYS" :key="k" type="button" role="radio"
-              :aria-checked="curbHeight === k" :disabled="!roadsBuilt || !hasOsmData || decalSidewalks"
-              @click="$emit('update:curbHeight', k)"
-              class="px-1 py-1 rounded text-caption transition-colors disabled:cursor-not-allowed"
-              :class="curbHeight === k ? 'bg-brand text-white shadow-sm font-medium' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700'"
-            >{{ t(`exportPanel.ui.curbHeight_${k}`) }}</button>
-          </div>
-          <p class="mt-1 text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.curbHeightHint') }}</p>
-        </div>
-      </section>
-      <section class="space-y-1.5 pt-1" :class="bridgesBuilt ? '' : 'opacity-50'">
-        <h4 class="text-micro font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('build.group_bridges') }}</h4>
-        <div class="flex items-start gap-2">
-          <div class="flex-1 min-w-0">
-            <div class="text-xs font-medium text-gray-800 dark:text-gray-100">{{ t('exportPanel.lidarDecks') }}</div>
-            <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ bridgesBuilt ? t('exportPanel.ui.lidarDecksHint') : t('build.offInFeatures', { what: t('build.item_bridges') }) }}</p>
-          </div>
-          <BaseSwitch :on="lidarDecks && bridgesBuilt" :label="t('exportPanel.lidarDecks')" :disabled="!bridgesBuilt || !hasOsmData" @toggle="$emit('update:lidarDecks', !lidarDecks)" />
-        </div>
-      </section>
-      <section class="space-y-1.5 pt-1">
-        <h4 class="text-micro font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('build.limits') }}</h4>
-        <div class="flex items-start gap-2">
-          <div class="flex-1 min-w-0">
-            <div class="text-xs font-medium text-gray-800 dark:text-gray-100">{{ t('exportPanel.ui.buildEverything') }}</div>
-            <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.buildEverythingHint') }}</p>
-          </div>
-          <BaseSwitch :on="!safeCaps" :label="t('exportPanel.ui.buildEverything')" @toggle="$emit('update:safeCaps', !safeCaps)" />
-        </div>
-      </section>
+        </section>
+      </div>
     </template>
 
     <p v-if="advanced" class="text-micro text-gray-500 dark:text-gray-400">{{ footer }}</p>
@@ -307,6 +310,7 @@ import { ChevronRight } from 'lucide-vue-next';
 import SettingCard from '../base/SettingCard.vue';
 import SectionToggleAll from '../base/SectionToggleAll.vue';
 import BaseSwitch from '../base/BaseSwitch.vue';
+import TuneRow from '../base/TuneRow.vue';
 import { SELECT_XS } from '../base/controlStyles.js';
 import { useMainStore } from '../../stores/mainStore';
 import { CONTENT_GROUPS, PRESET_IDS, osmTagCounts } from '../../services/buildContent.js';
@@ -383,6 +387,23 @@ const setTreeChoice = (group, choice) => {
   emit('update:treeKindsOff', [...off]);
   emit('update:treeSwaps', swaps);
 };
+// (the note's first sentence on the row, the whole of it behind the info button)
+const measuredWidthsShort = computed(() => { const s = String(measuredWidthsNote.value || ''); const i = s.search(/[.。](\s|$)/); return i > 0 && i < s.length - 1 ? s.slice(0, i + 1) : s; });
+// Fine-tuning's groups fold; which are open is kept for the next visit (none at first: four rows, each with what is set)
+const TUNE_OPEN_KEY = 'mapng_tune_open';
+const tuneOpen = reactive({ green: false, roads: false, bridges: false, limits: false });
+try { for (const k of JSON.parse(localStorage.getItem(TUNE_OPEN_KEY) || '[]')) if (k in tuneOpen) tuneOpen[k] = true; } catch { /* first visit */ }
+const toggleTune = (k) => { tuneOpen[k] = !tuneOpen[k]; try { localStorage.setItem(TUNE_OPEN_KEY, JSON.stringify(Object.keys(tuneOpen).filter((x) => tuneOpen[x]))); } catch { /* not kept */ } };
+// (a tree kind's models show when the kind is opened)
+const treeOpen = reactive(new Set());
+const toggleTreeOpen = (g) => { if (treeOpen.has(g)) treeOpen.delete(g); else treeOpen.add(g); };
+// what each folded group has set, in a few words
+const tuneSummary = computed(() => ({
+  green: [t(`exportPanel.ui.forestDensity_${props.forestDensity}`), trees.value?.rows?.length ? t('build.tune.kinds', { n: trees.value.rows.filter((r) => !r.off && !r.swappedTo).length }) : ''].filter(Boolean).join(' · '),
+  roads: [t(`exportPanel.ui.roadSurface_${props.roadSurface}`), props.decalSidewalks ? t('exportPanel.ui.decalSidewalks') : t(`exportPanel.ui.curbHeight_${props.curbHeight}`)].join(' · '),
+  bridges: `${t('exportPanel.lidarDecks')}: ${props.lidarDecks ? t('build.tune.on') : t('build.tune.off')}`,
+  limits: `${t('exportPanel.ui.buildEverything')}: ${props.safeCaps ? t('build.tune.off') : t('build.tune.on')}`,
+}));
 const treeChoicesMade = computed(() => props.treeKindsOff.length + props.treeSwaps.length + props.treeModelsOff.length > 0);
 const resetTreeChoices = () => { emit('update:treeKindsOff', []); emit('update:treeSwaps', []); emit('update:treeModelsOff', []); };
 // (the kinds swapped into this one)

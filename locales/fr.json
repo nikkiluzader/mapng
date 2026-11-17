@@ -560,7 +560,21 @@
     "cleanupToolLinkLabel": "BeamNG Level Cleanup",
     "cleanupToolCredit": " pour générer une carte beaucoup plus détaillée. Outil créé par AlexKidd.",
     "exportingBeamng": "Export du niveau BeamNG",
-    "done": {"title": "Export terminé", "summary": "{size}, créé en {time}", "savedLabel": "Enregistré", "readyLabel": "Prêt à enregistrer", "whereMods": "Dans votre dossier de mods BeamNG : {path}", "whereChosen": "Il se trouve dans le dossier choisi dans la fenêtre d'enregistrement. (Un navigateur indique à la page le nom du fichier, pas son dossier : MapNG ne peut donc pas afficher le chemin.)", "whereDownload": "Cliquez sur Télécharger pour l'enregistrer. Votre navigateur le place dans son dossier de téléchargements.", "nextWeb": "Pour y jouer : déplacez le zip dans le dossier de mods de BeamNG.drive, puis choisissez Freeroam et sélectionnez le niveau.", "download": "Télécharger", "close": "Fermer", "panelSaved": "Enregistré : {name}", "panelReady": "Prêt à enregistrer : {name}", "whereDownloaded": "Votre navigateur l'a enregistré dans son dossier de téléchargements."},
+    "done": {
+      "title": "Export terminé",
+      "summary": "{size}, créé en {time}",
+      "savedLabel": "Enregistré",
+      "readyLabel": "Prêt à enregistrer",
+      "whereMods": "Dans votre dossier de mods BeamNG : {path}",
+      "whereChosen": "Il se trouve dans le dossier choisi dans la fenêtre d'enregistrement. (Un navigateur indique à la page le nom du fichier, pas son dossier : MapNG ne peut donc pas afficher le chemin.)",
+      "whereDownload": "Cliquez sur Télécharger pour l'enregistrer. Votre navigateur le place dans son dossier de téléchargements.",
+      "nextWeb": "Pour y jouer : déplacez le zip dans le dossier de mods de BeamNG.drive, puis choisissez Freeroam et sélectionnez le niveau.",
+      "download": "Télécharger",
+      "close": "Fermer",
+      "panelSaved": "Enregistré : {name}",
+      "panelReady": "Prêt à enregistrer : {name}",
+      "whereDownloaded": "Votre navigateur l'a enregistré dans son dossier de téléchargements."
+    },
     "mayTakeWhile": "Cela peut prendre un moment pour les grandes cartes",
     "elapsed": "Écoulé",
     "hybrid": "Hybride",
@@ -836,7 +850,13 @@
     "moveTile": "Déplacer {label}",
     "mapLayers": "Couches de carte",
     "streetMap": "Plan des rues",
-    "streetStyle": { "light": "Clair", "dark": "Sombre", "white": "Blanc", "grayscale": "Niveaux de gris", "black": "Noir" },
+    "streetStyle": {
+      "light": "Clair",
+      "dark": "Sombre",
+      "white": "Blanc",
+      "grayscale": "Niveaux de gris",
+      "black": "Noir"
+    },
     "satellite": "Satellite",
     "topoMap": "Carte topo",
     "osmCoverage": "Couverture OSM de MapNG",
@@ -2033,7 +2053,24 @@
       "resetHint": "Remettre chaque type sur Garder et réactiver chaque modèle",
       "takesIn": "Aussi planté à la place de : {kinds}"
     },
-    "decalSidewalks": "trottoirs plats"
+    "decalSidewalks": "trottoirs plats",
+    "tune": {
+      "more": "En savoir plus",
+      "less": "Masquer",
+      "kinds": "{n} essences",
+      "models": "{n} modèles",
+      "parkingShort": "Une bande de stationnement de chaque côté des rues de ville sans balise de stationnement.",
+      "followShort": "Les routes suivent la pente mesurée par le relevé lidar.",
+      "surface_decal": "Les routes normales de MapNG, peintes sur le terrain.",
+      "surface_mesh": "Expérimental : chaque route revêtue reçoit aussi une Mesh Road BeamNG en dessous, pour une conduite plus douce.",
+      "surface_hero": "Expérimental : les Hero Roads de BeamNG sont construites au premier chargement du niveau (une à deux minutes). Les carrefours ne sont pas encore reliés.",
+      "walksShort": "Trottoirs plats peints, sans bordure, au lieu de dalles surélevées.",
+      "curbShort": "De combien les trottoirs surélevés dépassent la chaussée.",
+      "capsShort": "Lève les limites sur les bâtiments, clôtures, lampadaires et arbres.",
+      "showModels": "Afficher les modèles de {kind}",
+      "on": "oui",
+      "off": "non"
+    }
   },
   "backupData": {
     "title": "Cette carte a été construite avec des données de secours.",
