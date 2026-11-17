@@ -5,6 +5,7 @@
 // ...\Temp\Rar$EXa...\resources\runner\generateJob.mjs" (problem report
 // MR-QWWD99). Checked at start instead, with a message that says what to do.
 import fs from 'node:fs';
+import { startText } from './menuText.js';
 
 /**
  * What is missing of the files the app needs beside its executable:
@@ -20,16 +21,19 @@ export function inArchiveTemp(exePath) {
   return /\/rar\$[^/]*\//.test(p) || /\/7z[a-z0-9]{6,}\//.test(p) || /\/temp\d*_[^/]*\.zip\//.test(p) || /\.zip\//.test(p);
 }
 
-/** The message for an app that is not whole: { title, message, detail }. */
-export function incompleteMessage(missing, exePath) {
+/** The message for an app that is not whole: { title, message, detail }, in the app's language. */
+export function incompleteMessage(missing, exePath, language) {
+  const s = startText(language);
   const fromArchive = inArchiveTemp(exePath);
   return {
-    title: 'MapNG is not unpacked',
-    message: fromArchive
-      ? 'MapNG was started from inside the zip file.'
-      : 'Some of MapNG\'s files are missing.',
-    detail: `${fromArchive
-      ? 'Only MapNG.exe was unpacked, without the files it needs beside it, so Generate and Export cannot run.'
-      : 'Generate and Export cannot run without them.'}\n\nExtract the whole zip to a folder first (right-click the zip, Extract All), then run MapNG.exe from that folder.\n\nMissing: ${missing.join(', ')}.`,
+    title: s.notUnpacked,
+    message: fromArchive ? s.fromZip : s.filesMissing,
+    detail: `${fromArchive ? s.fromZipDetail : s.filesMissingDetail}\n\n${s.extract}${missing.length ? `\n\n${s.missing.replace('{missing}', missing.join(', '))}` : ''}`,
   };
+}
+
+/** Graphics drawn in software: the feature status (app.getGPUFeatureStatus()) says the compositor has no card. */
+export function softwareGraphics(status) {
+  const v = String(status?.gpu_compositing || '');
+  return /software|disabled/.test(v) && !/^enabled/.test(v);
 }

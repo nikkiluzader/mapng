@@ -1,8 +1,8 @@
 // MapNG desktop: the web app in a window, its level export in a full Node
 // process (no 4 GB tab heap), the level written straight into BeamNG's mods.
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, Notification, protocol, screen, session as electronSession, shell } from 'electron';
-import { missingParts, incompleteMessage } from './installCheck.js';
-import { menuText, updaterText, networkText } from './menuText.js';
+import { missingParts, incompleteMessage, inArchiveTemp, softwareGraphics } from './installCheck.js';
+import { menuText, updaterText, networkText, startText } from './menuText.js';
 import { activityHtml, noteHost, watchSession } from './networkActivity.js';
 import { allowedUrl, setOwnServer } from './networkGuard.js';
 import { fork } from 'node:child_process';
@@ -292,6 +292,15 @@ function createWindow() {
   });
   // (shown once placed: maximising a visible window flashes the old size first)
   win.once('ready-to-show', () => {
+    // (drawn without a graphics driver: said once per installation; reports MR-VYJ4Y7 and others ended in a stopped window)
+    setTimeout(() => {
+      try {
+        if (process.env.MAPNG_TEST_NO_BROWSER || readSettings().toldSoftwareGraphics || !softwareGraphics(app.getGPUFeatureStatus())) return;
+        writeSettings({ toldSoftwareGraphics: true });
+        const s = startText(readSettings().language || app.getLocale());
+        dialog.showMessageBox(win, { type: 'warning', title: 'MapNG', noLink: true, message: s.gpuTitle, detail: s.gpuDetail, buttons: [s.ok] }).catch(() => {});
+      } catch { /* no notice */ }
+    }, 4000);
     if (saved?.maximized) win.maximize();
     if (saved?.fullScreen) win.setFullScreen(true);
     win.show();
@@ -1401,11 +1410,18 @@ app.whenReady().then(() => {
     const missing = missingParts([
       { path: GENERATOR, what: 'resources/runner' }, { path: NODE, what: 'resources/node' }, { path: path.join(DIST, 'index.html'), what: 'resources/dist' },
     ]);
+    const startLang = readSettings().language || app.getLocale();
     if (missing.length) {
-      const m = incompleteMessage(missing, process.execPath);
-      dialog.showMessageBoxSync({ type: 'error', title: m.title, message: m.message, detail: m.detail, buttons: ['Close'] });
+      const m = incompleteMessage(missing, process.execPath, startLang);
+      dialog.showMessageBoxSync({ type: 'error', title: m.title, message: m.message, detail: m.detail, buttons: [startText(startLang).close] });
       app.exit(1);
       return;
+    }
+    // (whole, but in an archive program's temporary folder: WinRAR unpacks everything there, the check above
+    // passes, and Generate then cannot start its helper: report MR-4JKG8M. Said now, with the choice to go on)
+    if (inArchiveTemp(process.execPath) && !process.env.MAPNG_TEST_NO_BROWSER) {
+      const m = incompleteMessage([], process.execPath, startLang); const s = startText(startLang);
+      if (dialog.showMessageBoxSync({ type: 'warning', title: m.title, message: m.message, detail: m.detail, buttons: [s.close, s.carryOn], defaultId: 0, cancelId: 0, noLink: true }) === 0) { app.exit(1); return; }
     }
   }
   clearLeftovers();

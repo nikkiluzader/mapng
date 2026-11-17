@@ -45,3 +45,20 @@ test('the update dialogs are worded in every language, with the same placeholder
   assert.equal(fill(en.available, { new: '0.3.1', have: '0.3.0' }), 'MapNG 0.3.1 is available (you have 0.3.0).');
   assert.equal(updaterText('xx').later, 'Later');
 });
+
+test('the start-up notices are worded in every language; the unpack message follows the language', async () => {
+  const { startText, MENU_LANGUAGES } = await import('../desktop/menuText.js');
+  const en = startText('en'); const keys = Object.keys(en).sort();
+  for (const lang of MENU_LANGUAGES) { const s = startText(lang); assert.deepEqual(Object.keys(s).sort(), keys, lang); for (const k of keys) assert.ok(s[k], `${lang}.${k}`); assert.ok(s.missing.includes('{missing}'), lang); }
+  const de = incompleteMessage(['resources/node'], 'C:\\Temp\\Rar$EXa1.2.rartemp\\MapNG.exe', 'de');
+  assert.match(de.message, /Zip-Datei/); assert.match(de.detail, /resources\/node/);
+  // (whole but in the archive's folder: no "missing" line)
+  assert.doesNotMatch(incompleteMessage([], 'C:\\Temp\\Rar$EXa1.2.rartemp\\MapNG.exe').detail, /Missing/);
+});
+
+test('graphics drawn in software are recognised from the feature status', async () => {
+  const { softwareGraphics } = await import('../desktop/installCheck.js');
+  assert.equal(softwareGraphics({ gpu_compositing: 'disabled_software' }), true);
+  assert.equal(softwareGraphics({ gpu_compositing: 'enabled' }), false);
+  assert.equal(softwareGraphics({}), false); assert.equal(softwareGraphics(null), false);
+});
