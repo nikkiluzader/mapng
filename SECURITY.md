@@ -3,7 +3,8 @@
 MapNG is a website (mapng.com) and a desktop app (Windows and Linux) that build BeamNG.drive levels from
 public map data. This page says how to report a problem and how to check what you downloaded. What MapNG
 connects to, what it stores and what the desktop app writes on your computer are on
-[mapng.com/data.html](https://mapng.com/data.html).
+[mapng.com/data.html](https://mapng.com/data.html). The same measures written for users, with their limits, are on
+[mapng.com/security.html](https://mapng.com/security.html).
 
 ## Reporting a problem
 

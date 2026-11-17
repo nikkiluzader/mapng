@@ -130,7 +130,7 @@ import { useI18n } from 'vue-i18n';
 import BaseButton from '../base/BaseButton.vue';
 import ModeToggle from '../ui/ModeToggle.vue';
 import { getSupportedLocales, setI18nLanguage } from '../../i18n';
-import { CircleHelp, Heart, Sun, Moon, Code, Download, RotateCw, Globe, Github, MessageCircle, Mail, Database, Shield, Share2, FlaskConical, BarChart3 } from 'lucide-vue-next';
+import { CircleHelp, Heart, Sun, Moon, Code, Download, RotateCw, Globe, Github, MessageCircle, Mail, Database, Shield, ShieldCheck, Share2, FlaskConical, BarChart3 } from 'lucide-vue-next';
 import { openShareDialog } from '../../composables/useShareDialog.js';
 
 const { t, locale } = useI18n({ useScope: 'global' });
@@ -147,6 +147,8 @@ const footerLinks = computed(() => [
   { key: 'contact', icon: Mail, label: t('sidebar.contact'), href: 'https://github.com/nikkiluzader/mapng/issues/new' },
   ...(desktopApp ? [] : [{ key: 'desktop', icon: Download, label: t('sidebar.desktopApp'), title: t('sidebar.desktopAppTooltip'), href: DESKTOP_DOWNLOAD_URL }]),
   { key: 'data', icon: Database, label: t('sidebar.yourData'), href: desktopApp ? 'https://mapng.com/data.html' : '/data.html' },
+  // (what limits the app and how to check it: public/security.html)
+  { key: 'security', icon: ShieldCheck, label: t('sidebar.security'), href: desktopApp ? 'https://mapng.com/security.html' : '/security.html' },
   // (the public counts: where people build, which settings, what goes wrong: public/stats.html)
   { key: 'stats', icon: BarChart3, label: t('sidebar.stats'), href: desktopApp ? 'https://mapng.com/stats.html' : '/stats.html' },
   // (who writes the code, how it is tested, what the tests miss: public/how-its-built.html)

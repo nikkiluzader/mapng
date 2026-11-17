@@ -139,6 +139,7 @@ This helps keep community resource hubs focused on curated, polished releases wh
 ## Security and trust
 
 - What MapNG connects to (every address), what it stores and what the desktop app writes on your computer: [mapng.com/data.html](https://mapng.com/data.html).
+- Every security measure, how to check it and what it does not cover: [mapng.com/security.html](https://mapng.com/security.html).
 - The desktop app shows its own connections under **Help > Network Activity**.
 - How the desktop download is built, how to check a file you downloaded, and how to report a problem: [SECURITY.md](SECURITY.md).
 

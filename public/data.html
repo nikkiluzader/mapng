@@ -400,6 +400,7 @@ Content-Type: application/json
       <li><b>Signed for Windows.</b> From the version after 0.3.2 on, the installer and the program are signed with a Windows code signature: the publisher is <b>Nikki Luzader</b>, MapNG's developer, whose identity Microsoft checked. To see it, right-click the file, choose Properties, then Digital Signatures; or in PowerShell, <code>Get-AuthenticodeSignature MapNG-Setup-x.y.z.exe</code> says <code>Valid</code>. The build that makes a release fails if a file comes out unsigned. Windows SmartScreen may still warn about a newly released installer, because it judges a file by how many people have downloaded it; the publisher's name in that warning is what tells you it is the real one. Version 0.3.2 and older are not signed.</li>
       <li><b>No installer needed.</b> There is a portable zip for Windows and an AppImage for Linux, and you can build and run it from the code yourself.</li>
     </ul>
+    <p>All of MapNG's security measures, and their limits, are on one page: <a href="/security.html">Security in MapNG</a>.</p>
     <p>Found a security problem? Please report it privately: <a href="https://github.com/nikkiluzader/mapng/security/advisories/new">open a private report on GitHub</a>.</p>
   </section>
 

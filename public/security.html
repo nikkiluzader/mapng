@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MapNG Security</title>
+<meta name="description" content="How MapNG protects the people who use it: a signed Windows app, signed updates, a desktop app that can only reach a published list of addresses, builds made in the open, and what none of that covers.">
+<link rel="canonical" href="https://mapng.com/security.html">
+<meta property="og:title" content="MapNG: security">
+<meta property="og:description" content="The security measures in MapNG's website and desktop app, how to check each one yourself, and what they do not cover.">
+<meta property="og:url" content="https://mapng.com/security.html">
+<meta property="og:image" content="https://mapng.com/og-image.jpg">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  /* BeamNG.drive's UI fonts, as the app (public/fonts, SIL OFL) */
+  @font-face { font-family: "Noto Sans"; src: url(/fonts/noto-sans-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass"; src: url(/fonts/overpass-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass Mono"; src: url(/fonts/overpass-mono-latin-wght-normal.woff2) format("woff2"); font-weight: 300 700; font-display: swap; }
+  :root {
+    --bg: #f7f7f8; --surface: #ffffff; --surface-2: #f2f2f4; --border: #e3e3e8;
+    --text: #1d1d22; --text-2: #4a4a55; --muted: #6e6e7a;
+    --brand: #ff6600; --brand-ink: #c2410c; --brand-tint: #fff4ec;
+    --ok: #15803d; --code-bg: #1d1d22; --code-text: #f4f4f6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+      --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+      --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+      --ok: #4ade80; --code-bg: #0b0b0e; --code-text: #ececf0;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+    --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+    --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+    --ok: #4ade80; --code-bg: #0b0b0e; --code-text: #ececf0;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--brand-ink); }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 0 16px; }
+  header.top { background: linear-gradient(90deg, #ff6600, #f59e0b); color: #fff; }
+  header.top .wrap { padding-top: 20px; padding-bottom: 36px; }
+  .brand { display: inline-flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; opacity: .95; }
+  .brand img { width: 22px; height: 22px; }
+  h1, h2, h3 { font-family: "Overpass", "Noto Sans", system-ui, sans-serif; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.15; margin: 22px 0 10px; letter-spacing: -0.01em; }
+  .lede { font-size: 18px; max-width: 640px; margin: 0; color: rgba(255,255,255,.95); }
+  main { padding: 0 0 64px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: -22px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .card b { display: block; font-size: 15px; margin-bottom: 2px; }
+  .card span { color: var(--text-2); font-size: 14px; }
+  .card .tick { color: var(--ok); font-weight: 700; margin-right: 4px; }
+  section { margin-top: 44px; }
+  h2 { font-size: 24px; line-height: 1.25; margin: 0 0 10px; }
+  h3 { font-size: 17px; margin: 22px 0 6px; }
+  p, li { color: var(--text-2); }
+  .note { background: var(--brand-tint); border-left: 3px solid var(--brand); border-radius: 0 8px 8px 0; padding: 10px 14px; color: var(--text); font-size: 15px; }
+  pre { background: var(--code-bg); color: var(--code-text); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-size: 14px; line-height: 1.5; }
+  code { font-family: "Overpass Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; }
+  p code, li code, td code { background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; color: var(--text); }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; color: var(--text); white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  td { color: var(--text-2); }
+  .flow { list-style: none; padding: 0; margin: 14px 0 0; counter-reset: step; }
+  .flow li { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px 12px 52px; margin: 0 0 22px; counter-increment: step; }
+  .flow li::before { content: counter(step); position: absolute; left: 14px; top: 12px; width: 26px; height: 26px; border-radius: 50%; background: var(--brand); color: #fff; font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+  .flow li:not(:last-child)::after { content: ""; position: absolute; left: 26px; bottom: -22px; width: 2px; height: 22px; background: var(--border); }
+  .flow b { color: var(--text); }
+  .flow .where { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .02em; color: var(--brand-ink); background: var(--brand-tint); border-radius: 999px; padding: 1px 8px; margin-left: 6px; vertical-align: 1px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 12px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .stat .v { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
+  .stat .k { font-size: 13px; color: var(--muted); }
+  .usage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 12px; }
+  .usage-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
+  .usage-card h3 { font-size: 14px; margin: 0 0 6px; }
+  .usage-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; font-size: 13px; margin: 4px 0; }
+  .usage-row .bar { grid-column: 1 / -1; height: 4px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
+  .usage-row .bar span { display: block; height: 100%; background: var(--brand); border-radius: 2px; }
+  .usage-row .n { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .never { columns: 2 240px; column-gap: 24px; padding-left: 20px; }
+  .never li { break-inside: avoid; margin-bottom: 6px; }
+  footer { border-top: 1px solid var(--border); margin-top: 56px; padding-top: 18px; font-size: 14px; color: var(--muted); }
+  footer p { color: var(--muted); }
+
+  /* this page's own pieces */
+  .pill { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .02em; border-radius: 999px; padding: 1px 9px; margin-right: 6px; vertical-align: 1px; white-space: nowrap; }
+  .pill.desk { color: var(--brand-ink); background: var(--brand-tint); }
+  .pill.web { color: var(--text); background: var(--surface-2); border: 1px solid var(--border); }
+  .pill.both { color: #fff; background: var(--brand); }
+  .measures { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 14px; }
+  .measure { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .measure h3 { margin: 6px 0 4px; font-size: 16px; }
+  .measure p { margin: 0; font-size: 14.5px; }
+  .measure .how { margin-top: 8px; font-size: 13px; color: var(--muted); }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-top: 12px; }
+  .two > div { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .two h3 { margin-top: 0; }
+  .two ul { padding-left: 18px; margin: 6px 0 0; }
+  .two li { font-size: 14.5px; margin-bottom: 4px; }
+  .limits li { margin-bottom: 8px; }
+  .toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; padding: 0; list-style: none; }
+  .toc a { display: inline-block; font-size: 14px; text-decoration: none; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; color: var(--text); }
+  .toc a:hover { border-color: var(--brand); }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/favicon.svg" alt="">MapNG</a>
+    <h1>Security in MapNG</h1>
+    <p class="lede">MapNG is a website and a desktop app. A program you install can do more than a web page, so here is every measure that limits what MapNG can do, how to check each one yourself, and what they do not cover.</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="cards">
+    <div class="card"><b><span class="tick">✓</span>Open source</b><span>All of it: app, server and build scripts.</span></div>
+    <div class="card"><b><span class="tick">✓</span>Built in the open</b><span>Releases are built by a public workflow, not on a private computer.</span></div>
+    <div class="card"><b><span class="tick">✓</span>Signed</b><span>The Windows app and every update carry a signature.</span></div>
+    <div class="card"><b><span class="tick">✓</span>A fixed list of addresses</b><span>The desktop app refuses to connect anywhere else.</span></div>
+    <div class="card"><b><span class="tick">✓</span>No account, no ads</b><span>Nothing is sent about you unless you opt in.</span></div>
+  </div>
+
+  <ul class="toc">
+    <li><a href="#choose">Website or app</a></li>
+    <li><a href="#desktop">The desktop app</a></li>
+    <li><a href="#download">The download</a></li>
+    <li><a href="#website">The website and server</a></li>
+    <li><a href="#data">Your data and keys</a></li>
+    <li><a href="#check">Check it yourself</a></li>
+    <li><a href="#limits">What this does not cover</a></li>
+    <li><a href="#report">Report a problem</a></li>
+  </ul>
+
+  <section id="choose">
+    <h2>You never have to install anything</h2>
+    <p>The website does the same work as the desktop app, inside your browser's own sandbox. The desktop app exists for one reason: very large or very dense maps need more memory than a browser tab is allowed. If you would rather not run a program from the internet, use the website.</p>
+    <div class="two">
+      <div>
+        <h3>The website</h3>
+        <ul>
+          <li>Runs in your browser; it cannot touch your files except the ones you pick or save.</li>
+          <li>Your map is built on your own computer, not on a server.</li>
+          <li>Nothing to install, nothing to update.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>The desktop app</h3>
+        <ul>
+          <li>Windows and Linux. The same pages as the website, in its own window.</li>
+          <li>Can use all of your computer's memory and write a level straight into your mods folder.</li>
+          <li>Held in by the measures below.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="desktop">
+    <h2>What holds the desktop app in</h2>
+    <p>These apply to the Windows and Linux app from the version after 0.3.2 on, unless a card says otherwise.</p>
+    <div class="measures">
+      <div class="measure"><span class="pill desk">Desktop</span>
+        <h3>It connects only to a published list</h3>
+        <p>Every address MapNG uses is on one list. The app refuses any other address before a request is made, in its window and in its export process. The one addition is your own Overpass server, if you set one.</p>
+        <p class="how">See it: <a href="/data.html#addresses">the list</a>. Lift it yourself only by adding <code>"allowUnlistedAddresses": true</code> to the app's <code>settings.json</code>.</p>
+      </div>
+      <div class="measure"><span class="pill desk">Desktop</span>
+        <h3>It shows you what it contacted</h3>
+        <p><b>Help &gt; Network Activity</b> lists every address the app has connected to since it started, how many requests it made, what each is for, and anything it refused.</p>
+        <p class="how">Nothing in that window is sent anywhere or kept after you close the app.</p>
+      </div>
+      <div class="measure"><span class="pill desk">Desktop</span>
+        <h3>The window is sandboxed</h3>
+        <p>The pages run in Chromium's sandbox with no access to the system. Only MapNG's own pages may ask the app to do something, and the window cannot be sent to another website.</p>
+        <p class="how">A page from anywhere else gets no access to your files, even if one were somehow shown.</p>
+      </div>
+      <div class="measure"><span class="pill desk">Desktop</span>
+        <h3>It writes in three places only</h3>
+        <p>Its own app folder, your Downloads folder, and the BeamNG mods folder you chose. Requests to write anywhere else are refused.</p>
+        <p class="how">The folders, one by one: <a href="/data.html#files">what the app writes</a>.</p>
+      </div>
+      <div class="measure"><span class="pill desk">Desktop</span>
+        <h3>Updates must be signed by MapNG</h3>
+        <p>The app takes an update only when the release's update file carries MapNG's signature, checked against a key built into the app. A changed file is refused. On Windows the new installer must also carry the same publisher's code signature.</p>
+        <p class="how">Since 0.3.2. Update checks themselves are optional: Help &gt; Check for Updates Automatically.</p>
+      </div>
+      <div class="measure"><span class="pill desk">Desktop</span>
+        <h3>Nothing runs behind your back</h3>
+        <p>No background service, no start with Windows, no tray icon. When you close the window, running exports are stopped and the app is gone.</p>
+        <p class="how">It downloads data only (elevation, maps, pictures), never programs. Its own signed update is the one exception.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="download">
+    <h2>How you know the download is the real one</h2>
+    <div class="measures">
+      <div class="measure"><span class="pill desk">Windows</span>
+        <h3>A Windows code signature</h3>
+        <p>The installer and the program are signed. The publisher is <b>Nikki Luzader</b>, MapNG's developer, whose identity Microsoft verified. The build that makes a release fails if a file comes out unsigned.</p>
+        <p class="how">From the version after 0.3.2 on. Right-click the file &gt; Properties &gt; Digital Signatures.</p>
+      </div>
+      <div class="measure"><span class="pill both">Both</span>
+        <h3>Built by a public workflow</h3>
+        <p>Installers are built by GitHub Actions from a tagged commit of the public code. Every build's log is public, the build tools it uses are pinned to exact versions, and only the project's admin can create a release tag.</p>
+        <p class="how"><a href="https://github.com/nikkiluzader/mapng/actions/workflows/desktop-release.yml">The build runs</a> · <a href="https://github.com/nikkiluzader/mapng/blob/main/.github/workflows/desktop-release.yml">the workflow</a></p>
+      </div>
+      <div class="measure"><span class="pill both">Both</span>
+        <h3>Checksums and build provenance</h3>
+        <p>Each release carries the SHA-256 of every download, and GitHub signs a statement of which commit and which build run produced each file. On Linux, where there is no code signature, these are the way to check a file.</p>
+        <p class="how">From the version after 0.3.2 on. The commands are <a href="#check">below</a>.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="website">
+    <h2>The website and the server</h2>
+    <div class="measures">
+      <div class="measure"><span class="pill both">Both</span>
+        <h3>Only MapNG's own scripts run</h3>
+        <p>The website and the app send a content security policy: scripts come from MapNG itself and nothing injected is allowed to run. Nothing is loaded from an advertising or tracking service, because there is none.</p>
+      </div>
+      <div class="measure"><span class="pill web">Server</span>
+        <h3>A small, fenced server</h3>
+        <p>mapng.com mostly hands out files. Its few services (map data, relays for elevation and place search, send codes, opt-in stats and reports) accept only the request shapes they need and answer with strict security headers; MapNG's own services never set a cookie.</p>
+      </div>
+      <div class="measure"><span class="pill web">Server</span>
+        <h3>Limits against abuse</h3>
+        <p>Each sender is limited per minute, and each service has a daily total for everyone together, so one script cannot flood the server or use MapNG to hammer the data sources it relays.</p>
+      </div>
+      <div class="measure"><span class="pill web">Server</span>
+        <h3>No secrets in the code</h3>
+        <p>Keys and tokens live in the hosting provider's secret store. The repository, its history and the built files were checked for them in the November 2026 review.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="data">
+    <h2>Your data and your keys</h2>
+    <ul>
+      <li><b>No account.</b> No sign-in, no email, no device ID.</li>
+      <li><b>Sharing is opt-in.</b> Export hotspots, settings stats and problem reports are sent only if you turn them on or press Send. A report shows you everything in it first.</li>
+      <li><b>Your keys stay with you.</b> A GPXZ key or an Overpass address with a key is kept on your computer, removed from an export's job files when the export ends, and hidden in logs and reports.</li>
+      <li><b>Shared settings are checked.</b> A config you paste or open by code is cleaned first, and the dialog names any risky setting before you accept it.</li>
+    </ul>
+    <p>The full account of what can be sent, what is stored and where: <a href="/data.html">Your data and MapNG</a>.</p>
+  </section>
+
+  <section id="check">
+    <h2>Check it yourself</h2>
+    <ol class="flow">
+      <li><b>See the Windows signature.</b> Right-click the installer, choose Properties, then Digital Signatures. Or in PowerShell:
+        <pre>Get-AuthenticodeSignature .\MapNG-Setup-x.y.z.exe</pre>
+        The status is <code>Valid</code> and the signer is Nikki Luzader.</li>
+      <li><b>Compare the checksum.</b> Download <code>SHA256SUMS-win32.txt</code> or <code>SHA256SUMS-linux.txt</code> from the same release, then:
+        <pre>Get-FileHash .\MapNG-Setup-x.y.z.exe -Algorithm SHA256     # Windows
+sha256sum MapNG-x.y.z-x86_64.AppImage                       # Linux</pre></li>
+      <li><b>Check where it was built.</b> With GitHub's command line tool:
+        <pre>gh attestation verify MapNG-Setup-x.y.z.exe --repo nikkiluzader/mapng</pre>
+        It names the commit and the build run that produced the file.</li>
+      <li><b>Watch what it connects to.</b> In the app, Help &gt; Network Activity. Or watch the network with your own tools and compare with <a href="/data.html#addresses">the list</a>.</li>
+      <li><b>Read the code.</b> The pieces named on this page: <a href="https://github.com/nikkiluzader/mapng/blob/main/desktop/networkHosts.js">the address list</a>, <a href="https://github.com/nikkiluzader/mapng/blob/main/desktop/networkGuard.js">the guard</a>, <a href="https://github.com/nikkiluzader/mapng/blob/main/desktop/updateSignature.js">the update signature</a>, <a href="https://github.com/nikkiluzader/mapng/blob/main/desktop/main.js">the app's main process</a>, <a href="https://github.com/nikkiluzader/mapng/tree/main/worker">the server</a>.</li>
+    </ol>
+  </section>
+
+  <section id="limits">
+    <h2>What this does not cover</h2>
+    <p>Security pages that only list strengths are not worth much. These are the limits.</p>
+    <ul class="limits">
+      <li><b>No outside audit.</b> The project reviewed its own server, app and website in November 2026 and fixed what it found. Nobody independent has audited it.</li>
+      <li><b>An installed program is still an installed program.</b> The measures above limit what MapNG's own code does. They cannot make a program as contained as a web page. If that matters to you, use the website.</li>
+      <li><b>Windows may still warn.</b> SmartScreen judges a new installer by how many people have downloaded it, so a fresh release can show a warning even though it is signed. The publisher's name in that warning is what to check.</li>
+      <li><b>Some list entries are broad.</b> A few addresses on the list stand for a whole family (for example the storage addresses that USGS and GitHub hand out), because those services choose the exact address themselves.</li>
+      <li><b>The website is not fenced the same way.</b> A browser page cannot be limited to a list of addresses by MapNG; there the list is what the code contains, checked by a test.</li>
+      <li><b>Linux has no code signature.</b> The AppImage is checked by its checksum and build provenance instead.</li>
+      <li><b>Older versions.</b> Version 0.3.2 and older are not signed for Windows and do not refuse unlisted addresses.</li>
+      <li><b>You are trusting the build and hosting services.</b> GitHub builds the app, Microsoft's signing service signs it, and Cloudflare serves the site. MapNG can show you what was built from which code; it cannot vouch for those companies' own systems.</li>
+      <li><b>The maps come from public data.</b> MapNG reads elevation and map data from other services. It treats what it downloads as data, never as code, but it cannot promise those services are always available or correct.</li>
+    </ul>
+  </section>
+
+  <section id="report">
+    <h2>Report a problem</h2>
+    <p>Found a security problem? Please report it privately, so it can be fixed before it is public: <a href="https://github.com/nikkiluzader/mapng/security/advisories/new">open a private report on GitHub</a>. Say what you found, how to reproduce it and which version or page it concerns. For anything else, <a href="https://github.com/nikkiluzader/mapng/issues">open an issue</a>.</p>
+    <p>The same information for developers is in the repository's <a href="https://github.com/nikkiluzader/mapng/blob/main/SECURITY.md">SECURITY.md</a>.</p>
+  </section>
+
+  <footer>
+    <p>Last updated 16 November 2026. If a measure on this page changes, this page changes with it.</p>
+    <p><a href="/">Back to MapNG</a> · <a href="/data.html">Your data</a> · <a href="/stats.html">Public stats</a></p>
+  </footer>
+</main>
+</body>
+</html>
