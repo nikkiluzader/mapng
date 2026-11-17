@@ -11,6 +11,10 @@
 <meta property="og:url" content="https://mapng.com/how-its-built.html">
 <meta property="og:image" content="https://mapng.com/og-image.jpg">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<script>
+  // the theme before the first paint: the app's link (?theme=), else this visit's, else the app's own choice, else the system's
+  (function () { var t; try { var q = new URLSearchParams(location.search).get('theme'); if (q === 'dark' || q === 'light') sessionStorage.setItem('mapng_page_theme', q); t = sessionStorage.getItem('mapng_page_theme') || localStorage.getItem('theme'); } catch (e) { /* storage blocked */ } if (t !== 'dark' && t !== 'light') t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; document.documentElement.setAttribute('data-theme', t); })();
+</script>
 <style>
   /* BeamNG.drive's UI fonts, as the app (public/fonts, SIL OFL) */
   @font-face { font-family: "Noto Sans"; src: url(/fonts/noto-sans-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
@@ -101,6 +105,8 @@
   .who ul { margin: 0; padding-left: 18px; }
   .who li { margin-bottom: 4px; }
 </style>
+<link rel="stylesheet" href="/pages.css">
+<script src="/pages.js" defer></script>
 </head>
 <body>
 <header class="top">

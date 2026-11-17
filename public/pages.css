@@ -1,0 +1,56 @@
+/* The look the info pages share with the app (data, security, stats, how it's built). Loaded after each page's own
+   styles: it sets the app's colours for light and dark (the page's root carries data-theme, set before the first
+   paint by the small script in its head), and replaces the old orange banner with the app's own header: the logo
+   tile, the page links and the light / dark switch (built by pages.js). Colours are the app's: Tailwind's grey
+   ramp and the BeamNG orange, as in tailwind.config.js. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f9fafb; --surface: #ffffff; --surface-2: #f3f4f6; --border: #e5e7eb;
+  --text: #111827; --text-2: #4b5563; --muted: #6b7280;
+  --brand: #ff6600; --brand-ink: #c2410c; --brand-tint: #fff1e8;
+  --ok: #15803d; --code-bg: #111827; --code-text: #f3f4f6;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #111827; --surface: #1f2937; --surface-2: #283445; --border: #374151;
+  --text: #f3f4f6; --text-2: #d1d5db; --muted: #9ca3af;
+  --brand: #ff6600; --brand-ink: #ff8955; --brand-tint: #2f2014;
+  --ok: #34d399; --code-bg: #0b1220; --code-text: #e5e7eb;
+  /* (the stats page's map and bars, on the app's navy) */
+  --track: #283445; --land: #334155; --land-edge: #1f2937; --sea: #0f172a;
+}
+body { background: var(--bg); color: var(--text); }
+::selection { background: var(--brand); color: #fff; }
+a { text-underline-offset: 2px; }
+
+/* the header: the app's, not a banner */
+header.top { background: var(--surface); color: var(--text); border-bottom: 1px solid var(--border); }
+header.top .wrap { padding-top: 0; padding-bottom: 26px; }
+header.top h1 { color: var(--text); margin-top: 26px; }
+header.top .lede { color: var(--text-2); }
+header.top .brand { color: var(--text); opacity: 1; padding: 14px 0; }
+.pg-bar { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.pg-logo { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); margin-right: auto; }
+.pg-logo .pg-tile { display: inline-flex; padding: 6px; background: var(--brand); border-radius: 8px; }
+.pg-logo .pg-tile svg { width: 26px; height: 26px; display: block; }
+.pg-logo b { display: block; font: 700 18px/1.1 "Overpass", "Noto Sans", system-ui, sans-serif; }
+.pg-logo small { display: block; font-size: 11px; line-height: 1.3; color: var(--muted); }
+.pg-nav { display: flex; flex-wrap: wrap; gap: 4px; }
+.pg-nav a { font-size: 13px; font-weight: 600; text-decoration: none; color: var(--text-2); padding: 6px 10px; border-radius: 8px; border: 1px solid transparent; }
+.pg-nav a:hover { background: var(--surface-2); color: var(--text); }
+.pg-nav a[aria-current="page"] { background: var(--brand); color: #fff; }
+.pg-theme { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; }
+.pg-theme:hover { background: var(--surface-2); color: var(--brand); }
+.pg-theme svg { width: 16px; height: 16px; }
+.pg-theme:focus-visible, .pg-nav a:focus-visible, .pg-logo:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+:root[data-theme="dark"] .pg-theme .pg-moon, :root[data-theme="light"] .pg-theme .pg-sun { display: none; }
+
+/* the app's corners (4 / 8 px) and flat panels; the summary boxes no longer overlap a banner */
+.cards, .tiles { margin-top: 22px !important; }
+.card, .tile, .measure, .two > div, .stat, .usage-card, .flow li, .table-wrap, pre, .panel, .box { border-radius: 8px; }
+.note { border-radius: 0 8px 8px 0; }
+.card, .tile, .measure, .two > div { box-shadow: 0 1px 2px rgba(0, 0, 0, .04); }
+h2 { padding-top: 4px; }
+section > h2::before { content: ""; display: inline-block; width: 4px; height: .9em; margin-right: 10px; border-radius: 2px; background: var(--brand); vertical-align: -1px; }
+th { text-transform: uppercase; font-size: 11px; letter-spacing: .05em; color: var(--muted); }
+footer a { color: var(--brand-ink); }

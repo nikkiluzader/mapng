@@ -138,18 +138,20 @@ const locales = computed(() => getSupportedLocales());
 const localeShort = computed(() => (String(locale.value).startsWith('zh') ? '中文' : String(locale.value).slice(0, 2).toUpperCase()));
 // The footer's links, all alike: an icon, the name on hover. The desktop app
 // has no "get the desktop app" link.
+// (an info page opens in the app's own light or dark: public/pages.js reads ?theme=)
+const pageLink = (page) => `${desktopApp ? 'https://mapng.com' : ''}/${page}.html?theme=${props.isDarkMode ? 'dark' : 'light'}`;
 const footerLinks = computed(() => [
   { key: 'discord', icon: MessageCircle, label: t('sidebar.discord'), href: 'https://discord.gg/j6ZvcF8rgk' },
   { key: 'github', icon: Github, label: t('sidebar.github'), href: 'https://github.com/nikkiluzader/mapng' },
   { key: 'contact', icon: Mail, label: t('sidebar.contact'), href: 'https://github.com/nikkiluzader/mapng/issues/new' },
   ...(desktopApp ? [] : [{ key: 'desktop', icon: Download, label: t('sidebar.desktopApp'), title: t('sidebar.desktopAppTooltip'), href: DESKTOP_DOWNLOAD_URL }]),
-  { key: 'data', icon: Database, label: t('sidebar.yourData'), href: desktopApp ? 'https://mapng.com/data.html' : '/data.html' },
+  { key: 'data', icon: Database, label: t('sidebar.yourData'), href: pageLink('data') },
   // (what limits the app and how to check it: public/security.html)
-  { key: 'security', icon: ShieldCheck, label: t('sidebar.security'), href: desktopApp ? 'https://mapng.com/security.html' : '/security.html' },
+  { key: 'security', icon: ShieldCheck, label: t('sidebar.security'), href: pageLink('security') },
   // (the public counts: where people build, which settings, what goes wrong: public/stats.html)
-  { key: 'stats', icon: BarChart3, label: t('sidebar.stats'), href: desktopApp ? 'https://mapng.com/stats.html' : '/stats.html' },
+  { key: 'stats', icon: BarChart3, label: t('sidebar.stats'), href: pageLink('stats') },
   // (who writes the code, how it is tested, what the tests miss: public/how-its-built.html)
-  { key: 'how', icon: FlaskConical, label: t('sidebar.howBuilt'), href: desktopApp ? 'https://mapng.com/how-its-built.html' : '/how-its-built.html' },
+  { key: 'how', icon: FlaskConical, label: t('sidebar.howBuilt'), href: pageLink('how-its-built') },
   { key: 'disclaimer', icon: Shield, label: t('sidebar.disclaimer'), emit: 'show-disclaimer' },
   { key: 'stack', icon: Code, label: t('sidebar.stack'), emit: 'show-stack' },
 ]);
@@ -175,7 +177,7 @@ onMounted(async () => {
 const isProductionHost = typeof window !== 'undefined'
   && /^(www\.)?mapng\.com$/i.test(window.location.hostname);
 
-defineProps({
+const props = defineProps({
   batchMode: { type: Boolean, default: false },
   isDarkMode: { type: Boolean, default: false },
   buildMainHash: { type: String, default: 'n/a' },
