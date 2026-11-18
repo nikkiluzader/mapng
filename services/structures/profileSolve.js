@@ -712,17 +712,33 @@ function tieTwinDecks(edges, Z, off, pinned, held, L, U, crossings = []) {
     under.add(off[dn.edge] + dn.i); under.add(off[dn.edge] + dn.i + 1);
   }
   const moves = [];
+  // (each deck's box; a pair whose boxes never come within twin reach is never paired, and a station whose
+  // point is out of reach of the other's box finds no twin there: both skipped, exactly as the full scan.
+  // A city's 700 decks scanned every other deck at every station: 19 s)
+  const box = new Map(decks.map((k) => {
+    const e = edges[k]; let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
+    for (let i = 0; i < e.s.length; i++) { if (e.x[i] < x0) x0 = e.x[i]; if (e.x[i] > x1) x1 = e.x[i]; if (e.y[i] < y0) y0 = e.y[i]; if (e.y[i] > y1) y1 = e.y[i]; }
+    return [k, [x0, y0, x1, y1]];
+  }));
+  // (no width set: NaN, which never rejects below, so nothing is skipped either)
+  const reachOf = (ea, eb) => ea.half + eb.half + TWIN_GAP_M;
   for (const a of decks) {
     const ea = edges[a];
     const n = ea.s.length;
     const sum = new Float64Array(n); const cnt = new Uint16Array(n);
+    const ba = box.get(a);
+    const near = decks.filter((b) => {
+      if (b === a) return false;
+      const bb = box.get(b); const r = reachOf(ea, edges[b]);
+      return !(Number.isFinite(r) && (bb[0] > ba[2] + r || bb[2] < ba[0] - r || bb[1] > ba[3] + r || bb[3] < ba[1] - r));
+    });
     for (let i = 0; i < n; i++) {
       const ia = Math.min(i, n - 2);
       const ux = ea.x[ia + 1] - ea.x[ia]; const uy = ea.y[ia + 1] - ea.y[ia]; const ul = Math.hypot(ux, uy) || 1;
-      for (const b of decks) {
-        if (b === a) continue;
+      for (const b of near) {
         const eb = edges[b];
         if ((eb.layer || 0) !== (ea.layer || 0)) continue;
+        { const bb = box.get(b); const r = reachOf(ea, eb); if (Number.isFinite(r) && (ea.x[i] < bb[0] - r || ea.x[i] > bb[2] + r || ea.y[i] < bb[1] - r || ea.y[i] > bb[3] + r)) continue; }
         // (not a fork's branches: they share a node, and the ramp follows the main deck, never the other
         // way; nor a ramp beside its main line)
         if (ea.from === eb.from || ea.from === eb.to || ea.to === eb.from || ea.to === eb.to) continue;
