@@ -300,13 +300,13 @@ Chicago 8192 export: about 1050 s on the morning of 2026-11-18, 447 s that eveni
 | Data step (downloads) | 45 | done: one run (exit fix), 3 downloads at once, lidar 8 ahead |
 | Preparing / bridge lidar read | 12 | open: a third lidar decode in the export itself |
 | Laying roads | 159 | in progress |
-| - structure solver | 57 | done: twin decks, structureEnds, clamp loop; open: worklist (needs care to stay exact), projectNetwork, tautProfile |
+| - structure solver | 57 | done: twin decks, structureEnds, clamp loop, typed links (5 %). Found: it never settles (a station lifted by smoothing and put back by the clamp counts as moving), so every solve runs 6 x 120 sweeps; some bridges still creep up at the last sweep. Stopping when settled moved roads up to 5.8 m: a quality question, not a speed change. Open: sweeps on worker threads (clamp and smoothing are per edge; projection stays in order) |
 | - tunnels (nearestOnTunnel, ground) | ~20 | partly: the ground lookup reuses its result objects (less garbage, no time) |
 | - terrain under roads (composeTerrain) | ~8 | done: bands of rows on workers (NYC 4 km roads 73 -> 35 s) |
 | - lake and river beds | ~20 | fixed: Map size limit (Chicago's beds were skipped); open: the lake pass's own speed |
 | - bridge models | 8 | done: box pre-checks |
 | - railways, beds under decks, styles | ~15 | partly (styles done) |
-| Sidewalks, curbs, ramps | 67 | partly (deck sidewalks done); open: polygon merging, grading |
+| Sidewalks, curbs, ramps | 67 | partly: deck sidewalks; strip cuts and seawall unions on workers (NYC 24.8 -> 18.7 s); open: grading (gradeSidewalkGround), walk runs |
 | Street props | 3 | open |
 | Base texture | 12 | open |
 | Terrain materials | ~3 | (the 29 s was mostly the lake beds, logged inside this step) |
