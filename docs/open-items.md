@@ -291,7 +291,7 @@ Out: approximate geometry, raising any third-party request rate, a bigger young 
 
 Each change: the same level (byte for byte, or within 1 mm where agreed), then measured on Chicago 8192 (Mapterhorn, 30 m backdrop, scratch/memprobe).
 
-Chicago 8192 export: about 1050 s on the morning of 2026-11-18, 447 s that evening (peak 28-30 GB -> 18-21 GB).
+Chicago 8192 export: about 1050 s on the morning of 2026-11-18, 447 s that evening, 423 s later that night with its lake beds carved for the first time (peak 28-30 GB -> 18-21 GB). Each change is checked on the six bt_* areas and on nyc_s4096 / pgh4k headless; Chicago only at milestones (no backdrop in test runs).
 
 **Export steps** (seconds at Chicago 8192, latest; status):
 
@@ -299,17 +299,17 @@ Chicago 8192 export: about 1050 s on the morning of 2026-11-18, 447 s that eveni
 |---|---|---|
 | Data step (downloads) | 45 | done: one run (exit fix), 3 downloads at once, lidar 8 ahead |
 | Preparing / bridge lidar read | 12 | open: a third lidar decode in the export itself |
-| Laying roads | 168 | in progress |
+| Laying roads | 159 | in progress |
 | - structure solver | 57 | done: twin decks, structureEnds, clamp loop; open: worklist (needs care to stay exact), projectNetwork, tautProfile |
-| - tunnels (nearestOnTunnel, ground) | ~20 | open |
-| - terrain under roads (composeTerrain) | 20 | open: strips |
-| - lake and river beds | ~16 | open |
+| - tunnels (nearestOnTunnel, ground) | ~20 | partly: the ground lookup reuses its result objects (less garbage, no time) |
+| - terrain under roads (composeTerrain) | ~8 | done: bands of rows on workers (NYC 4 km roads 73 -> 35 s) |
+| - lake and river beds | ~20 | fixed: Map size limit (Chicago's beds were skipped); open: the lake pass's own speed |
 | - bridge models | 8 | done: box pre-checks |
 | - railways, beds under decks, styles | ~15 | partly (styles done) |
 | Sidewalks, curbs, ramps | 67 | partly (deck sidewalks done); open: polygon merging, grading |
 | Street props | 3 | open |
 | Base texture | 12 | open |
-| Terrain materials | 29 | open: strips |
+| Terrain materials | ~3 | (the 29 s was mostly the lake beds, logged inside this step) |
 | terrain.ter | 8 | open |
 | Heightmap PNG | 2 | open |
 | Backdrop | 8 | open |
