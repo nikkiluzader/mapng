@@ -287,6 +287,7 @@ function longestDeck(z, s, maxGrade) {
  * compact dataset list; fetchImpl, lp (laz-perf instance). Returns
  * { dataset, grid, nodes, bytes } or null.
  */
+const FETCH_AHEAD = 8;
 export async function fetchSurvey({ lines, toGeo, toLocal, zAbs, index, fetchImpl = fetch, lp, maxNodes = 400, onProgress = () => {}, exclude = [] }) {
   if (!lines.length) return null;
   const mid = lines[0].pts[Math.floor(lines[0].pts.length / 2)];
@@ -306,11 +307,19 @@ export async function fetchSurvey({ lines, toGeo, toLocal, zAbs, index, fetchImp
     const keys = (await nodesAlong(ept, getJson, merc, band)).slice(0, maxNodes);
     if (!keys.length) continue;
     const clouds = []; let bytes = 0;
+    // (up to FETCH_AHEAD nodes downloading while the earlier ones decode, still taken in their order: one at a
+    // time, a city's 400 nodes took 100 s, most of it waiting on the network. A failed request fails where
+    // the one-at-a-time loop would have)
+    const fetchNode = async (k) => { const r = await fetchImpl(`${base}/ept-data/${keys[k]}.laz`); return r.ok ? new Uint8Array(await r.arrayBuffer()) : null; };
+    const ahead = new Map();
+    const start = (k) => { if (k < keys.length && !ahead.has(k)) { const pr = fetchNode(k); pr.catch(() => {}); ahead.set(k, pr); } };
+    for (let k = 0; k < FETCH_AHEAD; k++) start(k);
     for (let k = 0; k < keys.length; k++) {
       onProgress(k, keys.length);
-      const r = await fetchImpl(`${base}/ept-data/${keys[k]}.laz`);
-      if (!r.ok) continue;
-      const buf = new Uint8Array(await r.arrayBuffer());
+      const pr = ahead.get(k); ahead.delete(k);
+      start(k + FETCH_AHEAD);
+      const buf = await pr;
+      if (!buf) continue;
       bytes += buf.length;
       try { clouds.push(decodeLaz(buf, lp)); } catch { /* a node that fails to decode: skipped */ }
     }
