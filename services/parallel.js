@@ -38,12 +38,22 @@ async function workerThreads() {
   return nodeThreads;
 }
 
+// Each worker is a whole engine with the code loaded and its own working memory: about 0.2 GB each on a 4 km
+// town, much more on a 16 km one. Measured on a 32-thread machine (scratch/memprobe, 2026-11-18): 4, 8, 12 and 32
+// workers finished a town in the same time, while 32 needed 24 GB at 8 km where 8 needed 17. No more than this many,
+// whatever the machine has (MAPNG_THREADS sets it).
+export const MAX_THREADS = 8;
+
 /** How many threads parallelMap would use here (1 where it runs in this thread). */
 export async function parallelThreads(limit = Infinity) {
   const wt = await workerThreads();
   if (!wt || process.env.MAPNG_THREADS === '1') return 1;
-  const cores = globalThis.navigator?.hardwareConcurrency || 4;
-  const wanted = Number(process.env.MAPNG_THREADS) || cores;
+  return threadsFor(globalThis.navigator?.hardwareConcurrency, process.env.MAPNG_THREADS, limit);
+}
+
+/** The thread count for this many cores, an override (MAPNG_THREADS) and a caller's limit. */
+export function threadsFor(cores, override, limit = Infinity) {
+  const wanted = Number(override) || Math.min(Number(cores) || 4, MAX_THREADS);
   return Math.max(1, Math.min(limit, wanted));
 }
 
