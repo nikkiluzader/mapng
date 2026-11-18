@@ -730,6 +730,11 @@ const LAKE_SLOPE_SHARE = 0.5;   // with the rounded profile: the bed leaves the 
 const LAKE_SLOPE_READ_M = [8, 40];  // the hillside read this far out from the shore
 const LAKE_SLOPE_MAX = 1.2;
 const LAKE_SLOPE_QUANTILE = 0.75;
+// A lake running off the map: its bed leaves the shore at most this steeply. Its farthest point from a shore is
+// measured to the map's edge (off the map there is no shore), and a city's quays and seawalls read as a steep
+// hillside: Lake Michigan off Chicago came out 177 m deep at an 8 km map's edge, 60 m a kilometre out, where the
+// real lake is about 10 m. 1 in 100 keeps a great lake's or a sea bay's shelf; a lake inside the map is as before.
+const LAKE_OFF_MAP_SLOPE_MAX = 0.01;
 const LAKE_SIZE_DEPTH = 0.15;
 const LAKE_DEPTH_MAX_M = 400;
 const RIVER_AREA_MAX_M = 4;
@@ -980,6 +985,7 @@ export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [], shal
       low.sort((p, q) => p - q);
       if (low.length >= 8) loose = low[Math.floor(low.length * 0.9)] - low[Math.floor(low.length * 0.1)] > LAKE_FLAT_M;
     }
+    let runsOff = false;   // (some of the lake off the map)
     const seed = new Uint8Array(gw * gh);
     const damSeed = new Uint8Array(gw * gh);
     const wet = new Uint8Array(gw * gh);
@@ -994,6 +1000,7 @@ export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [], shal
         const [x, y] = toWorld(c, r);
         const i = gy * gw + gx;
         if (inRow(x) && !keep(x, y)) {
+          if (!onMap) runsOff = true;
           const above = onMap ? heightMap[Math.round(r) * width + Math.round(c)] - minHeight - level : 0;
           if (above >= LAKE_CUT_FULL_M && above < LAKE_CUT_TOP_M) high[i] = 1;
           if (above < LAKE_CUT_FULL_M || loose) wet[i] = 1;
@@ -1062,7 +1069,7 @@ export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [], shal
     const tagged = tagDepthM(lake.tags);
     // (each piece's shore read on its own: a seam between two pieces is no shore, and flat)
     const slopes = tagged ? [] : pieces.map((pp) => shoreSlope(pp, level, groundAt)).filter((v) => v != null);
-    const slope = slopes.length ? Math.max(...slopes) : null;
+    const slope = slopes.length ? (runsOff ? Math.min(LAKE_OFF_MAP_SLOPE_MAX, Math.max(...slopes)) : Math.max(...slopes)) : null;
     let depth = tagged ?? (slope != null ? LAKE_SLOPE_SHARE * slope * reach : LAKE_BED_M);
     if (!tagged) depth = Math.min(depth, Math.max(LAKE_BED_M, LAKE_SIZE_DEPTH * Math.sqrt(area)), LAKE_DEPTH_MAX_M);
     // a reservoir: its depth at the dam, the floor rising away from it

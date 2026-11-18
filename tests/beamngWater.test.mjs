@@ -602,3 +602,27 @@ test('lake beds: water the survey holds at a second level is water; a beach at t
   assert.equal(at(0, -39), before, 'the beach stays as surveyed');
   assert.ok(before > level + 0.5, 'and it was over the water');
 });
+
+test('lake beds: a lake running off the map leaves the shore at most 1 in 100; one inside the map keeps its hillside slope', async () => {
+  const { planLakes, carveLakeBeds } = await import('../services/beamngWater.js');
+  // a 400 m grid at 1 m; two lakes at 0 m between hillsides rising 1 in 2: one inside the map, one running off
+  // its east edge (a great lake's shore read off a city's seawalls came out 177 m deep at the map's edge)
+  const N = 401; const SIZE = 400;
+  const boxes = { inside: [-150, -50, -50, 50], off: [100, -60, 260, 60] };
+  const hm = new Float32Array(N * N);
+  const boxDist = ([x0, y0, x1, y1], x, y) => Math.hypot(Math.max(x0 - x, 0, x - x1), Math.max(y0 - y, 0, y - y1));
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+    const x = (c / (N - 1) - 0.5) * SIZE; const y = (0.5 - r / (N - 1)) * SIZE;
+    hm[r * N + c] = 0.5 * Math.min(boxDist(boxes.inside, x, y), boxDist(boxes.off, x, y));
+  }
+  const toPixel = (x, y) => [Math.round((x / SIZE + 0.5) * (N - 1)), Math.round((0.5 - y / SIZE) * (N - 1))];
+  const at = (x, y) => { const [c, r] = toPixel(x, y); return hm[Math.min(N - 1, Math.max(0, r)) * N + Math.min(N - 1, Math.max(0, c))]; };
+  const feat = (name, [x0, y0, x1, y1]) => ({ type: 'water', tags: { natural: 'water', name }, geometry: [[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]].map(([x, y]) => ({ lat: y, lng: x })) });
+  const plan = planLakes({ features: [feat('inside', boxes.inside), feat('off', boxes.off)], toWorld: (lat, lng) => [lng, lat], heightAt: at });
+  const beds = carveLakeBeds(plan.lakes, { heightMap: hm, width: N, height: N, worldSize: SIZE, minHeight: 0 });
+  const by = Object.fromEntries(beds.lakes.map((l) => [l.name, l]));
+  assert.ok(by.inside.slope > 0.3, `inside: the hillside's slope kept (${by.inside.slope})`);
+  assert.ok(by.inside.depth > 5, `inside: deep (${by.inside.depth})`);
+  assert.ok(by.off.slope <= 0.01, `off the map: capped (${by.off.slope})`);
+  assert.ok(by.off.depth <= 0.5 * 0.01 * by.off.reach + 1e-9 || by.off.depth === 1.5, `off the map: shallow (${by.off.depth})`);
+});
