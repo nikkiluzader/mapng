@@ -21,6 +21,7 @@
 // flatten water to its surface).
 // Pure: callers pass world-space lookups.
 import { fastHypot } from './fastMath.js';
+import { PixelEdits } from './pixelEdits.js';
 
 export const RIVER_KINDS = {
   river: { spacing: 20, width: 12, flow: 2.0 },
@@ -869,7 +870,7 @@ export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [], shal
     const fc = c - c0; const fr = r - r0; const at = (cc, rr) => heightMap[rr * width + cc] - minHeight;
     return (at(c0, r0) * (1 - fc) + at(c0 + 1, r0) * fc) * (1 - fr) + (at(c0, r0 + 1) * (1 - fc) + at(c0 + 1, r0 + 1) * fc) * fr;
   };
-  const edits = new Map();
+  const edits = new PixelEdits();   // (not a Map: 2^24 entries at most; services/pixelEdits.js)
   const report = [];
   // Outlines that meet edge to edge are one body of water (a big lake from
   // map tiles arrives cut along the tiles' edges; a reservoir mapped in two
@@ -1128,7 +1129,7 @@ export function carveWaterUnderDecks({ rivers = [], lakes = [] }, grid, covered,
   const { heightMap, width, height, worldSize, minHeight = 0 } = grid;
   const toPixel = (x, y) => [(x / worldSize + 0.5) * width, ((0.5 - y / worldSize) * height - 1)];
   const toWorld = (c, r) => [((c / width) - 0.5) * worldSize, (0.5 - (r + 1) / height) * worldSize];
-  const edits = new Map();
+  const edits = new PixelEdits();   // (not a Map: 2^24 entries at most; services/pixelEdits.js)
   const banks = new Map();   // (ground inside a river over the bank limit: dug only when surrounded, below)
   const lower = (idx, target) => {
     if (target < heightMap[idx] - minHeight) edits.set(idx, Math.min(edits.get(idx) ?? Infinity, target + minHeight));
@@ -1223,7 +1224,7 @@ export function levelUnderDecks(decks, grid, keep = () => false, extra = 0.4, we
     if (ci < 0 || ri < 0 || ci >= width || ri >= height) return null;
     return { idx: ri * width + ci, z: heightMap[ri * width + ci] - minHeight };
   };
-  const edits = new Map();
+  const edits = new PixelEdits();   // (not a Map: 2^24 entries at most; services/pixelEdits.js)
   for (const deck of decks) {
     for (const p of deck.parts) {
       const xy = p.xy;
@@ -1279,7 +1280,7 @@ export function levelUnderDecks(decks, grid, keep = () => false, extra = 0.4, we
  * apply(set) }; heightMap is read as it now stands.
  */
 export function fillRemnants(heightMap, width, height, lowered, { rounds = 2, keep = () => false } = {}) {
-  const edits = new Map();
+  const edits = new PixelEdits();   // (not a Map: 2^24 entries at most; services/pixelEdits.js)
   const z = (i) => edits.get(i) ?? heightMap[i];
   const low = new Set(lowered);
   for (let k = 0; k < rounds; k++) {
@@ -1448,7 +1449,7 @@ export function lowerSeabed(grid, landCover, seaZ, { coarse = false, keep = null
   // (the coastline's own sea: no flood needed, the map says so; not ground far over the sea, which is a
   // coastline drawn the wrong way round or a cliff the data did resolve)
   if (coarse) for (let i = 0; i < n * n; i++) if (byCoast[i] && cellZ[i] <= seaZ + COAST_SEA_MAX_M) sea[i] = 2;
-  const edits = new Map();
+  const edits = new PixelEdits();   // (not a Map: 2^24 entries at most; services/pixelEdits.js)
   const shoal = seaZ + SEA_SHOAL_MAX_M;
   for (let r = 0; r < height; r++) {
     const lr = Math.min(n - 1, Math.floor((r / height) * n)) * n;
@@ -1504,7 +1505,7 @@ export function lowerSeabed(grid, landCover, seaZ, { coarse = false, keep = null
     // level. Compared with its neighbour alone, the lowering crept step by step over low ground that falls away
     // gently from a canal, and Amsterdam's streets stood over the lowered ground. Ground kept for a road or its
     // quay is never taken)
-    let frontier = []; const level = new Map();
+    let frontier = []; const level = new PixelEdits();
     for (const idx of edits.keys()) if (heightMap[idx] - minHeight <= top) { frontier.push(idx); level.set(idx, heightMap[idx]); }
     for (let step = 0; step < maxSteps && frontier.length; step++) {
       const next = [];
