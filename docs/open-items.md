@@ -300,7 +300,7 @@ Chicago 8192 export: about 1050 s on the morning of 2026-11-18, 447 s that eveni
 | Data step (downloads) | 45 | done: one run (exit fix), 3 downloads at once, lidar 8 ahead |
 | Preparing / bridge lidar read | 12 | open: a third lidar decode in the export itself |
 | Laying roads | 159 | in progress |
-| - structure solver | 57 | done: twin decks, structureEnds, clamp loop, typed links (5 %). Found: it never settles (a station lifted by smoothing and put back by the clamp counts as moving), so every solve runs 6 x 120 sweeps; some bridges still creep up at the last sweep. Stopping when settled moved roads up to 5.8 m: a quality question, not a speed change. Open: sweeps on worker threads (clamp and smoothing are per edge; projection stays in order) |
+| - structure solver | 57 | done: settles to 0.1 mm (end vs start of a sweep) with an active set of moving roads: matches a fully settled reference (Pittsburgh 2.6 cm, was 0.92 m) and faster (Pittsburgh 7.0 -> 3.2 s). Graphs: scratch/speed/solverplot.py. Open: re-measure at Chicago 8192; sweeps on workers only if still worth it |
 | - tunnels (nearestOnTunnel, ground) | ~20 | partly: the ground lookup reuses its result objects (less garbage, no time) |
 | - terrain under roads (composeTerrain) | ~8 | done: bands of rows on workers (NYC 4 km roads 73 -> 35 s) |
 | - lake and river beds | ~20 | fixed: Map size limit (Chicago's beds were skipped); open: the lake pass's own speed |
