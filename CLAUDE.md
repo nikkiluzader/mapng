@@ -3,6 +3,47 @@
 Standing rules for every session. They are strict: follow them without being reminded. Add new ones here as they
 come up.
 
+## BeamNG reference: always check it
+
+Use BeamNG's own documentation and the real game files as the reference for best practice on anything the game
+reads (level files, materials, roads, prefabs, Lua, assets). Never guess a format.
+
+- **`refs/beamng-docs/`:** BeamNG's documentation pages. They stay out of the public repo (`refs/` is
+  git-ignored): they are BeamNG's text, not ours.
+- **`refs/output/beamng-master-reference.md`:** MapNG's digest of those docs. Start there.
+- **`refs/beamng`:** a link to the installed game. It holds all of its Lua, assets and official maps; check how the
+  official levels do a thing before building it. It follows the live Steam install, so after a game update, re-run
+  the generators and the audit (`scripts/audit-official-paths.py`).
+- **`refs/output/beamng-mcp-reference.md`:** read it before driving the running game through its MCP server.
+- **`refs/docs/`:** the export conformance matrix and the level export guide.
+
+## Where things live
+
+- **Plans and status:** `docs/open-items.md` holds priorities, branch state, test lists and the speed pass. Update
+  it as work lands.
+- **Backlog, releases, history:** `refs/output/backlog.md` (feature requests grouped by area),
+  `refs/output/releases.md` and `refs/output/history.md`. Add to these files; don't start a new file per release or
+  report.
+- **OSM to game assets:**
+  - `data/osm-tag-library.json`: OSM tags mapped to the game's native models; a test keeps it in step with the
+    code.
+  - `data/game-model-catalogue.json`: the native model catalogue.
+  - The organiser and thumbnail tools are in `refs/output/tag-library/` (private).
+  - Look at a model in game before using it.
+- **Reference sources:** `refs/output/reference-list.md` lists the OSM wiki tag pages and the photo and check
+  sources. Use it on every task, and add to it.
+- **Technique sources:** `refs/BeamNG.Earth-main` (MIT) and `refs/earth2road-main`. Borrowed ideas get tailored to
+  MapNG's one-shot, most-detailed build and measured against what we have.
+- **Test tooling:**
+  - `scripts/sweep/` (exportArea.mjs, fetchArea.mjs, runSweep with `--matrix`);
+  - test areas in `scratch/levelprobe/data`;
+  - `scratch/memprobe` for desktop RAM per job;
+  - `scratch/speed` for benchmarks and solver graphs;
+  - `scripts/ingame` for in-game tests;
+  - `scripts/osm` for the OSM fix workflow.
+- **Deploys:** pushing `dev` builds dev.mapng.com, `main` builds mapng.com (Cloudflare Workers Builds). Check their
+  build checks before a release.
+
 ## Optimization rules
 
 Every feature, change and fix follows **docs/optimization-rules.md** from the start: go through its checklist for
