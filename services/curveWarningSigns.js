@@ -10,6 +10,7 @@
 
 import { US_SIGN_SHAPES } from './beamngPropLibrary.js';
 import { parseSignedSpeed } from './roadSigns.js';
+import { fastHypot } from './fastMath.js';
 
 const IT = '/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_';
 export const CURVE_SIGN_SETS = {
@@ -52,7 +53,7 @@ export function findCurves(nodes) {
   const n = nodes.length;
   if (n < 5) return [];
   const s = [0];
-  for (let i = 1; i < n; i++) s.push(s[i - 1] + Math.hypot(nodes[i][0] - nodes[i - 1][0], nodes[i][1] - nodes[i - 1][1]));
+  for (let i = 1; i < n; i++) s.push(s[i - 1] + fastHypot(nodes[i][0] - nodes[i - 1][0], nodes[i][1] - nodes[i - 1][1]));
   // segment headings, unwrapped, at the segment midpoints
   const h = []; const hs = [];
   for (let i = 0; i + 1 < n; i++) {
@@ -88,7 +89,7 @@ function pointAt(nodes, at) {
   let s = 0;
   for (let i = 0; i + 1 < nodes.length; i++) {
     const a = nodes[i]; const b = nodes[i + 1];
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]);
     if (s + L >= at || i + 2 === nodes.length) {
       const f = L > 0 ? Math.max(0, Math.min(1, (at - s) / L)) : 0;
       return { x: a[0] + (b[0] - a[0]) * f, y: a[1] + (b[1] - a[1]) * f, t: L > 0 ? [(b[0] - a[0]) / L, (b[1] - a[1]) / L] : [1, 0] };
@@ -117,7 +118,7 @@ function joinPieces(carriageways) {
     }
   };
   runs.forEach(index);
-  const near = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) < NEAR;
+  const near = (a, b) => fastHypot(a[0] - b[0], a[1] - b[1]) < NEAR;
   const continues = (a, b) => [...b.owners].some((o) => a.owners.has(o) || a.continuations.has(o));
   for (const a of runs) {
     let grown = true;
@@ -170,7 +171,7 @@ export function placeCurveWarnings({ carriageways = [], heightAt, isBlocked = ()
     if (limit && limit.value <= (SLOW_LIMIT[limit.unit] ?? 0)) continue;
     const curves = findCurves(cw.nodes);
     if (!curves.length) continue;
-    const length = curves.length ? cw.nodes.reduce((L, p, i) => (i ? L + Math.hypot(p[0] - cw.nodes[i - 1][0], p[1] - cw.nodes[i - 1][1]) : 0), 0) : 0;
+    const length = curves.length ? cw.nodes.reduce((L, p, i) => (i ? L + fastHypot(p[0] - cw.nodes[i - 1][0], p[1] - cw.nodes[i - 1][1]) : 0), 0) : 0;
     const dirs = isOneWay(cw.tags) ? [travelSign(cw.tags)] : [1, -1];
     for (const dir of dirs) {
       // curves in travel order, in travel coordinates (u from the start of travel)

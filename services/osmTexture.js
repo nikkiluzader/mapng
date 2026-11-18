@@ -4,6 +4,7 @@ import { buildRoadNetwork, getEffectiveRoadLayer, mergeLinearRoadSegments } from
 import { racewayHalfWidth } from "./roadWidth.js";
 import { readGameTextureBlend, gameTextureBlendStrength } from './gameTextureBlend.js';
 import { WC, steepRockFrom } from "./worldCover.js";
+import { fastHypot } from './fastMath.js';
 
 // Colors aligned to OSM Carto style definitions
 // Source: https://github.com/gravitystorm/openstreetmap-carto (landcover.mss / water.mss)
@@ -2071,7 +2072,7 @@ function cellSlopes(terrainData, w, h, mpp) {
       const k = hy * W + hx;
       const dzE = (hm[k + R] - hm[k - R]) / (2 * R * mpp);
       const dzN = (hm[k - R * W] - hm[k + R * W]) / (2 * R * mpp);   // (row 0 is north)
-      const len = Math.hypot(dzE, dzN, 1);
+      const len = fastHypot(dzE, dzN, 1);
       const i = y * w + x;
       nx[i] = -dzE / len; ny[i] = -dzN / len; nz[i] = 1 / len;
     }
@@ -2357,7 +2358,7 @@ export function paintSteepRock(ctx, canvas, terrainData) {
         const gx = (hm[k + 1] - hm[k - 1]) / (2 * mpp); const gy = (hm[k + W] - hm[k - W]) / (2 * mpp);
         const u = hash(tx, y0 + ty);
         const from = lc ? steepRockFrom(lc.grid[lcRow + colLc[tx]]) : 0.9;
-        if (Math.hypot(gx, gy) < from * (1 + 0.233 * u)) continue;   // tan 42°..48° (grass 50°..56°)
+        if (fastHypot(gx, gy) < from * (1 + 0.233 * u)) continue;   // tan 42°..48° (grass 50°..56°)
         const i = (off + tx) * 4;
         const r = d[i], g = d[i + 1], b = d[i + 2];
         // (natural colours only: green or brown, not the greys of roads, buildings and water)

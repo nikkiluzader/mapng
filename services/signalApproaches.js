@@ -12,6 +12,7 @@
 // Everything works in a local metric frame (x east, y north, metres).
 
 import { makeRoadNodeKey } from './roadNetwork.js';
+import { fastHypot } from './fastMath.js';
 
 // An OSM signal on an approach belongs to the junction it leads to.
 export const SIGNAL_TO_JUNCTION_MAX_M = 40;
@@ -120,7 +121,7 @@ export function buildRoadGraph(roads, projector) {
       if (a === b) continue;
       const edge = {
         from: a, to: b, road, roadIndex, halfWidth,
-        length: Math.hypot(b.x - a.x, b.y - a.y),
+        length: fastHypot(b.x - a.x, b.y - a.y),
         fwd: way >= 0, back: way <= 0,
       };
       edges.push(edge);
@@ -166,7 +167,7 @@ export function pointAlong(path, distM) {
       const t = step.edge.length > 0 ? Math.min(1, Math.max(0, (distM - step.startM) / step.edge.length)) : 0;
       const dx = step.to.x - step.from.x;
       const dy = step.to.y - step.from.y;
-      const len = Math.hypot(dx, dy) || 1;
+      const len = fastHypot(dx, dy) || 1;
       return { x: step.from.x + dx * t, y: step.from.y + dy * t, outward: [dx / len, dy / len], edge: step.edge };
     }
   }
@@ -180,7 +181,7 @@ function snapToGraph(graph, pt, projector) {
   let best = null;
   let bestD = SNAP_MAX_M;
   for (const node of graph.nodes.values()) {
-    const d = Math.hypot(node.x - x, node.y - y);
+    const d = fastHypot(node.x - x, node.y - y);
     if (d < bestD) {
       bestD = d;
       best = node;
@@ -276,7 +277,7 @@ function clusterJunctions(junctions) {
   const find = (k) => (parent.get(k) === k ? k : (parent.set(k, find(parent.get(k))), parent.get(k)));
   for (let i = 0; i < junctions.length; i++) {
     for (let j = i + 1; j < junctions.length; j++) {
-      if (Math.hypot(junctions[i].x - junctions[j].x, junctions[i].y - junctions[j].y) <= JUNCTION_CLUSTER_M) {
+      if (fastHypot(junctions[i].x - junctions[j].x, junctions[i].y - junctions[j].y) <= JUNCTION_CLUSTER_M) {
         parent.set(find(junctions[i].key), find(junctions[j].key));
       }
     }
@@ -349,7 +350,7 @@ export function findSignalApproaches({
   // Signals with no junction nearby: pedestrian crossings and similar.
   const midblockGroups = [];
   for (const item of midblock) {
-    const group = midblockGroups.find((g) => Math.hypot(g.x - item.node.x, g.y - item.node.y) <= 30);
+    const group = midblockGroups.find((g) => fastHypot(g.x - item.node.x, g.y - item.node.y) <= 30);
     if (group) group.items.push(item);
     else midblockGroups.push({ x: item.node.x, y: item.node.y, items: [item] });
   }

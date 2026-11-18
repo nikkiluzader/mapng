@@ -5,6 +5,7 @@
 //   1. its own direction=* tag (degrees or a compass point);
 //   2. water within WATER_REACH_M (a river, a lake, the sea): it looks out over the water;
 //   3. the nearest path or street within WAY_REACH_M: it looks at the way it stands beside; else no opinion (null).
+import { fastHypot } from './fastMath.js';
 
 export const WATER_REACH_M = 25;
 const WAY_REACH_M = 30;
@@ -28,7 +29,7 @@ export function nearestOnLines(lines, x, y, reach) {
     for (let i = 0; i + 1 < pts.length; i++) {
       const ax = pts[i][0]; const ay = pts[i][1]; const vx = pts[i + 1][0] - ax; const vy = pts[i + 1][1] - ay;
       const t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / (vx * vx + vy * vy || 1e-9)));
-      const px = ax + vx * t; const py = ay + vy * t; const d = Math.hypot(px - x, py - y);
+      const px = ax + vx * t; const py = ay + vy * t; const d = fastHypot(px - x, py - y);
       if (d <= reach && (!best || d < best.d)) best = { x: px, y: py, d };
     }
   }

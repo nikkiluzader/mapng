@@ -1,6 +1,7 @@
 import { createGridProjector } from './geoUtils.js';
 import { buildRoadNetwork, makeRoadNodeKey, mergeLinearRoadSegments } from './roadNetwork.js';
 import { buildUrbanRoadClassifier, estimateRoadCrossSection, isOneWayRoad, NON_DRIVEABLE_HIGHWAYS } from './roadWidth.js';
+import { fastHypot } from './fastMath.js';
 
 const NO_DATA_VALUE = -99999;
 
@@ -125,7 +126,7 @@ function resampleUniform(points, spacing) {
     for (let i = 0; i < points.length - 1; i++) {
         const p1 = points[i];
         const p2 = points[i + 1];
-        const L = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+        const L = fastHypot(p2.x - p1.x, p2.y - p1.y);
         let s = spacing - carry;
         while (s < L) {
             out.push({ x: p1.x + ((p2.x - p1.x) * s) / L, y: p1.y + ((p2.y - p1.y) * s) / L });
@@ -135,7 +136,7 @@ function resampleUniform(points, spacing) {
     }
     const last = points[points.length - 1];
     const tail = out[out.length - 1];
-    if (Math.hypot(last.x - tail.x, last.y - tail.y) > spacing * 0.25) out.push(last);
+    if (fastHypot(last.x - tail.x, last.y - tail.y) > spacing * 0.25) out.push(last);
     else out[out.length - 1] = last;
     return out;
 }
@@ -340,7 +341,7 @@ function buildCorridorProfiles(corridors, heightMap, width, height, project, met
         for (let i = 1; i < points.length; i++) {
             const dx = points[i].x - points[i - 1].x;
             const dy = points[i].y - points[i - 1].y;
-            cumLenM[i] = cumLenM[i - 1] + Math.hypot(dx, dy) * metersPerPixel;
+            cumLenM[i] = cumLenM[i - 1] + fastHypot(dx, dy) * metersPerPixel;
         }
         const baseKey = (key) => String(key).split('|')[0];
         const bridgeAtStart = bridgeNodes.has(baseKey(corridor.startKey));
@@ -514,7 +515,7 @@ function seatSideRoads(profiles, halfWidths, metersPerPixel, tuning) {
             const i0 = atEnd ? n - 1 : 0; const step = atEnd ? -1 : 1;
             let i = i0;
             while (i + step >= 0 && i + step < n && Math.abs(p.cumLenM[i] - p.cumLenM[i0]) < ARM_DIR_M) i += step;
-            const dx = p.points[i].x - p.points[i0].x; const dy = p.points[i].y - p.points[i0].y; const l = Math.hypot(dx, dy);
+            const dx = p.points[i].x - p.points[i0].x; const dy = p.points[i].y - p.points[i0].y; const l = fastHypot(dx, dy);
             if (!(l > 0)) continue;
             const list = arms.get(key) || [];
             list.push({ k, atEnd, dx: dx / l, dy: dy / l });
@@ -693,7 +694,7 @@ export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeat
         // across every junction of a wide road, 0.5 m off on a 12% hill.
         const nPts = points.length;
         const reachM = radiusMeters + tuning.feather;
-        const endLine = (a, b) => { const dx = b.x - a.x; const dy = b.y - a.y; const l = Math.hypot(dx, dy) || 1; return { x: a.x, y: a.y, dx: dx / l, dy: dy / l }; };
+        const endLine = (a, b) => { const dx = b.x - a.x; const dy = b.y - a.y; const l = fastHypot(dx, dy) || 1; return { x: a.x, y: a.y, dx: dx / l, dy: dy / l }; };
         const startLine = sharedStart && !bridgeAtStart ? endLine(points[0], points[1]) : null;
         const finishLine = sharedEnd && !bridgeAtEnd ? endLine(points[nPts - 1], points[nPts - 2]) : null;
 
@@ -739,7 +740,7 @@ export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeat
                         // (past a shared end: the road's own cross-section, faded out
                         // over the feather by the distance past the end, so the claim
                         // carries on continuously from the road and never stands flat)
-                        const len = Math.hypot(p2.x - p1.x, p2.y - p1.y) || 1;
+                        const len = fastHypot(p2.x - p1.x, p2.y - p1.y) || 1;
                         const ex = first ? p1.x : p2.x, ey = first ? p1.y : p2.y;
                         const past = Math.abs((x - ex) * (p2.x - p1.x) + (y - ey) * (p2.y - p1.y)) / len;
                         const side = Math.abs((x - ex) * (p2.y - p1.y) - (y - ey) * (p2.x - p1.x)) / len;

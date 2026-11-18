@@ -10,6 +10,7 @@
 //   sidewalk  a sidewalk slab's top
 //   tunnel    a tunnel's road surface, from inside (a roof over it)
 //   spawn     the spawn point's ground
+import { fastHypot } from './fastMath.js';
 
 const ROAD_STEP_M = 40;
 const DECK_STEP_M = 12;
@@ -34,7 +35,7 @@ function along(nodes, step, offset = step / 2) {
   let next = offset; let s = 0;
   for (let i = 0; i + 1 < nodes.length; i++) {
     const a = nodes[i]; const b = nodes[i + 1];
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]);
     while (L > 1e-6 && next <= s + L) {
       const t = (next - s) / L;
       out.push({ x: a[0] + (b[0] - a[0]) * t, y: a[1] + (b[1] - a[1]) * t, z: a[2] + (b[2] - a[2]) * t, dx: (b[0] - a[0]) / L, dy: (b[1] - a[1]) / L });
@@ -50,7 +51,7 @@ function thinLine(nodes) {
   const out = [nodes[0]];
   for (let i = 1; i < nodes.length - 1; i++) {
     const l = out[out.length - 1];
-    if (Math.hypot(nodes[i][0] - l[0], nodes[i][1] - l[1]) >= LINE_STEP_M) out.push(nodes[i]);
+    if (fastHypot(nodes[i][0] - l[0], nodes[i][1] - l[1]) >= LINE_STEP_M) out.push(nodes[i]);
   }
   if (nodes.length > 1) out.push(nodes[nodes.length - 1]);
   return out;
@@ -102,7 +103,7 @@ export function buildIngameProbes({ carriageways = [], sidewalkRuns = [], underS
       }
       // roads under decks are short: probe them closer
       for (const p of along(n, UNDER_STEP_M)) {
-        if (under.some((q) => Math.hypot(q.x - p.x, q.y - p.y) < UNDER_STEP_M)) continue;
+        if (under.some((q) => fastHypot(q.x - p.x, q.y - p.y) < UNDER_STEP_M)) continue;
         if (underStructure(p.x, p.y, p.z, p.z + 60) && !inTunnel(p.x, p.y, p.z, p.z + 3)) under.push({ k: 'under', x: r2(p.x), y: r2(p.y), z: r2(p.z), h: heading(p.dx, p.dy), road: cw.highway });
       }
     }

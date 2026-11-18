@@ -12,6 +12,7 @@
 import { findSideArms, sideArmFromEnd, sideArmStation, throughSurface } from './sideArms.js';
 import { WING_FILL_M } from './wingWalls.js';
 import { seatable } from './profileSolve.js';
+import { fastHypot } from '../fastMath.js';
 
 const TILE = 64;
 const SHOULDER_M = 1;          // flat past the paved half width before the slope
@@ -174,7 +175,7 @@ export function composeTerrain(graph, grid) {
     const n = e.s.length; const kinds = kindOf[k]; const out = [];
     // at station `at`, facing from station `a` toward `b` (into the tube)
     const plane = (at, a, b) => {
-      const dx = e.x[b] - e.x[a]; const dy = e.y[b] - e.y[a]; const L = Math.hypot(dx, dy);
+      const dx = e.x[b] - e.x[a]; const dy = e.y[b] - e.y[a]; const L = fastHypot(dx, dy);
       if (L > 1e-6) out.push([e.x[at], e.y[at], dx / L, dy / L]);
     };
     if (n < 2) return out;
@@ -208,7 +209,7 @@ export function composeTerrain(graph, grid) {
     if (z && arm.under + 1 < e.s.length) {
       const i0 = sideArmStation(e, arm.end, arm.under); const i1 = sideArmStation(e, arm.end, arm.under + 1);
       const a = Math.min(i0, i1); const b = Math.max(i0, i1);
-      const dx = e.x[b] - e.x[a]; const dy = e.y[b] - e.y[a]; const L = Math.hypot(dx, dy);
+      const dx = e.x[b] - e.x[a]; const dy = e.y[b] - e.y[a]; const L = fastHypot(dx, dy);
       if (L > 1e-6) {
         // (to the left of the edge's own direction, as the banking below)
         const nx = -dy / L; const ny = dx / L; const h = Math.max(1, e.half);
@@ -233,7 +234,7 @@ export function composeTerrain(graph, grid) {
     // round end back over the outer lane, nor the next pieces' round ends, a road's width behind them)
     if (arm.under + 1 < e.s.length) {
       const i0 = sideArmStation(e, arm.end, arm.under); const i1 = sideArmStation(e, arm.end, arm.under + 1);
-      const dx = e.x[i1] - e.x[i0]; const dy = e.y[i1] - e.y[i0]; const L = Math.hypot(dx, dy);
+      const dx = e.x[i1] - e.x[i0]; const dy = e.y[i1] - e.y[i0]; const L = fastHypot(dx, dy);
       if (L > 1e-6) {
         const reach = sideArmFromEnd(e, arm.end, i0);
         let list = squareEnds.get(arm.edge);
@@ -327,10 +328,10 @@ export function composeTerrain(graph, grid) {
         for (let c = cFrom; c <= cTo; c++) {
           const x = xOfCol(c);
           const uRaw = ((x - ax) * vx + (y - ay) * vy) / L2;
-          if (planes.length && planes.some(([px, py, dx, dy]) => (x - px) * dx + (y - py) * dy > 0 && Math.hypot(x - px, y - py) < PORTAL_PLANE_M)) { left.add(r * width + c); continue; }
+          if (planes.length && planes.some(([px, py, dx, dy]) => (x - px) * dx + (y - py) * dy > 0 && fastHypot(x - px, y - py) < PORTAL_PLANE_M)) { left.add(r * width + c); continue; }
           if (squares.length && squares.some((q) => (x - q.px) * q.dx + (y - q.py) * q.dy < 0)) continue;
           const u = Math.max(0, Math.min(1, uRaw));
-          const d = Math.hypot(ax + vx * u - x, ay + vy * u - y);
+          const d = fastHypot(ax + vx * u - x, ay + vy * u - y);
           if (d > reach) continue;
           // (past this piece's end where a deck begins: the road's line carried on at its grade and a little
           // under it, not this end's own height laid flat. See deckBefore above.)

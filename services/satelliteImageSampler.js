@@ -12,6 +12,7 @@
 // Each sample is bilinear; where one output pixel spans more than about one
 // mosaic pixel, an n×n grid of bilinear taps averages its footprint, so
 // downsampling no longer aliases (the old path took the nearest mosaic pixel).
+import { fastHypot } from './fastMath.js';
 
 export const IMAGE_LATTICE_STEP = 16;
 
@@ -68,8 +69,8 @@ export function sampleSatelliteTexture({ width, height, outWidth, outHeight, mos
   const [ax, ay] = at(cx, cy);
   const [bx, by] = at(cx + 1, cy);
   const [dx, dy] = at(cx, cy + 1);
-  const footX = Math.hypot(bx - ax, by - ay);
-  const footY = Math.hypot(dx - ax, dy - ay);
+  const footX = fastHypot(bx - ax, by - ay);
+  const footY = fastHypot(dx - ax, dy - ay);
   const taps = Math.max(1, Math.min(MAX_TAPS, Math.round(Math.max(footX, footY))));
 
   const src = mosaic.pixels;

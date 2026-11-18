@@ -11,6 +11,7 @@
  * is named and under it the road below.
  */
 
+import { fastHypot } from './fastMath.js';
 const CHUNK_M = 150;            // strip length
 const SIDE_M = 1.5;             // past the carriageway's edge
 const FLOOR_M = 1.5;            // below the road's lowest point
@@ -30,7 +31,7 @@ function chunks(nodes) {
   let piece = [nodes[0]];
   let len = 0;
   for (let i = 1; i < nodes.length; i++) {
-    len += Math.hypot(nodes[i][0] - nodes[i - 1][0], nodes[i][1] - nodes[i - 1][1]);
+    len += fastHypot(nodes[i][0] - nodes[i - 1][0], nodes[i][1] - nodes[i - 1][1]);
     piece.push(nodes[i]);
     if (len >= CHUNK_M && i < nodes.length - 1) {
       out.push(piece);
@@ -49,7 +50,7 @@ function outline(piece, half) {
   for (let i = 0; i < piece.length; i++) {
     const a = piece[Math.max(0, i - 1)];
     const b = piece[Math.min(piece.length - 1, i + 1)];
-    const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const len = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
     const nx = -(b[1] - a[1]) / len;
     const ny = (b[0] - a[0]) / len;
     const [x, y, z] = piece[i];

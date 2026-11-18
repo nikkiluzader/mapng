@@ -6,6 +6,7 @@
 // just beyond the asphalt that is actually there.
 
 import { buildCarriagewayIndex, isOnCrossingCarriageway, isOnOtherCarriageway } from './roadMarkingCuts.js';
+import { fastHypot } from './fastMath.js';
 
 const LIT_VALUES = new Set(['yes', '24/7', 'automatic', 'sunset-sunrise', 'limited', 'interval']);
 // Main roads in built-up areas are lit even when nobody tagged it.
@@ -57,7 +58,7 @@ export function generateRoadLamps(carriageways, mappedLamps = [], budget = Infin
   const index = buildCarriagewayIndex(carriageways);
   const lamps = [];
   const taken = mappedLamps.map(([x, y]) => ({ x, y, spacing: DEFAULT_SPACING_M }));
-  const tooClose = (x, y, spacing) => taken.some((t) => Math.hypot(t.x - x, t.y - y) < Math.min(spacing, t.spacing) * NEAR_MAPPED_FACTOR);
+  const tooClose = (x, y, spacing) => taken.some((t) => fastHypot(t.x - x, t.y - y) < Math.min(spacing, t.spacing) * NEAR_MAPPED_FACTOR);
 
   for (const cw of carriageways) {
     if (!isLitRoad(cw, { litStreets })) continue;
@@ -74,7 +75,7 @@ export function generateRoadLamps(carriageways, mappedLamps = [], budget = Infin
       for (let i = 0; i + 1 < cw.nodes.length && lamps.length < budget; i++) {
         const a = cw.nodes[i];
         const b = cw.nodes[i + 1];
-        const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        const len = fastHypot(b[0] - a[0], b[1] - a[1]);
         if (len < 1e-6) continue;
         const dir = [(b[0] - a[0]) / len, (b[1] - a[1]) / len];
         // side −1 = right of node order, +1 = left.

@@ -9,6 +9,7 @@
 
 import { getEffectiveRoadLayer } from './roadNetwork.js';
 import { RAILWAY_WAYS, RAILWAY_LIFECYCLE_WAYS } from './overpassQuery.js';
+import { fastHypot } from './fastMath.js';
 
 // The kinds of line (the same list the Overpass query asks for: overpassQuery.js).
 // railway=razed / dismantled / construction / proposed are values of their own, so
@@ -150,7 +151,7 @@ export function undergroundRailIds(features = [], bounds = null) {
     for (let i = 1; i < g.length; i++) {
       const dy = (g[i].lat - g[i - 1].lat) * 111320;
       const dx = (g[i].lng - g[i - 1].lng) * 111320 * Math.cos((g[i].lat * Math.PI) / 180);
-      m += Math.hypot(dx, dy);
+      m += fastHypot(dx, dy);
     }
     return m;
   };
@@ -300,7 +301,7 @@ export function streetRunningTest(roads, project) {
       const [ax, ay] = l.xy[i]; const [bx, by] = l.xy[i + 1];
       const vx = bx - ax; const vy = by - ay; const L2 = vx * vx + vy * vy || 1e-9;
       const t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / L2));
-      if (Math.hypot(ax + vx * t - x, ay + vy * t - y) <= l.half + 0.5) return true;
+      if (fastHypot(ax + vx * t - x, ay + vy * t - y) <= l.half + 0.5) return true;
     }
     return false;
   };
@@ -315,7 +316,7 @@ export function streetRunningTest(roads, project) {
     let n = 0; let hit = 0;
     for (let i = 0; i + 1 < xy.length; i++) {
       const [ax, ay] = xy[i]; const [bx, by] = xy[i + 1];
-      const L = Math.hypot(bx - ax, by - ay);
+      const L = fastHypot(bx - ax, by - ay);
       const k = Math.max(1, Math.ceil(L / STREET_SAMPLE_M));
       for (let j = 0; j < k; j++) {
         const f = (j + 0.5) / k;

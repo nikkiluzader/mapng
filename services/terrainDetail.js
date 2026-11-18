@@ -21,6 +21,7 @@
 // in small integer types, and the cliff corrections are kept only where there are cliffs (16k maps: 1 GiB per
 // full-size buffer).
 import { createGridProjector } from './geoUtils.js';
+import { fastHypot } from './fastMath.js';
 
 // amplitude (m, before the slope factor) by land cover; unmapped ground gets DEFAULT
 const COVER = [
@@ -107,7 +108,7 @@ function coverGrids({ width, height, bounds, mpp, osmFeatures }) {
   const stroke = (pts, halfCells, val) => {
     const r = Math.max(0.5, halfCells);
     for (let i = 1; i < pts.length; i++) {
-      const a = pts[i - 1], b = pts[i]; const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) * 2));
+      const a = pts[i - 1], b = pts[i]; const steps = Math.max(1, Math.ceil(fastHypot(b.x - a.x, b.y - a.y) * 2));
       for (let s = 0; s <= steps; s++) {
         const px = a.x + ((b.x - a.x) * s) / steps, py = a.y + ((b.y - a.y) * s) / steps;
         for (let y = Math.floor(py - r); y <= Math.ceil(py + r); y++) for (let x = Math.floor(px - r); x <= Math.ceil(px + r); x++) {
@@ -160,7 +161,7 @@ export function sharpenCliffs({ heightMap, out = null, width, height, bounds, me
     const pts = f.geometry.map((p) => { const q = proj(p.lat, p.lng); return { x: q.x + 0.5, y: q.y + 0.5 }; });
     let drop = 0, cnt = 0;
     for (let i = 1; i < pts.length; i++) {
-      const a = pts[i - 1], b = pts[i], l = Math.hypot(b.x - a.x, b.y - a.y); if (l < 1e-6) continue;
+      const a = pts[i - 1], b = pts[i], l = fastHypot(b.x - a.x, b.y - a.y); if (l < 1e-6) continue;
       const nx = -(b.y - a.y) / l, ny = (b.x - a.x) / l;          // right of travel (image y down)
       const n = Math.max(1, Math.ceil(l / 4));
       for (let j = 0; j < n; j++) {
@@ -173,7 +174,7 @@ export function sharpenCliffs({ heightMap, out = null, width, height, bounds, me
     cliffs++;
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (const p of pts) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); }
-    const total = pts.reduce((acc, p, i) => acc + (i ? Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y) : 0), 0);
+    const total = pts.reduce((acc, p, i) => acc + (i ? fastHypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y) : 0), 0);
     for (let py = Math.max(0, Math.floor(y0 - W)); py <= Math.min(height - 1, Math.ceil(y1 + W)); py++) {
       for (let px = Math.max(0, Math.floor(x0 - W)); px <= Math.min(width - 1, Math.ceil(x1 + W)); px++) {
         const cx = px + 0.5, cy = py + 0.5;
@@ -182,7 +183,7 @@ export function sharpenCliffs({ heightMap, out = null, width, height, bounds, me
           const a = pts[i - 1], b = pts[i], dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
           if (l2 < 1e-9) continue;
           const l = Math.sqrt(l2), t = Math.min(1, Math.max(0, ((cx - a.x) * dx + (cy - a.y) * dy) / l2));
-          const ex = a.x + dx * t, ey = a.y + dy * t, d = Math.hypot(cx - ex, cy - ey);
+          const ex = a.x + dx * t, ey = a.y + dy * t, d = fastHypot(cx - ex, cy - ey);
           if (d < best) { best = d; nX = -dy / l; nY = dx / l; s = (cx - ex) * nX + (cy - ey) * nY; along = run + t * l; qx = ex; qy = ey; }
           run += l;
         }
@@ -243,7 +244,7 @@ export function addFineGroundDetail({ heightMap, width, height, bounds, metersPe
       const f = Math.min(1, distAll[c] / DIST_UNIT / featherCells); if (f <= 0) continue;
       const gx = (row[Math.min(width - 1, px + 1)] - row[Math.max(0, px - 1)]) / (2 * mpp);
       const gy = (below[px] - above[px]) / (2 * mpp);
-      const slope = Math.min(1.5, Math.hypot(gx, gy));
+      const slope = Math.min(1.5, fastHypot(gx, gy));
       const k = py * width + px;
       const a0 = amp[c] / 100;
       const a = (sharp.face.has(k) ? Math.max(a0, CLIFF_AMP) : a0) * (1 + 1.2 * slope) * fade(f);

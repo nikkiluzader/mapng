@@ -6,6 +6,7 @@
 // table picks a kind per station; runs shorter than their kind's minimum
 // merge into a neighbour. The table is data: change a rule here, not in code
 // paths. Nothing here knows about any place.
+import { fastHypot } from '../fastMath.js';
 
 const ROOF_M = 6;            // road surface to the outside of a cut-and-cover roof (5 m headroom + slab)
 const OVER_ROAD_MARGIN_M = 3; // a deck reaches this far past a crossed road's edge
@@ -99,7 +100,7 @@ export function classifyStructures(graph, { rules = STRUCTURE_RULES } = {}) {
       // (and as far along this road as the cutting runs under it where the two cross at a slant: at 30
       // degrees a 5.6 m road is under the other for twice its width, and a hump of the upper road's ground
       // was left standing in the underpass beyond a deck measured square)
-      const d = edges[dn.edge]; const dir = (q, i) => { const a = Math.max(0, i - 1); const b = Math.min(q.s.length - 1, i + 1); const L = Math.hypot(q.x[b] - q.x[a], q.y[b] - q.y[a]) || 1; return [(q.x[b] - q.x[a]) / L, (q.y[b] - q.y[a]) / L]; };
+      const d = edges[dn.edge]; const dir = (q, i) => { const a = Math.max(0, i - 1); const b = Math.min(q.s.length - 1, i + 1); const L = fastHypot(q.x[b] - q.x[a], q.y[b] - q.y[a]) || 1; return [(q.x[b] - q.x[a]) / L, (q.y[b] - q.y[a]) / L]; };
       const u = dir(e, up.i); const v = dir(d, dn.i);
       const sin = Math.abs(u[0] * v[1] - u[1] * v[0]);
       reach = (reach + OPEN_UNDER_MARGIN_M + (e.half || 4) * Math.sqrt(Math.max(0, 1 - sin * sin))) / Math.max(0.35, sin);
@@ -139,7 +140,7 @@ export function classifyStructures(graph, { rules = STRUCTURE_RULES } = {}) {
             const o = edges[k2];
             if (o.from === e.from || o.from === e.to || o.to === e.from || o.to === e.to) continue;   // meets it
             if (z[k][i] - z[k2][i2] < 1.5) continue;
-            const d = Math.hypot(o.x[i2] - e.x[i], o.y[i2] - e.y[i]) - o.half;
+            const d = fastHypot(o.x[i2] - e.x[i], o.y[i2] - e.y[i]) - o.half;
             if (d < reach) { out[i] = 1; break search; }
           }
         }

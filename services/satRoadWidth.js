@@ -9,6 +9,7 @@
 import { loadDataImage } from './dataCache.js';
 import { desktopApp } from './platform/desktop.js';
 import { estimateRoadHalfWidth, isOneWayRoad } from './roadWidth.js';
+import { fastHypot } from './fastMath.js';
 
 export const MEASURE_WIDTHS_STORAGE_KEY = 'mapng_measureRoadWidths';
 export const WIDTH_SOURCE_TAG = 'mapng:width_source';
@@ -42,7 +43,7 @@ export function widthOfSection(profile, stepM = STEP_M) {
   const n = profile.length; const mid = n >> 1;
   if (profile.some((c) => !c)) return null;
   const core = [0, 1, 2].map((k) => median(profile.slice(mid - 4, mid + 5).map((c) => c[k])));
-  const d = profile.map((c) => Math.hypot(c[0] - core[0], c[1] - core[1], c[2] - core[2]));
+  const d = profile.map((c) => fastHypot(c[0] - core[0], c[1] - core[1], c[2] - core[2]));
   // (the road's own scatter around its colour sets how far off counts as off)
   const limit = Math.max(22, 3 * median(d.slice(mid - 6, mid + 7)) + 10);
   const run = Math.max(1, Math.round(EDGE_RUN_M / stepM));
@@ -90,11 +91,11 @@ const pixelOf = (lat, lng) => {
 export function sectionsOf(geometry) {
   const lat0 = geometry[0].lat; const mLat = 1 / 111320; const mLng = 1 / (111320 * Math.cos((lat0 * Math.PI) / 180));
   const pts = geometry.map((p) => ({ x: p.lng / mLng, y: p.lat / mLat }));
-  let total = 0; for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+  let total = 0; for (let i = 1; i < pts.length; i++) total += fastHypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
   const every = Math.max(EVERY_M, total / MAX_SECTIONS); const out = [];
   let next = every / 2, walked = 0;
   for (let i = 1; i < pts.length; i++) {
-    const a = pts[i - 1], b = pts[i]; const len = Math.hypot(b.x - a.x, b.y - a.y);
+    const a = pts[i - 1], b = pts[i]; const len = fastHypot(b.x - a.x, b.y - a.y);
     if (len < 0.5) { walked += len; continue; }
     const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
     for (; next <= walked + len; next += every) {

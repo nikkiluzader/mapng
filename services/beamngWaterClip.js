@@ -10,6 +10,7 @@
 // Pure: tunnels as services/beamngTunnels.js solves them, world space.
 
 import { LINING_M, WALKWAY_M, extraAt } from './beamngTunnels.js';
+import { fastHypot } from './fastMath.js';
 
 const ROOF_CLEAR_M = 0.3;      // water stops this far over a tube's roof
 const TUBE_PAD_M = 1.5;        // past the lining
@@ -87,7 +88,7 @@ const segDist = (x, y, a, b) => {
   const vx = b[0] - a[0]; const vy = b[1] - a[1];
   const L2 = vx * vx + vy * vy || 1e-9;
   const t = Math.max(0, Math.min(1, ((x - a[0]) * vx + (y - a[1]) * vy) / L2));
-  return Math.hypot(a[0] + vx * t - x, a[1] + vy * t - y);
+  return fastHypot(a[0] + vx * t - x, a[1] + vy * t - y);
 };
 
 /**
@@ -97,7 +98,7 @@ const segDist = (x, y, a, b) => {
 export function waterFloorIn(zones, x0, y0, x1, y1) {
   let floor = -Infinity;
   const cx = (x0 + x1) / 2; const cy = (y0 + y1) / 2;
-  const r = Math.hypot(x1 - x0, y1 - y0) / 2;
+  const r = fastHypot(x1 - x0, y1 - y0) / 2;
   for (const z of zonesIn(zones, x0, y0, x1, y1)) {
     if (z.box[0] > x1 || z.box[2] < x0 || z.box[1] > y1 || z.box[3] < y0) continue;
     if (segDist(cx, cy, z.a, z.b) > z.half + r) continue;

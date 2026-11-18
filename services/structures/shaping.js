@@ -12,6 +12,7 @@
 // any place.
 
 import { gradeLimit as gradeLimitOf } from './profileSolve.js';
+import { fastHypot } from '../fastMath.js';
 
 // a road meeting a structure at a node is its approach this far out (its
 // ramp or cutting, shaped with the structure)
@@ -188,7 +189,7 @@ export function simpleSpans(graph, rawDeck, measured = []) {
     for (let j = 0; j < n; j++) out.push([k, end === 0 ? j : n - 1 - j]);
     return out;
   };
-  const dirAt = (k, i, j) => { const e = edges[k]; const dx = e.x[j] - e.x[i]; const dy = e.y[j] - e.y[i]; const L = Math.hypot(dx, dy) || 1; return [dx / L, dy / L]; };
+  const dirAt = (k, i, j) => { const e = edges[k]; const dx = e.x[j] - e.x[i]; const dy = e.y[j] - e.y[i]; const L = fastHypot(dx, dy) || 1; return [dx / L, dy / L]; };
   const done = new Set();
   // the stations of the spans already laid, for a narrower deck edge to edge with one of them
   // (a ramp's bridge beside the main road's over the same creek, a turn lane's link leaving a
@@ -200,7 +201,7 @@ export function simpleSpans(graph, rawDeck, measured = []) {
     const e = edges[k]; let best = null; let bd = Infinity;
     for (const p of laid) {
       if (!joined.has(p[4])) continue;
-      const d = Math.hypot(p[0] - e.x[i], p[1] - e.y[i]);
+      const d = fastHypot(p[0] - e.x[i], p[1] - e.y[i]);
       if (d <= p[3] + (e.half || 0) + SIBLING_GAP_M && d < bd) { bd = d; best = p; }
     }
     return best ? best[2] : null;
@@ -255,19 +256,19 @@ export function simpleSpans(graph, rawDeck, measured = []) {
         const st = walk(best.k, best.end).slice(1);
         for (const [kk, ii] of st) {
           const [pk, pi] = out.length ? out[out.length - 1] : [k, i];
-          walked += Math.hypot(edges[kk].x[ii] - edges[pk].x[pi], edges[kk].y[ii] - edges[pk].y[pi]);
+          walked += fastHypot(edges[kk].x[ii] - edges[pk].x[pi], edges[kk].y[ii] - edges[pk].y[pi]);
           out.push([kk, ii]);
           if (walked >= SPAN_SEARCH_M) break;
         }
         const last = out[out.length - 1];
         const prev = out.length > 1 ? out[out.length - 2] : [k, i];
-        [dx, dy] = (() => { const ex = edges[last[0]].x[last[1]] - edges[prev[0]].x[prev[1]]; const ey = edges[last[0]].y[last[1]] - edges[prev[0]].y[prev[1]]; const L = Math.hypot(ex, ey) || 1; return [ex / L, ey / L]; })();
+        [dx, dy] = (() => { const ex = edges[last[0]].x[last[1]] - edges[prev[0]].x[prev[1]]; const ey = edges[last[0]].y[last[1]] - edges[prev[0]].y[prev[1]]; const L = fastHypot(ex, ey) || 1; return [ex / L, ey / L]; })();
         [k, i] = last;
       }
       return out;
     };
     if (path.length < 2) continue;
-    const step = (p, q) => { const ex = edges[q[0]].x[q[1]] - edges[p[0]].x[p[1]]; const ey = edges[q[0]].y[q[1]] - edges[p[0]].y[p[1]]; const L = Math.hypot(ex, ey) || 1; return [ex / L, ey / L]; };
+    const step = (p, q) => { const ex = edges[q[0]].x[q[1]] - edges[p[0]].x[p[1]]; const ey = edges[q[0]].y[q[1]] - edges[p[0]].y[p[1]]; const L = fastHypot(ex, ey) || 1; return [ex / L, ey / L]; };
     const before = extend(k0First, null, step(path[1], path[0])).reverse();
     const after = extend(kLast, null, step(path[path.length - 2], path[path.length - 1]));
     const b0 = before.length; const b1 = b0 + path.length - 1;
@@ -276,7 +277,7 @@ export function simpleSpans(graph, rawDeck, measured = []) {
     const s = [0]; const g = [];
     path.forEach(([k, i], j) => {
       g.push(Number.isFinite(edges[k].g[i]) ? edges[k].g[i] : 0);
-      if (j) s.push(s[j - 1] + Math.hypot(edges[k].x[i] - edges[path[j - 1][0]].x[path[j - 1][1]], edges[k].y[i] - edges[path[j - 1][0]].y[path[j - 1][1]]));
+      if (j) s.push(s[j - 1] + fastHypot(edges[k].x[i] - edges[path[j - 1][0]].x[path[j - 1][1]], edges[k].y[i] - edges[path[j - 1][0]].y[path[j - 1][1]]));
     });
     const lim = Math.max(...chain.map(({ k }) => gradeLimitOf(edges[k].highway)));
     // the floor of the dip

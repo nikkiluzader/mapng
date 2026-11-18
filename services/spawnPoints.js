@@ -9,6 +9,7 @@
 // by the export. Pure functions; the 2D map and the sidebar keep the list in
 // the store (stores/mainStore.js), the export places them on the drawn roads.
 import { NON_DRIVEABLE_HIGHWAYS } from './roadWidth.js';
+import { fastHypot } from './fastMath.js';
 
 export const MAX_POINTS = 64;
 export const POINT_NAME_MAX = 48;
@@ -141,7 +142,7 @@ const FLAT_STEP_M = 2.5;
 export function slopeAt(x, y, groundAt, r = 2) {
   const gx = (groundAt(x + r, y) - groundAt(x - r, y)) / (2 * r);
   const gy = (groundAt(x, y + r) - groundAt(x, y - r)) / (2 * r);
-  return Math.hypot(gx, gy);
+  return fastHypot(gx, gy);
 }
 export function flattestNear(x, y, groundAt) {
   const slope0 = slopeAt(x, y, groundAt);
@@ -149,7 +150,7 @@ export function flattestNear(x, y, groundAt) {
   let best = { x, y, slope: slope0, d: 0 };
   for (let dx = -FLAT_REACH_M; dx <= FLAT_REACH_M; dx += FLAT_STEP_M) {
     for (let dy = -FLAT_REACH_M; dy <= FLAT_REACH_M; dy += FLAT_STEP_M) {
-      const d = Math.hypot(dx, dy);
+      const d = fastHypot(dx, dy);
       if (d > FLAT_REACH_M || d === 0) continue;
       const sl = slopeAt(x + dx, y + dy, groundAt);
       if (!Number.isFinite(sl)) continue;
@@ -204,7 +205,7 @@ export function snapToCarriageway(x, y, headingDeg, carriageways, { leftHandTraf
       if (L2 < 1e-6) continue;
       const t = Math.max(0, Math.min(1, ((x - x0) * dx + (y - y0) * dy) / L2));
       const px = x0 + dx * t; const py = y0 + dy * t;
-      const d = Math.hypot(x - px, y - py);
+      const d = fastHypot(x - px, y - py);
       if (d > reach) continue;
       const L = Math.sqrt(L2); const tx = dx / L; const ty = dy / L;
       const align = Math.abs(ax * tx + ay * ty);

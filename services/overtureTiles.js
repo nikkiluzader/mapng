@@ -25,6 +25,7 @@
  */
 import { PMTiles } from 'pmtiles';
 import { OSM_FILTER } from './overpassQuery.js';
+import { fastHypot } from './fastMath.js';
 
 // Pinned release; bump with Overture's monthly releases (tiles.overturemaps.org/<release>/).
 export const OVERTURE_RELEASE = '2026-10-21.0';
@@ -377,7 +378,7 @@ const metersBetween = (a, b) => {
   const k = 111320;
   const dx = (b.lon - a.lon) * k * Math.cos((a.lat * Math.PI) / 180);
   const dy = (b.lat - a.lat) * k;
-  return Math.hypot(dx, dy);
+  return fastHypot(dx, dy);
 };
 
 // Split a whole segment at fractions of its length.
@@ -417,9 +418,9 @@ const fractionAlong = (outline, pt) => {
     const a = outline[i]; const b = outline[i + 1];
     const ax = (a.lon - pt.lon) * kx; const ay = (a.lat - pt.lat) * k;
     const bx = (b.lon - pt.lon) * kx; const by = (b.lat - pt.lat) * k;
-    const dx = bx - ax; const dy = by - ay; const len = Math.hypot(dx, dy);
+    const dx = bx - ax; const dy = by - ay; const len = fastHypot(dx, dy);
     const t = len > 0 ? Math.min(1, Math.max(0, -(ax * dx + ay * dy) / (len * len))) : 0;
-    const d = Math.hypot(ax + dx * t, ay + dy * t);
+    const d = fastHypot(ax + dx * t, ay + dy * t);
     if (d < best.d) best = { d, at: total + len * t };
     total += len;
   }

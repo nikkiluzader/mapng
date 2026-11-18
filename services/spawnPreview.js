@@ -7,6 +7,7 @@
 // runner (desktop/runner/browserShims.mjs: a real canvas, no WebGL), and it
 // downloads nothing. Any failure gives no image: the point then shows the
 // level's preview.png instead.
+import { fastHypot } from './fastMath.js';
 
 export const PREVIEW_W = 800;
 export const PREVIEW_H = 600;
@@ -64,7 +65,7 @@ async function renderOne(bmp, p, { worldSize, roads, quality }) {
     // turned photo can show is drawn: the half diagonal, 100 m)
     const u = (p.x / worldSize + 0.5) * bmp.width;
     const v = (0.5 - p.y / worldSize) * bmp.height;
-    const r = Math.hypot(PREVIEW_W, PREVIEW_H) / 2 / pxPerM * texPerM + 2;
+    const r = fastHypot(PREVIEW_W, PREVIEW_H) / 2 / pxPerM * texPerM + 2;
     const sx = Math.max(0, Math.floor(u - r)); const sy = Math.max(0, Math.floor(v - r));
     const ex = Math.min(bmp.width, Math.ceil(u + r)); const ey = Math.min(bmp.height, Math.ceil(v + r));
     if (ex > sx && ey > sy) {

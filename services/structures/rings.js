@@ -9,6 +9,7 @@
 //
 // Only rings wholly on bridges: a roundabout on the ground follows its ground (junction rings
 // have their own care in the road smoother), and a plane through a hillside would be fill.
+import { fastHypot } from '../fastMath.js';
 
 const RING_MAX_M = 450;          // round the loop
 const RING_MIN_M = 50;
@@ -86,7 +87,7 @@ export function ringPlanePins(graph, z, rings = findElevatedRings(graph)) {
     for (const [x, y, h] of pts) { const dx = x - mx; const dy = y - my; const dz = h - mz; sxx += dx * dx; sxy += dx * dy; syy += dy * dy; sxz += dx * dz; syz += dy * dz; }
     const det = sxx * syy - sxy * sxy;
     let a = Math.abs(det) > 1e-6 ? (sxz * syy - syz * sxy) / det : 0; let b = Math.abs(det) > 1e-6 ? (syz * sxx - sxz * sxy) / det : 0;
-    const tilt = Math.hypot(a, b);
+    const tilt = fastHypot(a, b);
     if (tilt > RING_MAX_TILT) { a *= RING_MAX_TILT / tilt; b *= RING_MAX_TILT / tilt; }
     const at = (x, y) => mz + a * (x - mx) + b * (y - my);
     let lift = 0; let lo = Infinity; let hi = -Infinity;
@@ -106,7 +107,7 @@ export function ringPlanePins(graph, z, rings = findElevatedRings(graph)) {
         const fromEnd = Math.min(nodeIds.has(e.from) ? e.s[i] : Infinity, nodeIds.has(e.to) ? e.length - e.s[i] : Infinity);
         if (fromEnd > RING_JOIN_REACH_M) continue;
         let inside = false;
-        for (const [x, y, half] of ringPts) if (Math.hypot(e.x[i] - x, e.y[i] - y) <= half + RING_SLAB_MARGIN_M) { inside = true; break; }
+        for (const [x, y, half] of ringPts) if (fastHypot(e.x[i] - x, e.y[i] - y) <= half + RING_SLAB_MARGIN_M) { inside = true; break; }
         if (inside) { pins.push([k, i, at(e.x[i], e.y[i]) + lift]); joined++; }
       }
     });

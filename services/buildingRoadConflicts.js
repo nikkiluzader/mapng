@@ -25,6 +25,7 @@
 // Pure: features in, features out, plus the list of what was changed.
 
 import { estimateRoadCrossSection, isOneWayRoad, NON_DRIVEABLE_HIGHWAYS } from './roadWidth.js';
+import { fastHypot } from './fastMath.js';
 
 // an ML outline with this share of its area on a road's driving lanes, or the
 // road's centre line this far through it, is left out
@@ -167,7 +168,7 @@ export function resolveBuildingRoadConflicts(features, { project, unproject, urb
     for (const s of near) {
       const vx = s.b[0] - s.a[0]; const vy = s.b[1] - s.a[1]; const L2 = vx * vx + vy * vy;
       const t = L2 > 1e-9 ? Math.max(0, Math.min(1, ((x - s.a[0]) * vx + (y - s.a[1]) * vy) / L2)) : 0;
-      if (Math.hypot(s.a[0] + vx * t - x, s.a[1] + vy * t - y) <= s.half) return s;
+      if (fastHypot(s.a[0] + vx * t - x, s.a[1] + vy * t - y) <= s.half) return s;
     }
     return null;
   };
@@ -212,7 +213,7 @@ export function resolveBuildingRoadConflicts(features, { project, unproject, urb
     // the longest run of one road's centre line through the footprint
     let run = 0;
     for (const s of near) {
-      const L = Math.hypot(s.b[0] - s.a[0], s.b[1] - s.a[1]);
+      const L = fastHypot(s.b[0] - s.a[0], s.b[1] - s.a[1]);
       let r = 0;
       for (let d = 0; d <= L; d += 0.5) {
         const t = L > 0 ? d / L : 0;
@@ -235,7 +236,7 @@ export function resolveBuildingRoadConflicts(features, { project, unproject, urb
     let cut = ring.slice();
     const order = [...bySeg.entries()].sort((a, b) => b[1] - a[1]).slice(0, MAX_CUTS);
     for (const [s] of order) {
-      const vx = s.b[0] - s.a[0]; const vy = s.b[1] - s.a[1]; const L = Math.hypot(vx, vy);
+      const vx = s.b[0] - s.a[0]; const vy = s.b[1] - s.a[1]; const L = fastHypot(vx, vy);
       if (L < 1e-6) continue;
       const nx = -vy / L; const ny = vx / L;
       let cx = 0; let cy = 0;

@@ -6,6 +6,7 @@
 // asphalt of the road they meet.
 //
 // Works on DecalRoad nodes in world space: [x, y, z, width].
+import { fastHypot } from './fastMath.js';
 
 const CELL_M = 16;
 const SAMPLE_STEP_M = 0.5;
@@ -38,7 +39,7 @@ export function buildCarriagewayIndex(carriageways) {
     for (let i = 0; i + 1 < cw.nodes.length; i++) {
       const a = cw.nodes[i];
       const b = cw.nodes[i + 1];
-      const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const len = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
       const idx = segments.push({
         ax: a[0], ay: a[1], bx: b[0], by: b[1], az: a[2], bz: b[2], half: cw.half, owner: cw.owner,
         // (each end's own half width where the way narrows to the next)
@@ -133,7 +134,7 @@ export function cutNodes(nodes, blocked, { minPieceM = 3 } = {}) {
   for (let i = 0; i + 1 < nodes.length; i++) {
     const a = nodes[i];
     const b = nodes[i + 1];
-    const steps = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / SAMPLE_STEP_M));
+    const steps = Math.max(1, Math.ceil(fastHypot(b[0] - a[0], b[1] - a[1]) / SAMPLE_STEP_M));
     for (let k = i === 0 ? 0 : 1; k <= steps; k++) {
       const p = lerpNode(a, b, k / steps);
       samples.push({ p, vertex: k === 0 || k === steps, free: !blocked(p[0], p[1]) });
@@ -149,7 +150,7 @@ export function cutNodes(nodes, blocked, { minPieceM = 3 } = {}) {
     for (let k = i + 1; k < j; k++) if (samples[k].vertex) run.push(samples[k].p);
     if (j > i) run.push(samples[j].p);
     let length = 0;
-    for (let k = 1; k < run.length; k++) length += Math.hypot(run[k][0] - run[k - 1][0], run[k][1] - run[k - 1][1]);
+    for (let k = 1; k < run.length; k++) length += fastHypot(run[k][0] - run[k - 1][0], run[k][1] - run[k - 1][1]);
     if (run.length >= 2 && length >= minPieceM) runs.push(run.map(roundNode));
     i = j + 1;
   }
@@ -165,7 +166,7 @@ function nearbySegments(index, x, y, extra) {
     const dy = s.by - s.ay;
     const len = dx * dx + dy * dy;
     const t = len > 0 ? Math.max(0, Math.min(1, ((x - s.ax) * dx + (y - s.ay) * dy) / len)) : 0;
-    const distance = Math.hypot(s.ax + t * dx - x, s.ay + t * dy - y);
+    const distance = fastHypot(s.ax + t * dx - x, s.ay + t * dy - y);
     if (distance < s.half + extra) out.push({ s, distance });
   }
   return out;
@@ -209,7 +210,7 @@ function zoneGridFor(zones) {
   if (grid) return grid;
   grid = new Map();
   for (const z of zones) {
-    const r = Math.hypot(z.halfLength, z.halfWidth);
+    const r = fastHypot(z.halfLength, z.halfWidth);
     for (let gx = Math.floor((z.x - r) / CELL_M); gx <= Math.floor((z.x + r) / CELL_M); gx++) {
       for (let gy = Math.floor((z.y - r) / CELL_M); gy <= Math.floor((z.y + r) / CELL_M); gy++) {
         const key = cellKey(gx, gy);

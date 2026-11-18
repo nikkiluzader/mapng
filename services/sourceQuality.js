@@ -14,6 +14,7 @@
 // A score out of 100 weighs them (bench most, where the square has hillside
 // roads at all). Pure but for nothing: heights and roads in, numbers and one
 // HTML string out; the hillshade pictures come from the caller (a canvas).
+import { fastHypot } from './fastMath.js';
 
 const STEP_M = 2;
 const DRIVABLE = new Set(['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'unclassified', 'residential', 'living_street', 'service', 'track',
@@ -70,7 +71,7 @@ function stationsOf(pts) {
   const out = []; let run = 0; let next = 0;
   for (let i = 1; i < pts.length; i++) {
     const [ax, ay] = pts[i - 1]; const [bx, by] = pts[i];
-    const L = Math.hypot(bx - ax, by - ay);
+    const L = fastHypot(bx - ax, by - ay);
     if (!(L > 1e-6)) continue;
     const tx = (bx - ax) / L; const ty = (by - ay) / L;
     for (; next <= run + L; next += STEP_M) out.push({ x: ax + tx * (next - run), y: ay + ty * (next - run), nx: -ty, ny: tx, s: next });

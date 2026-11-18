@@ -12,6 +12,7 @@
 // 80 %). Trees and buildings also put the 30 m data above lidar, but as an
 // offset, not as a slope across hundreds of metres: both are compared only
 // after smoothing over about 90 m, and only their slopes decide.
+import { fastHypot } from './fastMath.js';
 
 const SMOOTH_M = 90;          // both sources are smoothed over this before their slopes are compared
 const LEVEL_SLOPE = 0.007;    // lidar counts as level under 0.7 %
@@ -53,7 +54,7 @@ export function levelWhereItSlopes(lidar, coarse, px, cellM) {
   const pick = (h) => { const o = new Float64Array(n * n); for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) o[y * n + x] = h[(y * step) * px + x * step]; return o; };
   const radius = Math.max(1, Math.round(SMOOTH_M / 2 / cell));
   const L = smooth(pick(lidar), n, radius); const C = smooth(pick(coarse), n, radius);
-  const slopeAt = (h, x, y) => Math.hypot(h[y * n + x + 1] - h[y * n + x - 1], h[(y + 1) * n + x] - h[(y - 1) * n + x]) / (2 * cell);
+  const slopeAt = (h, x, y) => fastHypot(h[y * n + x + 1] - h[y * n + x - 1], h[(y + 1) * n + x] - h[(y - 1) * n + x]) / (2 * cell);
   let cells = 0; const apart = [];
   for (let y = 1; y < n - 1; y++) for (let x = 1; x < n - 1; x++) {
     const l = L[y * n + x]; const c = C[y * n + x];

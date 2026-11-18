@@ -37,6 +37,7 @@ import { planDams, buildDam, damBeside, damKind } from './dams.js';
 import { planPitches, buildPitch, planSeating, buildSeating, drapedMesh, SPORTS_MATERIAL_STAGES, SPORTS_MATERIAL_FLAGS } from './sportsFields.js';
 import { planRaceways, buildRaceway, planRacewayAreas, carriagewayTest, tracksideStands, dragStartFirst } from './racetracks.js';
 import { planFieldPoles, planStandLights, planTrackPoles } from './sportsLights.js';
+import { fastHypot } from './fastMath.js';
 
 // ── Materials ───────────────────────────────────────────────────────────────
 
@@ -413,10 +414,10 @@ function cleanRing(points) {
   for (const p of points) {
     if (!Number.isFinite(p[0]) || !Number.isFinite(p[1])) continue;
     const prev = out[out.length - 1];
-    if (prev && Math.hypot(p[0] - prev[0], p[1] - prev[1]) < 0.05) continue;
+    if (prev && fastHypot(p[0] - prev[0], p[1] - prev[1]) < 0.05) continue;
     out.push(p);
   }
-  while (out.length > 1 && Math.hypot(out[0][0] - out[out.length - 1][0], out[0][1] - out[out.length - 1][1]) < 0.05) out.pop();
+  while (out.length > 1 && fastHypot(out[0][0] - out[out.length - 1][0], out[0][1] - out[out.length - 1][1]) < 0.05) out.pop();
   return out;
 }
 
@@ -444,7 +445,7 @@ export function orientedBox(ring) {
   for (let i = 0; i < hull.length; i++) {
     const [ax, ay] = hull[i];
     const [bx, by] = hull[(i + 1) % hull.length];
-    const len = Math.hypot(bx - ax, by - ay);
+    const len = fastHypot(bx - ax, by - ay);
     if (len < 1e-6) continue;
     const ux = (bx - ax) / len;
     const uy = (by - ay) / len;
@@ -713,7 +714,7 @@ function useDetails(m, builder, { plan, ring, base, eave, flat, streets, crossin
   let front = -1; let best = Infinity;
   for (let i = 0; i < ring.length; i++) {
     const a = ring[i]; const b = ring[(i + 1) % ring.length];
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]);
     if (L < 4) continue;
     const d = streets.facing(a, b);
     if (d === null) continue;
@@ -727,7 +728,7 @@ function useDetails(m, builder, { plan, ring, base, eave, flat, streets, crossin
   }
   if (front < 0) return { counts, props };
   const a = ring[front]; const b = ring[(front + 1) % ring.length];
-  const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const L = fastHypot(b[0] - a[0], b[1] - a[1]);
   const d = [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; const out = [d[1], -d[0]];
   const facingYaw = Math.atan2(out[1], out[0]);
   const at = (t, k) => [a[0] + d[0] * t + out[0] * k, a[1] + d[1] * t + out[1] * k];
@@ -908,13 +909,13 @@ class MeshBuilder {
 // ── Walls ────────────────────────────────────────────────────────────────────
 
 function wallStrip(m, mat, a, b, z0, z1, col, uvScale = SIDING_UV_M) {
-  const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const L = fastHypot(b[0] - a[0], b[1] - a[1]);
   m.quad(mat, [a[0], a[1], z0], [b[0], b[1], z0], [b[0], b[1], z1], [a[0], a[1], z1],
     [0, z0 / uvScale], [L / uvScale, z0 / uvScale], [L / uvScale, z1 / uvScale], [0, z1 / uvScale], col);
 }
 
 function bandFloor(m, mat, band, a, b, z0, z1, col, seed, edge, floor) {
-  const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const L = fastHypot(b[0] - a[0], b[1] - a[1]);
   const [, perSheet, allowed] = band;
   const bay = TILE_PX_M / perSheet;
   const nb = Math.round(L / bay);
@@ -943,7 +944,7 @@ function bandFloor(m, mat, band, a, b, z0, z1, col, seed, edge, floor) {
 }
 
 function houseWindows(m, a, b, base, floors, floorH, zTop, winUv = WIN_UV) {
-  const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const L = fastHypot(b[0] - a[0], b[1] - a[1]);
   const nb = Math.floor(L / HOUSE_BAY_M);
   if (nb < 1 || L < 2) return;
   const dx = (b[0] - a[0]) / L; const dy = (b[1] - a[1]) / L;
@@ -989,7 +990,7 @@ function pitchedRoof(m, box, z, plan, wallMat, wallUv, detail = m) {
   const P = (u, v, h) => [cx + ux * u + vx * v, cy + uy * u + vy * v, z + h];
   const mat = plan.roofMat;
   const col = plan.roofTint;
-  const slope = Math.hypot(hw, rise);
+  const slope = fastHypot(hw, rise);
   const hip = plan.roof === 'hipped' ? Math.min(box.width / 2, hl * 0.95) : 0;
   const rl = hl - hip;                         // ridge half-length
   const eaveDrop = -ROOF_OVERHANG_M * Math.tan((plan.pitch * Math.PI) / 180);
@@ -1047,7 +1048,7 @@ function roofUnderside(m, P, { hl, hw, rl, rise, eaveDrop, hipped }) {
   const down = [0, 0, -1];
   const centre = P(0, 0, 0);
   const out = (p) => [p[0] - centre[0], p[1] - centre[1], 0];
-  const slope = Math.hypot(hw, rise - eaveDrop);
+  const slope = fastHypot(hw, rise - eaveDrop);
   for (const side of [1, -1]) {
     // under the long slope
     facingQuad(m, D(-hl, side * hw, eaveDrop), D(hl, side * hw, eaveDrop), D(rl, 0, rise), D(-rl, 0, rise), down, uv(2 * hl, slope));
@@ -1350,7 +1351,7 @@ function buildGarage(m, ring, holes, base, z0, g) {
   // perimeter columns between the decks, just inside the outline
   for (let i = 0; i < ring.length; i++) {
     const p = ring[i]; const q = ring[(i + 1) % ring.length];
-    const L = Math.hypot(q[0] - p[0], q[1] - p[1]);
+    const L = fastHypot(q[0] - p[0], q[1] - p[1]);
     if (L < 1) continue;
     const ex = (q[0] - p[0]) / L; const ey = (q[1] - p[1]) / L;
     const nx = -ey; const ny = ex;       // inward (counter-clockwise ring)
@@ -1428,7 +1429,7 @@ function buildGarage(m, ring, holes, base, z0, g) {
         const w = GARAGE_RAMP_WALL_M;
         const q0 = [s0[0], s0[1], s0[2] - d]; const q1 = [s1[0], s1[1], s1[2] - d];
         const r0 = [s0[0], s0[1], s0[2] + w]; const r1 = [s1[0], s1[1], s1[2] + w];
-        const L2 = Math.hypot(s1[0] - s0[0], s1[1] - s0[1]) / SIDING_UV_M;
+        const L2 = fastHypot(s1[0] - s0[0], s1[1] - s0[1]) / SIDING_UV_M;
         m.quad('concrete', q0, q1, r1, r0, [0, 0], [L2, 0], [L2, 0.4], [0, 0.4], grey);
         m.quad('concrete', q1, q0, r0, r1, [0, 0], [L2, 0], [L2, 0.4], [0, 0.4], grey);
       }
@@ -1485,7 +1486,7 @@ export function neighbourLevels(features, project) {
     const gx = Math.floor(u.x / CELL); const gy = Math.floor(u.y / CELL);
     for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
       for (const k of grid.get(`${gx + dx},${gy + dy}`) || []) {
-        if (k.group === u.group && Math.hypot(k.x - u.x, k.y - u.y) <= NEIGHBOUR_LEVELS_M) near.push(k.floors);
+        if (k.group === u.group && fastHypot(k.x - u.x, k.y - u.y) <= NEIGHBOUR_LEVELS_M) near.push(k.floors);
       }
     }
     if (near.length < NEIGHBOUR_LEVELS_MIN) continue;
@@ -1678,7 +1679,7 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     // the ground under a wall's middle (from the footprint's corners)
     const groundNear = (pt) => {
       let best = zMin; let bd = Infinity;
-      for (const q of projected) { const d = Math.hypot(q[0] - pt[0], q[1] - pt[1]); if (d < bd && Number.isFinite(q[2])) { bd = d; best = q[2]; } }
+      for (const q of projected) { const d = fastHypot(q[0] - pt[0], q[1] - pt[1]); if (d < bd && Number.isFinite(q[2])) { bd = d; best = q[2]; } }
       return best;
     };
     // passages through the building: the walls open over the road for the
@@ -1716,7 +1717,7 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     };
     for (let i = 0; i < ring.length; i++) {
       const a = ring[i]; const b = ring[(i + 1) % ring.length];
-      if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 0.05) continue;
+      if (fastHypot(b[0] - a[0], b[1] - a[1]) < 0.05) continue;
       const openings = crossings.length ? passageOpenings(a, b, passages) : [];
       if (!openings.length) { wallPiece(a, b, i, false); continue; }
       const at = (t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
@@ -1736,7 +1737,7 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     holes.forEach((hole, hi) => {
       for (let i = 0; i < hole.length; i++) {
         const a = hole[i]; const b = hole[(i + 1) % hole.length];
-        if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 0.05) continue;
+        if (fastHypot(b[0] - a[0], b[1] - a[1]) < 0.05) continue;
         const k = 1000 * (hi + 1) + i;
         const openings = crossings.length ? passageOpenings(a, b, passages) : [];
         if (!openings.length) { wallPiece(a, b, k, false, true); continue; }
@@ -1808,7 +1809,7 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
       let door = -1; let dmin = Infinity; let longest = -1; let lmax = 0;
       for (let i = 0; i < ring.length; i++) {
         const p = ring[i]; const q = ring[(i + 1) % ring.length];
-        const wl = Math.hypot(q[0] - p[0], q[1] - p[1]);
+        const wl = fastHypot(q[0] - p[0], q[1] - p[1]);
         if (wl > lmax) { lmax = wl; longest = i; }
         const dd = streets.facing(p, q);
         if (dd !== null && dd < dmin && wl >= 2.9) { dmin = dd; door = i; }
@@ -1829,12 +1830,12 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
       if (door >= 0) {
         const a = ring[door]; const b = ring[(door + 1) % ring.length];
         const style = rnd('entrance') < 0.65 ? plan.entrance : 'steps';
-        const wallL = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        const wallL = fastHypot(b[0] - a[0], b[1] - a[1]);
         // (the ground before the street in front of the entrance's stretch)
         const room = streets.clearance(a, b, wallL * 0.2, wallL * 0.8);
         const built = entrance(detailB, a, b, base, groundNear([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]), style, flat ? 'roofFlat' : plan.roofMat, plan.roofTint, (...k) => rnd('ent', ...k), { room, props });
         if (built) stats.details[built] = (stats.details[built] || 0) + 1;
-        if (built && globalThis.__MAPNG_BLD_DEBUG) globalThis.__MAPNG_BLD_DEBUG({ kind: built, at: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], out: [(b[1] - a[1]) / Math.hypot(b[0] - a[0], b[1] - a[1]), -(b[0] - a[0]) / Math.hypot(b[0] - a[0], b[1] - a[1])], id: f.id });
+        if (built && globalThis.__MAPNG_BLD_DEBUG) globalThis.__MAPNG_BLD_DEBUG({ kind: built, at: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], out: [(b[1] - a[1]) / fastHypot(b[0] - a[0], b[1] - a[1]), -(b[0] - a[0]) / fastHypot(b[0] - a[0], b[1] - a[1])], id: f.id });
       }
       if (!flat && rnd('chimney') < plan.chimneyShare) {
         chimney(detailB, box, eave, rise, plan.wall || 'stucco', plan.wallTint, (...k) => rnd('chim', ...k));
@@ -1879,7 +1880,7 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
       let gate = -1; let best = crossings.length ? -Infinity : Infinity;
       for (let i = 0; i < ring.length; i++) {
         const a = ring[i]; const b = ring[(i + 1) % ring.length];
-        const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        const L = fastHypot(b[0] - a[0], b[1] - a[1]);
         if (L < 7) continue;
         const d = streets.facing(a, b);
         const score = d === null ? 1000 - L : d;
@@ -1976,7 +1977,7 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     for (const r of trackLines) for (let i = 0; i + 1 < r.nodes.length; i++) {
       const a = r.nodes[i]; const b = r.nodes[i + 1]; const dx = b[0] - a[0]; const dy = b[1] - a[1];
       const u = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy || 1)));
-      const q = [a[0] + dx * u, a[1] + dy * u]; const d = Math.hypot(q[0] - x, q[1] - y);
+      const q = [a[0] + dx * u, a[1] + dy * u]; const d = fastHypot(q[0] - x, q[1] - y);
       if (!best || d < best.d) best = { d, q };
     }
     return best?.q || null;
@@ -1986,7 +1987,7 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
   for (const c of trackLines) {
     const pad = (c.half || 6) + RACE_CLEAR_M;
     for (let i = 0; i + 1 < c.nodes.length; i++) {
-      const a = c.nodes[i]; const b = c.nodes[i + 1]; const n = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / RACE_CELL_M) + 1;
+      const a = c.nodes[i]; const b = c.nodes[i + 1]; const n = Math.ceil(fastHypot(b[0] - a[0], b[1] - a[1]) / RACE_CELL_M) + 1;
       for (let k = 0; k <= n; k++) {
         const x = a[0] + ((b[0] - a[0]) * k) / n; const y = a[1] + ((b[1] - a[1]) * k) / n;
         for (let cx = Math.floor((x - pad) / RACE_CELL_M); cx <= Math.floor((x + pad) / RACE_CELL_M); cx++) for (let cy = Math.floor((y - pad) / RACE_CELL_M); cy <= Math.floor((y + pad) / RACE_CELL_M); cy++) {
@@ -1999,7 +2000,7 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
   const onRacing = raceCells.size ? (x, y) => (raceCells.get(`${Math.floor(x / RACE_CELL_M)},${Math.floor(y / RACE_CELL_M)}`) || []).some(([a, b, pad]) => {
     const dx = b[0] - a[0]; const dy = b[1] - a[1];
     const u = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy || 1)));
-    return Math.hypot(a[0] + dx * u - x, a[1] + dy * u - y) < pad;
+    return fastHypot(a[0] + dx * u - x, a[1] + dy * u - y) < pad;
   }) : null;
   const seating = planSeating(features, project, pitches, { groundAt, faceTo, keepOff: onRacing });
   for (const st of seating) {

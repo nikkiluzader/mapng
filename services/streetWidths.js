@@ -20,6 +20,7 @@
 // times the class default are not trusted. Pure: features in, features out.
 
 import { estimateRoadCrossSection, isOneWayRoad } from './roadWidth.js';
+import { fastHypot } from './fastMath.js';
 
 const STEP_M = 6;
 const END_SKIP_M = 10;
@@ -121,7 +122,7 @@ export function measureRightOfWay(line, walls, water = null) {
 /** { row (or null), pinch (or null) } of a street, or null when too short to sample. */
 export function sampleRightOfWay(line, walls, water = null) {
   const s = [0];
-  for (let i = 1; i < line.length; i++) s.push(s[i - 1] + Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]));
+  for (let i = 1; i < line.length; i++) s.push(s[i - 1] + fastHypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]));
   const L = s[s.length - 1];
   if (L < 2 * END_SKIP_M + STEP_M) return null;
   const rows = [];

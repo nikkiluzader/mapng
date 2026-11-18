@@ -12,6 +12,7 @@
 // The pure parts (decode, shade, colours) are tested in
 // tests/reliefTileLayer.test.mjs; the Leaflet layer wraps them.
 import { TILE_API_URL } from './terrain.js';
+import { fastHypot } from './fastMath.js';
 
 export const RELIEF_MODES = ['height', 'relief', 'slope'];
 const SIZE = 256;
@@ -102,7 +103,7 @@ export function shadeReliefTile(heights, { size = SIZE, mpp = 30, mode = 'height
         const g = 40 + 215 * Math.min(1, shade / 0.9);
         c = [g, g, g];
       } else if (mode === 'slope') {
-        const deg = (Math.atan(Math.hypot(dzdx, dzdy)) * 180) / Math.PI;
+        const deg = (Math.atan(fastHypot(dzdx, dzdy)) * 180) / Math.PI;
         const k = 0.82 + 0.18 * Math.min(1, shade / 0.707);
         c = ramp(SLOPE_STOPS, deg).map((v) => v * k);
       } else if (h < SEA_BELOW_M) {

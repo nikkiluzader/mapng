@@ -24,6 +24,7 @@
 // roads are not smoothed or levelled into the terrain: the elevation stays as downloaded
 // there (on: true), or smoothed again (on: false, over earlier strokes). They change no
 // objects and fetch nothing differently. Pure: no DOM, no Vue.
+import { fastHypot } from './fastMath.js';
 
 export const MASK_VERSION = 1;
 const SLIVER = 12; // cells: areas this small (in line corners) don't count
@@ -54,7 +55,7 @@ export function makeProjector(bounds, n) {
 }
 
 function stamp(arr, n, a, b, rad) {
-  const d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const d = fastHypot(b[0] - a[0], b[1] - a[1]);
   const steps = Math.max(1, Math.ceil(d * 2));
   const r = Math.ceil(rad), r2 = rad * rad;
   for (let s = 0; s <= steps; s++) {
@@ -132,12 +133,12 @@ export function snapLineEnds(pts, otherLines, n, snap) {
   const snapOne = (line, atStart) => {
     const p = atStart ? line[0] : line[line.length - 1];
     const edges = [[p[0], 0], [p[0], n], [0, p[1]], [n, p[1]]]
-      .map((q) => ({ q, d: Math.hypot(q[0] - p[0], q[1] - p[1]) }))
+      .map((q) => ({ q, d: fastHypot(q[0] - p[0], q[1] - p[1]) }))
       .sort((a, b) => a.d - b.d);
     let best = null, bd = snap;
-    for (const l of otherLines) for (const q of l) { const d = Math.hypot(q[0] - p[0], q[1] - p[1]); if (d < bd) { bd = d; best = q; } }
+    for (const l of otherLines) for (const q of l) { const d = fastHypot(q[0] - p[0], q[1] - p[1]); if (d < bd) { bd = d; best = q; } }
     const far = atStart ? line.slice(12) : line.slice(0, -12);
-    for (const q of far) { const d = Math.hypot(q[0] - p[0], q[1] - p[1]); if (d < bd) { bd = d; best = q; } }
+    for (const q of far) { const d = fastHypot(q[0] - p[0], q[1] - p[1]); if (d < bd) { bd = d; best = q; } }
     // a little past the edge so the wall meets the border cells
     const edge = edges[0].d < snap && edges[0].d <= bd
       ? edges[0].q.map((v) => (v <= 0 ? -1 : v >= n ? n + 1 : v))

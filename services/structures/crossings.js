@@ -14,6 +14,7 @@ const MOVABLE_CLEAR_M = 6;      // a drawbridge sits low and opens for ships
 const REACH_SHARE = 0.8;        // of the climb its length allows (room for vertical curves)
 const WATER_CLEAR_FLOOR_M = 2.5; // over water a deck always keeps this much
 import { cellsAlong } from './metrics.js';
+import { fastHypot } from '../fastMath.js';
 
 const CELL_M = 32;
 // A hit this close to a node both edges share is their junction, not a
@@ -149,18 +150,18 @@ export function findCrossings(graph, { waterAt = null } = {}) {
         if (seen.has(key)) continue;
         seen.add(key);
         const x = A.x[a0] + (A.x[a1] - A.x[a0]) * hit.t; const y = A.y[a0] + (A.y[a1] - A.y[a0]) * hit.t;
-        if (sharedNodes(A, B).some((n) => n && Math.hypot(n.x - x, n.y - y) < SHARED_NODE_M)) continue;
+        if (sharedNodes(A, B).some((n) => n && fastHypot(n.x - x, n.y - y) < SHARED_NODE_M)) continue;
         const order = crossingOrder(A, B);
         if (!order) { unjoined++; continue; }
         // (decks of one layer crossing near a node they share are merging
         // there, not one over the other)
-        if (order.dynamic && sharedNodes(A, B).some((n) => n && Math.hypot(n.x - x, n.y - y) < STACKED_NODE_M)) continue;
+        if (order.dynamic && sharedNodes(A, B).some((n) => n && fastHypot(n.x - x, n.y - y) < STACKED_NODE_M)) continue;
         // (... and two crossing almost parallel are one bridge drawn twice (a duplicate way, a bridge
         // outline beside its road), not one over the other: asked to clear each other by 6.5 m, sharing
         // their ends, they climbed 38 m and took 989 m of Val d'Isère's streets up with them)
         if (order.dynamic && ea !== eb) {
           const ax = A.x[a1] - A.x[a0]; const ay = A.y[a1] - A.y[a0]; const bx = B.x[b1] - B.x[b0]; const by = B.y[b1] - B.y[b0];
-          const cos = Math.abs(ax * bx + ay * by) / ((Math.hypot(ax, ay) || 1) * (Math.hypot(bx, by) || 1));
+          const cos = Math.abs(ax * bx + ay * by) / ((fastHypot(ax, ay) || 1) * (fastHypot(bx, by) || 1));
           if (cos > STACKED_PARALLEL_COS) { unjoined++; continue; }
         }
         const [upper, lower] = order.upper === 'a' ? [A, B] : [B, A];
@@ -206,9 +207,9 @@ export function findCrossings(graph, { waterAt = null } = {}) {
       }
     });
     const found = [];
-    const nearShared = (A, B, x, y) => sharedNodes(A, B).some((n) => n && Math.hypot(n.x - x, n.y - y) < OVERLAP_NODE_M);
+    const nearShared = (A, B, x, y) => sharedNodes(A, B).some((n) => n && fastHypot(n.x - x, n.y - y) < OVERLAP_NODE_M);
     // (running alongside: across each other is a crossing, found above)
-    const dir = (e, i) => { const a = Math.max(0, i - 1); const b = Math.min(e.s.length - 1, i + 1); const dx = e.x[b] - e.x[a]; const dy = e.y[b] - e.y[a]; const L = Math.hypot(dx, dy) || 1; return [dx / L, dy / L]; };
+    const dir = (e, i) => { const a = Math.max(0, i - 1); const b = Math.min(e.s.length - 1, i + 1); const dx = e.x[b] - e.x[a]; const dy = e.y[b] - e.y[a]; const L = fastHypot(dx, dy) || 1; return [dx / L, dy / L]; };
     edges.forEach((A, ka) => {
       if (PATH_CLASSES.has(A.highway) || A.tunnel) return;
       for (let i = 0; i < A.s.length; i++) {
@@ -221,7 +222,7 @@ export function findCrossings(graph, { waterAt = null } = {}) {
             // (each pair once, from the upper road's stations)
             if (kb === ka || !(A.layer > B.layer) || !stacked(A, B)) continue;
             const ib = list[j + 1];
-            const d = Math.hypot(B.x[ib] - A.x[i], B.y[ib] - A.y[i]);
+            const d = fastHypot(B.x[ib] - A.x[i], B.y[ib] - A.y[i]);
             if (d >= (under(A, B) ? Math.max(A.half, B.half) * 0.5 : (A.half + B.half) * OVERLAP_SHARE)) continue;
             if (!best.has(kb) || d < best.get(kb)[1]) best.set(kb, [ib, d]);
           }
@@ -317,7 +318,7 @@ export function findCrossings(graph, { waterAt = null } = {}) {
         let hit = null;
         for (let dx = -1; dx <= 1 && !hit; dx++) for (let dy = -1; dy <= 1 && !hit; dy++) {
           const list = cells.get(`${cx + dx},${cy + dy}`) || [];
-          for (let j = 0; j < list.length; j += 2) if (Math.hypot(list[j].x[list[j + 1]] - e.x[i], list[j].y[list[j + 1]] - e.y[i]) <= TWIN_M) { hit = list[j]; break; }
+          for (let j = 0; j < list.length; j += 2) if (fastHypot(list[j].x[list[j + 1]] - e.x[i], list[j].y[list[j + 1]] - e.y[i]) <= TWIN_M) { hit = list[j]; break; }
         }
         if (hit) { near++; votes.set(hit.structure, (votes.get(hit.structure) || 0) + 1); }
       }

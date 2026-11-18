@@ -15,6 +15,7 @@ import { sampleSatelliteTexture, satelliteLatticeRows } from './satelliteImageSa
 import { decodeTerrariumPixels, blendTerrariumTileSeams, sampleTerrariumHeights, wrapMosaicX } from './terrariumSampling.js';
 import { parallelMap, parallelThreads } from './parallel.js';
 import { continuousLngRange } from './lngRange.js';
+import { fastHypot } from './fastMath.js';
 
 const DEBUG_RESAMPLER = false;
 const debugLog = (...args) => {
@@ -346,7 +347,7 @@ export function featherSheetJoins(heightMap, seam, width, height, noData) {
             const yy = y + dy; if (yy < 0 || yy >= height) continue;
             for (let dx = -D; dx <= D; dx++) {
                 const xx = x + dx; if (xx < 0 || xx >= width) continue;
-                const d = Math.hypot(dx, dy); if (d > D) continue;
+                const d = fastHypot(dx, dy); if (d > D) continue;
                 const k = yy * width + xx; const was = near.get(k);
                 if (was === undefined || d < was) near.set(k, d);
             }

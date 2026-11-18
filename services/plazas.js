@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import polygonClipping from './polyClip.js';
 import { drapedMesh } from './sportsFields.js';
+import { fastHypot } from './fastMath.js';
 
 const PLAZA_LIFT_M = 0.04;     // over the ground (the drape lies on its triangles)
 const PLAZA_MIN_M2 = 12;
@@ -181,7 +182,7 @@ function bufferLine(nodes, half) {
   const parts = [];
   for (let i = 0; i + 1 < nodes.length; i++) {
     const a = nodes[i]; const b = nodes[i + 1];
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]);
     if (L < 0.01) continue;
     const ux = (b[0] - a[0]) / L; const uy = (b[1] - a[1]) / L;
     const nx = -uy * half; const ny = ux * half;
@@ -263,7 +264,7 @@ export function buildPlazaMeshes(plazas, { drape, buildings = [], roads = [] } =
   for (const { nodes, half } of roads) {
     for (let i = 0; i + 1 < nodes.length; i++) {
       const a = nodes[i]; const b = nodes[i + 1];
-      const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const L = fastHypot(b[0] - a[0], b[1] - a[1]);
       if (L < 0.01) continue;
       const h = half + ROAD_CLEAR_M;
       const ux = (b[0] - a[0]) / L; const uy = (b[1] - a[1]) / L;

@@ -17,6 +17,7 @@
 //   - that need spread along the road at a gentle slope, so one high node is a long ramp and not a bump.
 // The deck is level across (its normals point up): a road on a slope the terrain was not levelled for stands
 // out of the ground on its low side, and its depth reaches down to cover that.
+import { fastHypot } from './fastMath.js';
 
 export const MESH_ROAD_MATERIAL = 'mapng_meshroad_asphalt';
 export const MESH_ROAD_MATERIAL_DEF = {
@@ -90,12 +91,12 @@ function resample(nodes, gap) {
   for (let i = 1; i < nodes.length; i++) {
     let ax = nodes[i - 1][0]; let ay = nodes[i - 1][1]; let az = nodes[i - 1][2];
     const bx = nodes[i][0]; const by = nodes[i][1]; const bz = nodes[i][2];
-    let d = Math.hypot(bx - ax, by - ay);
+    let d = fastHypot(bx - ax, by - ay);
     while (acc + d >= gap) {
       const t = (gap - acc) / d;
       ax += (bx - ax) * t; ay += (by - ay) * t; az += (bz - az) * t;
       out.push([ax, ay, az]);
-      d = Math.hypot(bx - ax, by - ay);
+      d = fastHypot(bx - ax, by - ay);
       acc = 0;
     }
     acc += d;
@@ -103,7 +104,7 @@ function resample(nodes, gap) {
   const last = nodes[nodes.length - 1];
   const tail = out[out.length - 1];
   // (the end always a node; a node almost on it gives way to it)
-  if (Math.hypot(last[0] - tail[0], last[1] - tail[1]) < gap * 0.4 && out.length > 1) out.pop();
+  if (fastHypot(last[0] - tail[0], last[1] - tail[1]) < gap * 0.4 && out.length > 1) out.pop();
   out.push([last[0], last[1], last[2]]);
   return out;
 }
@@ -142,7 +143,7 @@ export function structureTest(graph) {
       const raw = ((x - s[0]) * dx + (y - s[1]) * dy) / L2; const slack = 0.25 / Math.sqrt(L2);
       if (raw < -slack || raw > 1 + slack) continue;
       const t = Math.max(0, Math.min(1, raw));
-      if (Math.hypot(x - (s[0] + dx * t), y - (s[1] + dy * t)) <= s[6] && Math.abs(zq - (s[2] + (s[5] - s[2]) * t)) < STRUCTURE_LEVEL_M) return true;
+      if (fastHypot(x - (s[0] + dx * t), y - (s[1] + dy * t)) <= s[6] && Math.abs(zq - (s[2] + (s[5] - s[2]) * t)) < STRUCTURE_LEVEL_M) return true;
     }
     return false;
   };
@@ -174,7 +175,7 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined, onSt
         // by any measure, which were left bare between the bridge's end and the next deck)
         const st = fine.map((q) => !!onStructure(q[0], q[1], q[2]) && Math.abs(q[2] - drapeAt(q[0], q[1])) > ON_GROUND_M);
         const bad = fine.map((q, i) => st[i] || Math.abs(q[2] - drapeAt(q[0], q[1])) > OVER_GROUND_M);
-        const along = [0]; for (let i = 1; i < fine.length; i++) along.push(along[i - 1] + Math.hypot(fine[i][0] - fine[i - 1][0], fine[i][1] - fine[i - 1][1]));
+        const along = [0]; for (let i = 1; i < fine.length; i++) along.push(along[i - 1] + fastHypot(fine[i][0] - fine[i - 1][0], fine[i][1] - fine[i - 1][1]));
         for (let i = 0; i < fine.length;) {
           if (!bad[i]) { i++; continue; }
           let j = i; let structure = st[i]; while (j + 1 < fine.length && bad[j + 1]) { j++; structure = structure || st[j]; }
@@ -230,7 +231,7 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined, onSt
   // met at a bend left an open wedge between them, seen in game on the first trial. A deck's width is per node,
   // so joined pieces keep their own. Not past JOIN_MAX_M: the game draws a MeshRoad whole or not at all.
   const endKey = (q) => `${Math.round(q.x * 10)},${Math.round(q.y * 10)}`;
-  const lengthOf = (nodes) => { let L = 0; for (let i = 1; i < nodes.length; i++) L += Math.hypot(nodes[i].x - nodes[i - 1].x, nodes[i].y - nodes[i - 1].y); return L; };
+  const lengthOf = (nodes) => { let L = 0; for (let i = 1; i < nodes.length; i++) L += fastHypot(nodes[i].x - nodes[i - 1].x, nodes[i].y - nodes[i - 1].y); return L; };
   for (const pc of pieces) { pc.length = lengthOf(pc.nodes); pc.keys = new Set([endKey(pc.nodes[0]), endKey(pc.nodes[pc.nodes.length - 1])]); }
   const meetAt = () => {
     const at = new Map();
@@ -243,7 +244,7 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined, onSt
     const first = endKey(pc.nodes[0]) === k;
     const e = first ? pc.nodes[0] : pc.nodes[pc.nodes.length - 1];
     const q = first ? pc.nodes[1] : pc.nodes[pc.nodes.length - 2];
-    const L = Math.hypot(q.x - e.x, q.y - e.y) || 1;
+    const L = fastHypot(q.x - e.x, q.y - e.y) || 1;
     return [(q.x - e.x) / L, (q.y - e.y) / L];
   };
   for (let again = true; again;) {
@@ -290,7 +291,7 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined, onSt
       const a = nd[i - 1]; const b = nd[i];
       const dx = b.x - a.x; const dy = b.y - a.y;
       const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (y - a.y) * dy) / (dx * dx + dy * dy || 1)));
-      if (Math.hypot(x - (a.x + dx * t), y - (a.y + dy * t)) <= a.hw + (b.hw - a.hw) * t + 0.05) return true;
+      if (fastHypot(x - (a.x + dx * t), y - (a.y + dy * t)) <= a.hw + (b.hw - a.hw) * t + 0.05) return true;
     }
     return false;
   };
@@ -307,7 +308,7 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined, onSt
       if (!m || m.n < 2) { e.loose = true; continue; }
       e.meet = true;
       const others = (through.get(k) || []).filter((o) => o !== pc);
-      const L = Math.hypot(e.x - inner.x, e.y - inner.y) || 1;
+      const L = fastHypot(e.x - inner.x, e.y - inner.y) || 1;
       const ux = (e.x - inner.x) / L; const uy = (e.y - inner.y) / L;
       const full = Math.min(JUNCTION_REACH_M, m.hw);
       let reach = 0;
@@ -366,7 +367,7 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined, onSt
       const raw = new Float64Array(n);
       for (let i = 0; i < n; i++) {
         const a = pts[Math.max(0, i - 1)]; const b = pts[Math.min(n - 1, i + 1)];
-        const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+        const len = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
         const nx = -(b[1] - a[1]) / len; const ny = (b[0] - a[0]) / len;
         // (the lean of the flattest half of the width: the road itself. A line fitted across the whole width took
         // in the hillside beside a road on a bench, or beside a line drawn a few metres off its road, and leaned
@@ -389,9 +390,9 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined, onSt
       }
     }
     for (let i = 0; i < n; i++) {
-      if (i) s[i] = s[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+      if (i) s[i] = s[i - 1] + fastHypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
       const a = pts[Math.max(0, i - 1)]; const b = pts[Math.min(n - 1, i + 1)];
-      const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const len = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
       const nx = -(b[1] - a[1]) / len; const ny = (b[0] - a[0]) / len;
       // (the ground the node answers for: across the inner road, and along it half-way to the nodes either
       // side; looked at only at the nodes, a hump of the terrain's grid between two of them stood through the deck)
@@ -457,7 +458,7 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined, onSt
       // ran 0.2 to 0.45 m under its own line: the sunk stretches after every cut in a long road.)
       if ((i === 1 && raw < 0) || (i === d.pts.length - 1 && raw > 1)) continue;
       const t = Math.max(0, Math.min(1, raw));
-      if (Math.hypot(x - (a[0] + dx * t), y - (a[1] + dy * t)) > d.hw[i - 1] + (d.hw[i] - d.hw[i - 1]) * t) continue;
+      if (fastHypot(x - (a[0] + dx * t), y - (a[1] + dy * t)) > d.hw[i - 1] + (d.hw[i] - d.hw[i - 1]) * t) continue;
       // (the deck's height there: along its line, and across it by its lean)
       const L = Math.sqrt(L2); const off = ((x - a[0]) * -dy + (y - a[1]) * dx) / L;
       const leanHere = d.lean ? d.lean[i - 1] + (d.lean[i] - d.lean[i - 1]) * t : 0;
@@ -502,7 +503,7 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined, onSt
     if (!out) {
       const nodes = d.pts.map((q, i) => ({ x: q[0], y: q[1], base: d.base[i], hw: d.hw[i], need: d.need[i], low: d.low[i], flag: d.flag[i], camber: d.camber ? d.camber[i] : 0 }));
       const S = [0];
-      for (let i = 1; i < nodes.length; i++) S.push(S[i - 1] + Math.hypot(nodes[i].x - nodes[i - 1].x, nodes[i].y - nodes[i - 1].y));
+      for (let i = 1; i < nodes.length; i++) S.push(S[i - 1] + fastHypot(nodes[i].x - nodes[i - 1].x, nodes[i].y - nodes[i - 1].y));
       const total = S[S.length - 1];
       const meet0 = nodes[0].flag === 1; const meet1 = nodes[nodes.length - 1].flag === 1;
       const at = (s) => {
@@ -595,7 +596,7 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined, onSt
     d.base = Float64Array.from(out, (q) => q.base); d.hw = Float64Array.from(out, (q) => q.hw);
     d.need = Float64Array.from(out, (q) => q.need); d.low = Float64Array.from(out, (q) => q.low); d.flag = Uint8Array.from(out, (q) => q.flag || 0);
     d.s = new Float64Array(n); d.z = new Float64Array(n);
-    for (let i = 1; i < n; i++) d.s[i] = d.s[i - 1] + Math.hypot(d.pts[i][0] - d.pts[i - 1][0], d.pts[i][1] - d.pts[i - 1][1]);
+    for (let i = 1; i < n; i++) d.s[i] = d.s[i - 1] + fastHypot(d.pts[i][0] - d.pts[i - 1][0], d.pts[i][1] - d.pts[i - 1][1]);
     const r = new Float64Array(n); const fixed = new Uint8Array(n);
     // A node inside another deck also takes that deck's tilt across this road's width (its normal). A deck is
     // level across its own line: a side road ending in a through road that climbs lay level across the climb,
@@ -606,7 +607,7 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined, onSt
     d.nrm = []; const lean = new Float64Array(n); const leanFree = new Uint8Array(n); const across = [];
     for (let i = 0; i < n; i++) {
       const a = d.pts[Math.max(0, i - 1)]; const b = d.pts[Math.min(n - 1, i + 1)];
-      const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
       const nx = -(b[1] - a[1]) / L; const ny = (b[0] - a[0]) / L;
       across.push([nx, ny]);
       // (the other deck's height under this road's two edges, where it lies under both: its true lean across
@@ -651,7 +652,7 @@ export function buildMeshRoads(groups, drapeAt, { makeId = () => undefined, onSt
     }
     for (let i = 0; i < n; i++) if (Math.abs(lean[i]) < 1e-4) lean[i] = 0;
     d.lean = lean;
-    for (let i = 0; i < n; i++) { const g = lean[i]; const len = Math.hypot(g, 1); d.nrm[i] = g ? [(-g * across[i][0]) / len, (-g * across[i][1]) / len, 1 / len] : [0, 0, 1]; }
+    for (let i = 0; i < n; i++) { const g = lean[i]; const len = fastHypot(g, 1); d.nrm[i] = g ? [(-g * across[i][0]) / len, (-g * across[i][1]) / len, 1 / len] : [0, 0, 1]; }
     d.leans = lean.some((g) => g !== 0);
     for (let i = 1; i < n; i++) if (!fixed[i]) r[i] = Math.max(r[i], r[i - 1] - RAMP_SLOPE * (d.s[i] - d.s[i - 1]));
     for (let i = n - 2; i >= 0; i--) if (!fixed[i]) r[i] = Math.max(r[i], r[i + 1] - RAMP_SLOPE * (d.s[i + 1] - d.s[i]));

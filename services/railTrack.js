@@ -11,6 +11,7 @@
 // Nothing here knows about any place.
 
 import { BALLAST_TOP_HALF_M, RAIL_DEPTH_M, RAIL_OVER_GROUND_M, STANDARD_GAUGE_M, TRACK_SPACING_M, gaugeOf, tracksOf } from './railways.js';
+import { fastHypot } from './fastMath.js';
 
 // ── Level crossings and the formation under the track ─────────────────────
 
@@ -95,13 +96,13 @@ export function railGroundTargets(graph) {
     if (!node) return null;
     const n = e.s.length;
     const i0 = end === 0 ? 0 : n - 1; const i1 = end === 0 ? Math.min(n - 1, 2) : Math.max(0, n - 3);
-    const dx = e.x[i0] - e.x[i1]; const dy = e.y[i0] - e.y[i1]; const L = Math.hypot(dx, dy) || 1;
+    const dx = e.x[i0] - e.x[i1]; const dy = e.y[i0] - e.y[i1]; const L = fastHypot(dx, dy) || 1;
     let best = null; let bestCos = 0.7;
     for (const o of node.edges) {
       if (o.edge === k || !edges[o.edge].rail) continue;
       const f = edges[o.edge]; const m = f.s.length;
       const j0 = o.end === 0 ? 0 : m - 1; const j1 = o.end === 0 ? Math.min(m - 1, 2) : Math.max(0, m - 3);
-      const ex = f.x[j1] - f.x[j0]; const ey = f.y[j1] - f.y[j0]; const M = Math.hypot(ex, ey) || 1;
+      const ex = f.x[j1] - f.x[j0]; const ey = f.y[j1] - f.y[j0]; const M = fastHypot(ex, ey) || 1;
       const cos = (dx * ex + dy * ey) / (L * M);
       if (cos > bestCos) { bestCos = cos; best = o; }
     }
@@ -204,7 +205,7 @@ export function unjoinedRailCrossings(graph) {
     for (let j = 0; j + 1 < v.length; j++) {
       const a = v[j]; const b = v[j + 1];
       const cx = Math.floor((e.x[a] + e.x[b]) / 2 / CELL); const cy = Math.floor((e.y[a] + e.y[b]) / 2 / CELL);
-      const reach = Math.ceil(Math.hypot(e.x[b] - e.x[a], e.y[b] - e.y[a]) / CELL) + 1;
+      const reach = Math.ceil(fastHypot(e.x[b] - e.x[a], e.y[b] - e.y[a]) / CELL) + 1;
       for (let dx = -reach; dx <= reach; dx++) for (let dy = -reach; dy <= reach; dy++) {
         const list = grid.get(`${cx + dx},${cy + dy}`) || [];
         for (let q = 0; q < list.length; q += 3) {
@@ -385,7 +386,7 @@ export function buildTrackGeometry(graph, { tagsOf = () => ({}) } = {}) {
     const nx = new Float64Array(n); const ny = new Float64Array(n);
     for (let i = 0; i < n; i++) {
       const a = Math.max(0, i - 1); const b = Math.min(n - 1, i + 1);
-      const dx = e.x[b] - e.x[a]; const dy = e.y[b] - e.y[a]; const L = Math.hypot(dx, dy) || 1;
+      const dx = e.x[b] - e.x[a]; const dy = e.y[b] - e.y[a]; const L = fastHypot(dx, dy) || 1;
       nx[i] = -dy / L; ny[i] = dx / L;
     }
     // a point at arc length sv between stations i and i + 1, offset o to the
@@ -393,7 +394,7 @@ export function buildTrackGeometry(graph, { tagsOf = () => ({}) } = {}) {
     const at = (i, sv, o, dz) => {
       const f = (sv - e.s[i]) / ((e.s[i + 1] - e.s[i]) || 1);
       let ux = nx[i] + (nx[i + 1] - nx[i]) * f; let uy = ny[i] + (ny[i + 1] - ny[i]) * f;
-      const ul = Math.hypot(ux, uy) || 1; ux /= ul; uy /= ul;
+      const ul = fastHypot(ux, uy) || 1; ux /= ul; uy /= ul;
       return [e.x[i] + (e.x[i + 1] - e.x[i]) * f + ux * o, e.y[i] + (e.y[i + 1] - e.y[i]) * f + uy * o, zk[i] + (zk[i + 1] - zk[i]) * f - dz];
     };
     // the level crossings along it: no ballast, sleepers or rails inside one
@@ -470,7 +471,7 @@ export function buildTrackGeometry(graph, { tagsOf = () => ({}) } = {}) {
       const f = (s - e.s[j]) / ((e.s[j + 1] - e.s[j]) || 1);
       const x = e.x[j] + (e.x[j + 1] - e.x[j]) * f; const y = e.y[j] + (e.y[j + 1] - e.y[j]) * f;
       const zz = zk[j] + (zk[j + 1] - zk[j]) * f;
-      let tx = e.x[j + 1] - e.x[j]; let ty = e.y[j + 1] - e.y[j]; const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
+      let tx = e.x[j + 1] - e.x[j]; let ty = e.y[j + 1] - e.y[j]; const tl = fastHypot(tx, ty) || 1; tx /= tl; ty /= tl;
       const lx = -ty; const ly = tx;
       const t = tileOf(x, y);
       const part = partOf(t, sleeper);
@@ -518,7 +519,7 @@ function densify(pts, step = DECAL_STEP_M) {
   const out = [pts[0]];
   for (let i = 0; i + 1 < pts.length; i++) {
     const a = pts[i]; const b = pts[i + 1];
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]);
     const k = Math.max(1, Math.ceil(L / step));
     for (let j = 1; j <= k; j++) out.push([a[0] + (b[0] - a[0]) * (j / k), a[1] + (b[1] - a[1]) * (j / k), a[2] + (b[2] - a[2]) * (j / k)]);
   }
@@ -547,7 +548,7 @@ export function crossingDecals(graph, { tagsOf = () => ({}) } = {}) {
     const at = (sv, o) => {
       let i = 0; while (i + 2 < n && e.s[i + 1] < sv) i++;
       const f = Math.max(0, Math.min(1, (sv - e.s[i]) / ((e.s[i + 1] - e.s[i]) || 1)));
-      const dx = e.x[i + 1] - e.x[i]; const dy = e.y[i + 1] - e.y[i]; const L = Math.hypot(dx, dy) || 1;
+      const dx = e.x[i + 1] - e.x[i]; const dy = e.y[i + 1] - e.y[i]; const L = fastHypot(dx, dy) || 1;
       return [e.x[i] + dx * f - (dy / L) * o, e.y[i] + dy * f + (dx / L) * o, z[k][i] + (z[k][i + 1] - z[k][i]) * f];
     };
     for (const [za, zb] of e.crossingZones) {

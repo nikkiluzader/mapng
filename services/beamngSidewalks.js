@@ -27,6 +27,7 @@ import { buildCarriagewayIndex, carriagewaysAt, cutNodes, isInZone, isOnOtherCar
 import { isOneWayRoad } from './roadWidth.js';
 import { PLAZA_MATERIAL, plazaTileM, pavedWalkSurface } from './plazas.js';
 import { smoothLine } from './lineSmoothing.js';
+import { fastHypot } from './fastMath.js';
 
 let CURB_H = 0.15;            // m above the road (setCurbHeight: the Curb height choice)
 const SINK = 0.10;            // m the faces reach below the road
@@ -324,7 +325,7 @@ function offsetLine(nodes, offsetArg) {
     const offset = offsetOf(i);
     const a = nodes[Math.max(0, i - 1)];
     const b = nodes[Math.min(nodes.length - 1, i + 1)];
-    const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const len = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
     out.push([nodes[i][0] - ((b[1] - a[1]) / len) * offset, nodes[i][1] + ((b[0] - a[0]) / len) * offset, nodes[i][2], 0]);
   }
   return out;
@@ -411,7 +412,7 @@ const PAVE_CELL_M = 16;
 export function pavedWalkZones(carriageways = [], walks = [], { americas = false } = {}) {
   const strips = [];   // { a, b, h0, h1, set }: from h0 to h1 off segment a-b, + left
   const add = (nodes, set, h0, h1) => {
-    for (let i = 0; i + 1 < nodes.length; i++) if (Math.hypot(nodes[i + 1][0] - nodes[i][0], nodes[i + 1][1] - nodes[i][1]) > 0.01) strips.push({ a: nodes[i], b: nodes[i + 1], h0, h1, set });
+    for (let i = 0; i + 1 < nodes.length; i++) if (fastHypot(nodes[i + 1][0] - nodes[i][0], nodes[i + 1][1] - nodes[i][1]) > 0.01) strips.push({ a: nodes[i], b: nodes[i + 1], h0, h1, set });
   };
   for (const cw of carriageways) {
     const t = cw.tags || {};
@@ -441,7 +442,7 @@ export function pavedWalkZones(carriageways = [], walks = [], { americas = false
   return (x, y) => {
     for (const k of grid.get(`${Math.floor(x / PAVE_CELL_M)},${Math.floor(y / PAVE_CELL_M)}`) || []) {
       const { a, b, h0, h1, set } = strips[k];
-      const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L = Math.hypot(dx, dy);
+      const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L = fastHypot(dx, dy);
       const u = ((x - a[0]) * dx + (y - a[1]) * dy) / (L * L);
       if (u < -0.02 || u > 1.02) continue;
       const across = (dx * (y - a[1]) - dy * (x - a[0])) / L;
@@ -463,15 +464,15 @@ function footwaySides(index, cw) {
   const n = cw.nodes;
   n.forEach((p, i) => {
     const a = n[Math.max(0, i - 1)]; const b = n[Math.min(n.length - 1, i + 1)];
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
     const t = [(b[0] - a[0]) / L, (b[1] - a[1]) / L];
     const seen = new Set();
     for (const { q, r } of index.get(`${Math.floor(p[0] / FOOTWAY_CELL_M)},${Math.floor(p[1] / FOOTWAY_CELL_M)}`) || []) {
-      const dx = r[0] - q[0]; const dy = r[1] - q[1]; const l = Math.hypot(dx, dy) || 1;
+      const dx = r[0] - q[0]; const dy = r[1] - q[1]; const l = fastHypot(dx, dy) || 1;
       if (Math.abs((dx * t[0] + dy * t[1]) / l) < FOOTWAY_ALONG_COS) continue;
       const u = Math.max(0, Math.min(1, ((p[0] - q[0]) * dx + (p[1] - q[1]) * dy) / (l * l)));
       const ox = q[0] + dx * u - p[0]; const oy = q[1] + dy * u - p[1];
-      if (Math.hypot(ox, oy) > cw.half + FOOTWAY_SETBACK_M) continue;
+      if (fastHypot(ox, oy) > cw.half + FOOTWAY_SETBACK_M) continue;
       const across = t[0] * oy - t[1] * ox;
       if (Math.abs(across) < cw.half - 1) continue;
       const side = across > 0 ? 1 : -1;
@@ -515,7 +516,7 @@ const hasSidewalkTags = (tags = {}) => Object.keys(tags).some((k) => k === 'side
 export function streetSides(carriageways, footways = []) {
   const sides = new Map(carriageways.map((cw) => [cw, sidewalkSides(cw)]));
   const known = new Set(carriageways.filter((cw) => hasSidewalkTags(cw.tags)));
-  const near = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) < 1;
+  const near = (a, b) => fastHypot(a[0] - b[0], a[1] - b[1]) < 1;
   const ends = (cw) => [cw.nodes[0], cw.nodes[cw.nodes.length - 1]];
   const sameStreet = (a, b) => (a.owner === b.owner || (a.continuations || []).includes(b.owner) || (b.continuations || []).includes(a.owner))
     && String(a.tags?.name ?? '') === String(b.tags?.name ?? '');
@@ -610,7 +611,7 @@ export function findMedians(carriageways) {
               const L2 = sx * sx + sy * sy || 1e-9;
               const f = Math.max(0, Math.min(1, ((p[0] - q0[0]) * sx + (p[1] - q0[1]) * sy) / L2));
               const vx = q0[0] + sx * f - p[0]; const vy = q0[1] + sy * f - p[1];
-              const d = Math.hypot(vx, vy);
+              const d = fastHypot(vx, vy);
               if (d < DUAL_GAP_M[0] || d > DUAL_GAP_M[1] || (best && d >= best.d)) continue;
               const u = unit([sx, sy]);
               // the other carriageway of a divided road is driven the other
@@ -651,7 +652,7 @@ const medianShare = (median, side) => {
 function everyMetres(line, step) {
   const out = [line[0]]; let left = step;
   for (let i = 0; i + 1 < line.length; i++) {
-    const a = line[i]; const b = line[i + 1]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const a = line[i]; const b = line[i + 1]; const L = fastHypot(b[0] - a[0], b[1] - a[1]);
     let d = left;
     while (d <= L) { const f = d / L; out.push([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f]); d += step; }
     left = d - L;
@@ -768,7 +769,7 @@ function splitRunsWhereBlocked(runs, blocked) {
     const flush = () => { if (piece.length >= 2 && runLength(piece) >= MIN_RUN_M) out.push({ ...run, width: pieceW, points: piece }); piece = []; };
     for (let i = 0; i + 1 < p.length; i++) {
       const a = p[i]; const b = p[i + 1];
-      const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const L = fastHypot(b[0] - a[0], b[1] - a[1]);
       if (L < 1e-6) continue;
       const nx = (-(b[1] - a[1]) / L) * run.side; const ny = ((b[0] - a[0]) / L) * run.side;
       const n = Math.max(1, Math.ceil(L / STEP));
@@ -814,7 +815,7 @@ export function buildSidewalkRuns(carriageways, { zones = [], driveways = [], me
       const n = cw.nodes;
       for (const [p, q] of [[n[0], n[1]], [n[n.length - 1], n[n.length - 2]]]) {
         if (!ends.has(key(p))) ends.set(key(p), []);
-        const L = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1;
+        const L = fastHypot(q[0] - p[0], q[1] - p[1]) || 1;
         ends.get(key(p)).push({ cw, out: [(q[0] - p[0]) / L, (q[1] - p[1]) / L] });
       }
     }
@@ -864,7 +865,7 @@ export function buildSidewalkRuns(carriageways, { zones = [], driveways = [], me
         for (let i = 0; i + 1 < n.length; i++) {
           const ex = n[i + 1][0] - n[i][0]; const ey = n[i + 1][1] - n[i][1];
           const t = Math.max(0, Math.min(1, ((q[0] - n[i][0]) * ex + (q[1] - n[i][1]) * ey) / (ex * ex + ey * ey || 1)));
-          const e = Math.abs(Math.hypot(q[0] - n[i][0] - t * ex, q[1] - n[i][1] - t * ey) - cw.half);
+          const e = Math.abs(fastHypot(q[0] - n[i][0] - t * ex, q[1] - n[i][1] - t * ey) - cw.half);
           if (e < d) { d = e; best = o; }
         }
       }
@@ -906,7 +907,7 @@ export function buildSidewalkRuns(carriageways, { zones = [], driveways = [], me
   for (const run of runs) {
     const p = run.points; const edge = run.width <= CURB_ONLY_M;
     const on = (x, y, i) => (nearDriveway && nearDriveway(x, y, DRIVEWAY_HALF_M)) || (edge && inParking && (() => {
-      const a = p[Math.max(0, i)]; const b = p[Math.min(p.length - 1, i + 1)]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const a = p[Math.max(0, i)]; const b = p[Math.min(p.length - 1, i + 1)]; const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
       return inParking(x + (-(b[1] - a[1]) / L) * run.side * PARKING_OPEN_M, y + ((b[0] - a[0]) / L) * run.side * PARKING_OPEN_M);
     })());
     // (at a crosswalk too: the curb carries on through it, lowered)
@@ -980,7 +981,7 @@ function fillToBuildingFronts(runs, buildings, parking = [], { openGround = [], 
     const pts = run.points;
     const gaps = pts.map((p, i) => {
       const a = pts[Math.max(0, i - 1)]; const b = pts[Math.min(pts.length - 1, i + 1)];
-      const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
       const ux = (-(b[1] - a[1]) / L) * run.side; const uy = ((b[0] - a[0]) / L) * run.side;
       // (a mapped sidewalk just behind the curb: it is the sidewalk)
       if (mappedWalkAt(p[0] + ux * 1.5, p[1] + uy * 1.5)) return null;
@@ -1056,7 +1057,7 @@ function buildLineIndex(lines) {
     const dx = bx - ax; const dy = by - ay;
     const len = dx * dx + dy * dy;
     const t = len > 0 ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / len)) : 0;
-    return Math.hypot(ax + t * dx - x, ay + t * dy - y) < r;
+    return fastHypot(ax + t * dx - x, ay + t * dy - y) < r;
   });
 }
 
@@ -1072,7 +1073,7 @@ function buildLineIndex(lines) {
 function mergeRuns(pieces, { matchWidth = true } = {}) {
   const NEAR = 0.75;
   const runs = pieces.map((r) => ({ ...r, points: [...r.points], alive: true }));
-  const near = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) < NEAR;
+  const near = (a, b) => fastHypot(a[0] - b[0], a[1] - b[1]) < NEAR;
   const dir = (a, b) => unit([b[0] - a[0], b[1] - a[1]]);
   const cellOf = (p) => `${Math.floor(p[0] / NEAR)},${Math.floor(p[1] / NEAR)}`;
   const grid = new Map();   // cell -> runs with an end there (checked again on use)
@@ -1137,7 +1138,7 @@ function endIndex(ends, pad) {
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
         for (const [ex, ey, half] of cells.get(keyOf(cx + dx, cy + dy)) || []) {
-          if (Math.hypot(ex - x, ey - y) < half + pad) return true;
+          if (fastHypot(ex - x, ey - y) < half + pad) return true;
         }
       }
     }
@@ -1152,7 +1153,7 @@ function dipsAlong(points, on) {
   for (let i = 0; i + 1 < points.length; i++) {
     const [ax, ay] = points[i];
     const [bx, by] = points[i + 1];
-    const len = Math.hypot(bx - ax, by - ay);
+    const len = fastHypot(bx - ax, by - ay);
     for (let d = 0; d < len; d += DIP_STEP_M) {
       const hit = on(ax + ((bx - ax) * d) / len, ay + ((by - ay) * d) / len, i);
       if (hit && open === null) open = s + d;
@@ -1296,7 +1297,7 @@ function heightShare(total, ramps, dips, rampM = null) {
 
 function rampStations(points, ramps, dips = [], rampM = null) {
   const s = [0];
-  for (let i = 1; i < points.length; i++) s.push(s[i - 1] + Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]));
+  for (let i = 1; i < points.length; i++) s.push(s[i - 1] + fastHypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]));
   const total = s[s.length - 1];
   const shareAt = heightShare(total, ramps, dips, rampM);
   const cuts = [];
@@ -1327,12 +1328,12 @@ function paveGap(builder, run) {
   const p = run.points; let s = 0;
   const out = p.map((q, i) => {
     const a = p[Math.max(0, i - 1)]; const b = p[Math.min(p.length - 1, i + 1)];
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
     const w = (q[3] || 0.3) + 0.15;
     return [q[0] + (-(b[1] - a[1]) / L) * run.side * w, q[1] + ((b[0] - a[0]) / L) * run.side * w, q[2]];
   });
   for (let i = 0; i + 1 < p.length; i++) {
-    const L = Math.hypot(p[i + 1][0] - p[i][0], p[i + 1][1] - p[i][1]);
+    const L = fastHypot(p[i + 1][0] - p[i][0], p[i + 1][1] - p[i][1]);
     const uv = (o, v) => [o / PAVED_TILE_M, v / PAVED_TILE_M];
     const q = [p[i], p[i + 1], out[i + 1], out[i]].map(([x, y, z]) => [x, y, z + FILLET_LIFT_M]);
     builder.tri('paved', q[0], q[1], q[2], uv(s, 0), uv(s + L, 0), uv(s + L, 1), [0, 0, 1]);
@@ -1352,13 +1353,13 @@ function sweepRun(builder, run) {
   const outward = points.map((p, i) => {
     const a = points[Math.max(0, i - 1)];
     const b = points[Math.min(points.length - 1, i + 1)];
-    const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const len = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
     return [-((b[1] - a[1]) / len) * side, ((b[0] - a[0]) / len) * side];
   });
   const stations = points.map((p, i) => (profiles ? profiles[i] : profile).points.map(([o, h]) => [p[0] + outward[i][0] * o, p[1] + outward[i][1] * o, p[2] + (h > 0 ? h * share[i] : h)]));
   let along = 0;
   for (let i = 0; i + 1 < points.length; i++) {
-    const step = Math.hypot(points[i + 1][0] - points[i][0], points[i + 1][1] - points[i][1]);
+    const step = fastHypot(points[i + 1][0] - points[i][0], points[i + 1][1] - points[i][1]);
     const s0 = along;
     const s1 = along + step;
     along = s1;
@@ -1390,14 +1391,14 @@ function sweepRun(builder, run) {
   }
 }
 
-const unit = (v) => { const l = Math.hypot(v[0], v[1]) || 1; return [v[0] / l, v[1] / l]; };
+const unit = (v) => { const l = fastHypot(v[0], v[1]) || 1; return [v[0] / l, v[1] / l]; };
 const lineX = (p, d, q, e) => {
   const den = d[0] * e[1] - d[1] * e[0];
   if (Math.abs(den) < 1e-9) return null;
   const t = ((q[0] - p[0]) * e[1] - (q[1] - p[1]) * e[0]) / den;
   return [p[0] + t * d[0], p[1] + t * d[1]];
 };
-const runLength = (pts) => pts.reduce((n, p, i) => (i ? n + Math.hypot(p[0] - pts[i - 1][0], p[1] - pts[i - 1][1]) : 0), 0);
+const runLength = (pts) => pts.reduce((n, p, i) => (i ? n + fastHypot(p[0] - pts[i - 1][0], p[1] - pts[i - 1][1]) : 0), 0);
 
 // A run's end: its point, the way on past it, the sidewalk's side (outward
 // from the road), its height.
@@ -1422,7 +1423,7 @@ function moveEnd(end, t) {
     while (pts.length > 1) {
       const a = pts[pts.length - 1];
       const b = pts[pts.length - 2];
-      const seg = Math.hypot(a[0] - b[0], a[1] - b[1]);
+      const seg = fastHypot(a[0] - b[0], a[1] - b[1]);
       if (seg > cut + 1e-6) {
         const f = cut / seg;
         pts[pts.length - 1] = a.map((v, k) => v + (b[k] - v) * f);
@@ -1465,7 +1466,7 @@ function joinCorners(runs, index, walkRuns = []) {
     for (const j of near) {
       const A = ends[i];
       const B = ends[j];
-      if (A.run === B.run || Math.hypot(A.p[0] - B.p[0], A.p[1] - B.p[1]) > 2 * CORNER_REACH_M) continue;
+      if (A.run === B.run || fastHypot(A.p[0] - B.p[0], A.p[1] - B.p[1]) > 2 * CORNER_REACH_M) continue;
       const angle = Math.acos(Math.max(-1, Math.min(1, A.d[0] * B.d[0] + A.d[1] * B.d[1]))) * 180 / Math.PI;
       if (angle < CORNER_ANGLES[0] || angle > CORNER_ANGLES[1]) continue;
       // each sidewalk lies on the outside of the other's road
@@ -1535,7 +1536,7 @@ function joinCorners(runs, index, walkRuns = []) {
     const c = [end.p[0] + end.n[0] * w / 2, end.p[1] + end.n[1] * w / 2];
     const gx = Math.floor(c[0] / WALK_CELL); const gy = Math.floor(c[1] / WALK_CELL);
     for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
-      for (const q of walkGrid.get(`${gx + i},${gy + j}`) || []) if (Math.hypot(q[0] - c[0], q[1] - c[1]) < q[2] + w / 2 + SIDEWALK_WALK_JOIN_M) return true;
+      for (const q of walkGrid.get(`${gx + i},${gy + j}`) || []) if (fastHypot(q[0] - c[0], q[1] - c[1]) < q[2] + w / 2 + SIDEWALK_WALK_JOIN_M) return true;
     }
     return false;
   };
@@ -1577,7 +1578,7 @@ function levelWalkEndsOnSidewalks(walkRuns, streetRuns, corners = []) {
       const { a, b, half: h } = slabs[k];
       const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L2 = dx * dx + dy * dy || 1;
       const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2));
-      return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy) < h + half * 0.5 + 0.3;
+      return fastHypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy) < h + half * 0.5 + 0.3;
     });
   };
   for (const w of walkRuns) {
@@ -1592,7 +1593,7 @@ function levelWalkEndsOnSidewalks(walkRuns, streetRuns, corners = []) {
       const idx = (i) => (k ? n - 1 - i : i);
       let d = 0; let level = null;
       for (let i = 1; i < n; i++) {
-        d += Math.hypot(w.centre[idx(i)][0] - w.centre[idx(i - 1)][0], w.centre[idx(i)][1] - w.centre[idx(i - 1)][1]);
+        d += fastHypot(w.centre[idx(i)][0] - w.centre[idx(i - 1)][0], w.centre[idx(i)][1] - w.centre[idx(i - 1)][1]);
         if (d >= WALK_RAMP_M) { level = w.centre[idx(i)][2]; break; }
       }
       if (level === null) return;
@@ -1620,8 +1621,8 @@ export function cornerPatches(corners) {
     const { arc, centre, a, b } = corner;
     const apex = cornerPoint(corner);
     if (!apex || arc.length < 3) continue;
-    const radius = Math.hypot(arc[0][0] - centre[0], arc[0][1] - centre[1]);
-    const depth = Math.hypot(apex[0] - centre[0], apex[1] - centre[1]) - radius;
+    const radius = fastHypot(arc[0][0] - centre[0], arc[0][1] - centre[1]);
+    const depth = fastHypot(apex[0] - centre[0], apex[1] - centre[1]) - radius;
     if (!(depth > 0) || depth > 15) continue;
     const z = (a.z + b.z) / 2;
     // (both streets: the corner takes the junction's surface, exportBeamNGLevel)
@@ -1655,7 +1656,7 @@ export function cornerPatches(corners) {
           break;
         }
       }
-      const length = kept.reduce((sum, q, i) => (i ? sum + Math.hypot(q[0] - kept[i - 1][0], q[1] - kept[i - 1][1]) : 0), 0);
+      const length = kept.reduce((sum, q, i) => (i ? sum + fastHypot(q[0] - kept[i - 1][0], q[1] - kept[i - 1][1]) : 0), 0);
       if (kept.length < 2 || length < CORNER_BAND_MIN_M) continue;
       // (evenly spaced: the game's spline through two nodes almost on top of
       // each other, as the cut left them, overshot into spikes across the road)
@@ -1668,7 +1669,7 @@ const lerp3 = (p, q, t) => p.map((v, i) => v + ((q[i] ?? v) - v) * t);
 // n points evenly along a polyline, its ends kept
 function resampleEven(pts, n) {
   const cum = [0];
-  for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + fastHypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
   const total = cum[cum.length - 1];
   const out = [];
   let j = 1;
@@ -1698,7 +1699,7 @@ export function curbKeepOuts(runs, carriageways) {
       const a = cw.nodes[i - 1]; const b = cw.nodes[i];
       const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L2 = dx * dx + dy * dy || 1;
       const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2));
-      best = Math.min(best, Math.hypot(a[0] + dx * t - p[0], a[1] + dy * t - p[1]));
+      best = Math.min(best, fastHypot(a[0] + dx * t - p[0], a[1] + dy * t - p[1]));
     }
     return best;
   };
@@ -1713,7 +1714,7 @@ export function curbKeepOuts(runs, carriageways) {
     const pts = run.points;
     for (let i = 0; i + 1 < pts.length; i++) {
       const p = pts[i]; const q = pts[i + 1];
-      const L = Math.hypot(q[0] - p[0], q[1] - p[1]);
+      const L = fastHypot(q[0] - p[0], q[1] - p[1]);
       if (L < 0.05) continue;
       let n = [-(q[1] - p[1]) / L, (q[0] - p[0]) / L];
       const m = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
@@ -1738,7 +1739,7 @@ export function curbKeepOuts(runs, carriageways) {
     const h = (i) => (cw.halfAt ? cw.halfAt[i] : cw.half) - CURB_KEEP_OUT_SET_M;
     for (let i = 0; i + 1 < cw.nodes.length; i++) {
       const p = cw.nodes[i]; const q = cw.nodes[i + 1];
-      const L = Math.hypot(q[0] - p[0], q[1] - p[1]);
+      const L = fastHypot(q[0] - p[0], q[1] - p[1]);
       if (L < 0.05) continue;
       const ux = -(q[1] - p[1]) / L; const uy = (q[0] - p[0]) / L; const hp = h(i); const hq = h(i + 1);
       out.push([[p[0] + ux * hp, p[1] + uy * hp], [q[0] + ux * hq, q[1] + uy * hq], [q[0] - ux * hq, q[1] - uy * hq], [p[0] - ux * hp, p[1] - uy * hp]]);
@@ -1794,7 +1795,7 @@ function cornerPoint(corner) {
 function cornerSlabOutline({ arc, centre, outer, a, b }) {
   const w = Math.max(a.run.width, b.run.width);
   const inward = arc.map(([x, y]) => unit([centre[0] - x, centre[1] - y]));
-  const reach = arc.map(([x, y]) => Math.min(w, Math.hypot(centre[0] - x, centre[1] - y) - 0.1));
+  const reach = arc.map(([x, y]) => Math.min(w, fastHypot(centre[0] - x, centre[1] - y) - 0.1));
   const inner = arc.map((p, i) => [p[0] + inward[i][0] * reach[i], p[1] + inward[i][1] * reach[i]]);
   const k = Math.floor(arc.length / 2);
   // (the outer corner on the sidewalk side of the curve and past the band:
@@ -1833,7 +1834,7 @@ function sweepCorner(builder, corner) {
   const stations = arc.map((p, i) => curbPts.map(([o, h]) => [p[0] + inward[i][0] * o, p[1] + inward[i][1] * o, p[2] + h]));
   let along = 0;
   for (let i = 0; i + 1 < arc.length; i++) {
-    const step = Math.hypot(arc[i + 1][0] - arc[i][0], arc[i + 1][1] - arc[i][1]);
+    const step = fastHypot(arc[i + 1][0] - arc[i][0], arc[i + 1][1] - arc[i][1]);
     const u0 = along / CURB_REPEAT_M;
     along += step;
     const u1 = along / CURB_REPEAT_M;
@@ -1905,7 +1906,7 @@ function wallIndex(walls) {
   const cells = new Map();
   for (const wall of walls) {
     for (let i = 0; i + 1 < wall.length; i++) {
-      const a = wall[i]; const b = wall[i + 1]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const a = wall[i]; const b = wall[i + 1]; const L = fastHypot(b[0] - a[0], b[1] - a[1]);
       for (let s = 0; s <= L + 4; s += 4) {
         const f = Math.min(1, L ? s / L : 0);
         const key = wallCellKey(Math.floor((a[0] + (b[0] - a[0]) * f) / 8), Math.floor((a[1] + (b[1] - a[1]) * f) / 8));
@@ -1930,7 +1931,7 @@ function wallAhead(cells, x, y, nx, ny, reach, across = 1) {
         const ex = b[0] - a[0]; const ey = b[1] - a[1];
         const det = nx * ey - ny * ex;
         if (Math.abs(det) < 1e-6) continue;
-        if (Math.abs(ex * nx + ey * ny) > across * Math.hypot(ex, ey)) continue;
+        if (Math.abs(ex * nx + ey * ny) > across * fastHypot(ex, ey)) continue;
         const t = ((a[0] - x) * ey - (a[1] - y) * ex) / det; const u = ((a[0] - x) * ny - (a[1] - y) * nx) / det;
         if (t > 0 && t < d && u >= 0 && u <= 1) { d = t; best = t; }
       }
@@ -1965,7 +1966,7 @@ function apronsOf(run, cells, { groundAt = null, seaZ = -Infinity, clear = () =>
     const flush = () => { if (cur && cur.edge.length >= 2 && (!cur.sea || cur.seaLen >= SEAWALL_MIN_LEN_M)) out.push(cur); cur = null; };
     c.forEach((p, i) => {
       const a = c[Math.max(0, i - 1)]; const b = c[Math.min(c.length - 1, i + 1)];
-      const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
       const nx = (-(b[1] - a[1]) / L) * sg; const ny = ((b[0] - a[0]) / L) * sg;
       const ex = p[0] + nx * run.half; const ey = p[1] + ny * run.half;
       const walkTop = (p[2] ?? 0) + WALK_H;
@@ -1985,7 +1986,7 @@ function apronsOf(run, cells, { groundAt = null, seaZ = -Infinity, clear = () =>
       }
       cur ??= { edge: [], out: [], z: [], seaLen: 0, sea };
       const last = cur.edge[cur.edge.length - 1];
-      if (sea && last) cur.seaLen += Math.hypot(pt.e[0] - last[0], pt.e[1] - last[1]);
+      if (sea && last) cur.seaLen += fastHypot(pt.e[0] - last[0], pt.e[1] - last[1]);
       push(cur, pt);
     });
     flush();
@@ -2025,7 +2026,7 @@ export function buildWalkRuns(paths, carriageways, { groundAt, driveways = [], b
     const cx = Math.floor(x / WALK_JOIN_M); const cy = Math.floor(y / WALK_JOIN_M);
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
-        for (const [o, qx, qy] of cells.get(`${cx + dx},${cy + dy}`) || []) if (o !== k && Math.hypot(qx - x, qy - y) < reach) return true;
+        for (const [o, qx, qy] of cells.get(`${cx + dx},${cy + dy}`) || []) if (o !== k && fastHypot(qx - x, qy - y) < reach) return true;
       }
     }
     return false;
@@ -2036,7 +2037,7 @@ export function buildWalkRuns(paths, carriageways, { groundAt, driveways = [], b
     // an end pointing at a road just ahead of it goes on to the road
     const reachRoad = (end, prev) => {
       if (joinsAnother(end[0], end[1], k, WALK_TOUCH_M)) return [];
-      const L = Math.hypot(end[0] - prev[0], end[1] - prev[1]) || 1;
+      const L = fastHypot(end[0] - prev[0], end[1] - prev[1]) || 1;
       const ux = (end[0] - prev[0]) / L; const uy = (end[1] - prev[1]) / L;
       if (carriagewaysAt(index, end[0], end[1], 0).length) return [];
       for (let d = 0.5; d <= WALK_REACH_M; d += 0.5) {
@@ -2054,11 +2055,11 @@ export function buildWalkRuns(paths, carriageways, { groundAt, driveways = [], b
     // into a wedge where two walks joined)
     // (a closed walk stays closed: its last point a hair from the one before
     // went as a repeat, and the ring, open now, kept a straight chord)
-    const distinct = path.nodes.filter((q, i, a) => !i || Math.hypot(q[0] - a[i - 1][0], q[1] - a[i - 1][1]) > WALK_DUP_M);
+    const distinct = path.nodes.filter((q, i, a) => !i || fastHypot(q[0] - a[i - 1][0], q[1] - a[i - 1][1]) > WALK_DUP_M);
     const n0 = path.nodes[0]; const nl = path.nodes[path.nodes.length - 1];
-    if (path.nodes.length > 3 && Math.hypot(n0[0] - nl[0], n0[1] - nl[1]) < 1e-6) {
+    if (path.nodes.length > 3 && fastHypot(n0[0] - nl[0], n0[1] - nl[1]) < 1e-6) {
       const dl = distinct[distinct.length - 1];
-      if (Math.hypot(dl[0] - n0[0], dl[1] - n0[1]) > 1e-6) distinct[distinct.length - 1] = n0;
+      if (fastHypot(dl[0] - n0[0], dl[1] - n0[1]) > 1e-6) distinct[distinct.length - 1] = n0;
     }
     const nodes = thinLine(smoothLine(dewobble(distinct.length >= 2 ? distinct : path.nodes)));
     const full = [...reachRoad(nodes[0], nodes[1]).reverse(), ...nodes, ...reachRoad(nodes[nodes.length - 1], nodes[nodes.length - 2])];
@@ -2070,7 +2071,7 @@ export function buildWalkRuns(paths, carriageways, { groundAt, driveways = [], b
     // a footway just off the curb is against it: the thin strip between closed
     const normals = full.map((q, i) => {
       const a = full[Math.max(0, i - 1)]; const b = full[Math.min(full.length - 1, i + 1)];
-      const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
       return [-(b[1] - a[1]) / L, (b[0] - a[0]) / L];
     });
     // (from just off its line: a walk mapped partly over the drawn road's
@@ -2172,7 +2173,7 @@ export function buildWalkRuns(paths, carriageways, { groundAt, driveways = [], b
           const ex = b[0] - a[0]; const ey = b[1] - a[1];
           const u = Math.max(0, Math.min(1, ((p[0] - a[0]) * ex + (p[1] - a[1]) * ey) / (ex * ex + ey * ey || 1)));
           const q = [a[0] + ex * u, a[1] + ey * u, a[2] + (b[2] - a[2]) * u, 0];
-          const e = Math.hypot(q[0] - p[0], q[1] - p[1]);
+          const e = fastHypot(q[0] - p[0], q[1] - p[1]);
           if (e < d) { d = e; best = q; }
         }
       }
@@ -2189,8 +2190,8 @@ export function buildWalkRuns(paths, carriageways, { groundAt, driveways = [], b
     // other walk's line, over the far half of its slab, doubled back to the
     // point on that line and folded up as a wedge)
     let body = drawn;
-    while (head && body.length > 2 && Math.hypot(body[0][0] - head[0], body[0][1] - head[1]) < half + WALK_ATTACH_CLEAR_M) body = body.slice(1);
-    while (tail && body.length > 2 && Math.hypot(body[body.length - 1][0] - tail[0], body[body.length - 1][1] - tail[1]) < half + WALK_ATTACH_CLEAR_M) body = body.slice(0, -1);
+    while (head && body.length > 2 && fastHypot(body[0][0] - head[0], body[0][1] - head[1]) < half + WALK_ATTACH_CLEAR_M) body = body.slice(1);
+    while (tail && body.length > 2 && fastHypot(body[body.length - 1][0] - tail[0], body[body.length - 1][1] - tail[1]) < half + WALK_ATTACH_CLEAR_M) body = body.slice(0, -1);
     const line = [...(head ? [head] : []), ...body, ...(tail ? [tail] : [])];
     // the sides of the slab off the road: it may run up to a road, not along one
     const sideOn = (x, y) => {
@@ -2202,7 +2203,7 @@ export function buildWalkRuns(paths, carriageways, { groundAt, driveways = [], b
         if (e < d) { d = e; best = q; at = i; }
       }
       const a = line[Math.max(0, at - 1)]; const b = line[Math.min(line.length - 1, at + 1)];
-      const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
       const nx = -(b[1] - a[1]) / L * half; const ny = (b[0] - a[0]) / L * half;
       return isOnOtherCarriageway(index, x + nx, y + ny, WALK_ROAD_M, () => false) && isOnOtherCarriageway(index, x - nx, y - ny, WALK_ROAD_M, () => false) && !!best;
     };
@@ -2213,11 +2214,11 @@ export function buildWalkRuns(paths, carriageways, { groundAt, driveways = [], b
       // (a crossing's landing between the sidewalk and the curb can be short)
       if (runLength(piece) < (chosen[k].crossing ? WALK_LANDING_M : WALK_MIN_M)) continue;
       const ends = [piece[0], piece[piece.length - 1]];
-      const joined = [piece[0] === line[0] || Math.hypot(ends[0][0] - line[0][0], ends[0][1] - line[0][1]) < 0.01 ? !!head : false,
-        Math.hypot(ends[1][0] - line[line.length - 1][0], ends[1][1] - line[line.length - 1][1]) < 0.01 ? !!tail : false];
+      const joined = [piece[0] === line[0] || fastHypot(ends[0][0] - line[0][0], ends[0][1] - line[0][1]) < 0.01 ? !!head : false,
+        fastHypot(ends[1][0] - line[line.length - 1][0], ends[1][1] - line[line.length - 1][1]) < 0.01 ? !!tail : false];
       // (the cut above is only as fine as its sampling: an end at a road goes on to its edge)
       const toEdge = (q, prev) => {
-        const L = Math.hypot(q[0] - prev[0], q[1] - prev[1]) || 1;
+        const L = fastHypot(q[0] - prev[0], q[1] - prev[1]) || 1;
         for (let d = 0.1; d <= WALK_EDGE_M; d += 0.1) {
           const x = q[0] + ((q[0] - prev[0]) / L) * d; const y = q[1] + ((q[1] - prev[1]) / L) * d;
           if (carriagewaysAt(index, x, y, 0).length) return [x, y, q[2], q[3]];
@@ -2233,7 +2234,7 @@ export function buildWalkRuns(paths, carriageways, { groundAt, driveways = [], b
       });
       // an end at a road comes down to the road; any other stays up (one at a seawall folded)
       const ramps = onRoad.map((road) => !!road);
-      const stations = piece.filter((q, i, a) => !i || Math.hypot(q[0] - a[i - 1][0], q[1] - a[i - 1][1]) > WALK_DUP_M).map((q) => [...q]);
+      const stations = piece.filter((q, i, a) => !i || fastHypot(q[0] - a[i - 1][0], q[1] - a[i - 1][1]) > WALK_DUP_M).map((q) => [...q]);
       if (stations.length < 2) continue;
       const total = runLength(stations);
       // (a stub that is all ramp, between where two walks join and the road:
@@ -2241,7 +2242,7 @@ export function buildWalkRuns(paths, carriageways, { groundAt, driveways = [], b
       if (total < WALK_STUB_M && ramps.some(Boolean)) continue;
       let s = 0;
       stations.forEach((q, i) => {
-        if (i) s += Math.hypot(q[0] - stations[i - 1][0], q[1] - stations[i - 1][1]);
+        if (i) s += fastHypot(q[0] - stations[i - 1][0], q[1] - stations[i - 1][1]);
         for (const [road, d] of [[onRoad[0], s], [onRoad[1], total - s]]) {
           if (road && d < WALK_RAMP_M) q[2] += (road.z - q[2]) * (1 - d / WALK_RAMP_M);
         }
@@ -2265,14 +2266,14 @@ const WOBBLE_M = 0.25;
 const WOBBLE_PASSES = 3;
 function dewobble(nodes) {
   if (nodes.length < 3) return nodes;
-  const closed = nodes.length > 3 && Math.hypot(nodes[0][0] - nodes[nodes.length - 1][0], nodes[0][1] - nodes[nodes.length - 1][1]) < 1e-6;
+  const closed = nodes.length > 3 && fastHypot(nodes[0][0] - nodes[nodes.length - 1][0], nodes[0][1] - nodes[nodes.length - 1][1]) < 1e-6;
   let pts = nodes.map((q) => [...q]);
   for (let pass = 0; pass < WOBBLE_PASSES; pass++) {
     const next = pts.map((q) => [...q]);
     for (let i = 1; i + 1 < pts.length; i++) {
       const a = pts[i - 1]; const b = pts[i + 1]; const p = pts[i];
       const mx = (a[0] + b[0]) / 2; const my = (a[1] + b[1]) / 2;
-      if (Math.hypot(p[0] - mx, p[1] - my) < WOBBLE_M) { next[i][0] = (p[0] + mx) / 2; next[i][1] = (p[1] + my) / 2; }
+      if (fastHypot(p[0] - mx, p[1] - my) < WOBBLE_M) { next[i][0] = (p[0] + mx) / 2; next[i][1] = (p[1] + my) / 2; }
     }
     pts = next;
   }
@@ -2291,7 +2292,7 @@ function thinLine(pts) {
   let last = 0;
   for (let i = 1; i + 1 < pts.length; i++) {
     const a = pts[last]; const p = pts[i]; const b = pts[i + 1];
-    const ex = b[0] - a[0]; const ey = b[1] - a[1]; const L = Math.hypot(ex, ey);
+    const ex = b[0] - a[0]; const ey = b[1] - a[1]; const L = fastHypot(ex, ey);
     const off = L > 1e-9 ? Math.abs(((p[0] - a[0]) * ey - (p[1] - a[1]) * ex) / L) : 0;
     // (the stretch from the last kept point to the next, every dropped point on it)
     let keep = off >= THIN_M || L > THIN_MAX_M;
@@ -2314,7 +2315,7 @@ const WALK_SHIFT_EASE_M = 3;
 function easeShift(line, moves, held = []) {
   if (!moves.some((v) => Math.abs(v) > 1e-6)) return moves;
   const st = [0];
-  for (let i = 1; i < line.length; i++) st.push(st[i - 1] + Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]));
+  for (let i = 1; i < line.length; i++) st.push(st[i - 1] + fastHypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]));
   const windowed = (vals, f) => vals.map((_, i) => {
     let a = i; let b = i;
     while (a > 0 && st[i] - st[a - 1] <= WALK_SHIFT_EASE_M) a--;
@@ -2352,7 +2353,7 @@ export function chainWalks(paths) {
     const n = p.nodes;
     for (const atEnd of [false, true]) {
       const q = atEnd ? n[n.length - 1] : n[0]; const r = atEnd ? n[n.length - 2] : n[1];
-      const L = Math.hypot(r[0] - q[0], r[1] - q[1]) || 1;
+      const L = fastHypot(r[0] - q[0], r[1] - q[1]) || 1;
       const kq = key(q);
       if (!ends.has(kq)) ends.set(kq, []);
       ends.get(kq).push({ k, atEnd, out: [(r[0] - q[0]) / L, (r[1] - q[1]) / L] });
@@ -2416,7 +2417,7 @@ const WALK_BRIDGE_M = 10;
 function bridgeCorners(pieces, blockedAt, half) {
   if (pieces.length < 2) return pieces;
   const clear = (a, b) => {
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]);
     if (L > WALK_BRIDGE_M) return false;
     const nx = -(b[1] - a[1]) / (L || 1) * half; const ny = (b[0] - a[0]) / (L || 1) * half;
     for (let d = 0; d <= L + 1e-6; d += 0.25) {
@@ -2430,7 +2431,7 @@ function bridgeCorners(pieces, blockedAt, half) {
     const out = []; let d = 0;
     for (let k = 0; k < line.length && d <= WALK_BRIDGE_TRIM_M; k++) {
       const i = fromEnd ? line.length - 1 - k : k;
-      if (k) { const j = fromEnd ? i + 1 : i - 1; d += Math.hypot(line[i][0] - line[j][0], line[i][1] - line[j][1]); }
+      if (k) { const j = fromEnd ? i + 1 : i - 1; d += fastHypot(line[i][0] - line[j][0], line[i][1] - line[j][1]); }
       if (line.length - k >= 2) out.push({ i, d });
     }
     return out;
@@ -2463,7 +2464,7 @@ const WALK_JUNCTION_BLEND_M = 3;
 function levelWalkJunctions(runs) {
   const walks = runs.filter((r) => r.centre?.length >= 2);
   if (walks.length < 2) return;
-  const stationsOf = (r) => { const s = [0]; for (let i = 1; i < r.centre.length; i++) s.push(s[i - 1] + Math.hypot(r.centre[i][0] - r.centre[i - 1][0], r.centre[i][1] - r.centre[i - 1][1])); return s; };
+  const stationsOf = (r) => { const s = [0]; for (let i = 1; i < r.centre.length; i++) s.push(s[i - 1] + fastHypot(r.centre[i][0] - r.centre[i - 1][0], r.centre[i][1] - r.centre[i - 1][1])); return s; };
   for (const r of walks) r._s = stationsOf(r);
   const zAt = (r, st) => {
     const s = r._s; const c = r.centre;
@@ -2495,7 +2496,7 @@ function levelWalkJunctions(runs) {
     let m = null;
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
-        for (const o of meetCells.get((cx + dx) * 1048576 + (cy + dy)) || []) if (Math.hypot(o.x - x, o.y - y) < MEET_M && (!m || o.n < m.n)) m = o;
+        for (const o of meetCells.get((cx + dx) * 1048576 + (cy + dy)) || []) if (fastHypot(o.x - x, o.y - y) < MEET_M && (!m || o.n < m.n)) m = o;
       }
     }
     if (!m) {
@@ -2531,7 +2532,7 @@ function levelWalkJunctions(runs) {
         const B = walks[kb]; const c = B.centre[j]; const d = B.centre[j + 1];
         const ex = d[0] - c[0]; const ey = d[1] - c[1];
         const u = Math.max(0, Math.min(1, ((e[0] - c[0]) * ex + (e[1] - c[1]) * ey) / (ex * ex + ey * ey || 1)));
-        if (Math.hypot(c[0] + ex * u - e[0], c[1] + ey * u - e[1]) < B.half + 0.3) add(e[0], e[1], ka, se, kb, B._s[j] + (B._s[j + 1] - B._s[j]) * u);
+        if (fastHypot(c[0] + ex * u - e[0], c[1] + ey * u - e[1]) < B.half + 0.3) add(e[0], e[1], ka, se, kb, B._s[j] + (B._s[j + 1] - B._s[j]) * u);
       }
     }
   });
@@ -2594,7 +2595,7 @@ function levelWalkJunctions(runs) {
       if (e < 0 || r.ramps?.[e] || r._over?.[e]) continue;
       const c = r.centre; const n = c.length;
       const [p, q] = e ? [c[n - 1], c[n - 2]] : [c[0], c[1]];
-      const L = Math.hypot(p[0] - q[0], p[1] - q[1]) || 1;
+      const L = fastHypot(p[0] - q[0], p[1] - q[1]) || 1;
       const tip = [p[0] + ((p[0] - q[0]) / L) * over, p[1] + ((p[1] - q[1]) / L) * over, p[2]];
       if (e) c.push(tip); else { c.unshift(tip); if (r.dips) r.dips = r.dips.map(([a, b]) => [a + over, b + over]); }
       r.points = offsetLine(c, r.half).map((o) => [o[0], o[1], o[2]]);
@@ -2642,7 +2643,7 @@ export function buildDeckRuns(paths, bridges, opts = {}) {
     const deckNear = (q, i) => {
       if (!index) return null;
       const a = nodes[Math.max(0, i - 1)]; const b = nodes[Math.min(nodes.length - 1, i + 1)];
-      const pl = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const pl = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
       let best = null;
       // (only segments near enough to count: those within half + SIDEWALK_DECK_M are registered within
       // SIDEWALK_DECK_M - 4 of the point; a scan of every segment took a city's footbridges half a minute)
@@ -2652,7 +2653,7 @@ export function buildDeckRuns(paths, bridges, opts = {}) {
         const dx = s.bx - s.ax; const dy = s.by - s.ay; const L2 = dx * dx + dy * dy || 1;
         const tt = Math.max(0, Math.min(1, ((q[0] - s.ax) * dx + (q[1] - s.ay) * dy) / L2));
         const px = s.ax + tt * dx; const py = s.ay + tt * dy;
-        const r = Math.hypot(q[0] - px, q[1] - py);
+        const r = fastHypot(q[0] - px, q[1] - py);
         const d = r - s.half;
         if (d > SIDEWALK_DECK_M || (best && d >= best.gap)) continue;
         const along = Math.abs(((b[0] - a[0]) * dx + (b[1] - a[1]) * dy) / (pl * Math.sqrt(L2)));
@@ -2687,7 +2688,7 @@ export function buildDeckRuns(paths, bridges, opts = {}) {
           if (Number.isFinite(sv) && sv - groundAt(nodes[e][0], nodes[e][1]) > DECK_DUG_M) raw[e] = Math.max(raw[e], sv);
         }
       }
-      const sAt = [0]; for (let i = 1; i < nodes.length; i++) sAt.push(sAt[i - 1] + Math.hypot(nodes[i][0] - nodes[i - 1][0], nodes[i][1] - nodes[i - 1][1]));
+      const sAt = [0]; for (let i = 1; i < nodes.length; i++) sAt.push(sAt[i - 1] + fastHypot(nodes[i][0] - nodes[i - 1][0], nodes[i][1] - nodes[i - 1][1]));
       const total = sAt[nodes.length - 1] || 1; const z0 = raw[0]; const z1 = raw[nodes.length - 1];
       for (let i = 1; i + 1 < nodes.length; i++) {
         if (onRoad[i]) continue;
@@ -2699,7 +2700,7 @@ export function buildDeckRuns(paths, bridges, opts = {}) {
     // cantilevered walkway past the cable planes): on a line between its heights either side, not
     // down to the water and up again (the Golden Gate's sidewalks)
     if (path.bridge) {
-      const sAt = [0]; for (let i = 1; i < nodes.length; i++) sAt.push(sAt[i - 1] + Math.hypot(nodes[i][0] - nodes[i - 1][0], nodes[i][1] - nodes[i - 1][1]));
+      const sAt = [0]; for (let i = 1; i < nodes.length; i++) sAt.push(sAt[i - 1] + fastHypot(nodes[i][0] - nodes[i - 1][0], nodes[i][1] - nodes[i - 1][1]));
       for (let i = 0; i < nodes.length; i++) {
         if (onRoad[i]) continue;
         let a = i - 1; while (a >= 0 && !onRoad[a]) a--;
@@ -2719,7 +2720,7 @@ export function buildDeckRuns(paths, bridges, opts = {}) {
       if (index) for (const q of nodes) for (const s of index.segments) {
         const dx = s.bx - s.ax; const dy = s.by - s.ay; const L2 = dx * dx + dy * dy || 1;
         const t = Math.max(0, Math.min(1, ((q[0] - s.ax) * dx + (q[1] - s.ay) * dy) / L2));
-        const d = Math.hypot(s.ax + t * dx - q[0], s.ay + t * dy - q[1]) - s.half;
+        const d = fastHypot(s.ax + t * dx - q[0], s.ay + t * dy - q[1]) - s.half;
         if (!near || d < near.d) near = { d, roadZ: (s.az ?? 0) + ((s.bz ?? 0) - (s.az ?? 0)) * t, pathZ: z[nodes.indexOf(q)], owner: s.owner, layer: layerByOwner.get(s.owner) };
       }
       // (per point: x, y, deck z, ground, the nearest road deck's z and how far out from its edge)
@@ -2728,7 +2729,7 @@ export function buildDeckRuns(paths, bridges, opts = {}) {
         if (index) for (const s of index.segments) {
           const dx = s.bx - s.ax; const dy = s.by - s.ay; const L2 = dx * dx + dy * dy || 1;
           const tt = Math.max(0, Math.min(1, ((q[0] - s.ax) * dx + (q[1] - s.ay) * dy) / L2));
-          const d = Math.hypot(s.ax + tt * dx - q[0], s.ay + tt * dy - q[1]) - s.half;
+          const d = fastHypot(s.ax + tt * dx - q[0], s.ay + tt * dy - q[1]) - s.half;
           if (!best || d < best[1]) best = [(s.az ?? 0) + ((s.bz ?? 0) - (s.az ?? 0)) * tt, d];
         }
         return [q[0], q[1], z[i], groundAt(q[0], q[1]), best ? best[0] : null, best ? best[1] : null, onRoad[i] ? 1 : 0];
@@ -2770,11 +2771,11 @@ function planWallDecks(rings, groundAt, seaZ = -Infinity) {
   const decks = [];
   for (const raw of rings || []) {
     let ring = raw.map((q) => [q[0], q[1]]);
-    if (Math.hypot(ring[0][0] - ring[ring.length - 1][0], ring[0][1] - ring[ring.length - 1][1]) < 0.01) ring = ring.slice(0, -1);
+    if (fastHypot(ring[0][0] - ring[ring.length - 1][0], ring[0][1] - ring[ring.length - 1][1]) < 0.01) ring = ring.slice(0, -1);
     if (ring.length < 3) continue;
     // points along the outline, so the deck follows the walls' tops
     const fine = ring.flatMap((a, i) => {
-      const b = ring[(i + 1) % ring.length]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const b = ring[(i + 1) % ring.length]; const L = fastHypot(b[0] - a[0], b[1] - a[1]);
       const n = Math.max(1, Math.round(L / WALL_POINT_M));
       return Array.from({ length: n }, (_, k) => [a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n]);
     });
@@ -2812,7 +2813,7 @@ export function buildWallDeckMesh(decks, wallTops = [], { sidewalkLook } = {}) {
     const cx = Math.floor(x / 8); const cy = Math.floor(y / 8);
     for (let i = -1; i <= 1; i++) {
       for (let j = -1; j <= 1; j++) {
-        for (const t of cells.get(`${cx + i},${cy + j}`) || []) if (Math.hypot(t.x - x, t.y - y) < WALL_TOP_REACH_M && (best === null || t.z > best)) best = t.z;
+        for (const t of cells.get(`${cx + i},${cy + j}`) || []) if (fastHypot(t.x - x, t.y - y) < WALL_TOP_REACH_M && (best === null || t.z > best)) best = t.z;
       }
     }
     return best;
@@ -2861,7 +2862,7 @@ export function gutterLines({ runs = [], corners = [] }) {
     points.forEach((p, i) => {
       if (share[i] < 0.99) { flush(); return; }
       const a = points[Math.max(0, i - 1)]; const b = points[Math.min(points.length - 1, i + 1)];
-      const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
       cur.push([p[0] + ((b[1] - a[1]) / L) * run.side * off, p[1] - ((b[0] - a[0]) / L) * run.side * off, p[2]]);
     });
     flush();
@@ -2927,8 +2928,8 @@ function metalPlate(builder, a, b, c, d) {
 
 // Handrails both sides from `a` to `b`, the walking line, posted every so often.
 function handrails(builder, a, b, hw) {
-  const L = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) || 1;
-  const nx = -(b[1] - a[1]) / (Math.hypot(b[0] - a[0], b[1] - a[1]) || 1); const ny = (b[0] - a[0]) / (Math.hypot(b[0] - a[0], b[1] - a[1]) || 1);
+  const L = fastHypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) || 1;
+  const nx = -(b[1] - a[1]) / (fastHypot(b[0] - a[0], b[1] - a[1]) || 1); const ny = (b[0] - a[0]) / (fastHypot(b[0] - a[0], b[1] - a[1]) || 1);
   const n = Math.max(2, Math.round(L / GANGWAY_POST_M));
   for (const sg of [1, -1]) {
     const off = (p, h) => [p[0] + nx * sg * hw, p[1] + ny * sg * hw, p[2] + h];
@@ -2946,7 +2947,7 @@ function handrails(builder, a, b, hw) {
  * else stairs. Returns the kind built.
  */
 function buildGangway(builder, top, foot) {
-  const run = Math.hypot(top[0] - foot[0], top[1] - foot[1]) || 1;
+  const run = fastHypot(top[0] - foot[0], top[1] - foot[1]) || 1;
   const drop = top[2] - foot[2];
   const stairs = drop / run > GANGWAY_MAX_SLOPE;
   const nx = -(foot[1] - top[1]) / run; const ny = (foot[0] - top[0]) / run;
@@ -2963,7 +2964,7 @@ function buildGangway(builder, top, foot) {
     }
   } else {
     metalPlate(builder, side(top, 1), side(top, -1), side(foot, -1), side(foot, 1));
-    const cleats = Math.round(Math.hypot(run, drop) / 0.4);
+    const cleats = Math.round(fastHypot(run, drop) / 0.4);
     for (let i = 1; i < cleats; i++) {
       const p = top.map((v, k) => v + (foot[k] - v) * (i / cleats));
       metalBar(builder, side([p[0], p[1], p[2] + 0.012], 1), side([p[0], p[1], p[2] + 0.012], -1), 0.012);
@@ -2975,7 +2976,7 @@ function buildGangway(builder, top, foot) {
 
 // Where a deck's end looks at higher ground just past it: the height and place to come down from.
 function shoreAbove(end, prev, z, walkTop, groundAt) {
-  const L = Math.hypot(end[0] - prev[0], end[1] - prev[1]) || 1;
+  const L = fastHypot(end[0] - prev[0], end[1] - prev[1]) || 1;
   const ux = (end[0] - prev[0]) / L; const uy = (end[1] - prev[1]) / L;
   let best = null;
   for (let d = 0.5; d <= GANGWAY_REACH_M; d += 0.5) {
@@ -3000,7 +3001,7 @@ function walkTopOver(walkRuns) {
   }
   return (x, y) => {
     const cx = Math.floor(x / 4); const cy = Math.floor(y / 4);
-    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (const q of cells.get(`${cx + i},${cy + j}`) || []) if (Math.hypot(q[0] - x, q[1] - y) < q[3]) return q[2];
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (const q of cells.get(`${cx + i},${cy + j}`) || []) if (fastHypot(q[0] - x, q[1] - y) < q[3]) return q[2];
     return null;
   };
 }
@@ -3016,7 +3017,7 @@ function buildGangways(builder, deckRuns, walkRuns, groundAt) {
   }
   const walkTop = (x, y) => {
     const cx = Math.floor(x / 4); const cy = Math.floor(y / 4);
-    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (const q of cells.get(`${cx + i},${cy + j}`) || []) if (Math.hypot(q[0] - x, q[1] - y) < q[3]) return q[2];
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (const q of cells.get(`${cx + i},${cy + j}`) || []) if (fastHypot(q[0] - x, q[1] - y) < q[3]) return q[2];
     return null;
   };
   const counts = { ramp: 0, stairs: 0 };
@@ -3033,13 +3034,13 @@ function buildGangways(builder, deckRuns, walkRuns, groundAt) {
       const walk = (want) => {
         let left = want;
         for (let i = e; i + step >= 0 && i + step < n; i += step) {
-          const a = c[i]; const b = c[i + step]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+          const a = c[i]; const b = c[i + step]; const L = fastHypot(b[0] - a[0], b[1] - a[1]);
           if (left <= L) { const f = left / (L || 1); return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f + WALK_H]; }
           left -= L;
         }
         return null;
       };
-      const reach = Math.hypot(top[0] - end[0], top[1] - end[1]);
+      const reach = fastHypot(top[0] - end[0], top[1] - end[1]);
       // the gentle ramp if the deck has room for its foot, else stairs
       const foot = walk(Math.min(GANGWAY_MAX_RUN_M, drop / GANGWAY_SLOPE) - reach) ?? walk(Math.max(0.3, drop / STAIR_SLOPE - reach));
       if (!foot) continue;
@@ -3060,7 +3061,7 @@ function deckRailings(builder, run) {
   for (const sg of [1, -1]) {
     const edge = c.map((p, i) => {
       const a = c[Math.max(0, i - 1)]; const b = c[Math.min(c.length - 1, i + 1)];
-      const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
       const nx = -(b[1] - a[1]) / L; const ny = (b[0] - a[0]) / L;
       return [p[0] + nx * sg * (run.half - 0.06), p[1] + ny * sg * (run.half - 0.06), p[2] + top];
     });
@@ -3068,7 +3069,7 @@ function deckRailings(builder, run) {
     let s = 0; let next = 0;
     for (let i = 0; i < edge.length; i++) {
       if (i) {
-        s += Math.hypot(edge[i][0] - edge[i - 1][0], edge[i][1] - edge[i - 1][1]);
+        s += fastHypot(edge[i][0] - edge[i - 1][0], edge[i][1] - edge[i - 1][1]);
         metalBar(builder, up(edge[i - 1], GANGWAY_RAIL_M), up(edge[i], GANGWAY_RAIL_M), 0.03);
         metalBar(builder, up(edge[i - 1], GANGWAY_RAIL_M / 2), up(edge[i], GANGWAY_RAIL_M / 2), 0.015);
       }
@@ -3082,11 +3083,11 @@ function deckPosts(builder, run, groundAt) {
   const c = run.centre; let next = 0; let s = 0;
   const mat = run.wood ? 'wood' : 'curb';
   c.forEach((p, i) => {
-    if (i) s += Math.hypot(p[0] - c[i - 1][0], p[1] - c[i - 1][1]);
+    if (i) s += fastHypot(p[0] - c[i - 1][0], p[1] - c[i - 1][1]);
     if (s < next) return;
     next = s + DECK_POST_M;
     const a = c[Math.max(0, i - 1)]; const b = c[Math.min(c.length - 1, i + 1)];
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
     const nx = -(b[1] - a[1]) / L; const ny = (b[0] - a[0]) / L;
     for (const sg of [1, -1]) {
       const x = p[0] + nx * sg * (run.half - 0.15); const y = p[1] + ny * sg * (run.half - 0.15);
@@ -3109,7 +3110,7 @@ function deckPosts(builder, run, groundAt) {
 
 // A quad round segment a-b, `half` either side (and past its ends by `pad`).
 function segmentQuad(a, b, half, pad = 0) {
-  const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const L = fastHypot(b[0] - a[0], b[1] - a[1]);
   if (L < 1e-6) return null;
   const ux = (b[0] - a[0]) / L; const uy = (b[1] - a[1]) / L;
   const nx = -uy * half; const ny = ux * half;
@@ -3136,7 +3137,7 @@ export function findWallPockets(walkRuns, streetRuns, carriageways, { walls = []
   const sea = [];
   for (const wall of walls) {
     for (let i = 0; i + 1 < wall.length; i++) {
-      const a = wall[i]; const b = wall[i + 1]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const a = wall[i]; const b = wall[i + 1]; const L = fastHypot(b[0] - a[0], b[1] - a[1]);
       if (L < 0.3) continue;
       const nx = -(b[1] - a[1]) / L; const ny = (b[0] - a[0]) / L;
       let hits = 0; let n = 0;
@@ -3203,7 +3204,7 @@ export function findWallPockets(walkRuns, streetRuns, carriageways, { walls = []
   };
   const onSea = (x, y) => sea.some(([a, b]) => {
     const dx = b[0] - a[0]; const dy = b[1] - a[1]; const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy)));
-    return Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy) < C + 0.4;
+    return fastHypot(x - a[0] - t * dx, y - a[1] - t * dy) < C + 0.4;
   });
   // (a union per seawall's own surroundings, rounded to the centimetre: one over
   // a whole town fails on near-touching edges more often than not)
@@ -3234,7 +3235,7 @@ export function findWallPockets(walkRuns, streetRuns, carriageways, { walls = []
       // along a seawall for a good share of its edge
       let edge = 0; let walled = 0;
       ring.forEach((p, i) => {
-        const q = ring[(i + 1) % ring.length]; const L = Math.hypot(q[0] - p[0], q[1] - p[1]);
+        const q = ring[(i + 1) % ring.length]; const L = fastHypot(q[0] - p[0], q[1] - p[1]);
         for (let t = 0.25; t < L; t += 0.5) { edge++; if (onSea(p[0] + ((q[0] - p[0]) * t) / L, p[1] + ((q[1] - p[1]) * t) / L)) walled++; }
       });
       if (!edge || walled < POCKET_WALL_SHARE * edge) continue;
@@ -3328,15 +3329,15 @@ function* mergeWalks(builder, runs, { top = 'slab', edge = 'curb', pockets = [],
     const { points, share } = rampStations(run.centre, run.ramps, run.dips ?? [], run.rampM);
     const left = []; const right = []; const along = []; let s = 0;
     points.forEach((p, i) => {
-      if (i) s += Math.hypot(p[0] - points[i - 1][0], p[1] - points[i - 1][1]);
+      if (i) s += fastHypot(p[0] - points[i - 1][0], p[1] - points[i - 1][1]);
       const a = points[Math.max(0, i - 1)]; const b = points[Math.min(points.length - 1, i + 1)];
-      const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
       // mitred at a bend (the averaged normal at the half width fell short on
       // the outside of a sharp turn: a wedge cut out of the walk)
       let miter = 1;
       if (i > 0 && i < points.length - 1) {
-        const ux = p[0] - a[0]; const uy = p[1] - a[1]; const ul = Math.hypot(ux, uy) || 1;
-        const vx = b[0] - p[0]; const vy = b[1] - p[1]; const vl = Math.hypot(vx, vy) || 1;
+        const ux = p[0] - a[0]; const uy = p[1] - a[1]; const ul = fastHypot(ux, uy) || 1;
+        const vx = b[0] - p[0]; const vy = b[1] - p[1]; const vl = fastHypot(vx, vy) || 1;
         const cosHalf = Math.sqrt(Math.max(0, (1 + (ux * vx + uy * vy) / (ul * vl)) / 2));
         miter = 1 / Math.max(0.7, cosHalf);
       }
@@ -3403,7 +3404,7 @@ function* mergeWalks(builder, runs, { top = 'slab', edge = 'curb', pockets = [],
       // (slivers left between a straight curb's face and its back: dropped)
       // (and long thin ones: by area alone a 5 cm sliver along a cut kept its
       // outline while each panel's piece of it was dropped, bare walls left)
-      const perimeter = (ring) => ring.reduce((sum, q, i) => (i ? sum + Math.hypot(q[0] - ring[i - 1][0], q[1] - ring[i - 1][1]) : 0), 0);
+      const perimeter = (ring) => ring.reduce((sum, q, i) => (i ? sum + fastHypot(q[0] - ring[i - 1][0], q[1] - ring[i - 1][1]) : 0), 0);
       for (const shape of pieces) {
         const area = Math.abs(ringArea(shape[0])) - shape.slice(1).reduce((a, h) => a + Math.abs(ringArea(h)), 0);
         if (area >= CUT_SLIVER_M2 && (2 * area) / (perimeter(shape[0]) || 1) >= CUT_SLIVER_W_M) kept.push({ ...strip, shape, piece: true });
@@ -3459,7 +3460,7 @@ function* mergeWalks(builder, runs, { top = 'slab', edge = 'curb', pockets = [],
       for (let k = 0; k + 1 < line.length; k++) {
         const a = line[k]; const b = line[k + 1]; const dx = b[0] - a[0]; const dy = b[1] - a[1];
         const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy || 1)));
-        d = Math.min(d, Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy));
+        d = Math.min(d, fastHypot(x - a[0] - t * dx, y - a[1] - t * dy));
       }
     }
     return d;
@@ -3575,7 +3576,7 @@ function* mergeWalks(builder, runs, { top = 'slab', edge = 'curb', pockets = [],
       ring.forEach((_, i) => {
         const a = all[at + i]; const b = all[at + ((i + 1) % ring.length)];
         if (onTileSide(a, b, tb)) return;
-        const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L = Math.hypot(dx, dy) || 1;
+        const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L = fastHypot(dx, dy) || 1;
         const want = right ? [dy / L, -dx / L, 0] : [-dy / L, dx / L, 0];
         const fa = [a[0], a[1], a[3] - WALK_SINK_M]; const fb = [b[0], b[1], b[3] - WALK_SINK_M];
         // (the curb texture's clean band: its lower one is dark road grime)
@@ -3778,7 +3779,7 @@ function* sidewalkMeshes(carriageways, options = {}) {
     for (let i = -1; i <= 1; i++) {
       for (let j = -1; j <= 1; j++) {
         for (const q of deckCells.get(`${cx + i},${cy + j}`) || []) {
-          const e = Math.hypot(q[0] - x, q[1] - y);
+          const e = fastHypot(q[0] - x, q[1] - y);
           if (e < d && e < q[3] + 1.5) { d = e; best = q[2]; }
         }
       }
@@ -3802,7 +3803,7 @@ function* sidewalkMeshes(carriageways, options = {}) {
     if (!apex) return [];
     const [p, q] = c.arc; const left = [-(q[1] - p[1]), q[0] - p[0]];
     const toApex = left[0] * (apex[0] - p[0]) + left[1] * (apex[1] - p[1]) >= 0 ? 1 : -1;
-    return [{ points: c.arc.map((o) => [o[0], o[1], o[2] - WALK_H]), side: toApex, width: Math.hypot(apex[0] - p[0], apex[1] - p[1]) + 1, walk: true }];
+    return [{ points: c.arc.map((o) => [o[0], o[1], o[2] - WALK_H]), side: toApex, width: fastHypot(apex[0] - p[0], apex[1] - p[1]) + 1, walk: true }];
   })];
   const result = { meshes, runs, corners, cornerRuns, cornerGround, medianRuns, walkRuns, deckRuns, deckAt, gangways, wallDecks, pockets, triangles };
   // (a test probe's look at what was built: scratch top-down plots)
@@ -3975,7 +3976,7 @@ export function checkSidewalkGround(runs, groundAt, { step = 2 } = {}) {
     let carry = 0;
     for (let i = 0; i + 1 < p.length; i++) {
       const [ax, ay, az] = p[i]; const [bx, by, bz] = p[i + 1];
-      const L = Math.hypot(bx - ax, by - ay);
+      const L = fastHypot(bx - ax, by - ay);
       if (L < 1e-6) continue;
       const nx = (-(by - ay) / L) * run.side; const ny = ((bx - ax) / L) * run.side;
       for (let s = carry; s <= L; s += step) {

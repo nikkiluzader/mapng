@@ -4,6 +4,7 @@
 // user asks: it counts against their plan).
 import { decodeTerrariumPixels } from './terrariumSampling.js';
 import { MAPTERHORN_CACHE_URL, MAPTERHORN_TILE_URL } from './mapterhorn.js';
+import { fastHypot } from './fastMath.js';
 
 const AWS = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium';
 const NO_DATA = -99999;
@@ -249,7 +250,7 @@ export function hillshadeDataUrl(h, px, cellM) {
   const az = (315 * Math.PI) / 180, alt = (45 * Math.PI) / 180;
   for (let j = 0; j < px; j++) for (let i = 0; i < px; i++) {
     const dx = (at(i + 1, j) - at(i - 1, j)) / (2 * cellM), dy = (at(i, j + 1) - at(i, j - 1)) / (2 * cellM);
-    const slope = Math.atan(Math.hypot(dx, dy) * 1.5), aspect = Math.atan2(dy, -dx);
+    const slope = Math.atan(fastHypot(dx, dy) * 1.5), aspect = Math.atan2(dy, -dx);
     const v = Math.max(0, Math.cos(alt) * Math.cos(slope) + Math.sin(alt) * Math.sin(slope) * Math.cos(az - aspect));
     const k = (j * px + i) * 4, g = Number.isFinite(h[j * px + i]) ? 30 + v * 215 : 0;
     img.data[k] = g; img.data[k + 1] = g; img.data[k + 2] = Number.isFinite(h[j * px + i]) ? g : 60; img.data[k + 3] = 255;

@@ -6,6 +6,7 @@
 // Nothing here knows about any place: every check is geometry.
 
 import { DECK_ROAD_CLEAR_M } from '../beamngBridges.js';
+import { fastHypot } from '../fastMath.js';
 
 // Where two carriageway ends count as one joint (horizontal, m).
 const JOINT_REACH_M = 0.3;
@@ -133,7 +134,7 @@ export function checkJoints(carriageways, { worldSize = null } = {}) {
       for (let dy = -1; dy <= 1; dy++) {
         for (const o of cells.get(`${cx + dx},${cy + dy}`) || []) {
           if (o.ci <= e.ci) continue;     // each pair once
-          if (Math.hypot(o.x - e.x, o.y - e.y) > JOINT_REACH_M) continue;
+          if (fastHypot(o.x - e.x, o.y - e.y) > JOINT_REACH_M) continue;
           if (atTrim(e) && atTrim(o)) continue;
           joints++;
           const dz = Math.abs(o.z - e.z);
@@ -161,7 +162,7 @@ export function checkGrades(carriageways) {
     let ds = 0;
     for (let i = 0; i + 1 < n.length; i++) {
       if (j <= i) { j = i; ds = 0; }
-      while (j + 1 < n.length && ds < GRADE_RUN_M) { ds += Math.hypot(n[j + 1][0] - n[j][0], n[j + 1][1] - n[j][1]); j++; }
+      while (j + 1 < n.length && ds < GRADE_RUN_M) { ds += fastHypot(n[j + 1][0] - n[j][0], n[j + 1][1] - n[j][1]); j++; }
       if (ds < GRADE_RUN_M) break;
       pairs++;
       const grade = Math.abs(n[j][2] - n[i][2]) / ds;
@@ -170,7 +171,7 @@ export function checkGrades(carriageways) {
           grade, max, x: (n[i][0] + n[j][0]) / 2, y: (n[i][1] + n[j][1]) / 2, road: roadName(cw),
         });
       }
-      ds -= Math.hypot(n[i + 1][0] - n[i][0], n[i + 1][1] - n[i][1]);
+      ds -= fastHypot(n[i + 1][0] - n[i][0], n[i + 1][1] - n[i][1]);
     }
   }
   const pack = (list) => {
@@ -214,8 +215,8 @@ export function checkCrossings(carriageways) {
   const seen = new Set();
   const short = [];
   let crossings = 0;
-  const atEnd = (n, i, t) => (i === 0 && t * Math.hypot(n[1][0] - n[0][0], n[1][1] - n[0][1]) < 1)
-    || (i === n.length - 2 && (1 - t) * Math.hypot(n[i + 1][0] - n[i][0], n[i + 1][1] - n[i][1]) < 1);
+  const atEnd = (n, i, t) => (i === 0 && t * fastHypot(n[1][0] - n[0][0], n[1][1] - n[0][1]) < 1)
+    || (i === n.length - 2 && (1 - t) * fastHypot(n[i + 1][0] - n[i][0], n[i + 1][1] - n[i][1]) < 1);
   for (const list of grid.values()) {
     for (let a = 0; a < list.length; a += 2) {
       for (let b = a + 2; b < list.length; b += 2) {
@@ -288,7 +289,7 @@ export function checkThroughDecks(decks, groundAt) {
       const rows = [];
       for (let i = 0; i + 1 < xy.length; i++) {
         const [ax, ay] = xy[i]; const [bx, by] = xy[i + 1];
-        const L = Math.hypot(bx - ax, by - ay);
+        const L = fastHypot(bx - ax, by - ay);
         if (L < 1e-6) continue;
         const nx = -(by - ay) / L; const ny = (bx - ax) / L;
         const steps = Math.max(1, Math.ceil(L / DECK_SAMPLE_M));
@@ -344,7 +345,7 @@ export function checkSpikes(decks, tunnels, grid) {
     for (let i = 0; i < pts.length; i++) {
       const a = toPixel(pts[i][0], pts[i][1]);
       const b = i + 1 < pts.length ? toPixel(pts[i + 1][0], pts[i + 1][1]) : a;
-      const steps = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / BLOCK));
+      const steps = Math.max(1, Math.ceil(fastHypot(b[0] - a[0], b[1] - a[1]) / BLOCK));
       for (let k = 0; k <= steps; k++) {
         const c = a[0] + (b[0] - a[0]) * (k / steps); const r = a[1] + (b[1] - a[1]) * (k / steps);
         for (let bc = Math.floor((c - rpx) / BLOCK); bc <= Math.floor((c + rpx) / BLOCK); bc++) {
@@ -403,18 +404,18 @@ const CREASE_SLOPE_CHANGE = 0.3;
 function along(n, s, cursor = null) {
   if (cursor) {
     while (cursor.i + 2 < n.length) {
-      const L = Math.hypot(n[cursor.i + 1][0] - n[cursor.i][0], n[cursor.i + 1][1] - n[cursor.i][1]);
+      const L = fastHypot(n[cursor.i + 1][0] - n[cursor.i][0], n[cursor.i + 1][1] - n[cursor.i][1]);
       if (cursor.acc + L >= s) break;
       cursor.acc += L; cursor.i++;
     }
     const i = cursor.i;
-    const L = Math.hypot(n[i + 1][0] - n[i][0], n[i + 1][1] - n[i][1]);
+    const L = fastHypot(n[i + 1][0] - n[i][0], n[i + 1][1] - n[i][1]);
     const f = L > 0 ? Math.min(1, Math.max(0, (s - cursor.acc) / L)) : 0;
     return [n[i][0] + (n[i + 1][0] - n[i][0]) * f, n[i][1] + (n[i + 1][1] - n[i][1]) * f, n[i][2] + (n[i + 1][2] - n[i][2]) * f];
   }
   let acc = 0;
   for (let i = 0; i + 1 < n.length; i++) {
-    const L = Math.hypot(n[i + 1][0] - n[i][0], n[i + 1][1] - n[i][1]);
+    const L = fastHypot(n[i + 1][0] - n[i][0], n[i + 1][1] - n[i][1]);
     if (acc + L >= s || i + 2 === n.length) {
       const f = L > 0 ? Math.min(1, Math.max(0, (s - acc) / L)) : 0;
       return [n[i][0] + (n[i + 1][0] - n[i][0]) * f, n[i][1] + (n[i + 1][1] - n[i][1]) * f, n[i][2] + (n[i + 1][2] - n[i][2]) * f];
@@ -451,9 +452,9 @@ export function checkRoadSurface(lines, groundAt) {
     if (list.length < 3) continue;
     const dirs = list.map((e) => {
       const n = ground[e.li].nodes; const a = e.fromStart ? n[0] : n[n.length - 1];
-      let total = 0; for (let i = 1; i < n.length; i++) total += Math.hypot(n[i][0] - n[i - 1][0], n[i][1] - n[i - 1][1]);
+      let total = 0; for (let i = 1; i < n.length; i++) total += fastHypot(n[i][0] - n[i - 1][0], n[i][1] - n[i - 1][1]);
       const b = along(n, e.fromStart ? Math.min(total, 8) : Math.max(0, total - 8));
-      const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const L = fastHypot(b[0] - a[0], b[1] - a[1]);
       return L > 1e-6 ? [(b[0] - a[0]) / L, (b[1] - a[1]) / L] : null;
     });
     if (dirs.some((d) => !d)) continue;
@@ -466,7 +467,7 @@ export function checkRoadSurface(lines, groundAt) {
   for (const [gi, cw] of ground.entries()) {
     const n = cw.nodes;
     const s = [0];
-    for (let i = 1; i < n.length; i++) s.push(s[i - 1] + Math.hypot(n[i][0] - n[i - 1][0], n[i][1] - n[i - 1][1]));
+    for (let i = 1; i < n.length; i++) s.push(s[i - 1] + fastHypot(n[i][0] - n[i - 1][0], n[i][1] - n[i - 1][1]));
     const total = s[s.length - 1];
     const max = KINK_MAX[cw.highway] ?? KINK_DEFAULT;
     // along: grade over the KINK_RUN_M before and after each point; one hit
@@ -483,7 +484,7 @@ export function checkRoadSurface(lines, groundAt) {
     const cp = { i: 0, acc: 0 }; const cq = { i: 0, acc: 0 };
     for (let at = 0; at <= total; at += CROSS_STEP_M) {
       const p = along(n, at, cp); const q = along(n, Math.min(total, at + 1), cq);
-      const dx = q[0] - p[0]; const dy = q[1] - p[1]; const L = Math.hypot(dx, dy);
+      const dx = q[0] - p[0]; const dy = q[1] - p[1]; const L = fastHypot(dx, dy);
       if (L < 1e-6) continue;
       const nx = -dy / L; const ny = dx / L;
       const gl = groundAt(p[0] + nx * half, p[1] + ny * half); const gr = groundAt(p[0] - nx * half, p[1] - ny * half); const gc = groundAt(p[0], p[1]);
@@ -516,7 +517,7 @@ export function checkRoadSurface(lines, groundAt) {
     for (const e of list) {
       const n = ground[e.li].nodes;
       let total = 0;
-      for (let i = 1; i < n.length; i++) total += Math.hypot(n[i][0] - n[i - 1][0], n[i][1] - n[i - 1][1]);
+      for (let i = 1; i < n.length; i++) total += fastHypot(n[i][0] - n[i - 1][0], n[i][1] - n[i - 1][1]);
       if (total < JUNCTION_RING_M) continue;
       const p = along(n, e.fromStart ? JUNCTION_RING_M : total - JUNCTION_RING_M);
       const g = groundAt(p[0], p[1]);

@@ -27,6 +27,7 @@
 import { box, cylinder, insetRing } from './buildingDetails.js';
 import { hash01, signedArea, cleanRing, inRing, flat, buildingTest } from './fountains.js';
 import { orientedBox, frameAt, coverRing } from './waterCover.js';
+import { fastHypot } from './fastMath.js';
 
 const DECK_MIN_M = 1.2;          // the paved deck round a sunk pool
 // The opening: terrain squares (squareSize each: the processing resolution)
@@ -92,7 +93,7 @@ export function poolShape(ring) {
   if (turns.every((t) => near(t, [90]))) return 'rectilinear';
   if (turns.every((t) => near(t, [45, 60, 90, 120, 135]))) return 'geometric';
   if (turns.length <= 4 && turns.every((t) => t > 0)) return 'simple';
-  const longest = Math.max(...ring.map((p, i) => { const q = ring[(i + 1) % n]; return Math.hypot(q[0] - p[0], q[1] - p[1]); }));
+  const longest = Math.max(...ring.map((p, i) => { const q = ring[(i + 1) % n]; return fastHypot(q[0] - p[0], q[1] - p[1]); }));
   if (longest <= DETAILED_EDGE_M) return 'detailed';
   return 'freeform';
 }
@@ -107,11 +108,11 @@ export function poolShape(ring) {
 export function smoothRing(ring) {
   const n = ring.length;
   const out = [];
-  const knot = (a, b) => Math.sqrt(Math.hypot(b[0] - a[0], b[1] - a[1])) || 1e-6;
+  const knot = (a, b) => Math.sqrt(fastHypot(b[0] - a[0], b[1] - a[1])) || 1e-6;
   for (let i = 0; i < n; i++) {
     const p0 = ring[(i - 1 + n) % n]; const p1 = ring[i]; const p2 = ring[(i + 1) % n]; const p3 = ring[(i + 2) % n];
     const t1 = knot(p0, p1); const t2 = t1 + knot(p1, p2); const t3 = t2 + knot(p2, p3);
-    const steps = Math.max(1, Math.ceil(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / SMOOTH_STEP_M));
+    const steps = Math.max(1, Math.ceil(fastHypot(p2[0] - p1[0], p2[1] - p1[1]) / SMOOTH_STEP_M));
     for (let k = 0; k < steps; k++) {
       const t = t1 + ((t2 - t1) * k) / steps;
       const lerp = (a, b, ta, tb) => [((tb - t) * a[0] + (t - ta) * b[0]) / (tb - ta), ((tb - t) * a[1] + (t - ta) * b[1]) / (tb - ta)];
@@ -188,7 +189,7 @@ function planDeck(p, area, roads, groundAt) {
   const m = { s0: M, s1: M, t0: M, t1: M };
   // each side pulled back from the roads in front of it
   for (const r of roads) {
-    const L = Math.hypot(r.b[0] - r.a[0], r.b[1] - r.a[1]);
+    const L = fastHypot(r.b[0] - r.a[0], r.b[1] - r.a[1]);
     for (let k = 0; k <= Math.ceil(L); k++) {
       const f = L > 0 ? Math.min(1, k / L) : 0;
       const x = r.a[0] + (r.b[0] - r.a[0]) * f; const y = r.a[1] + (r.b[1] - r.a[1]) * f;
@@ -217,7 +218,7 @@ function planDeck(p, area, roads, groundAt) {
   // each side's ground, sampled along it
   p.deckSides = p.deckRect.map((a, i) => {
     const b = p.deckRect[(i + 1) % 4];
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]);
     const n = Math.max(2, Math.ceil(L / 0.75));
     const pts = Array.from({ length: n + 1 }, (_, k) => {
       const x = a[0] + ((b[0] - a[0]) * k) / n; const y = a[1] + ((b[1] - a[1]) * k) / n;
@@ -286,11 +287,11 @@ function nearestWall(ring, q) {
   let best = null;
   for (let i = 0; i < ring.length; i++) {
     const a = ring[i]; const b = ring[(i + 1) % ring.length];
-    const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L = Math.hypot(dx, dy);
+    const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L = fastHypot(dx, dy);
     if (L < 1e-6) continue;
     const f = Math.max(0, Math.min(1, ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / (L * L)));
     const p = [a[0] + dx * f, a[1] + dy * f];
-    const d = Math.hypot(p[0] - q[0], p[1] - q[1]);
+    const d = fastHypot(p[0] - q[0], p[1] - q[1]);
     if (!best || d < best.d) best = { d, p, w: [dx / L, dy / L], n: [-dy / L, dx / L] };
   }
   return best;
@@ -298,13 +299,13 @@ function nearestWall(ring, q) {
 
 // a wall from a to b (inside on its left) between the floor's z at each end and zTop
 function innerWall(m, mat, a, b, za, zb, zTop, col) {
-  const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const L = fastHypot(b[0] - a[0], b[1] - a[1]);
   m.quad(mat, [b[0], b[1], zb], [a[0], a[1], za], [a[0], a[1], zTop], [b[0], b[1], zTop], [L / 1.5, zb / 1.5], [0, za / 1.5], [0, zTop / 1.5], [L / 1.5, zTop / 1.5], col);
 }
 function outerWall(m, mat, ring, z0, z1, col) {
   for (let i = 0; i < ring.length; i++) {
     const a = ring[i]; const b = ring[(i + 1) % ring.length];
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]);
     m.quad(mat, [a[0], a[1], z0], [b[0], b[1], z0], [b[0], b[1], z1], [a[0], a[1], z1], [0, z0], [L, z0], [L, z1], [0, z1], col);
   }
 }
@@ -353,14 +354,14 @@ function deckAround(stone, full, p, cope, zDeck) {
   const foot = Math.min(sideLow, zDeck) - DECK_BURY_M;
   for (const sd of sides) {
     const q0 = sd.pts[0]; const q1 = sd.pts[sd.pts.length - 1];
-    const L = Math.hypot(q1[0] - q0[0], q1[1] - q0[1]);
+    const L = fastHypot(q1[0] - q0[0], q1[1] - q0[1]);
     stone.quad('poolDeck', [q0[0], q0[1], foot], [q1[0], q1[1], foot], [q1[0], q1[1], zDeck], [q0[0], q0[1], zDeck],
       [0, foot / 2], [L / 2, foot / 2], [L / 2, zDeck / 2], [0, zDeck / 2], DECK);
   }
   if (!sides.some((sd) => sd.drop > RAISED_M)) return;
   // stairs from the side that stands highest, at its middle
   const hi = sides.reduce((a, b) => (b.drop > a.drop ? b : a));
-  const ux = (hi.b[0] - hi.a[0]); const uy = (hi.b[1] - hi.a[1]); const UL = Math.hypot(ux, uy);
+  const ux = (hi.b[0] - hi.a[0]); const uy = (hi.b[1] - hi.a[1]); const UL = fastHypot(ux, uy);
   const w = [ux / UL, uy / UL]; const out = [w[1], -w[0]];
   const mid = [(hi.a[0] + hi.b[0]) / 2, (hi.a[1] + hi.b[1]) / 2];
   const stairW = Math.min(1.2, UL * 0.4);
@@ -388,7 +389,7 @@ function deckAround(stone, full, p, cope, zDeck) {
   // the fence round the raised sides, open at the stairs
   for (const sd of sides) {
     if (sd.drop <= RAISED_M) continue;
-    const dx = sd.b[0] - sd.a[0]; const dy = sd.b[1] - sd.a[1]; const L = Math.hypot(dx, dy);
+    const dx = sd.b[0] - sd.a[0]; const dy = sd.b[1] - sd.a[1]; const L = fastHypot(dx, dy);
     const along = [dx / L, dy / L]; const inward = [-along[1], along[0]];
     const at2 = (s) => [sd.a[0] + along[0] * s + inward[0] * 0.08, sd.a[1] + along[1] * s + inward[1] * 0.08];
     const gaps = sd === hi ? [[L / 2 - stairW / 2, L / 2 + stairW / 2]] : [];

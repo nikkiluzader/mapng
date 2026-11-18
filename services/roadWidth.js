@@ -16,6 +16,7 @@
  * bench along a hiking trail leaves a terrace in the hillside with no road on
  * it, which is worse than leaving the trail on natural ground.
  */
+import { fastHypot } from './fastMath.js';
 export const NON_DRIVEABLE_HIGHWAYS = new Set([
   'footway', 'path', 'pedestrian', 'steps', 'cycleway',
   'bridleway', 'corridor', 'proposed', 'construction',
@@ -540,7 +541,7 @@ export function buildUrbanRoadClassifier(osmFeatures = []) {
     };
     for (let i = 0; i < pts.length; i++) {
       const a = pts[i]; const b = pts[(i + 1) % pts.length];
-      const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / URBAN_OUTLINE_STEP_M));
+      const n = Math.max(1, Math.ceil(fastHypot(b[0] - a[0], b[1] - a[1]) / URBAN_OUTLINE_STEP_M));
       for (let k = 0; k < n; k++) put(a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n);
     }
   });
@@ -574,7 +575,7 @@ export function buildUrbanRoadClassifier(osmFeatures = []) {
     for (let i = 0; i < pts.length - 1; i++) {
       const [ax, ay] = pts[i];
       const [bx, by] = pts[i + 1];
-      const len = Math.hypot(bx - ax, by - ay);
+      const len = fastHypot(bx - ax, by - ay);
       const steps = Math.max(1, Math.ceil(len / URBAN_SAMPLE_M));
       for (let s = 0; s < steps; s++) {
         const t = s / steps;
@@ -649,7 +650,7 @@ export function markShortSpans(features, project) {
     if (SPAN_OWN_TAGS.some((k) => t[k] !== undefined)) return f;
     const xy = f.geometry.map(project);
     let length = 0;
-    for (let i = 1; i < xy.length; i++) length += Math.hypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]);
+    for (let i = 1; i < xy.length; i++) length += fastHypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]);
     if (length > SHORT_SPAN_M) return f;
     return { ...f, tags: { ...t, 'parking:both': 'no', 'mapng:parking_source': 'short span' } };
   });

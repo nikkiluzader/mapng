@@ -29,6 +29,7 @@ import {
 import { makeRoadNodeKey } from './roadNetwork.js';
 import { US_SIGN_SHAPES } from './beamngPropLibrary.js';
 import SIGN_CODES from '../data/traffic-signs.json' with { type: 'json' };
+import { fastHypot } from './fastMath.js';
 
 const ECA = '/levels/east_coast_usa/art/shapes/signs_usa/';
 const IT = '/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_';
@@ -152,7 +153,7 @@ export function buildRoadSignProps(terrainData, squareSize, { style = 'americas'
   const place = (kind, x, y, dir, halfWidth, provenance, shapeOverride = null) => {
     const shape = shapeOverride ?? set[kind];
     if (!shape) { count(kind, skipped); return false; }
-    const len = Math.hypot(dir[0], dir[1]) || 1;
+    const len = fastHypot(dir[0], dir[1]) || 1;
     const d = [dir[0] / len, dir[1] / len];
     const right = [d[1], -d[0]];
     const kerb = leftHandTraffic ? [-right[0], -right[1]] : right;
@@ -315,7 +316,7 @@ export function buildRoadSignProps(terrainData, squareSize, { style = 'americas'
       for (const e of edges) {
         const vx = e.to.x - e.from.x; const vy = e.to.y - e.from.y; const L = vx * vx + vy * vy || 1e-9;
         const u = Math.max(0, Math.min(1, ((x - e.from.x) * vx + (y - e.from.y) * vy) / L));
-        const px = e.from.x + vx * u; const py = e.from.y + vy * u; const d = Math.hypot(x - px, y - py);
+        const px = e.from.x + vx * u; const py = e.from.y + vy * u; const d = fastHypot(x - px, y - py);
         if (d < MAPPED_SIGN_REACH_M && (!best || d < best.d)) best = { e, px, py, d, dir: [vx / Math.sqrt(L), vy / Math.sqrt(L)] };
       }
       return best;
@@ -330,12 +331,12 @@ export function buildRoadSignProps(terrainData, squareSize, { style = 'americas'
       for (const P of pathLines) for (let i = 0; i + 1 < P.length; i++) {
         const vx = P[i + 1][0] - P[i][0]; const vy = P[i + 1][1] - P[i][1]; const L = vx * vx + vy * vy || 1e-9;
         const u = Math.max(0, Math.min(1, ((x - P[i][0]) * vx + (y - P[i][1]) * vy) / L));
-        best = Math.min(best, Math.hypot(P[i][0] + vx * u - x, P[i][1] + vy * u - y));
+        best = Math.min(best, fastHypot(P[i][0] + vx * u - x, P[i][1] + vy * u - y));
       }
       return best;
     };
     const style = set === SIGN_SETS.americas ? 'americas' : 'white';
-    const near = (kind, x, y) => props.some((p) => p.kind === kind && Math.hypot(p.position[0] - x, p.position[1] - y) < MAPPED_SIGN_SAME_M);
+    const near = (kind, x, y) => props.some((p) => p.kind === kind && fastHypot(p.position[0] - x, p.position[1] - y) < MAPPED_SIGN_SAME_M);
     for (const f of terrainData.osmFeatures || []) {
       if (f?.geometry?.length !== 1 || !f.tags?.traffic_sign) continue;
       const signs = mappedSignKinds(f.tags);

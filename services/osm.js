@@ -12,6 +12,7 @@ import {
 } from "./overtureTiles.js";
 import { getLoadedOsmFile, osmFileCoverage } from "./osmFile.js";
 import { activeRailKind } from "./railways.js";
+import { fastHypot } from './fastMath.js';
 
 const OVERTURE_ENDPOINT = "overture-maps";
 // (the user's own OSM file: osmFile.js)
@@ -706,7 +707,7 @@ export const parseOverpassResponse = (data, bounds) => {
       if (!a.pt || brandKey(a.tags) !== bk) continue;
       const dy = (c.lat - a.pt.lat) * 111000;
       const dx = (c.lng - a.pt.lng) * 111000 * Math.cos((c.lat * Math.PI) / 180);
-      if (Math.hypot(dx, dy) <= STATION_BUILDING_RADIUS_M) return true;
+      if (fastHypot(dx, dy) <= STATION_BUILDING_RADIUS_M) return true;
     }
     return false;
   };

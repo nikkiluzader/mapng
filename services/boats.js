@@ -6,6 +6,7 @@
 // sets them 0.7 to 1.8 m down from their keel).
 
 import { hash01 } from './streetProps.js';
+import { fastHypot } from './fastMath.js';
 
 // shape (beamngPropLibrary PROP_SHAPES), length along local x (or y: yawOffset), beam, draft
 export const BOAT_TYPES = [
@@ -50,7 +51,7 @@ export function placeBoats({ piers = [], marinas = [], groundAt, seaZ, blocked =
         if (groundAt(x, y) > seaZ - Math.min(type.draft, WATER_MIN_M) - DEPTH_SPARE_M || blocked(x, y)) return false;
       }
     }
-    return boats.every((b) => Math.hypot(b.x - cx, b.y - cy) > (b.type.length + type.length) / 2 * 0.6 + BOAT_GAP_M);
+    return boats.every((b) => fastHypot(b.x - cx, b.y - cy) > (b.type.length + type.length) / 2 * 0.6 + BOAT_GAP_M);
   };
   const pick = (seed, sizes) => {
     const list = BOAT_TYPES.filter((t) => sizes.includes(t.size));
@@ -63,12 +64,12 @@ export function placeBoats({ piers = [], marinas = [], groundAt, seaZ, blocked =
     if (hash01(`pier:${pi}`, 'boats') >= PIER_SHARE) return;
     const n = pier.nodes;
     let total = 0; const st = [0];
-    for (let i = 1; i < n.length; i++) { total += Math.hypot(n[i][0] - n[i - 1][0], n[i][1] - n[i - 1][1]); st.push(total); }
+    for (let i = 1; i < n.length; i++) { total += fastHypot(n[i][0] - n[i - 1][0], n[i][1] - n[i - 1][1]); st.push(total); }
     const sizes = total > 80 ? ['mid', 'big'] : ['small', 'mid'];
     let here = 0;
     for (let s = STATION_STEP_M / 2; s < total && here < PER_PIER && boats.length < maxBoats; s += STATION_STEP_M) {
       const i = Math.max(1, st.findIndex((v) => v >= s));
-      const a = n[i - 1]; const b = n[i]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const a = n[i - 1]; const b = n[i]; const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
       const t = (s - st[i - 1]) / L;
       const px = a[0] + (b[0] - a[0]) * t; const py = a[1] + (b[1] - a[1]) * t;
       const ux = (b[0] - a[0]) / L; const uy = (b[1] - a[1]) / L;
@@ -91,7 +92,7 @@ export function placeBoats({ piers = [], marinas = [], groundAt, seaZ, blocked =
     const xs = ring.map((p) => p[0]); const ys = ring.map((p) => p[1]);
     const box = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
     let li = 0; let ll = 0;
-    for (let i = 0; i < ring.length; i++) { const q = ring[(i + 1) % ring.length]; const d = Math.hypot(q[0] - ring[i][0], q[1] - ring[i][1]); if (d > ll) { ll = d; li = i; } }
+    for (let i = 0; i < ring.length; i++) { const q = ring[(i + 1) % ring.length]; const d = fastHypot(q[0] - ring[i][0], q[1] - ring[i][1]); if (d > ll) { ll = d; li = i; } }
     const ux = (ring[(li + 1) % ring.length][0] - ring[li][0]) / (ll || 1); const uy = (ring[(li + 1) % ring.length][1] - ring[li][1]) / (ll || 1);
     const inside = (x, y) => { let k = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) if (((ring[i][1] > y) !== (ring[j][1] > y)) && (x < ((ring[j][0] - ring[i][0]) * (y - ring[i][1])) / (ring[j][1] - ring[i][1]) + ring[i][0])) k = !k; return k; };
     let here = 0;

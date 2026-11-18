@@ -18,6 +18,7 @@
 // 16k map needs no extra full-size buffers; the full grid takes the lowering
 // bilinearly.
 import { createGridProjector } from './geoUtils.js';
+import { fastHypot } from './fastMath.js';
 
 const RIVER_WATERWAYS = new Set(['river', 'stream', 'canal', 'drain', 'ditch', 'riverbank', 'tidal_channel']);
 const RIVER_WATER = new Set(['river', 'stream', 'canal', 'oxbow', 'stream_pool', 'ditch', 'drain', 'tidal_channel']);
@@ -72,14 +73,14 @@ function paintWater(mask, cw, ch, features, project, cellPx, mpp) {
       const r = Math.max(0.5, halfM / (CELL_M));
       for (let i = 1; i < pts.length; i++) {
         const [ax, ay] = pts[i - 1]; const [bx, by] = pts[i];
-        const len = Math.hypot(bx - ax, by - ay); const steps = Math.max(1, Math.ceil(len * 2));
+        const len = fastHypot(bx - ax, by - ay); const steps = Math.max(1, Math.ceil(len * 2));
         for (let s = 0; s <= steps; s++) {
           const cx = ax + ((bx - ax) * s) / steps; const cy = ay + ((by - ay) * s) / steps;
           for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) {
             if (y < 0 || y >= ch) continue;
             for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
               if (x < 0 || x >= cw) continue;
-              if (Math.hypot(x + 0.5 - cx, y + 0.5 - cy) <= r) mask[y * cw + x] = 1;
+              if (fastHypot(x + 0.5 - cx, y + 0.5 - cy) <= r) mask[y * cw + x] = 1;
             }
           }
         }

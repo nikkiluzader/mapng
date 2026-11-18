@@ -2,6 +2,7 @@
 // the picks in data/model-picks.json (scripts/tag-library/from-catalogue.mjs). A new object for a tag is a line
 // in the picks, not code here.
 import data from '../data/tag-models.json' with { type: 'json' };
+import { fastHypot } from './fastMath.js';
 
 // The region of the world a biome's look belongs to (the catalogue's regions).
 const REGION_OF_BIOME = {
@@ -70,7 +71,7 @@ export function standTagObject(rule, x, y, road, tags = {}, n = 0) {
   if (road && Number.isFinite(road.dist)) {
     // (a point mapped on the carriageway, a bus stop on the road's line: moved out beside it, the side it is on)
     const clear = (road.halfWidth ?? 3) + (rule.beside ?? 1);
-    let ux = px - road.cx; let uy = py - road.cy; const d = Math.hypot(ux, uy);
+    let ux = px - road.cx; let uy = py - road.cy; const d = fastHypot(ux, uy);
     if (d < clear) {
       if (d < 0.05) { const a = (n * 2.399963) % (2 * Math.PI); ux = Math.cos(a); uy = Math.sin(a); } else { ux /= d; uy /= d; }
       px = road.cx + ux * clear; py = road.cy + uy * clear;

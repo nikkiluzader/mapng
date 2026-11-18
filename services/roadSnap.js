@@ -1,6 +1,7 @@
 import { createGridProjector } from './geoUtils.js';
 import { makeRoadNodeKey } from './roadNetwork.js';
 import { buildUrbanRoadClassifier, estimateRoadCrossSection, isOneWayRoad } from './roadWidth.js';
+import { fastHypot } from './fastMath.js';
 
 /**
  * Slide OSM roads sideways onto the road cut in high-resolution elevation.
@@ -192,7 +193,7 @@ export function snapRoadsToTerrain(heightMap, width, height, bounds, osmFeatures
             const vx = s.bx - s.ax; const vy = s.by - s.ay;
             const L2 = vx * vx + vy * vy || 1e-9;
             const t = Math.max(0, Math.min(1, ((x - s.ax) * vx + (y - s.ay) * vy) / L2));
-            gap = Math.min(gap, Math.hypot(s.ax + vx * t - x, s.ay + vy * t - y) - s.half - half);
+            gap = Math.min(gap, fastHypot(s.ax + vx * t - x, s.ay + vy * t - y) - s.half - half);
         }
         return gap;
     };
@@ -223,7 +224,7 @@ export function snapRoadsToTerrain(heightMap, width, height, bounds, osmFeatures
 
         const pts = f.geometry.map((p) => project(p.lat, p.lng));
         const arcs = [0];
-        for (let i = 1; i < pts.length; i++) arcs.push(arcs[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
+        for (let i = 1; i < pts.length; i++) arcs.push(arcs[i - 1] + fastHypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
         const total = arcs[arcs.length - 1];
         if (total < 4 * samplePx) return f;
 
@@ -241,7 +242,7 @@ export function snapRoadsToTerrain(heightMap, width, height, bounds, osmFeatures
         for (let k = 0; k < S.length; k++) {
             const a = S[Math.max(0, k - 3)];
             const b = S[Math.min(S.length - 1, k + 3)];
-            const L = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+            const L = fastHypot(b.x - a.x, b.y - a.y) || 1;
             S[k].nx = -(b.y - a.y) / L;
             S[k].ny = (b.x - a.x) / L;
         }
@@ -294,7 +295,7 @@ export function snapRoadsToTerrain(heightMap, width, height, bounds, osmFeatures
         for (let i = 0; i < pts.length; i++) {
             const a = pts[Math.max(0, i - 1)];
             const b = pts[Math.min(pts.length - 1, i + 1)];
-            const L = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+            const L = fastHypot(b.x - a.x, b.y - a.y) || 1;
             const o = offsetAt(arcs[i]);
             const node = f.geometry[i];
             if (Math.abs(o) * metersPerPixel < MOVED_EPSILON_M) {

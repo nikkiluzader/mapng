@@ -17,9 +17,10 @@
 // Every helper takes a mesh builder (quad / tri, beamngBuildings.js MeshBuilder) and world-space metres;
 // walls face out (a ring counter-clockwise, its outside on each edge's right). Deterministic: choices
 // hash the building's seed. Pure geometry, no place-specific rules.
+import { fastHypot } from './fastMath.js';
 
 const v2 = (a, b) => [b[0] - a[0], b[1] - a[1]];
-const len2 = (v) => Math.hypot(v[0], v[1]);
+const len2 = (v) => fastHypot(v[0], v[1]);
 
 /** A vertical quad from a to b (plan points) between z0 and z1, facing the edge's right (outside). */
 export function wallQuad(m, mat, a, b, z0, z1, col, uvM = 3, outward = true) {
@@ -57,7 +58,7 @@ export function cylinder(m, mat, cx, cy, r, z0, z1, col, { n = 16, uvM = 3, top 
 /** A cone (spire, silo roof) from a circle of radius r at z0 to its apex. */
 export function cone(m, mat, cx, cy, r, z0, zTop, col, { n = 16 } = {}) {
   const p = circle(cx, cy, r, n);
-  const s = Math.hypot(r, zTop - z0);
+  const s = fastHypot(r, zTop - z0);
   for (let i = 0; i < n; i++) {
     const a = p[i]; const b = p[(i + 1) % n];
     m.tri(mat, [...a, z0], [...b, z0], [cx, cy, zTop], [0, 0], [(2 * Math.PI * r) / n / 3, 0], [0.5, s / 3], col);
@@ -187,7 +188,7 @@ export function streetIndex(features, project) {
               const x = o[0] + n[0] * r; const y = o[1] + n[1] * r;
               const s = v2(p, q); const S2 = s[0] * s[0] + s[1] * s[1];
               const u = S2 > 1e-9 ? Math.max(0, Math.min(1, ((x - p[0]) * s[0] + (y - p[1]) * s[1]) / S2)) : 0;
-              if (Math.hypot(p[0] + s[0] * u - x, p[1] + s[1] * u - y) < half) { best = Math.min(best, r); break; }
+              if (fastHypot(p[0] + s[0] * u - x, p[1] + s[1] * u - y) < half) { best = Math.min(best, r); break; }
             }
           }
         }
@@ -230,7 +231,7 @@ function nearestOnRing(p, ring) {
   for (let i = 0; i < ring.length; i++) {
     const a = ring[i]; const b = ring[(i + 1) % ring.length]; const e = v2(a, b); const L2 = e[0] * e[0] + e[1] * e[1];
     const t = L2 > 1e-9 ? Math.max(0, Math.min(1, ((p[0] - a[0]) * e[0] + (p[1] - a[1]) * e[1]) / L2)) : 0;
-    const c = [a[0] + e[0] * t, a[1] + e[1] * t]; const d = Math.hypot(c[0] - p[0], c[1] - p[1]);
+    const c = [a[0] + e[0] * t, a[1] + e[1] * t]; const d = fastHypot(c[0] - p[0], c[1] - p[1]);
     if (!best || d < best[2]) best = [c[0], c[1], d];
   }
   return best;
@@ -242,7 +243,7 @@ function wallDirAt(p, ring) {
     const a = ring[i]; const b = ring[(i + 1) % ring.length]; const e = v2(a, b); const L = len2(e);
     if (L < 1e-6) continue;
     const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * e[0] + (p[1] - a[1]) * e[1]) / (L * L)));
-    const d = Math.hypot(a[0] + e[0] * t - p[0], a[1] + e[1] * t - p[1]);
+    const d = fastHypot(a[0] + e[0] * t - p[0], a[1] + e[1] * t - p[1]);
     if (d < bd) { bd = d; best = [e[0] / L, e[1] / L]; }
   }
   return best;
@@ -286,25 +287,25 @@ function squareFrontWithin(sq, outer, reach) {
   const runs = [];
   let run = null;
   for (let i = 0; i + 1 < sq.length; i++) {
-    const a = sq[i]; const b = sq[i + 1]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const a = sq[i]; const b = sq[i + 1]; const L = fastHypot(b[0] - a[0], b[1] - a[1]);
     const n = Math.max(1, Math.ceil(L / 0.5));
     for (let k = 0; k < n; k++) {
       const p = [a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n];
       const near = nearestOnRing(p, outer)[2] < reach && (reach < 1 || !inRing(p, outer));
-      if (near) { if (!run) runs.push(run = { pts: [], len: 0 }); else run.len += Math.hypot(p[0] - run.pts[run.pts.length - 1][0], p[1] - run.pts[run.pts.length - 1][1]); run.pts.push(p); } else run = null;
+      if (near) { if (!run) runs.push(run = { pts: [], len: 0 }); else run.len += fastHypot(p[0] - run.pts[run.pts.length - 1][0], p[1] - run.pts[run.pts.length - 1][1]); run.pts.push(p); } else run = null;
     }
   }
   // (a ring's run may wrap round its first vertex)
   if (runs.length > 1 && runs[0].pts[0] && sq.length > 2) {
     const first = runs[0]; const last = runs[runs.length - 1];
     const lp = last.pts[last.pts.length - 1]; const fp = first.pts[0];
-    if (Math.hypot(lp[0] - fp[0], lp[1] - fp[1]) < 0.75) { last.len += first.len + Math.hypot(lp[0] - fp[0], lp[1] - fp[1]); last.pts.push(...first.pts); runs.shift(); }
+    if (fastHypot(lp[0] - fp[0], lp[1] - fp[1]) < 0.75) { last.len += first.len + fastHypot(lp[0] - fp[0], lp[1] - fp[1]); last.pts.push(...first.pts); runs.shift(); }
   }
   const best = runs.sort((x, y) => y.len - x.len)[0];
   if (!best || best.len < ARCH_HALF_M * 2) return null;
   let walked = 0;
   for (let i = 1; i < best.pts.length; i++) {
-    walked += Math.hypot(best.pts[i][0] - best.pts[i - 1][0], best.pts[i][1] - best.pts[i - 1][1]);
+    walked += fastHypot(best.pts[i][0] - best.pts[i - 1][0], best.pts[i][1] - best.pts[i - 1][1]);
     if (walked >= best.len / 2) return best.pts[i];
   }
   return best.pts[best.pts.length - 1];
@@ -376,7 +377,7 @@ export function courtyardPassages(features, project, mapped = [], facing = () =>
         const ahead = wall ? rayToRing(w, [-wall[1], wall[0]], hole) ?? rayToRing(w, [wall[1], -wall[0]], hole) : null;
         const targets = [ahead ?? nearestOnRing(w, hole).slice(0, 2), ...inner];
         targets.forEach((c, k) => {
-          const L = Math.hypot(c[0] - w[0], c[1] - w[1]);
+          const L = fastHypot(c[0] - w[0], c[1] - w[1]);
           if (L > ARCH_MAX_DEPTH_M || L < 0.5) return;
           // a courtyard path's end only if little further than the shortest way
           const score = k === 0 ? L : L * 0.8 + 2;
@@ -447,7 +448,7 @@ export function insetRing(ring, d) {
     // inward normals (left of each edge for a counter-clockwise ring)
     const n1 = [-e1[1] / l1, e1[0] / l1]; const n2 = [-e2[1] / l2, e2[0] / l2];
     let bx = n1[0] + n2[0]; let by = n1[1] + n2[1];
-    const bl = Math.hypot(bx, by) || 1; bx /= bl; by /= bl;
+    const bl = fastHypot(bx, by) || 1; bx /= bl; by /= bl;
     const cos = bx * n2[0] + by * n2[1];
     const k = Math.min(3, 1 / Math.max(0.33, cos)) * d;
     return [p[0] + bx * k, p[1] + by * k];
@@ -833,7 +834,7 @@ export function mosque(m, ring, boxInfo, eave, wallMat, wallTint, rnd) {
     const score = (p[0] - cx) * want[0] + (p[1] - cy) * want[1];
     if (score > best && inRing(p, ring)) { best = score; mc = p; }
   }
-  if (!mc || Math.hypot(mc[0] - cx, mc[1] - cy) < r + 1.5) return;
+  if (!mc || fastHypot(mc[0] - cx, mc[1] - cy) < r + 1.5) return;
   const h = eave + Math.max(14, length * 0.9);
   cylinder(m, wallMat, mc[0], mc[1], 1.1, eave - 0.5, h, wallTint, { n: 12, top: false });
   cylinder(m, 'concrete', mc[0], mc[1], 1.45, h - 2.6, h - 2.3, PARAPET.coping, { n: 12 });
@@ -848,7 +849,7 @@ export function silo(m, ring, z0, h, kind, tint) {
   for (const [x, y] of ring) { cx += x; cy += y; }
   cx /= ring.length; cy /= ring.length;
   let r = 0;
-  for (const [x, y] of ring) r += Math.hypot(x - cx, y - cy);
+  for (const [x, y] of ring) r += fastHypot(x - cx, y - cy);
   r /= ring.length;
   const mat = kind === 'tank' ? 'metalWhite' : 'concrete';
   cylinder(m, mat, cx, cy, r, z0, z0 + h, tint, { n: 20, top: false });
@@ -1086,7 +1087,7 @@ export function simplifyRing(ring0, tol) {
   if (ring0.length < 4) return ring0;
   const cx = ring0.reduce((t, q) => t + q[0], 0) / ring0.length; const cy = ring0.reduce((t, q) => t + q[1], 0) / ring0.length;
   let s0 = 0; let sd = -1;
-  ring0.forEach((q, i) => { const d = Math.hypot(q[0] - cx, q[1] - cy); if (d > sd) { sd = d; s0 = i; } });
+  ring0.forEach((q, i) => { const d = fastHypot(q[0] - cx, q[1] - cy); if (d > sd) { sd = d; s0 = i; } });
   const ring = [...ring0.slice(s0), ...ring0.slice(0, s0)];
   // (split at the point farthest from the first: a closed ring in two open runs)
   let far = 0; let fd = -1;

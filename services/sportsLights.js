@@ -21,6 +21,7 @@ import { frameAt } from './waterCover.js';
 import { part } from './tagModels.js';
 import { inRing } from './fountains.js';
 import { homePlate, seatRows } from './sportsFields.js';
+import { fastHypot } from './fastMath.js';
 
 export const POLE_SHAPE = part('SPORTS_LIGHT_POLE').shapeFile;
 export const POLE_SHAPE_HEIGHT_M = 30.36;
@@ -61,7 +62,7 @@ export function planFieldPoles(pitches, seating, free) {
   const poles = [];
   const add = (q, spec, aim, kind) => {
     if (!q) return;
-    if (poles.some((o) => Math.hypot(o.x - q[0], o.y - q[1]) < MERGE_M && o.kind === kind)) return;
+    if (poles.some((o) => fastHypot(o.x - q[0], o.y - q[1]) < MERGE_M && o.kind === kind)) return;
     poles.push({ x: q[0], y: q[1], h: spec.h, cd: spec.cd, aim, kind });
   };
   const tracks = pitches.filter((p) => p.sport === 'track');
@@ -69,7 +70,7 @@ export function planFieldPoles(pitches, seating, free) {
     const lit = String(p.tags?.lit || '').toLowerCase();
     if (lit === 'no') continue;
     const c = midOf(p);
-    const seated = (seating || []).some((st) => { const b = frameAt(st.box, (st.box.s0 + st.box.s1) / 2, (st.box.t0 + st.box.t1) / 2); return Math.hypot(b[0] - c[0], b[1] - c[1]) < SEATED_M; });
+    const seated = (seating || []).some((st) => { const b = frameAt(st.box, (st.box.s0 + st.box.s1) / 2, (st.box.t0 + st.box.t1) / 2); return fastHypot(b[0] - c[0], b[1] - c[1]) < SEATED_M; });
     if (lit !== 'yes' && !seated && !USUALLY_LIT.has(p.sport)) continue;
     // a field inside a running track: the track's poles light it
     if (p.sport !== 'track' && tracks.some((t) => inRing(c[0], c[1], t.ring))) continue;
@@ -143,7 +144,7 @@ export function planStandLights(seating) {
 function stops(nodes, every, reach = Infinity) {
   const out = []; let next = 0; let s = 0;
   for (let i = 0; i + 1 < nodes.length && s <= reach; i++) {
-    const a = nodes[i]; const b = nodes[i + 1]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const a = nodes[i]; const b = nodes[i + 1]; const L = fastHypot(b[0] - a[0], b[1] - a[1]);
     while (L > 1e-6 && next <= s + L && next <= reach) {
       const f = (next - s) / L;
       out.push({ i, x: a[0] + (b[0] - a[0]) * f, y: a[1] + (b[1] - a[1]) * f, t: [(b[0] - a[0]) / L, (b[1] - a[1]) / L] });
@@ -159,7 +160,7 @@ export function planTrackPoles(raceways, free, { startFirst = (rw) => rw.nodes }
   const poles = [];
   const put = (x, y, spec, aim, kind) => {
     if (!free(x, y)) return;
-    if (poles.some((o) => Math.hypot(o.x - x, o.y - y) < MERGE_M)) return;
+    if (poles.some((o) => fastHypot(o.x - x, o.y - y) < MERGE_M)) return;
     poles.push({ x, y, h: spec.h, cd: spec.cd, aim, kind, beam: spec.beam });
   };
   for (const rw of raceways || []) {

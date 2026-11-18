@@ -1,3 +1,4 @@
+import { fastHypot } from './fastMath.js';
 const DEFAULT_COORD_PRECISION = 7;
 
 export function makeRoadNodeKey(pt, decimals = DEFAULT_COORD_PRECISION) {
@@ -216,7 +217,7 @@ function joinDirection(geometry, fromEnd) {
   const avgLatRad = (((a.lat || 0) + (b.lat || 0)) * 0.5 * Math.PI) / 180;
   const vx = ((b.lng || 0) - (a.lng || 0)) * Math.cos(avgLatRad);
   const vy = (b.lat || 0) - (a.lat || 0);
-  const len = Math.hypot(vx, vy);
+  const len = fastHypot(vx, vy);
   if (len < 1e-12) return null;
   return { x: vx / len, y: vy / len };
 }

@@ -3,11 +3,12 @@
 // longest side, a model's length apart, `pitch` metres between rows, `margin` metres in from the outline.
 
 /** The direction (radians from +x) of a ring's longest side: the way a field's rows usually run. */
+import { fastHypot } from './fastMath.js';
 export function rowDirection(ring) {
   let best = 0; let bestLen = -1;
   for (let i = 0; i < ring.length; i++) {
     const a = ring[i]; const b = ring[(i + 1) % ring.length];
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]);
     if (L > bestLen) { bestLen = L; best = Math.atan2(b[1] - a[1], b[0] - a[0]); }
   }
   return best;
@@ -25,7 +26,7 @@ const distToRing = (x, y, r) => {
   for (let a = 0, b = r.length - 1; a < r.length; b = a++) {
     const vx = r[a][0] - r[b][0]; const vy = r[a][1] - r[b][1]; const L = vx * vx + vy * vy || 1e-9;
     const u = Math.max(0, Math.min(1, ((x - r[b][0]) * vx + (y - r[b][1]) * vy) / L));
-    d = Math.min(d, Math.hypot(r[b][0] + vx * u - x, r[b][1] + vy * u - y));
+    d = Math.min(d, fastHypot(r[b][0] + vx * u - x, r[b][1] + vy * u - y));
   }
   return d;
 };

@@ -1,5 +1,6 @@
 import { makeRoadNodeKey } from './roadNetwork.js';
 import { NON_DRIVEABLE_HIGHWAYS, racewayHalfWidth } from './roadWidth.js';
+import { fastHypot } from './fastMath.js';
 
 /**
  * Round the corners of OSM roads into tangent arcs.
@@ -69,8 +70,8 @@ function filletArc(a, b, c, radius, shareIn, shareOut, pinned = false) {
     const ay = (a.lat - b.lat) * my;
     const cx0 = (c.lng - b.lng) * mx;
     const cy0 = (c.lat - b.lat) * my;
-    const lenIn = Math.hypot(ax, ay);
-    const lenOut = Math.hypot(cx0, cy0);
+    const lenIn = fastHypot(ax, ay);
+    const lenOut = fastHypot(cx0, cy0);
     if (lenIn < 1e-6 || lenOut < 1e-6) return null;
     const ux = -ax / lenIn;
     const uy = -ay / lenIn;
@@ -116,7 +117,7 @@ function filletArc(a, b, c, radius, shareIn, shareOut, pinned = false) {
 function throughCurve(b, ux, uy, vx, vy, tangent, turn, mx, my) {
     let wx = ux + vx;
     let wy = uy + vy;
-    const wl = Math.hypot(wx, wy) || 1;
+    const wl = fastHypot(wx, wy) || 1;
     wx /= wl;
     wy /= wl;
     const steps = Math.max(2, Math.ceil(Math.max(turn / 2 / ARC_STEP_RAD, tangent / ARC_STEP_M)));
@@ -185,7 +186,7 @@ export function roundRoadCorners(osmFeatures) {
         const mx = Math.cos((b.lat * Math.PI) / 180);
         const ux = (b.lng - a.lng) * mx; const uy = b.lat - a.lat;
         const vx = (c.lng - b.lng) * mx; const vy = c.lat - b.lat;
-        const l = Math.hypot(ux, uy) * Math.hypot(vx, vy);
+        const l = fastHypot(ux, uy) * fastHypot(vx, vy);
         return l > 0 ? Math.acos(Math.max(-1, Math.min(1, (ux * vx + uy * vy) / l))) : 0;
     };
     const curves = (g, j) => {
@@ -275,7 +276,7 @@ function smoothRaceways(features) {
     const ref = ways[0].g[0];
     const mx = 111320 * Math.cos((ref.lat * Math.PI) / 180); const my = 111320;
     const toXY = (p) => [(p.lng - ref.lng) * mx, (p.lat - ref.lat) * my];
-    const dirOut = (g, atEnd) => { const a = toXY(atEnd ? g[g.length - 2] : g[1]); const b = toXY(atEnd ? g[g.length - 1] : g[0]); const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; };
+    const dirOut = (g, atEnd) => { const a = toXY(atEnd ? g[g.length - 2] : g[1]); const b = toXY(atEnd ? g[g.length - 1] : g[0]); const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1; return [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; };
     // the ends at each node; pair the straightest through it
     const ends = new Map();
     ways.forEach((w, wi) => [false, true].forEach((atEnd) => {
@@ -312,7 +313,7 @@ function smoothRaceways(features) {
     };
     ways.forEach((w, wi) => { if (seen.has(wi)) return; if (!link.has(`${wi}:0`)) chains.push(walk(wi, false)); else if (!link.has(`${wi}:1`)) chains.push(walk(wi, true)); });
     ways.forEach((w, wi) => { if (!seen.has(wi)) chains.push(walk(wi, false)); });   // closed laps
-    const lengthOf = (c) => c.reduce((sum, { wi }) => { const g = ways[wi].g; let L = 0; for (let i = 1; i < g.length; i++) { const a = toXY(g[i - 1]); const b = toXY(g[i]); L += Math.hypot(b[0] - a[0], b[1] - a[1]); } return sum + L; }, 0);
+    const lengthOf = (c) => c.reduce((sum, { wi }) => { const g = ways[wi].g; let L = 0; for (let i = 1; i < g.length; i++) { const a = toXY(g[i - 1]); const b = toXY(g[i]); L += fastHypot(b[0] - a[0], b[1] - a[1]); } return sum + L; }, 0);
     chains.sort((a, b) => lengthOf(b) - lengthOf(a));
     const moved = new Map();   // node key -> its new { lat, lng }
     const result = features.slice();
@@ -325,10 +326,10 @@ function smoothRaceways(features) {
             for (let i = from; i < g.length; i++) { marks.push({ wi, rev, src: g[i], first: i === 0 }); pts.push(toXY(moved.get(makeRoadNodeKey(g[i])) || g[i])); }
         }
         const s = [0];
-        for (let i = 1; i < pts.length; i++) s.push(s[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+        for (let i = 1; i < pts.length; i++) s.push(s[i - 1] + fastHypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
         const L = s[s.length - 1];
         if (L < 4 * RACE_STEP_M) continue;
-        const closed = Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]) < 0.5;
+        const closed = fastHypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]) < 0.5;
         const n = Math.round(L / RACE_STEP_M); const step = L / n;
         const raw = [];
         for (let k = 0, j = 0; k <= n; k++) {

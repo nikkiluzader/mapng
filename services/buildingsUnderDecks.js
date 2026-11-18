@@ -5,6 +5,7 @@
 // running through their walls (London Bridge's viaduct and station). A building a deck's middle line runs over for
 // THROUGH_MIN_M or more is held to the room under that deck: its height capped, its roof flat; where there is no
 // room for a storey it is left out (the deck's own structure stands there).
+import { fastHypot } from './fastMath.js';
 
 const THROUGH_MIN_M = 3;      // the deck's line inside the footprint for at least this long
 const ROOM_MIN_M = 2.5;       // less room than this under the deck: no building
@@ -44,7 +45,7 @@ export function buildingsUnderDecks(buildings = [], decks = [], { toXY, groundAt
       if (d.box[0] > x1 || d.box[2] < x0 || d.box[1] > y1 || d.box[3] < y0) continue;
       let through = 0; let low = Infinity;
       for (let i = 0; i + 1 < d.xy.length; i++) {
-        const [ax, ay] = d.xy[i]; const [bx, by] = d.xy[i + 1]; const L = Math.hypot(bx - ax, by - ay);
+        const [ax, ay] = d.xy[i]; const [bx, by] = d.xy[i + 1]; const L = fastHypot(bx - ax, by - ay);
         if (Math.max(ax, bx) < x0 || Math.min(ax, bx) > x1 || Math.max(ay, by) < y0 || Math.min(ay, by) > y1) continue;
         const n = Math.max(1, Math.ceil(L / STEP_M));
         for (let k = 0; k < n; k++) {

@@ -24,6 +24,7 @@ import { cleanRing, signedArea, inRing } from './fountains.js';
 import { bar } from './pools.js';
 import { racewayKind, racewayHalfWidth } from './roadWidth.js';
 import { orientedBox } from './waterCover.js';
+import { fastHypot } from './fastMath.js';
 
 const KERB_RADIUS_M = { circuit: 150, kart: 30 };
 const KERB_EXIT_M = 15;
@@ -48,7 +49,7 @@ const UNPAVED = new Set(['dirt', 'clay', 'ground', 'earth', 'unpaved', 'gravel',
 function bends(nodes, window = 6) {
   const n = nodes.length;
   const s = [0];
-  for (let i = 1; i < n; i++) s.push(s[i - 1] + Math.hypot(nodes[i][0] - nodes[i - 1][0], nodes[i][1] - nodes[i - 1][1]));
+  for (let i = 1; i < n; i++) s.push(s[i - 1] + fastHypot(nodes[i][0] - nodes[i - 1][0], nodes[i][1] - nodes[i - 1][1]));
   const at = (target) => { let j = 0; while (j < n - 1 && s[j + 1] < target) j++; const f = (target - s[j]) / ((s[j + 1] - s[j]) || 1); const a = nodes[j]; const b = nodes[Math.min(n - 1, j + 1)]; return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]; };
   return nodes.map((q, i) => {
     const a = at(Math.max(0, s[i] - window)); const b = at(Math.min(s[n - 1], s[i] + window));
@@ -68,11 +69,11 @@ const offsetAt = (q, t, d) => [q[0] - t[1] * d, q[1] + t[0] * d];
 // continuation at a fork (the lap, not the pit entry)
 const JOIN_HEADING_COS = Math.cos((25 * Math.PI) / 180);
 function joinCircuitPieces(rws) {
-  const dirAt = (nodes, atEnd) => { const n = nodes.length; const a = atEnd ? nodes[n - 2] : nodes[0]; const b = atEnd ? nodes[n - 1] : nodes[1]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; };
+  const dirAt = (nodes, atEnd) => { const n = nodes.length; const a = atEnd ? nodes[n - 2] : nodes[0]; const b = atEnd ? nodes[n - 1] : nodes[1]; const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1; return [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; };
   const lines = rws.filter((r) => r.kind === 'circuit' || r.kind === 'kart' || r.kind === 'dirt');
   // (lit= by length: one lit piece, a pit entry, doesn't light the whole lap)
   for (const r of lines) {
-    const L = r.nodes.slice(1).reduce((s, q, i) => s + Math.hypot(q[0] - r.nodes[i][0], q[1] - r.nodes[i][1]), 0);
+    const L = r.nodes.slice(1).reduce((s, q, i) => s + fastHypot(q[0] - r.nodes[i][0], q[1] - r.nodes[i][1]), 0);
     const lit = String(r.tags.lit || '').toLowerCase();
     r.lengths = { all: L, yes: lit === 'yes' ? L : 0, no: lit === 'no' ? L : 0 };
   }
@@ -85,7 +86,7 @@ function joinCircuitPieces(rws) {
       for (const b of lines) {
         if (b === a || b.gone || b.kind !== a.kind || Math.abs(b.half - a.half) > 1) continue;
         for (const nb of b.oneWay ? [b.nodes] : [b.nodes, b.nodes.slice().reverse()]) {
-          if (Math.hypot(nb[0][0] - e[0], nb[0][1] - e[1]) > 1) continue;
+          if (fastHypot(nb[0][0] - e[0], nb[0][1] - e[1]) > 1) continue;
           const db = dirAt(nb, false); const c = da[0] * db[0] + da[1] * db[1];
           if (c >= JOIN_HEADING_COS && (!best || c > best.c)) best = { c, b, nb };
         }
@@ -150,7 +151,7 @@ function cornersOf(info, lim) {
 export function planRaceways(carriageways = []) {
   const rws = carriageways.filter((cw) => cw.highway === 'raceway' && cw.nodes?.length >= 2).map((cw) => {
     const a = cw.nodes[0]; const b = cw.nodes[cw.nodes.length - 1];
-    return { kind: racewayKind(cw.tags || {}), nodes: cw.nodes, half: cw.half, closed: Math.hypot(b[0] - a[0], b[1] - a[1]) < 1, tags: cw.tags || {}, id: cw.wayId, oneWay: !!cw.oneWay };
+    return { kind: racewayKind(cw.tags || {}), nodes: cw.nodes, half: cw.half, closed: fastHypot(b[0] - a[0], b[1] - a[1]) < 1, tags: cw.tags || {}, id: cw.wayId, oneWay: !!cw.oneWay };
   });
   // a circuit or oval in pieces (its ways, the road system's chunks) is one
   // line: a corner cut at a piece's end lost its kerb there, a wall its join
@@ -159,14 +160,14 @@ export function planRaceways(carriageways = []) {
   // a drag strip in pieces (split at the timing lights, the shut-down area):
   // the pieces that meet end to end in line are one strip, one start
   const drags = rws.filter((r) => r.kind === 'drag');
-  const dirOf = (nodes, atEnd) => { const n = nodes.length; const a = atEnd ? nodes[n - 2] : nodes[1]; const b = atEnd ? nodes[n - 1] : nodes[0]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; };
+  const dirOf = (nodes, atEnd) => { const n = nodes.length; const a = atEnd ? nodes[n - 2] : nodes[1]; const b = atEnd ? nodes[n - 1] : nodes[0]; const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1; return [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; };
   for (let merged = true; merged;) {
     merged = false;
     outer: for (const a of drags) for (const b of drags) {
       if (a === b || a.gone || b.gone) continue;
       for (const [na, nb] of [[a.nodes, b.nodes], [a.nodes, b.nodes.slice().reverse()]]) {
         const e = na[na.length - 1]; const f = nb[0];
-        if (Math.hypot(e[0] - f[0], e[1] - f[1]) > 3) continue;
+        if (fastHypot(e[0] - f[0], e[1] - f[1]) > 3) continue;
         const da = dirOf(na, true); const db = dirOf(nb, false);
         // (the end's heading going on into the next piece's)
         if (-(da[0] * db[0] + da[1] * db[1]) < 0.95) continue;
@@ -182,7 +183,7 @@ export function planRaceways(carriageways = []) {
   // (paved ovals too: a loop that only ever bends round its own middle)
   const dirt = rws.filter((r) => r.kind === 'dirt' || r.kind === 'circuit');
   const ends = (r) => [r.nodes[0], r.nodes[r.nodes.length - 1]];
-  const touch = (r, o) => ends(r).some((p) => o.nodes.some((q) => Math.hypot(p[0] - q[0], p[1] - q[1]) < 3));
+  const touch = (r, o) => ends(r).some((p) => o.nodes.some((q) => fastHypot(p[0] - q[0], p[1] - q[1]) < 3));
   const seen = new Set();
   for (const r of dirt) {
     if (seen.has(r)) continue;
@@ -192,14 +193,14 @@ export function planRaceways(carriageways = []) {
     const c = [pts.reduce((a, q) => a + q[0], 0) / pts.length, pts.reduce((a, q) => a + q[1], 0) / pts.length];
     const BINS = 48; const far = new Array(BINS).fill(0);
     const bin = (q) => Math.floor(((Math.atan2(q[1] - c[1], q[0] - c[0]) + Math.PI) / (2 * Math.PI)) * BINS) % BINS;
-    for (const q of pts) { const b = bin(q); far[b] = Math.max(far[b], Math.hypot(q[0] - c[0], q[1] - c[1])); }
+    for (const q of pts) { const b = bin(q); far[b] = Math.max(far[b], fastHypot(q[0] - c[0], q[1] - c[1])); }
     let loop = far.every((v) => v > 0);   // the pieces go all the way round
     // on the outer ring: a line straight out from it, away from the middle,
     // meets no other piece of the track (a crossing has the ring beyond it)
     const segs = group.flatMap((g) => g.nodes.filter((_, i) => i % 3 === 0 || i === g.nodes.length - 1).map((q, i, a) => (i ? [a[i - 1], q] : null)).filter(Boolean));
     const outerOf = (g, q, i) => {
       const a = g.nodes[Math.max(0, i - 1)]; const b = g.nodes[Math.min(g.nodes.length - 1, i + 1)];
-      const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; let nx = -(b[1] - a[1]) / L; let ny = (b[0] - a[0]) / L;
+      const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1; let nx = -(b[1] - a[1]) / L; let ny = (b[0] - a[0]) / L;
       if ((c[0] - q[0]) * nx + (c[1] - q[1]) * ny > 0) { nx = -nx; ny = -ny; }
       for (const [p0, p1] of segs) {
         const dx = p1[0] - p0[0]; const dy = p1[1] - p0[1]; const den = nx * dy - ny * dx;
@@ -257,7 +258,7 @@ export function carriagewayTest(rws, cell = 20) {
       if (g.r.nodes === rw.nodes && Math.abs(g.s - s) < SELF_GAP_M) continue;
       const dx = g.b[0] - g.a[0]; const dy = g.b[1] - g.a[1]; const L2 = dx * dx + dy * dy || 1;
       const t = Math.max(0, Math.min(1, ((x - g.a[0]) * dx + (y - g.a[1]) * dy) / L2));
-      if (Math.hypot(x - g.a[0] - dx * t, y - g.a[1] - dy * t) < g.r.half + 0.3) return true;
+      if (fastHypot(x - g.a[0] - dx * t, y - g.a[1] - dy * t) < g.r.half + 0.3) return true;
     }
     return false;
   };
@@ -272,7 +273,7 @@ function edgeStrip(m, mat, rw, info, i0, i1, d0, d1, z, stripe, colours, lift) {
     const a0 = offsetAt(qa, info[i].t, d0); const a1 = offsetAt(qa, info[i].t, d1);
     const b0 = offsetAt(qb, info[i + 1].t, d0); const b1 = offsetAt(qb, info[i + 1].t, d1);
     if (rw.blocked && [a1, b1].some((q, k) => rw.blocked(q[0], q[1], rw, info[i + k].s))) continue;
-    const L = Math.hypot(qb[0] - qa[0], qb[1] - qa[1]);
+    const L = fastHypot(qb[0] - qa[0], qb[1] - qa[1]);
     const P = (xy, dz) => [xy[0], xy[1], z(xy[0], xy[1]) + dz];
     const lerp = (p, q, f) => [p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f];
     // (in pieces no longer than a stripe, each its own colour: a kerb's red and white)
@@ -307,7 +308,7 @@ function wallAlong(m, mat, rw, info, i0, i1, d, thick, h, ground, col, colours =
       const near = (q, t, k) => [offsetAt(q, t, -sg * off), offsetAt(q, t, sg * off)].some((p) => rw.blocked(p[0], p[1], rw, info[i + k].s));
       if (near(a, info[i].t, 0) || near(b, info[i + 1].t, 1)) continue;
     }
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]);
     if (L < 0.05) continue;
     const c = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; const u = [(b[0] - a[0]) / L, (b[1] - a[1]) / L];
     if (native) {
@@ -341,7 +342,7 @@ function openWall(rw, line, d, style) {
 /** A drag strip's nodes, start first: the end nearer the grandstands' middle (they line the quarter mile), without any the end nearer the rest of the raceways. */
 export function dragStartFirst(rw, others = [], spectators = []) {
   const n = rw.nodes.length;
-  const d = (q, p) => Math.hypot(p[0] - q[0], p[1] - q[1]);
+  const d = (q, p) => fastHypot(p[0] - q[0], p[1] - q[1]);
   const near = (q) => others.reduce((c, o) => c + o.nodes.filter((p) => d(q, p) < 80).length, 0);
   const toStands = (q) => Math.min(...spectators.map((p) => d(q, p)));
   const a0 = rw.nodes[0]; const a1 = rw.nodes[n - 1];
@@ -360,7 +361,7 @@ export function buildRaceway(stone, full, rw, { drapeAt, others = [], blocked = 
   // a closed lap: one direction where its ends meet, so its walls meet too
   {
     const a = rw.nodes[0]; const b = rw.nodes[n - 1];
-    if (n > 3 && Math.hypot(b[0] - a[0], b[1] - a[1]) < 1) {
+    if (n > 3 && fastHypot(b[0] - a[0], b[1] - a[1]) < 1) {
       const t = [info[0].t[0] + info[n - 1].t[0], info[0].t[1] + info[n - 1].t[1]]; const L = Math.hypot(...t) || 1;
       info[0].t = [t[0] / L, t[1] / L]; info[n - 1].t = info[0].t;
     }
@@ -420,7 +421,7 @@ export function buildRaceway(stone, full, rw, { drapeAt, others = [], blocked = 
       if (!onRing[i] || !onRing[i + 1]) continue;
       const d = side(i) * (rw.half + 1.2);
       for (const g of wallOpenings([offsetAt(rw.nodes[i], info[i].t, d), offsetAt(rw.nodes[i + 1], info[i + 1].t, d)], rw.roads)) {
-        if (openings.some((o) => Math.hypot(o.x - g.x, o.y - g.y) < g.width)) continue;
+        if (openings.some((o) => fastHypot(o.x - g.x, o.y - g.y) < g.width)) continue;
         openings.push(g);
         rw.gates.push({ ...g, prefer: Math.sign(d) || 1 });
       }
@@ -433,7 +434,7 @@ export function buildRaceway(stone, full, rw, { drapeAt, others = [], blocked = 
       const a0 = offsetAt(rw.nodes[i], info[i].t, d); const b0 = offsetAt(rw.nodes[i + 1], info[i + 1].t, d);
       for (const [u0, u1] of clearOf(a0, b0, openings)) {
         const a = lerpXY(a0, b0, u0); const b = lerpXY(a0, b0, u1);
-        const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        const L = fastHypot(b[0] - a[0], b[1] - a[1]);
         if (L < 0.05) continue;
         const ga = z(...a); const gb = z(...b);
         // the game's barrier pieces end to end (a gap starts them afresh)
@@ -494,14 +495,14 @@ export function planRacewayAreas(features, project) {
     const t = f?.tags || {};
     if (t.highway !== 'raceway' || t.area === 'yes' || !(f.geometry?.length >= 2)) continue;
     const w = 2 * racewayHalfWidth(t); const p = f.geometry.map((q) => project(q.lat, q.lng));
-    for (let i = 0; i + 1 < p.length; i++) lines.push({ x: (p[i][0] + p[i + 1][0]) / 2, y: (p[i][1] + p[i + 1][1]) / 2, area: w * Math.hypot(p[i + 1][0] - p[i][0], p[i + 1][1] - p[i][1]) });
+    for (let i = 0; i + 1 < p.length; i++) lines.push({ x: (p[i][0] + p[i + 1][0]) / 2, y: (p[i][1] + p[i + 1][1]) / 2, area: w * fastHypot(p[i + 1][0] - p[i][0], p[i + 1][1] - p[i][1]) });
   }
   for (const f of features || []) {
     const t = f?.tags || {};
     // (a raceway's own outline; a motorsport track mapped as an area:
     // motocross, BMX, a tractor pull, a speedway: its dirt unless paved)
     const g = f.geometry || [];
-    const closed = g.length >= 4 && Math.hypot(g[0].lat - g[g.length - 1].lat, g[0].lng - g[g.length - 1].lng) < 1e-7;
+    const closed = g.length >= 4 && fastHypot(g[0].lat - g[g.length - 1].lat, g[0].lng - g[g.length - 1].lng) < 1e-7;
     const motor = t.leisure === 'track' && t.area !== 'no' && closed && /motor|kart|cross|speedway|bmx|tractor|dirt|stock|drag/.test(String(t.sport || '').toLowerCase());
     if (!motor && (t.highway !== 'raceway' || t.area !== 'yes' || g.length < 4)) continue;
     let ring = cleanRing(f.geometry.map((q) => project(q.lat, q.lng)));
@@ -540,9 +541,9 @@ export function tracksideStands(features, project, carriageways = []) {
     const c = [ring.reduce((a, q) => a + q[0], 0) / ring.length, ring.reduce((a, q) => a + q[1], 0) / ring.length];
     const along = rws.some((r) => r.nodes.some((q, i) => {
       if (i + 1 >= r.nodes.length) return false;
-      const b = r.nodes[i + 1]; const dx = b[0] - q[0]; const dy = b[1] - q[1]; const sl = Math.hypot(dx, dy) || 1;
+      const b = r.nodes[i + 1]; const dx = b[0] - q[0]; const dy = b[1] - q[1]; const sl = fastHypot(dx, dy) || 1;
       const u = Math.max(0, Math.min(1, ((c[0] - q[0]) * dx + (c[1] - q[1]) * dy) / (sl * sl)));
-      if (Math.hypot(q[0] + dx * u - c[0], q[1] + dy * u - c[1]) > STAND_REACH_M + D / 2) return false;
+      if (fastHypot(q[0] + dx * u - c[0], q[1] + dy * u - c[1]) > STAND_REACH_M + D / 2) return false;
       return Math.abs((dx * bx.u[0] + dy * bx.u[1]) / sl) > 0.9;   // parallel
     }));
     if (along) out.add(f);

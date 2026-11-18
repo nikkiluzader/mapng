@@ -10,6 +10,7 @@
 // After a first solve the side road's stations inside the through road's width are pinned to the through
 // road's height beside them (level across it, as a road is), and the roads are solved once more: the side
 // road's own grade starts at the through road's edge. Ground roads only: decks and tunnels have their own care.
+import { fastHypot } from '../fastMath.js';
 
 const THROUGH_COS = Math.cos((35 * Math.PI) / 180);   // two roads within 35 degrees of straight on: one road through
 const MERGE_COS = Math.cos((30 * Math.PI) / 180);     // a road within 30 degrees of the through road's line is merging, not crossing
@@ -27,7 +28,7 @@ const REJOIN_MIN_M = 8;                                // a side road shorter th
 
 const outward = (e, end) => {   // the unit direction leaving the node at `end` of e
   const n = e.x.length; const a = end === 0 ? 0 : n - 1; const b = end === 0 ? Math.min(n - 1, 2) : Math.max(0, n - 3);
-  const dx = e.x[b] - e.x[a]; const dy = e.y[b] - e.y[a]; const L = Math.hypot(dx, dy) || 1;
+  const dx = e.x[b] - e.x[a]; const dy = e.y[b] - e.y[a]; const L = fastHypot(dx, dy) || 1;
   return [dx / L, dy / L];
 };
 const plain = (e) => e && !e.bridge && !e.tunnel && !e.rail && !e.external && e.s?.length >= 2;
@@ -79,7 +80,7 @@ export function junctionMouthPins(graph, z, { limitOf = null } = {}) {
         for (let q = 1; q < line.length; q++) {
           const a = line[q - 1]; const b = line[q]; const dx = b[0] - a[0]; const dy = b[1] - a[1];
           const t = Math.max(0, Math.min(1, ((e.x[i] - a[0]) * dx + (e.y[i] - a[1]) * dy) / (dx * dx + dy * dy || 1)));
-          const d = Math.hypot(e.x[i] - (a[0] + dx * t), e.y[i] - (a[1] + dy * t));
+          const d = fastHypot(e.x[i] - (a[0] + dx * t), e.y[i] - (a[1] + dy * t));
           if (d < bd) { bd = d; bz = a[2] + (b[2] - a[2]) * t; bh = a[3] + (b[3] - a[3]) * t; }
         }
         if (bd <= bh + MOUTH_MARGIN_M && Number.isFinite(bz)) { pins.push([edge, i, bz]); any = true; if (fromNode > edgeAt) { edgeAt = fromNode; edgeZ = bz; edgeI = i; } }

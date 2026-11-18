@@ -26,6 +26,7 @@ import { hash01, signedArea, cleanRing, inRing, lathe } from './fountains.js';
 import { orientedBox, frameAt } from './waterCover.js';
 import { smoothRing, poolShape, bar } from './pools.js';
 import { footballIsGridiron } from './beamngRegion.js';
+import { fastHypot } from './fastMath.js';
 
 // ── What a field is ──────────────────────────────────────────────────────────
 
@@ -147,7 +148,7 @@ function roadIndex(features, project) {
   return (x, y) => (cells.get(`${Math.floor(x / C)},${Math.floor(y / C)}`) || []).some(([a, b, half]) => {
     const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L2 = dx * dx + dy * dy || 1e-9;
     const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / L2));
-    return Math.hypot(a[0] + dx * t - x, a[1] + dy * t - y) < half + 0.3;
+    return fastHypot(a[0] + dx * t - x, a[1] + dy * t - y) < half + 0.3;
   });
 }
 
@@ -251,7 +252,7 @@ export function planPitches(features, project, { groundAt = null, drape = null }
     if (!['tennis', 'padel', 'pickleball', 'baseball', 'softball'].includes(p.sport)) continue;
     p.fenceEdges = p.ring.map((a, i) => {
       const b = p.ring[(i + 1) % p.ring.length];
-      const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
       const mid = [(a[0] + b[0]) / 2 + ((b[1] - a[1]) / L) * 1.5, (a[1] + b[1]) / 2 - ((b[0] - a[0]) / L) * 1.5];
       return !out.some((q) => q !== p && ['tennis', 'padel', 'pickleball'].includes(q.sport) && inRing(mid[0], mid[1], q.ring));
     });
@@ -276,7 +277,7 @@ export function pitchFootprints(pitches) {
 const lifted = (p, lift) => (p.slab !== null ? lift : lift + (p.drape ? 0.012 : 0.035));
 function strip(m, mat, p, a, b, w, col, lift = 0.012) {
   lift = lifted(p, lift);
-  const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const L = fastHypot(b[0] - a[0], b[1] - a[1]);
   if (L < 1e-3) return;
   const u = [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; const n = [-u[1] * w / 2, u[0] * w / 2];
   const k = Math.max(1, Math.ceil(L / (p.drape ? 0.5 : 1.5)));
@@ -293,7 +294,7 @@ function strip(m, mat, p, a, b, w, col, lift = 0.012) {
 const F = (p, s, t) => frameAt(p.box, s, t);
 function lineST(m, p, s0, t0, s1, t1, w = LINE_W, col = PAINT, lift) { strip(m, PAINT_MAT, p, F(p, s0, t0), F(p, s1, t1), w, col, lift); }
 function dashedST(m, p, s0, t0, s1, t1, dash = 1, gap = 1, w = LINE_W) {
-  const L = Math.hypot(s1 - s0, t1 - t0);
+  const L = fastHypot(s1 - s0, t1 - t0);
   for (let d = 0; d < L; d += dash + gap) {
     const e = Math.min(L, d + dash);
     lineST(m, p, s0 + ((s1 - s0) * d) / L, t0 + ((t1 - t0) * d) / L, s0 + ((s1 - s0) * e) / L, t0 + ((t1 - t0) * e) / L, w);
@@ -341,7 +342,7 @@ function post(m, p, s, t, r, h, col, mat = 'metalWhite') {
 }
 // a net panel between two (s, t, z) points along its bottom edge, h tall (double-sided material)
 function netPanel(m, p, a, b, z0, z1, col = NET, uv = 0.12) {
-  const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const L = fastHypot(b[0] - a[0], b[1] - a[1]);
   m.quad('netting', [a[0], a[1], z0], [b[0], b[1], z0], [b[0], b[1], z1], [a[0], a[1], z1], [0, z0 / uv], [L / uv, z0 / uv], [L / uv, z1 / uv], [0, z1 / uv], col);
 }
 
@@ -475,7 +476,7 @@ function surfaceMesh(stone, full, p) {
     for (const [ia, ib, ic] of tri) {
       let [a, b, c] = [all[ia], all[ib], all[ic]];
       if ((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]) < 0) [b, c] = [c, b];
-      const e = Math.max(Math.hypot(b[0] - a[0], b[1] - a[1]), Math.hypot(c[0] - b[0], c[1] - b[1]), Math.hypot(a[0] - c[0], a[1] - c[1]));
+      const e = Math.max(fastHypot(b[0] - a[0], b[1] - a[1]), fastHypot(c[0] - b[0], c[1] - b[1]), fastHypot(a[0] - c[0], a[1] - c[1]));
       const n = Math.max(1, Math.ceil(e / 2.5));
       const P = (i, j) => { const x = a[0] + ((b[0] - a[0]) * i + (c[0] - a[0]) * j) / n; const y = a[1] + ((b[1] - a[1]) * i + (c[1] - a[1]) * j) / n; return [x, y, p.fieldZ(x, y)]; };
       const uv = (q) => [q[0] / 4, q[1] / 4];
@@ -490,7 +491,7 @@ function surfaceMesh(stone, full, p) {
   if (p.slab !== null) {
     const edges = [...p.ring.map((a, i) => [a, p.ring[(i + 1) % p.ring.length]]), ...(p.hole || []).map((a, i, h) => [h[(i + 1) % h.length], a])];
     for (const [a, b] of edges) {
-      const L2 = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const L2 = fastHypot(b[0] - a[0], b[1] - a[1]);
       const k = Math.max(1, Math.ceil(L2 / 2));
       for (let j = 0; j < k; j++) {
         const q0 = [a[0] + ((b[0] - a[0]) * j) / k, a[1] + ((b[1] - a[1]) * j) / k];
@@ -622,7 +623,7 @@ function fence(stone, full, p, h, edges = null) {
   for (let i = 0; i < ring.length; i++) {
     if (edges && !edges[i]) continue;
     const a = ring[i]; const b = ring[(i + 1) % ring.length];
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]);
     const n = Math.max(1, Math.ceil(L / 3));
     if (native) {
       // (runs between the stretches a neighbouring court or a road takes)
@@ -645,7 +646,7 @@ function fence(stone, full, p, h, edges = null) {
         const q2 = [a[0] + ((b[0] - a[0]) * (k + 1)) / n, a[1] + ((b[1] - a[1]) * (k + 1)) / n];
         if (inNeighbour(p, (q[0] + q2[0]) / 2, (q[1] + q2[1]) / 2) || (p.onRoad && p.onRoad((q[0] + q2[0]) / 2, (q[1] + q2[1]) / 2))) continue;
         const g2 = p.ground(...q2);
-        const seg = Math.hypot(q2[0] - q[0], q2[1] - q[1]);
+        const seg = fastHypot(q2[0] - q[0], q2[1] - q[1]);
         full.quad('chainlink', [q[0], q[1], g], [q2[0], q2[1], g2], [q2[0], q2[1], g2 + h], [q[0], q[1], g + h], [0, 0], [seg / 1.5, 0], [seg / 1.5, h / 1.5], [0, h / 1.5], STEEL);
         bar(stone, 'metalWhite', [q[0], q[1], g + h], [q2[0], q2[1], g2 + h], 0.025, STEEL);
       }
@@ -755,7 +756,7 @@ function cricket(stone, full, p) {
   const cx = ring.reduce((a, q) => a + q[0], 0) / ring.length; const cy = ring.reduce((a, q) => a + q[1], 0) / ring.length;
   for (let i = 0; i < ring.length; i++) {
     const q0 = ring[i]; const q1 = ring[(i + 1) % ring.length];
-    const pull = (q) => { const d = Math.hypot(q[0] - cx, q[1] - cy) || 1; const f = Math.max(0, (d - 4) / d); return [cx + (q[0] - cx) * f, cy + (q[1] - cy) * f]; };
+    const pull = (q) => { const d = fastHypot(q[0] - cx, q[1] - cy) || 1; const f = Math.max(0, (d - 4) / d); return [cx + (q[0] - cx) * f, cy + (q[1] - cy) * f]; };
     strip(full, PAINT_MAT, p, pull(q0), pull(q1), 0.1, [0.95, 0.95, 0.95], 0.05);
   }
 }
@@ -784,7 +785,7 @@ export function homePlate(p) {
       let total = 0; let len = 0;
       for (let i = i0; i !== i1; i = (i + 1) % n) {
         const q = r[i]; const q2 = r[(i + 1) % n];
-        len += Math.hypot(q2[0] - q[0], q2[1] - q[1]);
+        len += fastHypot(q2[0] - q[0], q2[1] - q[1]);
         if (i !== i0) total += turn(i);
       }
       if (total < (20 * Math.PI) / 180) runs.push({ a: r[i0], b: r[i1], len });
@@ -800,9 +801,9 @@ export function homePlate(p) {
     const t = ((B.a[0] - A.a[0]) * v[1] - (B.a[1] - A.a[1]) * v[0]) / den;
     const h = [A.a[0] + u[0] * t, A.a[1] + u[1] * t];
     // (the crossing near the outline: a corner of it, not far outside)
-    const near = Math.min(...r.map((q) => Math.hypot(q[0] - h[0], q[1] - h[1])));
+    const near = Math.min(...r.map((q) => fastHypot(q[0] - h[0], q[1] - h[1])));
     if (near > 0.15 * Math.sqrt(p.area)) continue;
-    const L = Math.hypot(cx - h[0], cy - h[1]) || 1;
+    const L = fastHypot(cx - h[0], cy - h[1]) || 1;
     return { home: h, dir: [(cx - h[0]) / L, (cy - h[1]) / L], half: (ang * Math.PI) / 360 };   // (half the angle between the foul lines)
   }
   // else: the square-ish corner farthest from the middle
@@ -811,12 +812,12 @@ export function homePlate(p) {
     const a = r[(i - 1 + n) % n]; const b = r[i]; const c = r[(i + 1) % n];
     const u = [a[0] - b[0], a[1] - b[1]]; const v = [c[0] - b[0], c[1] - b[1]];
     const ang = Math.acos(Math.max(-1, Math.min(1, (u[0] * v[0] + u[1] * v[1]) / ((Math.hypot(...u) * Math.hypot(...v)) || 1)))) * 180 / Math.PI;
-    const d = Math.hypot(b[0] - cx, b[1] - cy);
+    const d = fastHypot(b[0] - cx, b[1] - cy);
     const score = d - Math.abs(ang - 90) * 0.4;
     if (ang < 125 && (!best || score > best.score)) best = { score, p: b };
   }
   const h = best ? best.p : r[0];
-  const L = Math.hypot(cx - h[0], cy - h[1]) || 1;
+  const L = fastHypot(cx - h[0], cy - h[1]) || 1;
   return { home: h, dir: [(cx - h[0]) / L, (cy - h[1]) / L], half: Math.PI / 4 };
 }
 
@@ -874,7 +875,7 @@ function baseball(stone, full, p, softball) {
   const d = base / Math.SQRT2;
   for (const sg of [-1, 1]) {
     const b0 = at(0, 0); const b1 = at(d, sg * d);
-    const L = Math.hypot(b1[0] - b0[0], b1[1] - b0[1]);
+    const L = fastHypot(b1[0] - b0[0], b1[1] - b0[1]);
     const uB = [(b1[0] - b0[0]) / L, (b1[1] - b0[1]) / L];
     // (out of the field by 0.9 m, in under the grass diamond's edge)
     const nIn = [dir[0] - uB[0] * (dir[0] * uB[0] + dir[1] * uB[1]), dir[1] - uB[1] * (dir[0] * uB[0] + dir[1] * uB[1])];
@@ -943,7 +944,7 @@ function baseball(stone, full, p, softball) {
     if (inNeighbour(p, q[0], q[1])) continue;
     cylinder(stone, 'metalWhite', q[0], q[1], 0.05, g - 0.3, g + hB, STEEL, { n: 6 });
     if (i + 1 < pts.length) {
-      const q2 = pts[i + 1]; const g2 = p.ground(...q2); const L = Math.hypot(q2[0] - q[0], q2[1] - q[1]);
+      const q2 = pts[i + 1]; const g2 = p.ground(...q2); const L = fastHypot(q2[0] - q[0], q2[1] - q[1]);
       if (inNeighbour(p, q2[0], q2[1])) continue;
       full.quad('chainlink', [q[0], q[1], g], [q2[0], q2[1], g2], [q2[0], q2[1], g2 + hB], [q[0], q[1], g + hB], [0, 0], [L / 1.5, 0], [L / 1.5, hB / 1.5], [0, hB / 1.5], STEEL);
       bar(stone, 'metalWhite', [q[0], q[1], g + hB], [q2[0], q2[1], g2 + hB], 0.03, STEEL);
@@ -1117,7 +1118,7 @@ function track(stone, full, p) {
     for (const [ia, ib, ic] of tri) {
       let [a, b, c] = [inner[ia], inner[ib], inner[ic]];
       if ((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]) < 0) [b, c] = [c, b];
-      const e = Math.max(Math.hypot(b[0] - a[0], b[1] - a[1]), Math.hypot(c[0] - b[0], c[1] - b[1]), Math.hypot(a[0] - c[0], a[1] - c[1]));
+      const e = Math.max(fastHypot(b[0] - a[0], b[1] - a[1]), fastHypot(c[0] - b[0], c[1] - b[1]), fastHypot(a[0] - c[0], a[1] - c[1]));
       const n = Math.max(1, Math.ceil(e / 2.5));
       const P = (i, j) => { const x = a[0] + ((b[0] - a[0]) * i + (c[0] - a[0]) * j) / n; const y = a[1] + ((b[1] - a[1]) * i + (c[1] - a[1]) * j) / n; return [x, y, p.fieldZ(x, y) - 0.015]; };
       const uv = (q) => [q[0] / 4, q[1] / 4];
@@ -1300,10 +1301,10 @@ function rowCap(tags) {
 function frontChain(ring, watch) {
   const n = ring.length;
   const edges = ring.map((a, i) => {
-    const b = ring[(i + 1) % n]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1e-6;
+    const b = ring[(i + 1) % n]; const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1e-6;
     const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; const to = watch(mid[0], mid[1]);
     if (!to) return { L, facing: false };
-    const d = Math.hypot(to[0] - mid[0], to[1] - mid[1]) || 1e-6;
+    const d = fastHypot(to[0] - mid[0], to[1] - mid[1]) || 1e-6;
     return { L, facing: ((b[1] - a[1]) * (to[0] - mid[0]) - (b[0] - a[0]) * (to[1] - mid[1])) / (L * d) > FRONT_FACING };
   });
   const start = edges.findIndex((e) => !e.facing);
@@ -1329,7 +1330,7 @@ function frontChain(ring, watch) {
 // A line resampled to about `step` apart, with its small jogs smoothed away.
 function evenLine(line, step) {
   const lens = [0];
-  for (let i = 1; i < line.length; i++) lens.push(lens[i - 1] + Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]));
+  for (let i = 1; i < line.length; i++) lens.push(lens[i - 1] + fastHypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]));
   const L = lens[lens.length - 1]; const n = Math.max(2, Math.round(L / step));
   let pts = []; let j = 0;
   for (let i = 0; i <= n; i++) {
@@ -1374,7 +1375,7 @@ function fillFront(pts, watch) {
   const w = Math.round(CUTOUT_M / SWEEP_STEP_M);
   const to = pts.map((p) => watch(p[0], p[1]));
   if (to.some((q) => !q)) return pts;
-  const dist = pts.map((p, i) => Math.hypot(to[i][0] - p[0], to[i][1] - p[1]) || 1e-6);
+  const dist = pts.map((p, i) => fastHypot(to[i][0] - p[0], to[i][1] - p[1]) || 1e-6);
   const near = fillDips(dist.map((d) => -d), w).map((d) => -d);
   let out = pts.map((p, i) => {
     const f = Math.min(CUTOUT_DEEP_M, dist[i] - near[i]) / dist[i];
@@ -1396,7 +1397,7 @@ function sweepStand(ring, tags, watch, keepOff) {
   const pts = fillFront(evenLine(chain, SWEEP_STEP_M), watch);
   const raw = pts.map((p, i) => {
     const a = pts[Math.max(0, i - 1)]; const b = pts[Math.min(pts.length - 1, i + 1)];
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
     let n = [-(b[1] - a[1]) / L, (b[0] - a[0]) / L];
     const to = watch(p[0], p[1]);
     if (to && (to[0] - p[0]) * n[0] + (to[1] - p[1]) * n[1] > 0) n = [-n[0], -n[1]];
@@ -1436,11 +1437,11 @@ export function planSeating(features, project, pitches = [], { groundAt = null, 
     let near = null;
     for (const p of pitches) {
       const pc = frameAt(p.box, (p.box.s0 + p.box.s1) / 2, (p.box.t0 + p.box.t1) / 2);
-      const d = Math.hypot(pc[0] - x, pc[1] - y);
+      const d = fastHypot(pc[0] - x, pc[1] - y);
       if (d < 250 && (!near || d < near.d)) near = { d, pc };
     }
     const other = faceTo?.(x, y);
-    if (other) { const d = Math.hypot(other[0] - x, other[1] - y); if (d < 250 && (!near || d < near.d)) near = { d, pc: other }; }
+    if (other) { const d = fastHypot(other[0] - x, other[1] - y); if (d < 250 && (!near || d < near.d)) near = { d, pc: other }; }
     return near ? near.pc : null;
   };
   for (const f of features || []) {
@@ -1502,7 +1503,7 @@ function buildSwept(stone, st) {
   // a wall from a to b facing `out`, and a flat quad facing up
   const wall = (m, a, b, za0, zb0, za1, zb1, out, col) => {
     const [p, q, p0, q0, p1, q1] = (b[1] - a[1]) * out[0] - (b[0] - a[0]) * out[1] >= 0 ? [a, b, za0, zb0, za1, zb1] : [b, a, zb0, za0, zb1, za1];
-    const L = Math.hypot(q[0] - p[0], q[1] - p[1]);
+    const L = fastHypot(q[0] - p[0], q[1] - p[1]);
     stone.quad(m, [...p, p0], [...q, q0], [...q, q1], [...p, p1], [0, 0], [L, 0], [L, 1], [0, 1], col);
   };
   const flat = (m, a, b, c, d, z, col) => {
@@ -1512,7 +1513,7 @@ function buildSwept(stone, st) {
     stone.quad(m, w, x, y, v, [0, 0], [1, 0], [1, 1], [0, 1], col);
   };
   const groundOf = (q) => (st.ground ? st.ground(q[0], q[1]) : st.z0);
-  const tan = (a, b) => { const L = Math.hypot(b.p[0] - a.p[0], b.p[1] - a.p[1]) || 1; return [(b.p[0] - a.p[0]) / L, (b.p[1] - a.p[1]) / L]; };
+  const tan = (a, b) => { const L = fastHypot(b.p[0] - a.p[0], b.p[1] - a.p[1]) || 1; return [(b.p[0] - a.p[0]) / L, (b.p[1] - a.p[1]) / L]; };
   // the side of a stretch of rows where it stands taller than what is next to it
   const end = (q, from, to, out) => {
     for (let k = from; k < to; k++) wall(mat, at(q, k * rowD), at(q, (k + 1) * rowD), st.z0 - 0.3, st.z0 - 0.3, foot(k) + rise, foot(k) + rise, out, body);
@@ -1557,7 +1558,7 @@ function buildSwept(stone, st) {
     for (let i = 0; i + 1 < pts.length; i++) {
       const a = pts[i]; const b = pts[i + 1];
       const q = [[...inner(a), zr + 0.5], [...inner(b), zr + 0.5], [...outer(b), zr - 0.3], [...outer(a), zr - 0.3]];
-      const L = Math.hypot(b.p[0] - a.p[0], b.p[1] - a.p[1]) / 3; const D = (a.rows * rowD + 1.5) / 3;
+      const L = fastHypot(b.p[0] - a.p[0], b.p[1] - a.p[1]) / 3; const D = (a.rows * rowD + 1.5) / 3;
       stone.quad('roofMetal', q[1], q[0], q[3], q[2], [0, 0], [L, 0], [L, D], [0, D], [0.85, 0.86, 0.88]);
       stone.quad('roofMetal', q[0], q[1], q[2], q[3], [0, 0], [L, 0], [L, D], [0, D], [0.6, 0.62, 0.65]);
     }

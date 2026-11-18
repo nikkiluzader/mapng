@@ -19,6 +19,7 @@ import { getEffectiveRoadLayer } from './roadNetwork.js';
 import { CURB_ONLY_M, sidewalkSides } from './beamngSidewalks.js';
 import { osmRockAllowed, steepRockFrom } from './worldCover.js';
 import { railHalfWidth, railKindOf, undergroundRailIds } from './railways.js';
+import { fastHypot } from './fastMath.js';
 
 // ── Material names ─────────────────────────────────────────────────────────
 // Index 0 = DefaultMaterial (satellite base), 1–9 = BeamNG-referenced materials
@@ -832,7 +833,7 @@ function buildOSMLayerMap(terrainData, worldSize, vegetationMask = null, { groun
           const ax = pts[i].px, ay = pts[i].py, dx = pts[i + 1].px - ax, dy = pts[i + 1].py - ay, l2 = dx * dx + dy * dy;
           if (l2 < 1e-9) continue;
           const t = Math.min(1, Math.max(0, ((x + 0.5 - ax) * dx + (y + 0.5 - ay) * dy) / l2));
-          const ex = ax + dx * t - x - 0.5, ey = ay + dy * t - y - 0.5, d = Math.hypot(ex, ey);
+          const ex = ax + dx * t - x - 0.5, ey = ay + dy * t - y - 0.5, d = fastHypot(ex, ey);
           if (d < best) { best = d; side = (-(x + 0.5 - ax - dx * t) * dy + (y + 0.5 - ay - dy * t) * dx) / Math.sqrt(l2); }
         }
         // side > 0: right of travel in image space (y down)
@@ -841,7 +842,7 @@ function buildOSMLayerMap(terrainData, worldSize, vegetationMask = null, { groun
         let steep = side < 4 / metersPerPixel;   // without heights: a 4 m strip
         if (hm?.length === size * size) {
           const gx = (hm[k + 1] - hm[k - 1]) / (2 * metersPerPixel), gy = (hm[k + size] - hm[k - size]) / (2 * metersPerPixel);
-          steep = Math.hypot(gx, gy) > 1;
+          steep = fastHypot(gx, gy) > 1;
         }
         if (steep) layerMap[k] = 4;
       }

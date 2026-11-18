@@ -19,6 +19,7 @@
 
 import { CALMING_SHAPES } from './beamngPropLibrary.js';
 import { part } from './tagModels.js';
+import { fastHypot } from './fastMath.js';
 
 export const HUMP_SIGN_SHAPES = { americas: part('HUMP_SIGN.americas').shapeFile, white: part('HUMP_SIGN.white').shapeFile };
 export const CALMING_KINDS = new Set(['bump', 'hump', 'table', 'cushion']);
@@ -44,7 +45,7 @@ const SIGN_BEFORE_M = 30;        // the warning sign this far ahead of the first
 const SIGN_RUN_M = 150;          // humps this close, going the same way, share a sign
 const SIGN_KERB_M = 1.5;
 
-const unit = ([x, y]) => { const l = Math.hypot(x, y) || 1; return [x / l, y / l]; };
+const unit = ([x, y]) => { const l = fastHypot(x, y) || 1; return [x / l, y / l]; };
 
 const isOneWay = (tags = {}) => ['yes', '1', 'true', '-1', 'reverse'].includes(String(tags.oneway ?? '').trim().toLowerCase())
   || tags.junction === 'roundabout' || tags.highway === 'motorway' || tags.highway === 'motorway_link';
@@ -76,7 +77,7 @@ function buildLineIndex(lines, cell = 20) {
         const L2 = sx * sx + sy * sy || 1e-9;
         const f = Math.max(0, Math.min(1, ((x - a[0]) * sx + (y - a[1]) * sy) / L2));
         const px = a[0] + sx * f; const py = a[1] + sy * f;
-        const d = Math.hypot(px - x, py - y);
+        const d = fastHypot(px - x, py - y);
         if (d <= maxD && (!best || d < best.d)) best = { d, line, point: [px, py], tangent: unit([sx, sy]) };
       }
     }
@@ -223,7 +224,7 @@ export function placeTrafficCalming({ features = [], carriageways = [], toWorld,
 
       // by heading, not road piece: OSM splits a street at every junction
       const dirKey = Math.round((Math.atan2(d[1], d[0]) * 8) / Math.PI);
-      if (signRuns.some((r) => r.dirKey === dirKey && Math.hypot(r.x - x, r.y - y) < SIGN_RUN_M)) continue;
+      if (signRuns.some((r) => r.dirKey === dirKey && fastHypot(r.x - x, r.y - y) < SIGN_RUN_M)) continue;
       const kx = x - d[0] * SIGN_BEFORE_M + side[0] * (road.half + SIGN_KERB_M);
       const ky = y - d[1] * SIGN_BEFORE_M + side[1] * (road.half + SIGN_KERB_M);
       if (isBlocked(kx, ky)) continue;

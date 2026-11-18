@@ -18,6 +18,7 @@
 import * as THREE from 'three';
 import { part } from './tagModels.js';
 import { resample } from './beamngBridges.js';
+import { fastHypot } from './fastMath.js';
 
 export const STEP_M = 2;               // m between profile stations
 export const MAX_GRADE = 0.06;         // tunnel road grade
@@ -232,7 +233,7 @@ function splitBranches(parts, group, ends, key) {
   const len = (i) => {
     const xy = parts[i].xy;
     let L = 0;
-    for (let k = 1; k < xy.length; k++) L += Math.hypot(xy[k][0] - xy[k - 1][0], xy[k][1] - xy[k - 1][1]);
+    for (let k = 1; k < xy.length; k++) L += fastHypot(xy[k][0] - xy[k - 1][0], xy[k][1] - xy[k - 1][1]);
     return String(parts[i].osm?.highway ?? '').endsWith('_link') ? L / 2 : L;
   };
   const inGroup = new Set(group);
@@ -308,7 +309,7 @@ function fitApproachWindow(approach, groundAt, [from, to]) {
   const samples = [];
   let s0 = 0;
   for (let i = 0; i + 1 < approach.length && s0 < to; i++) {
-    const L = Math.hypot(approach[i + 1][0] - approach[i][0], approach[i + 1][1] - approach[i][1]);
+    const L = fastHypot(approach[i + 1][0] - approach[i][0], approach[i + 1][1] - approach[i][1]);
     for (let s = Math.ceil(Math.max(s0, from) / 2) * 2; s <= Math.min(s0 + L, to); s += 2) {
       const t = (s - s0) / (L || 1);
       samples.push([s, groundAt(approach[i][0] + (approach[i + 1][0] - approach[i][0]) * t, approach[i][1] + (approach[i + 1][1] - approach[i][1]) * t)]);
@@ -363,10 +364,10 @@ function stations(xy, step = STEP_M) {
   const pts = resample(xy, step);
   let s = 0;
   return pts.map(([x, y], i) => {
-    if (i) s += Math.hypot(x - pts[i - 1][0], y - pts[i - 1][1]);
+    if (i) s += fastHypot(x - pts[i - 1][0], y - pts[i - 1][1]);
     const a = pts[Math.max(0, i - 1)];
     const b = pts[Math.min(pts.length - 1, i + 1)];
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
     return { x, y, s, tx: (b[0] - a[0]) / L, ty: (b[1] - a[1]) / L };
   });
 }
@@ -648,12 +649,12 @@ function overTheStep(path, opts) {
     // the lid. The tunnel's own direction carried on: the box only follows
     // it while the lid stands over the road)
     let line = a?.xy?.length >= 2 ? a.xy : null;
-    const reachOf = (pts) => { let L = 0; for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); return L; };
+    const reachOf = (pts) => { let L = 0; for (let i = 1; i < pts.length; i++) L += fastHypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); return L; };
     const synthetic = !line || reachOf(line) < 8;
     if (synthetic) {
       const end = e === 0 ? xy[0] : xy[xy.length - 1];
       const back = e === 0 ? xy[Math.min(xy.length - 1, 2)] : xy[Math.max(0, xy.length - 3)];
-      const L = Math.hypot(end[0] - back[0], end[1] - back[1]);
+      const L = fastHypot(end[0] - back[0], end[1] - back[1]);
       if (!(L > 0.5)) continue;
       const ux = (end[0] - back[0]) / L; const uy = (end[1] - back[1]) / L;
       line = [end, [end[0] + ux * LOW_STEP_REACH_M, end[1] + uy * LOW_STEP_REACH_M]];
@@ -682,7 +683,7 @@ function overTheStep(path, opts) {
     if (synthetic) { approaches[e] = null; continue; }
     const rest = a.xy.filter((q, i) => {
       let acc = 0;
-      for (let j = 1; j <= i; j++) acc += Math.hypot(a.xy[j][0] - a.xy[j - 1][0], a.xy[j][1] - a.xy[j - 1][1]);
+      for (let j = 1; j <= i; j++) acc += fastHypot(a.xy[j][0] - a.xy[j - 1][0], a.xy[j][1] - a.xy[j - 1][1]);
       return acc > from.s + 1e-6;
     });
     approaches[e] = rest.length >= 1 ? { ...a, xy: [[from.x, from.y], ...rest] } : null;
@@ -1085,7 +1086,7 @@ function findWindows(t, groundAt) {
   const make = (i0, side, kind, face) => {
     const k = WINDOW_KINDS[kind];
     const a = t.line[i0]; const b = t.line[i0 + k.segments];
-    const L = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const L = fastHypot(b.x - a.x, b.y - a.y) || 1;
     return {
       kind, i: i0, j: i0 + k.segments, side, face, s: (a.s + b.s) / 2,
       x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2,
@@ -1361,7 +1362,7 @@ const onForeignSegment = (r, i, x, y, margin) => {
   const [ax, ay] = r.xy[i]; const [bx, by] = r.xy[i + 1];
   const vx = bx - ax; const vy = by - ay; const L2 = vx * vx + vy * vy || 1e-9;
   const f = clamp(((x - ax) * vx + (y - ay) * vy) / L2, 0, 1);
-  return Math.hypot(ax + vx * f - x, ay + vy * f - y) <= r.half + margin;
+  return fastHypot(ax + vx * f - x, ay + vy * f - y) <= r.half + margin;
 };
 
 function onForeignRoad(t, x, y, margin) {
@@ -1553,7 +1554,7 @@ function cutsGroundAt(t, x, y, h) {
       const L2 = ex * ex + ey * ey || 1e-9;
       const raw = ((x - a.x) * ex + (y - a.y) * ey) / L2;
       const f = clamp(raw, 0, 1);
-      const d = Math.hypot(a.x + ex * f - x, a.y + ey * f - y);
+      const d = fastHypot(a.x + ex * f - x, a.y + ey * f - y);
       if (best && d >= best.d) continue;
       best = { d, z: a.z + (b.z - a.z) * f, beyond: (i === 0 && raw < 0) || (i === cut.line.length - 2 && raw > 1) };
     }
@@ -1608,7 +1609,7 @@ export function tunnelGroundAt(t, x, y, h) {
     // round the end (no wall across the road where the earthwork stops)
     const end = n.i <= 1 ? t.line[0] : t.line[t.line.length - 1];
     if (end.kind !== 'cut') return h;
-    const past = Math.hypot(x - end.x, y - end.y);
+    const past = fastHypot(x - end.x, y - end.y);
     // (straight on, where the road runs out of the cutting: no slope across it. The road's own levelling
     // ends square at the same point but along its own last bend, and the wedge between the two kept a tooth
     // of the old ground in the lane: 2.7 and 5.3 m of gallery roof in front of the D 902's second tunnel.
@@ -1870,7 +1871,7 @@ export function buildTubeGeometry(t) {
     for (let k = 1; k <= loop.length; k++) {
       const q = loop[k % loop.length];
       const o = loop[k - 1];
-      a.push(a[k - 1] + Math.hypot(q[0] - o[0], q[1] - o[1]));
+      a.push(a[k - 1] + fastHypot(q[0] - o[0], q[1] - o[1]));
     }
     return a;
   };
@@ -2008,10 +2009,10 @@ export function buildPortalGeometry(t, end) {
     for (let r = 0; r + 1 < run.length; r++) {
       const A = sec(run[r]); const B = sec(run[r + 1]); const o = centre(run[r]);
       const want = (c) => [c[0] - o[0], c[1] - o[1], c[2] - o[2]];
-      const u1 = u0 + Math.hypot(B[0][0] - A[0][0], B[0][1] - A[0][1]) / 4;
+      const u1 = u0 + fastHypot(B[0][0] - A[0][0], B[0][1] - A[0][1]) / 4;
       for (let f = 0; f < 3; f++) {   // inner face, top, outer face
         const a = A[f]; const b = A[f + 1]; const c = B[f]; const d = B[f + 1];
-        const up = (lo, hi) => Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) / 4;
+        const up = (lo, hi) => fastHypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) / 4;
         const va = f === 2 ? up(A[3], a) : 0; const vb = f === 2 ? 0 : up(a, b);
         const vc = f === 2 ? up(B[3], c) : 0; const vd = f === 2 ? 0 : up(c, d);
         T.tri(a, b, c, [[u0, va], [u0, vb], [u1, vc]], want);
@@ -2117,7 +2118,7 @@ export function buildWindowGeometry(t) {
         const k2 = (k + 1) % loop.length;
         const [a0, v0] = loop[k]; const [a1, v1] = loop[k2];
         const want = (c) => { const o = centre((D.rP + t.W) / 2); const d = [c[0] - o[0], c[1] - o[1], c[2] - o[2]]; return inward ? d.map((v) => -v) : d; };
-        const L = Math.hypot(a1 - a0, v1 - v0) / 4;
+        const L = fastHypot(a1 - a0, v1 - v0) / 4;
         quad(P(a0, t.W, v0), P(a1, t.W, v1), P(a1, D.rP, v1), P(a0, D.rP, v0), [[0, 0], [L, 0], [L, (D.rP - t.W) / 4], [0, (D.rP - t.W) / 4]], want);
       }
     }
@@ -2224,7 +2225,7 @@ export function buildTunnelObjects(t, group, id, { lightSpacing = LIGHT_SPACING_
   for (let c = 0; c + 1 < cuts.length; c++) {
     const a = t.line[cuts[c]];
     const b = t.line[cuts[c + 1]];
-    const dx = b.x - a.x; const dy = b.y - a.y; const Lc = Math.hypot(dx, dy) || 1;
+    const dx = b.x - a.x; const dy = b.y - a.y; const Lc = fastHypot(dx, dy) || 1;
     // the chord misses the bend's outside by its sagitta
     let sag = 0;
     let wide = t.W;

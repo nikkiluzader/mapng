@@ -14,6 +14,7 @@
 // Pure: features in, features out.
 
 import { estimateRoadCrossSection, isOneWayRoad } from './roadWidth.js';
+import { fastHypot } from './fastMath.js';
 
 const CLASSES = new Set(['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'motorway_link', 'trunk_link', 'primary_link', 'secondary_link', 'tertiary_link', 'unclassified', 'residential']);
 const STEP_M = 5;               // samples along a road
@@ -69,7 +70,7 @@ export function fitTwinCarriageways(features) {
   const fitted = [];
   for (const a of cands) {
     // samples along a, clear of its ends
-    const S = [0]; for (let i = 1; i < a.xy.length; i++) S.push(S[i - 1] + Math.hypot(a.xy[i][0] - a.xy[i - 1][0], a.xy[i][1] - a.xy[i - 1][1]));
+    const S = [0]; for (let i = 1; i < a.xy.length; i++) S.push(S[i - 1] + fastHypot(a.xy[i][0] - a.xy[i - 1][0], a.xy[i][1] - a.xy[i - 1][1]));
     const total = S[S.length - 1];
     if (total < 2 * END_SKIP_M + STEP_M) continue;
     let n = 0; let along = 0; const caps = [];
@@ -93,7 +94,7 @@ export function fitTwinCarriageways(features) {
         if (Math.abs((vx * u[0] + vy * u[1]) / Lb) < PARALLEL_COS) continue;
         const raw = ((p[0] - q0[0]) * vx + (p[1] - q0[1]) * vy) / L2;
         if (raw < 0 || raw > 1) continue;
-        const d = Math.hypot(q0[0] + vx * raw - p[0], q0[1] + vy * raw - p[1]);
+        const d = fastHypot(q0[0] + vx * raw - p[0], q0[1] + vy * raw - p[1]);
         if (!best || d < best.d) best = { d, b };
       }
       if (!best || best.d > a.half + best.b.half + REACH_M) continue;

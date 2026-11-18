@@ -10,6 +10,7 @@
 // a parapet on its outer edge, its outer face down into the ground. Nothing here knows about any place.
 
 import * as THREE from 'three';
+import { fastHypot } from '../fastMath.js';
 
 export const WING_FILL_M = 15;          // a road's fill this near a deck's end has walled sides, not slopes
 const WALL_MIN_DROP_M = 0.8;            // the road this far over the ground beside its fill: a wall
@@ -102,7 +103,7 @@ export function wingWallRuns(graph, { groundAt, onOtherRoad = () => false, shoul
       for (let i = 0; i < n; i++) {
         if (kindOf[k][i] === 'deck' || !(toDeck[k][i] < APPROACH_M)) { close(); continue; }
         const a = Math.max(0, i - 1); const b = Math.min(n - 1, i + 1);
-        const tx = e.x[b] - e.x[a]; const ty = e.y[b] - e.y[a]; const L = Math.hypot(tx, ty);
+        const tx = e.x[b] - e.x[a]; const ty = e.y[b] - e.y[a]; const L = fastHypot(tx, ty);
         if (L < 1e-6) { close(); continue; }
         const nx = (-ty / L) * side; const ny = (tx / L) * side;
         const core = e.half + shoulderM;

@@ -21,6 +21,7 @@
 //  6. Copernicus GLO-30 (copernicus.js) goes through the same steps and is averaged in where the data is radar.
 // The correction is applied to the full grid bilinearly. Runs before road smoothing, so roads level onto ground.
 import { createGridProjector } from './geoUtils.js';
+import { fastHypot } from './fastMath.js';
 
 const P = {
   CELL_MIN_M: 4, MAX_CELLS: 2048,
@@ -95,7 +96,7 @@ export function openingGround(a, n, cell) {
     const k = i * n + j;
     const gy = i === 0 ? (bm[k + n] - bm[k]) / cell : i === n - 1 ? (bm[k] - bm[k - n]) / cell : (bm[k + n] - bm[k - n]) / (2 * cell);
     const gx = j === 0 ? (bm[k + 1] - bm[k]) / cell : j === n - 1 ? (bm[k] - bm[k - 1]) / cell : (bm[k + 1] - bm[k - 1]) / (2 * cell);
-    let kk = clip01((cut[k] - (P.THRESHOLD_M + P.SLOPE_K * Math.hypot(gx, gy) * half)) / P.THRESHOLD_M);
+    let kk = clip01((cut[k] - (P.THRESHOLD_M + P.SLOPE_K * fastHypot(gx, gy) * half)) / P.THRESHOLD_M);
     kk *= clip01((P.RELIEF_HILLS_M - (dil[k] - ero[k])) / (P.RELIEF_HILLS_M - P.RELIEF_FLAT_M));
     kk *= clip01((P.CUT_HI - deep[k]) / (P.CUT_HI - P.CUT_LO));
     out[k] = a[k] - Math.min(cut[k] * kk, P.MAX_CUT_M);
@@ -127,7 +128,7 @@ export function rasterizeMapEvidence(osmFeatures, bounds, n, cell) {
   const stroke = (mask, pts, halfW) => {
     const r = Math.max(0.5, halfW);
     for (let i = 1; i < pts.length; i++) {
-      const a = pts[i - 1], b = pts[i]; const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) * 2));
+      const a = pts[i - 1], b = pts[i]; const steps = Math.max(1, Math.ceil(fastHypot(b.x - a.x, b.y - a.y) * 2));
       for (let s = 0; s <= steps; s++) {
         const px = a.x + ((b.x - a.x) * s) / steps, py = a.y + ((b.y - a.y) * s) / steps;
         for (let y = Math.floor(py - r); y <= Math.ceil(py + r); y++) for (let x = Math.floor(px - r); x <= Math.ceil(px + r); x++) {

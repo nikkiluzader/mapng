@@ -14,6 +14,7 @@
 import { curbHeight } from './beamngSidewalks.js';
 import { buildCarriagewayIndex, isOnCrossingCarriageway, isOnOtherCarriageway } from './roadMarkingCuts.js';
 import { isLitRoad } from './streetLamps.js';
+import { fastHypot } from './fastMath.js';
 
 // Spacings (m) and offsets, BeamNG.Earth's (US practice).
 const BENCH_SPACING_M = 140;
@@ -148,7 +149,7 @@ class Taken {
     for (let dx = -reach; dx <= reach; dx++) {
       for (let dy = -reach; dy <= reach; dy++) {
         for (const [px, py] of this.cells.get(`${cx + dx},${cy + dy}`) || []) {
-          if (Math.hypot(px - x, py - y) < r) return true;
+          if (fastHypot(px - x, py - y) < r) return true;
         }
       }
     }
@@ -162,13 +163,13 @@ function stations(points, spacing, phase, clear) {
   const out = [];
   let travelled = 0;
   let total = 0;
-  for (let i = 0; i + 1 < points.length; i++) total += Math.hypot(points[i + 1][0] - points[i][0], points[i + 1][1] - points[i][1]);
+  for (let i = 0; i + 1 < points.length; i++) total += fastHypot(points[i + 1][0] - points[i][0], points[i + 1][1] - points[i][1]);
   let next = phase;
   let k = 0;
   for (let i = 0; i + 1 < points.length; i++) {
     const a = points[i];
     const b = points[i + 1];
-    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const len = fastHypot(b[0] - a[0], b[1] - a[1]);
     if (len < 1e-6) continue;
     while (next <= travelled + len) {
       const t = (next - travelled) / len;
@@ -218,7 +219,7 @@ function lineIndex(lines) {
           const vx = bx - ax; const vy = by - ay;
           const L2 = vx * vx + vy * vy || 1e-9;
           const t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / L2));
-          if (Math.hypot(ax + vx * t - x, ay + vy * t - y) < r) return true;
+          if (fastHypot(ax + vx * t - x, ay + vy * t - y) < r) return true;
         }
       }
     }
@@ -244,7 +245,7 @@ export function sidewalkHeightLookup(runs) {
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
         for (const [px, py, pz, w] of cells.get(`${cx + dx},${cy + dy}`) || []) {
-          const d = Math.hypot(px - x, py - y);
+          const d = fastHypot(px - x, py - y);
           if (d < bestD && d <= w + 0.5) { bestD = d; best = pz + curbHeight(); }
         }
       }
@@ -262,7 +263,7 @@ export function wireLines(poles) {
   for (let i = 0; i + 1 < poles.length; i++) {
     const a = poles[i];
     const b = poles[i + 1];
-    const span = Math.hypot(b.x - a.x, b.y - a.y);
+    const span = fastHypot(b.x - a.x, b.y - a.y);
     const ta = POLE_TYPES[a.type] || POLE_TYPES.wood_wide;
     // (a tower's span is hundreds of metres; a pole's is not)
     if (span < WIRE_MIN_SPAN_M || span > (ta.maxSpan ?? WIRE_MAX_SPAN_M)) continue;
@@ -299,7 +300,7 @@ export function buildChains(carriageways) {
   const find = (o) => { while (parent.get(o) !== o) { parent.set(o, parent.get(parent.get(o))); o = parent.get(o); } return o; };
   const join = (a, b) => { if (parent.has(a) && parent.has(b)) parent.set(find(a), find(b)); };
   const ends = (cw) => [cw.nodes[0], cw.nodes[cw.nodes.length - 1]];
-  const gap = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]);
+  const gap = (p, q) => fastHypot(p[0] - q[0], p[1] - q[1]);
   for (const cw of carriageways) for (const o of cw.continuations || []) join(cw.owner, o);
   const byWay = new Map();
   for (const cw of carriageways) {
@@ -321,7 +322,7 @@ export function buildChains(carriageways) {
   const tip = (cw, atEnd) => {
     const n = cw.nodes;
     const [a, b] = atEnd ? [n[Math.max(0, n.length - 4)], n[n.length - 1]] : [n[Math.min(n.length - 1, 3)], n[0]];
-    const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const len = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
     return { p: b, out: [(b[0] - a[0]) / len, (b[1] - a[1]) / len], cw };
   };
   const cells = new Map();
@@ -490,7 +491,7 @@ export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, he
   const towerPoints = [...lone, ...poles.filter((p) => p.type === 'tower').map((p) => [p.x, p.y])];
   const towerYaw = (x, y) => {
     let best = null; let bd = 1200;
-    for (const q of towerPoints) { const d = Math.hypot(q[0] - x, q[1] - y); if (d > 1 && d < bd) { bd = d; best = q; } }
+    for (const q of towerPoints) { const d = fastHypot(q[0] - x, q[1] - y); if (d > 1 && d < bd) { bd = d; best = q; } }
     return best ? Math.atan2(best[1] - y, best[0] - x) + Math.PI / 2 : 0;
   };
   for (const mp of mapped.poles || []) {

@@ -8,6 +8,7 @@
 // house stands at the deck's road height (mapng:base_z for the building builder) and, where it is out
 // beside the deck, on a pier of its own outline from the ground (the water's bed) up to the deck.
 // Not a building beside an elevated road on land (only inside an outline or over water).
+import { fastHypot } from './fastMath.js';
 
 const MAX_AREA_M2 = 400;        // a tower or a tender's house; bigger is a building of its own
 const EDGE_REACH_M = 3;         // against the deck: its footprint within this of the deck's edge
@@ -36,7 +37,7 @@ function boxGap(xy, x, y) {
     for (const [px, py] of xy) { if (px < b[0]) b[0] = px; if (px > b[2]) b[2] = px; if (py < b[1]) b[1] = py; if (py > b[3]) b[3] = py; }
     partBoxes.set(xy, b);
   }
-  return Math.hypot(Math.max(b[0] - x, 0, x - b[2]), Math.max(b[1] - y, 0, y - b[3]));
+  return fastHypot(Math.max(b[0] - x, 0, x - b[2]), Math.max(b[1] - y, 0, y - b[3]));
 }
 function nearestDeck(decks, x, y) {
   let best = null;
@@ -48,7 +49,7 @@ function nearestDeck(decks, x, y) {
         const vx = xy[i + 1][0] - xy[i][0]; const vy = xy[i + 1][1] - xy[i][1];
         const L2 = vx * vx + vy * vy || 1e-9;
         const t = Math.max(0, Math.min(1, ((x - xy[i][0]) * vx + (y - xy[i][1]) * vy) / L2));
-        const d = Math.hypot(xy[i][0] + vx * t - x, xy[i][1] + vy * t - y);
+        const d = fastHypot(xy[i][0] + vx * t - x, xy[i][1] + vy * t - y);
         if (!best || d < best.d) best = { deck, part, d, z: z[i] + (z[i + 1] - z[i]) * t };
       }
     }
@@ -69,7 +70,7 @@ export function findBridgeTowers({ buildings = [], outlines = [], decks = [], gr
     const area = Math.abs(ringArea(ring));
     if (area < 4 || area > MAX_AREA_M2) continue;
     const cx = ring.reduce((n, p) => n + p[0], 0) / ring.length; const cy = ring.reduce((n, p) => n + p[1], 0) / ring.length;
-    const r = Math.max(...ring.map((p) => Math.hypot(p[0] - cx, p[1] - cy)));
+    const r = Math.max(...ring.map((p) => fastHypot(p[0] - cx, p[1] - cy)));
     const near = nearestDeck(decks, cx, cy);
     if (!near) continue;
     const edge = near.part.half + PARAPET_M;
@@ -94,13 +95,13 @@ export function towerPierGeometry(b, towers, groundAt) {
   for (const t of towers) {
     if (!t.pier) continue;
     const cx = t.ring.reduce((n, p) => n + p[0], 0) / t.ring.length; const cy = t.ring.reduce((n, p) => n + p[1], 0) / t.ring.length;
-    let ring = t.ring.map(([x, y]) => { const dx = x - cx; const dy = y - cy; const l = Math.hypot(dx, dy) || 1; return [x + (dx / l) * PIER_PAD_M, y + (dy / l) * PIER_PAD_M]; });
+    let ring = t.ring.map(([x, y]) => { const dx = x - cx; const dy = y - cy; const l = fastHypot(dx, dy) || 1; return [x + (dx / l) * PIER_PAD_M, y + (dy / l) * PIER_PAD_M]; });
     if (ringArea(ring) < 0) ring = ring.slice().reverse();
     const bottom = Math.min(...ring.map(([x, y]) => groundAt(x, y))) - PIER_FOOT_M;
     const top = t.top - 0.02;
     for (let i = 0; i < ring.length; i++) {
       const p = ring[i]; const q = ring[(i + 1) % ring.length];
-      const nx = q[1] - p[1]; const ny = -(q[0] - p[0]); const l = Math.hypot(nx, ny) || 1;
+      const nx = q[1] - p[1]; const ny = -(q[0] - p[0]); const l = fastHypot(nx, ny) || 1;
       b.quad([p[0], p[1], bottom], [q[0], q[1], bottom], [q[0], q[1], top], [p[0], p[1], top], [nx / l, ny / l, 0]);
     }
     // its top: a fan from the middle (a convex house outline)

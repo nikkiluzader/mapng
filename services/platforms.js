@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { PLAZA_MATERIAL, plazaTileM } from './plazas.js';
 import { drapedMesh } from './sportsFields.js';
+import { fastHypot } from './fastMath.js';
 
 export const PLATFORM_OVER_RAIL_M = 0.55;     // a main line's platform over the rails (0.55 m: the common European height)
 export const PLATFORM_OVER_GROUND_M = 0.3;    // with no track near: a tram or bus platform's kerb
@@ -22,7 +23,7 @@ export function bufferLine(pts, width) {
   const h = width / 2; const left = []; const right = [];
   for (let i = 0; i < pts.length; i++) {
     const a = pts[Math.max(0, i - 1)]; const b = pts[Math.min(pts.length - 1, i + 1)];
-    const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L = Math.hypot(dx, dy) || 1;
+    const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L = fastHypot(dx, dy) || 1;
     const nx = -dy / L; const ny = dx / L;
     left.push([pts[i][0] + nx * h, pts[i][1] + ny * h]); right.push([pts[i][0] - nx * h, pts[i][1] - ny * h]);
   }
@@ -47,7 +48,7 @@ export function buildPlatformMeshes(platforms, opts = {}) {
       for (let i = 0; i + 1 < p.length; i++) {
         const vx = p[i + 1][0] - p[i][0]; const vy = p[i + 1][1] - p[i][1]; const L = vx * vx + vy * vy || 1e-9;
         const u = Math.max(0, Math.min(1, ((x - p[i][0]) * vx + (y - p[i][1]) * vy) / L));
-        const d = Math.hypot(p[i][0] + vx * u - x, p[i][1] + vy * u - y);
+        const d = fastHypot(p[i][0] + vx * u - x, p[i][1] + vy * u - y);
         if (d < bd && Number.isFinite(t.z?.[i]) && Number.isFinite(t.z?.[i + 1])) { bd = d; best = t.z[i] + (t.z[i + 1] - t.z[i]) * u; }
       }
     }
@@ -98,7 +99,7 @@ export function buildPlatformMeshes(platforms, opts = {}) {
     for (let i = 0; i < ring.length; i++) {
       const j = (i + 1) % ring.length;
       const [x0, y0] = ring[i]; const [x1, y1] = ring[j];
-      const L = Math.hypot(x1 - x0, y1 - y0);
+      const L = fastHypot(x1 - x0, y1 - y0);
       // (an elevated station's platform, high over the ground with its track: a slab a metre deep, no wall to the street)
       // (on the ground: one foot for the whole platform, under the lowest ground round it, not a foot fitted to
       // the ground at each corner, which left the wall's bottom edge in the air where the ground dipped between two)

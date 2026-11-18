@@ -6,6 +6,7 @@ import {
 } from './signalApproaches.js';
 import { SIGNAL_MAST, SIGNAL_POLE } from './beamngPropLibrary.js';
 import { part } from './tagModels.js';
+import { fastHypot } from './fastMath.js';
 
 const ROAD_SKIP = new Set([
   'footway', 'path', 'pedestrian', 'steps', 'cycleway',
@@ -123,7 +124,7 @@ function findNearestRoadDirection(point, roadFeatures) {
       const distSq = cx * cx + cy * cy;
 
       if (!best || distSq < best.distSq) {
-        const len = Math.hypot(vx, vy);
+        const len = fastHypot(vx, vy);
         if (len < 1e-6) continue;
         best = {
           distSq,
@@ -251,7 +252,7 @@ function inferRoadLaneRoleNearPoint(point, signalDir, roadFeatures, maxDistance 
       const len = Math.sqrt(vv);
       const svx = Number(signalDir?.[0] ?? 0);
       const svy = Number(signalDir?.[1] ?? 0);
-      const sLen = Math.hypot(svx, svy);
+      const sLen = fastHypot(svx, svy);
       if (sLen > 1e-6) {
         const dot = Math.abs(((vx / len) * (svx / sLen)) + ((vy / len) * (svy / sLen)));
         if (dot < 0.65) continue;
@@ -308,7 +309,7 @@ function inferNearestRoadHighwayNearPoint(point, signalDir, roadFeatures, maxDis
       const len = Math.sqrt(vv);
       const svx = Number(signalDir?.[0] ?? 0);
       const svy = Number(signalDir?.[1] ?? 0);
-      const sLen = Math.hypot(svx, svy);
+      const sLen = fastHypot(svx, svy);
       if (sLen > 1e-6) {
         const dot = Math.abs(((vx / len) * (svx / sLen)) + ((vy / len) * (svy / sLen)));
         if (dot < 0.65) continue;
@@ -364,7 +365,7 @@ function hasProtectedTurnHintNearPoint(point, signalDir, roadFeatures, maxDistan
       const len = Math.sqrt(vv);
       const svx = Number(signalDir?.[0] ?? 0);
       const svy = Number(signalDir?.[1] ?? 0);
-      const sLen = Math.hypot(svx, svy);
+      const sLen = fastHypot(svx, svy);
       if (sLen > 1e-6) {
         const dot = Math.abs(((vx / len) * (svx / sLen)) + ((vy / len) * (svy / sLen)));
         // Require rough heading alignment so perpendicular roads do not leak hints.
@@ -392,7 +393,7 @@ function clusterTrafficLights(entries, maxDistance = 35) {
     for (const cluster of clusters) {
       const dx = entry.pos[0] - cluster.center[0];
       const dy = entry.pos[1] - cluster.center[1];
-      const dist = Math.hypot(dx, dy);
+      const dist = fastHypot(dx, dy);
       if (dist <= maxDistance && dist < targetDist) {
         target = cluster;
         targetDist = dist;
@@ -764,7 +765,7 @@ const STOP_POINT_Z = 0.1;
 
 function makeSignalEntry(approach, projector, terrainData, squareSize, roadFeatures) {
   const point = projector.unproject(approach.x, approach.y);
-  const len = Math.hypot(approach.dir[0], approach.dir[1]) || 1;
+  const len = fastHypot(approach.dir[0], approach.dir[1]) || 1;
   const dir = [approach.dir[0] / len, approach.dir[1] / len, 0];
   const explicitLaneRole = approach.hintTags ? inferSignalLaneRole(approach.hintTags) : 'unknown';
   return {
@@ -962,7 +963,7 @@ export function makeRoadClearance(roadFeatures, projector) {
       const pad = half + POLE_CLEARANCE_M;
       // the cells near the segment, walked along it (its bounding box made a
       // long diagonal road fill a square of cells: quadratic in its length)
-      const len = Math.hypot(seg.b[0] - seg.a[0], seg.b[1] - seg.a[1]);
+      const len = fastHypot(seg.b[0] - seg.a[0], seg.b[1] - seg.a[1]);
       const steps = Math.max(1, Math.ceil(len / (CELL / 2)));
       const seen = new Set();
       for (let k = 0; k <= steps; k++) {
@@ -987,7 +988,7 @@ export function makeRoadClearance(roadFeatures, projector) {
       const dy = b[1] - a[1];
       const len = dx * dx + dy * dy;
       const t = len > 0 ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / len)) : 0;
-      if (Math.hypot(a[0] + t * dx - x, a[1] + t * dy - y) < half + POLE_CLEARANCE_M) return false;
+      if (fastHypot(a[0] + t * dx - x, a[1] + t * dy - y) < half + POLE_CLEARANCE_M) return false;
     }
     return true;
   };
@@ -1020,7 +1021,7 @@ function buildSignalProps({ placements = [], projector, roadFeatures = [] }, ter
   let dropped = 0;
   for (const placement of placements) {
     const a = placement.approach;
-    const len = Math.hypot(a.dir[0], a.dir[1]) || 1;
+    const len = fastHypot(a.dir[0], a.dir[1]) || 1;
     const d = [a.dir[0] / len, a.dir[1] / len];
     const right = [d[1], -d[0]];
     const kerb = leftHandTraffic ? [-right[0], -right[1]] : right;
@@ -1056,7 +1057,7 @@ function buildSignalProps({ placements = [], projector, roadFeatures = [] }, ter
         // each (one way: the whole carriageway; else the right half), and a
         // street light on top.
         const left = [-d[1], d[0]];
-        const kerbGap = Math.hypot(spot[0] - (baseX + side[0] * a.halfWidth), spot[1] - (baseY + side[1] * a.halfWidth));
+        const kerbGap = fastHypot(spot[0] - (baseX + side[0] * a.halfWidth), spot[1] - (baseY + side[1] * a.halfWidth));
         const lanes = Math.max(1, Math.min(MAST_MAX_HEADS, a.lanesIn || 1));
         const laneW = (a.oneWay ? 2 * a.halfWidth : a.halfWidth) / Math.max(1, a.lanesIn || 1);
         props.push({ kind: 'signal_mast', position: toWorld(spot[0], spot[1]), yaw: Math.atan2(left[1], left[0]) });

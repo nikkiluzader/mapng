@@ -13,6 +13,7 @@
 // vertical datum against our elevation data comes from its ground points
 // beside the bridges (offset; metres or feet by the fit). Nothing here knows
 // about any place; fetch and the laz decoder are passed in.
+import { fastHypot } from './fastMath.js';
 
 const R_MERC = 6378137;
 export const toMercator = (lat, lng) => [(lng * Math.PI / 180) * R_MERC, Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI / 180) / 2)) * R_MERC];
@@ -136,7 +137,7 @@ export function pointGrid(clouds, toLocal, cell = 2) {
       for (let gy = Math.floor((y - r) / cell); gy <= Math.floor((y + r) / cell); gy++) {
         const b = grid.get(`${gx},${gy}`);
         if (!b) continue;
-        for (let j = 0; j < b.length; j += 4) if (Math.hypot(b[j] - x, b[j + 1] - y) <= r) fn(b[j], b[j + 1], b[j + 2], b[j + 3]);
+        for (let j = 0; j < b.length; j += 4) if (fastHypot(b[j] - x, b[j + 1] - y) <= r) fn(b[j], b[j + 1], b[j + 2], b[j + 3]);
       }
     }
   };
@@ -240,7 +241,7 @@ export function deckProfile(grid, line, half, datum, groundAt, { rank = 0, above
     out[i] = z;
   }
   // continuity: a station off the median of its neighbours by more than the grade allows is dropped
-  const s = [0]; for (let i = 1; i < line.length; i++) s.push(s[i - 1] + Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]));
+  const s = [0]; for (let i = 1; i < line.length; i++) s.push(s[i - 1] + fastHypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]));
   const clean = Float64Array.from(out);
   for (let i = 0; i < line.length; i++) {
     if (!Number.isFinite(out[i])) continue;
@@ -400,7 +401,7 @@ export function stackRanks(graph) {
           const ol = Number(o.layer) || 0;
           if (ol === layer) continue;
           const ib = list[j + 1];
-          if (Math.hypot(o.x[ib] - e.x[i], o.y[ib] - e.y[i]) >= ((e.half || 4) + (o.half || 4)) * STACK_SHARE) continue;
+          if (fastHypot(o.x[ib] - e.x[i], o.y[ib] - e.y[i]) >= ((e.half || 4) + (o.half || 4)) * STACK_SHARE) continue;
           (ol < layer ? under : over).add(kb);
         }
       }
@@ -446,7 +447,7 @@ export function lidarPins(graph, survey, groundAtAbs, minHeight) {
       for (let dx = -1; dx <= 1 && !saw; dx++) for (let dy = -1; dy <= 1 && !saw; dy++) {
         for (const [ko, x, y, zo, lo] of cells.get(`${cx + dx},${cy + dy}`) || []) {
           if (ko === k || lo <= layer || STACK_PATHS.has(graph.edges[ko].highway)) continue;
-          if (Math.abs(zo - z[i]) < SAW_OTHER_DZ_M && Math.hypot(x - e.x[i], y - e.y[i]) < SAW_OTHER_M) { saw = true; break; }
+          if (Math.abs(zo - z[i]) < SAW_OTHER_DZ_M && fastHypot(x - e.x[i], y - e.y[i]) < SAW_OTHER_M) { saw = true; break; }
         }
       }
       if (saw) (hidden ||= Int16Array.from(ranks.above.get(k) || new Int16Array(z.length)))[i] = 1;
@@ -533,7 +534,7 @@ function bridgeUnpinnedRuns(graph, bridges, measuredZ) {
     const dist = [0];
     for (let j = 1; j < order.length; j++) {
       const [k1, i1] = order[j - 1]; const [k2, i2] = order[j];
-      dist.push(dist[j - 1] + Math.hypot(graph.edges[k2].x[i2] - graph.edges[k1].x[i1], graph.edges[k2].y[i2] - graph.edges[k1].y[i1]));
+      dist.push(dist[j - 1] + fastHypot(graph.edges[k2].x[i2] - graph.edges[k1].x[i1], graph.edges[k2].y[i2] - graph.edges[k1].y[i1]));
     }
     // (the measured stations sit one station step beyond each end)
     const step = (j) => (order.length > 1 ? dist[1] - dist[0] : 0) * j;

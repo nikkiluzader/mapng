@@ -20,6 +20,7 @@
 // ones along the shore reaching just past it), at the lake's level (the median ground inside: elevation models
 // flatten water to its surface).
 // Pure: callers pass world-space lookups.
+import { fastHypot } from './fastMath.js';
 
 export const RIVER_KINDS = {
   river: { spacing: 20, width: 12, flow: 2.0 },
@@ -162,7 +163,7 @@ function fullBehindDam(t, poly, heightAt, damPoints) {
       const a = poly.outer[i]; const b = poly.outer[(i + 1) % poly.outer.length];
       const dx = b[0] - a[0]; const dy = b[1] - a[1];
       const u = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy || 1)));
-      if (Math.hypot(x - (a[0] + dx * u), y - (a[1] + dy * u)) <= DAM_NEAR_M) return true;
+      if (fastHypot(x - (a[0] + dx * u), y - (a[1] + dy * u)) <= DAM_NEAR_M) return true;
     }
     return false;
   });
@@ -206,14 +207,14 @@ function resample(pts, step) {
   let carry = 0;
   for (let i = 1; i < pts.length; i++) {
     const a = pts[i - 1]; const b = pts[i];
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]);
     let d = step - carry;
     while (d <= L) { out.push([a[0] + ((b[0] - a[0]) * d) / L, a[1] + ((b[1] - a[1]) * d) / L]); d += step; }
     carry = L - (d - step);
   }
   const last = pts[pts.length - 1];
   const tail = out[out.length - 1];
-  if (Math.hypot(last[0] - tail[0], last[1] - tail[1]) > step * 0.3) out.push(last);
+  if (fastHypot(last[0] - tail[0], last[1] - tail[1]) > step * 0.3) out.push(last);
   else out[out.length - 1] = last;
   return out;
 }
@@ -244,7 +245,7 @@ function buildRoadEdgeDistance(roads, cell = 32) {
       const sx = bx - ax; const sy = by - ay;
       const L2 = sx * sx + sy * sy || 1e-9;
       const f = Math.max(0, Math.min(1, ((x - ax) * sx + (y - ay) * sy) / L2));
-      best = Math.min(best, Math.hypot(ax + sx * f - x, ay + sy * f - y) - half);
+      best = Math.min(best, fastHypot(ax + sx * f - x, ay + sy * f - y) - half);
     }
     return best;
   };
@@ -331,7 +332,7 @@ export function planRivers({ features = [], toWorld, heightAt, roads = [] }) {
     if (pts.length < 2) continue;
     const tangents = pts.map((_, i) => {
       const a = pts[Math.max(0, i - 1)]; const b = pts[Math.min(pts.length - 1, i + 1)];
-      const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
       return [(b[0] - a[0]) / L, (b[1] - a[1]) / L];
     });
     // width across the outline, the node moved midway between its banks
@@ -409,7 +410,7 @@ export function planRivers({ features = [], toWorld, heightAt, roads = [] }) {
     let piece = []; let pieceOutline = [];
     const flush = () => {
       let L = 0;
-      for (let k = 1; k < piece.length; k++) L += Math.hypot(piece[k][0] - piece[k - 1][0], piece[k][1] - piece[k - 1][1]);
+      for (let k = 1; k < piece.length; k++) L += fastHypot(piece[k][0] - piece[k - 1][0], piece[k][1] - piece[k - 1][1]);
       if (piece.length >= 2 && L >= MIN_PIECE_M) {
         // (outline: per node, its width measured across a mapped water outline)
         rivers.push({ kind: chain.kind, name: chain.tags.name || null, flow: spec.flow, nodes: piece, outline: pieceOutline });
@@ -423,7 +424,7 @@ export function planRivers({ features = [], toWorld, heightAt, roads = [] }) {
       let edge = edgeDistance(x, y);
       if (i > 0) { // a road crossing between this node and the last
         const [px, py] = centres[i - 1];
-        const steps = Math.ceil(Math.hypot(x - px, y - py) / 2);
+        const steps = Math.ceil(fastHypot(x - px, y - py) / 2);
         for (let k = 1; k < steps && edge >= ROAD_MARGIN_M; k++) edge = Math.min(edge, edgeDistance(px + ((x - px) * k) / steps, py + ((y - py) * k) / steps) + 0.5);
       }
       if (edge < ROAD_MARGIN_M) { if (piece.length) stats.cutAtRoads++; flush(); return; }
@@ -708,7 +709,7 @@ const distToRing = (x, y, ring) => {
     const [ax, ay] = ring[j]; const [bx, by] = ring[i];
     const dx = bx - ax; const dy = by - ay; const L2 = dx * dx + dy * dy || 1e-9;
     const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / L2));
-    best = Math.min(best, Math.hypot(ax + dx * t - x, ay + dy * t - y));
+    best = Math.min(best, fastHypot(ax + dx * t - x, ay + dy * t - y));
   }
   return best;
 };
@@ -779,13 +780,13 @@ function squaredDistanceGrid(seed, w, h) {
 export function shoreSlope(poly, level, groundAt) {
   const ring = poly.outer;
   let per = 0;
-  for (let i = 0; i < ring.length; i++) { const a = ring[i]; const b = ring[(i + 1) % ring.length]; per += Math.hypot(b[0] - a[0], b[1] - a[1]); }
+  for (let i = 0; i < ring.length; i++) { const a = ring[i]; const b = ring[(i + 1) % ring.length]; per += fastHypot(b[0] - a[0], b[1] - a[1]); }
   const step = Math.max(5, per / 400);
   const slopes = [];
   let carry = 0;
   for (let i = 0; i < ring.length; i++) {
     const a = ring[i]; const b = ring[(i + 1) % ring.length];
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]);
     if (L < 1e-6) continue;
     const tx = (b[0] - a[0]) / L; const ty = (b[1] - a[1]) / L;
     for (let s = carry; s < L; s += step) {
@@ -820,7 +821,7 @@ export function shoreSlope(poly, level, groundAt) {
 const segDistXY = (x, y, a, b) => {
   const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L2 = dx * dx + dy * dy || 1e-9;
   const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / L2));
-  return Math.hypot(a[0] + dx * t - x, a[1] + dy * t - y);
+  return fastHypot(a[0] + dx * t - x, a[1] + dy * t - y);
 };
 const lineDist = (x, y, line) => { let d = Infinity; for (let i = 0; i + 1 < line.length; i++) d = Math.min(d, segDistXY(x, y, line[i], line[i + 1])); return d; };
 
@@ -836,7 +837,7 @@ export function damDepth(dam, poly, level, groundAt) {
   const line = dam.line;
   for (let i = 0; i + 1 < line.length; i++) {
     const a = line[i]; const b = line[i + 1];
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 1e-6) continue;
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]); if (L < 1e-6) continue;
     const nx = -(b[1] - a[1]) / L; const ny = (b[0] - a[0]) / L;
     for (let s = 0; s <= L; s += 10) {
       const x = a[0] + ((b[0] - a[0]) * s) / L; const y = a[1] + ((b[1] - a[1]) * s) / L;
@@ -1148,7 +1149,7 @@ export function carveWaterUnderDecks({ rivers = [], lakes = [] }, grid, covered,
           const [x, y] = toWorld(c, r);
           const t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / L2));
           const half = (aw + (bw - aw) * t) / 2;
-          const d = Math.hypot(ax + vx * t - x, ay + vy * t - y);
+          const d = fastHypot(ax + vx * t - x, ay + vy * t - y);
           if (d > half) continue;
           const surface = az + (bz - az) * t;
           const ground = heightMap[idx] - minHeight;
@@ -1226,7 +1227,7 @@ export function levelUnderDecks(decks, grid, keep = () => false, extra = 0.4, we
   for (const deck of decks) {
     for (const p of deck.parts) {
       const xy = p.xy;
-      const s = [0]; for (let i = 1; i < xy.length; i++) s.push(s[i - 1] + Math.hypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]));
+      const s = [0]; for (let i = 1; i < xy.length; i++) s.push(s[i - 1] + fastHypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]));
       const L = s.at(-1);
       for (let i = 0; i + 1 < xy.length; i++) {
         const [ax, ay] = xy[i]; const [bx, by] = xy[i + 1];
@@ -1366,7 +1367,7 @@ export function lowerSeabed(grid, landCover, seaZ, { coarse = false, keep = null
       // (a line that stops, at the map's edge or where the data has a gap, says nothing past its end: Naples,
       // Florida, where the coastline in the data ended at a beach and the square of town beyond the end, to the
       // right of the last stretch drawn on, went under)
-      const open = !(line.length > 2 && Math.hypot(line[0][0] - line[line.length - 1][0], line[0][1] - line[line.length - 1][1]) < 0.5);
+      const open = !(line.length > 2 && fastHypot(line[0][0] - line[line.length - 1][0], line[0][1] - line[line.length - 1][1]) < 0.5);
       for (let k = 1; k < line.length; k++) {
         const [ax, ay] = line[k - 1]; const [bx, by] = line[k]; const dx = bx - ax; const dy = by - ay; const len2 = dx * dx + dy * dy;
         if (!(len2 > 1e-6)) continue;
@@ -1377,7 +1378,7 @@ export function lowerSeabed(grid, landCover, seaZ, { coarse = false, keep = null
         for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
           const px = (c + 0.5 - n / 2) * cellM; const py = (n / 2 - r - 0.5) * cellM;
           const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2));
-          const d = Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+          const d = fastHypot(px - (ax + t * dx), py - (ay + t * dy));
           if (d > COAST_REACH_M) continue;
           if (d <= COAST_FINE_M) { const list = nearSegs.get(r * n + c); if (list) list.push(segId); else nearSegs.set(r * n + c, [segId]); }
           // (right of the way's direction: the sea)
@@ -1465,7 +1466,7 @@ export function lowerSeabed(grid, landCover, seaZ, { coarse = false, keep = null
         for (const k of list) {
           const [ax, ay, dx, dy, len2, freeStart, freeEnd] = segs[k];
           const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2));
-          const dist = Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+          const dist = fastHypot(px - (ax + t * dx), py - (ay + t * dy));
           const sgn = (freeStart && t <= 0) || (freeEnd && t >= 1) ? 0 : dx * (py - ay) - dy * (px - ax) < 0 ? 1 : -1;
           if (dist < best - 0.01) { best = dist; sd = sgn; } else if (dist <= best + 0.01 && sgn < 0) sd = -1;
         }

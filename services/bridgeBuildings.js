@@ -6,6 +6,7 @@
 //    for traffic through it or within TOWER_REACH_M of it (past its sidewalks): its towers, split round the road's
 //    arches (the Roebling Bridge's four parts). Shops on a bridge for walking stay: footways and pedestrian
 //    streets are not roads for traffic here. So does a building with a stated use (building=industrial, house...).
+import { fastHypot } from './fastMath.js';
 
 const TOWER_REACH_M = 7;
 const WALK = new Set(['footway', 'pedestrian', 'path', 'cycleway', 'steps', 'bridleway', 'corridor']);
@@ -43,7 +44,7 @@ export function leaveBridgeBuildings(features = []) {
       for (const p of g) for (let i = 0; i + 1 < road.length; i++) {
         const ax = (road[i].lng - p.lng) * kx; const ay = (road[i].lat - p.lat) * ky; const bx = (road[i + 1].lng - p.lng) * kx; const by = (road[i + 1].lat - p.lat) * ky;
         const vx = bx - ax; const vy = by - ay; const u = Math.max(0, Math.min(1, -(ax * vx + ay * vy) / (vx * vx + vy * vy || 1e-9)));
-        if (Math.hypot(ax + vx * u, ay + vy * u) < TOWER_REACH_M) return true;
+        if (fastHypot(ax + vx * u, ay + vy * u) < TOWER_REACH_M) return true;
       }
       return road.some((q) => inRing(q, g));
     };

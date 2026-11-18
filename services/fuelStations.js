@@ -11,6 +11,7 @@
 
 // the island in its model frame (measured in game: getObjBox): 17.6 m along
 // local x, 7.1 m across, its middle 1.3 m along x and 6.75 m to -y of the origin
+import { fastHypot } from './fastMath.js';
 export const ISLAND = { length: 17.6, width: 7.1, cx: 1.3, cy: -6.75 };
 const SCALE_RANGE = [0.7, 1.4];
 const MAX_PER_ROW = 8;             // (a truck stop's canopy: a hundred pumps)
@@ -37,7 +38,7 @@ export function boxOf(ring) {
   const r = openRing(ring);
   let best = null;
   for (let i = 0; i < r.length; i++) {
-    const a = r[i]; const b = r[(i + 1) % r.length]; const l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const a = r[i]; const b = r[(i + 1) % r.length]; const l = fastHypot(b[0] - a[0], b[1] - a[1]);
     if (l < 0.3) continue;
     const u = [(b[0] - a[0]) / l, (b[1] - a[1]) / l]; const v = [-u[1], u[0]];
     const s = r.map((p) => p[0] * u[0] + p[1] * u[1]); const t = r.map((p) => p[0] * v[0] + p[1] * v[1]);
@@ -71,7 +72,7 @@ export function stationCanopies(stations, buildings, { buildingAt = () => false 
       const name = String(b.tags?.name || b.tags?.brand || '').toLowerCase();
       if (name && name !== brand) continue;
       const within = st.area?.length >= 3 ? inRing(openRing(st.area), b.c[0], b.c[1]) : true;
-      const d = Math.hypot(b.c[0] - st.pt[0], b.c[1] - st.pt[1]);
+      const d = fastHypot(b.c[0] - st.pt[0], b.c[1] - st.pt[1]);
       if (!within || (!(st.area?.length >= 3) && d > CANOPY_NEAR_M)) continue;
       if (!best || d < best.d) best = { b, d };
     }
@@ -110,7 +111,7 @@ export function lanesUnder(ring, lanes = []) {
   const segs = [];
   for (const pts of lanes) {
     for (let i = 0; i + 1 < pts.length; i++) {
-      const a = pts[i]; const b = pts[i + 1]; const l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const a = pts[i]; const b = pts[i + 1]; const l = fastHypot(b[0] - a[0], b[1] - a[1]);
       if (l < 0.1) continue;
       const n = Math.ceil(l);
       for (let k = 0; k < n; k++) {

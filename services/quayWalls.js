@@ -11,6 +11,7 @@
 //
 // planQuayWalls(lines, opts) -> runs; quayWallTriangles(runs) -> triangles; buildQuayWallMesh(...) -> a mesh.
 import * as THREE from 'three';
+import { fastHypot } from './fastMath.js';
 
 const STEP_M = 2;                 // stations along the water's edge
 const WATER_IN_M = 6;              // the water looked for this far out from the mapped edge (a narrow canal: no further)
@@ -57,7 +58,7 @@ export function planQuayWalls(lines, { groundAt, surveyAt, hardAt = () => true, 
     let carry = 0;
     for (let i = 0; i + 1 < xy.length; i++) {
       const [ax, ay] = xy[i]; const [bx, by] = xy[i + 1];
-      const L = Math.hypot(bx - ax, by - ay);
+      const L = fastHypot(bx - ax, by - ay);
       if (L < 1e-6) continue;
       const tx = (bx - ax) / L; const ty = (by - ay) / L;
       for (let d = carry; d < L; d += STEP_M) st.push({ x: ax + tx * d, y: ay + ty * d, tx, ty });

@@ -14,6 +14,7 @@
 import { makeRoadNodeKey } from '../roadNetwork.js';
 import { isOneWayRoad } from '../roadWidth.js';
 import { isBoredTunnelTag } from '../beamngTunnels.js';
+import { fastHypot } from '../fastMath.js';
 
 export const STATION_M = 4;
 const JOIN_M = 0.5;
@@ -47,7 +48,7 @@ function stationsAlong(xy, stationM) {
   xs.push(xy[0][0]); ys.push(xy[0][1]); ss.push(0); vs.push(1);
   for (let i = 0; i + 1 < xy.length; i++) {
     const [ax, ay] = xy[i]; const [bx, by] = xy[i + 1];
-    const L = Math.hypot(bx - ax, by - ay);
+    const L = fastHypot(bx - ax, by - ay);
     if (L < 1e-6) continue;
     const n = Math.max(1, Math.ceil(L / stationM));
     for (let k = 1; k <= n; k++) {
@@ -146,7 +147,7 @@ export function buildStructureGraph(segments, { project, groundAt = null, halfOf
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
         for (const c of cells.get(`${cx + dx},${cy + dy}`) || []) {
-          if (c.seg !== segIndex && Math.hypot(c.x - x, c.y - y) <= JOIN_M && (c.layer === layer || ((c.end || end) && !(own || c.own)))) { canon.set(key, c.key); return c.key; }
+          if (c.seg !== segIndex && fastHypot(c.x - x, c.y - y) <= JOIN_M && (c.layer === layer || ((c.end || end) && !(own || c.own)))) { canon.set(key, c.key); return c.key; }
         }
       }
     }

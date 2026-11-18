@@ -18,6 +18,7 @@
 // Pure geometry.
 
 import { signedArea, cleanRing, flat, inRing } from './fountains.js';
+import { fastHypot } from './fastMath.js';
 
 const LINE_WIDTH_M = 8;
 const CREST_PERCENTILE = 0.85;
@@ -28,14 +29,14 @@ const CONCRETE = [0.82, 0.81, 0.78];
 const CREST = [0.7, 0.7, 0.68];
 
 const num = (v) => { const x = Number.parseFloat(String(v ?? '').replace(',', '.')); return Number.isFinite(x) && x > 0 ? x : null; };
-const isClosed = (pts) => pts.length > 3 && Math.hypot(pts[0][0] - pts.at(-1)[0], pts[0][1] - pts.at(-1)[1]) < 0.5;
+const isClosed = (pts) => pts.length > 3 && fastHypot(pts[0][0] - pts.at(-1)[0], pts[0][1] - pts.at(-1)[1]) < 0.5;
 
 // a line as a ring its width wide (both sides joined at the ends)
 export function bufferLine(pts, half) {
   const left = []; const right = [];
   for (let i = 0; i < pts.length; i++) {
     const a = pts[Math.max(0, i - 1)]; const b = pts[Math.min(pts.length - 1, i + 1)];
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
     const nx = -(b[1] - a[1]) / L; const ny = (b[0] - a[0]) / L;
     left.push([pts[i][0] + nx * half, pts[i][1] + ny * half]);
     right.push([pts[i][0] - nx * half, pts[i][1] - ny * half]);
@@ -48,7 +49,7 @@ function alongRing(ring, step) {
   const out = [];
   for (let i = 0; i < ring.length; i++) {
     const [ax, ay] = ring[i]; const [bx, by] = ring[(i + 1) % ring.length];
-    const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / step));
+    const n = Math.max(1, Math.ceil(fastHypot(bx - ax, by - ay) / step));
     for (let k = 0; k < n; k++) out.push([ax + ((bx - ax) * k) / n, ay + ((by - ay) * k) / n]);
   }
   return out;
@@ -101,7 +102,7 @@ export function buildDam(m, d, groundAt) {
     const a = pts[i]; const b = pts[j];
     const za = foot[i]; const zb = foot[j];
     if (za >= crest && zb >= crest) continue;   // inside the rock
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]);
     // (counter-clockwise ring: the face looks out)
     m.quad('concrete', [a[0], a[1], za], [b[0], b[1], zb], [b[0], b[1], crest], [a[0], a[1], crest],
       [0, za / 4], [L / 4, zb / 4], [L / 4, crest / 4], [0, crest / 4], CONCRETE);
@@ -125,7 +126,7 @@ export function damTopGeometry(d, uvM = 4, groundAt = null) {
     for (const p of [a, b, c]) { positions.push(p[0], p[1], p[2]); uvs.push(p[0] / uvM, p[1] / uvM); }
   };
   const split = (a, b, c, depth = 0) => {
-    const ab = Math.hypot(b[0] - a[0], b[1] - a[1]); const bc = Math.hypot(c[0] - b[0], c[1] - b[1]); const ca = Math.hypot(a[0] - c[0], a[1] - c[1]);
+    const ab = fastHypot(b[0] - a[0], b[1] - a[1]); const bc = fastHypot(c[0] - b[0], c[1] - b[1]); const ca = fastHypot(a[0] - c[0], a[1] - c[1]);
     const longest = Math.max(ab, bc, ca);
     if (longest <= TOP_EDGE_M || depth > 24) { emit(a, b, c); return; }
     const mid = (p, q) => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2, (p[2] + q[2]) / 2];
@@ -141,7 +142,7 @@ export function damTopGeometry(d, uvM = 4, groundAt = null) {
   const z0 = d.crest - SKIRT_M; const z1 = d.crest;
   for (let i = 0; i < d.ring.length; i++) {
     const a = d.ring[i]; const b = d.ring[(i + 1) % d.ring.length];
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]);
     const quad = [[a[0], a[1], z0, 0, z0], [b[0], b[1], z0, L, z0], [b[0], b[1], z1, L, z1], [a[0], a[1], z0, 0, z0], [b[0], b[1], z1, L, z1], [a[0], a[1], z1, 0, z1]];
     for (const [x, y, z, u, v] of quad) { positions.push(x, y, z); uvs.push(u / uvM, v / uvM); }
   }
@@ -176,7 +177,7 @@ export function damBeside(dams, ring, near = DAM_BUILDING_NEAR_M) {
         const [ax, ay] = d.ring[i]; const [bx, by] = d.ring[(i + 1) % d.ring.length];
         const L2 = (bx - ax) ** 2 + (by - ay) ** 2 || 1;
         const u = Math.max(0, Math.min(1, ((x - ax) * (bx - ax) + (y - ay) * (by - ay)) / L2));
-        if (Math.hypot(x - (ax + u * (bx - ax)), y - (ay + u * (by - ay))) <= near) return d;
+        if (fastHypot(x - (ax + u * (bx - ax)), y - (ay + u * (by - ay))) <= near) return d;
       }
     }
   }
@@ -204,7 +205,7 @@ export function damGuardrails(graph) {
       const pts = []; const zz = [];
       for (let i = seg.i0; i <= seg.i1; i++) {
         const a = Math.max(seg.i0, i - 1); const b = Math.min(seg.i1, i + 1);
-        const dx = e.x[b] - e.x[a]; const dy = e.y[b] - e.y[a]; const L = Math.hypot(dx, dy) || 1;
+        const dx = e.x[b] - e.x[a]; const dy = e.y[b] - e.y[a]; const L = fastHypot(dx, dy) || 1;
         pts.push([e.x[i] - (dy / L) * off * side, e.y[i] + (dx / L) * off * side]);
         zz.push(z[seg.edge][i]);
       }
@@ -249,7 +250,7 @@ export function assignDamAxes(graph, ways = []) {
       for (const nd of w.nodes || []) { if (inRing(nd[0], nd[1], d.ring)) run.push([nd[0], nd[1]]); else { if (run.length > top.length) top = run; run = []; } }
       if (run.length > top.length) top = run;
       if (top.length < 2) continue;
-      let len = 0; for (let i = 1; i < top.length; i++) len += Math.hypot(top[i][0] - top[i - 1][0], top[i][1] - top[i - 1][1]);
+      let len = 0; for (let i = 1; i < top.length; i++) len += fastHypot(top[i][0] - top[i - 1][0], top[i][1] - top[i - 1][1]);
       if (len >= WAY_SHARE * long && (!best || len > best.len)) best = { pts: top, len, half: w.half || 1.5 };
     }
     if (best) { d.axis = best.pts; d.axisLen = best.len; d.half = best.half; d.axisFrom = 'way'; continue; }
@@ -312,7 +313,7 @@ function resampleLine(pts, step) {
   const out = [pts[0]];
   for (let i = 1; i < pts.length; i++) {
     const [ax, ay] = pts[i - 1]; const [bx, by] = pts[i];
-    const n = Math.max(1, Math.round(Math.hypot(bx - ax, by - ay) / step));
+    const n = Math.max(1, Math.round(fastHypot(bx - ax, by - ay) / step));
     for (let k = 1; k <= n; k++) out.push([ax + ((bx - ax) * k) / n, ay + ((by - ay) * k) / n]);
   }
   return out;
@@ -353,7 +354,7 @@ function archFrame(d, groundAt) {
   const p = resampleLine(d.axis, AXIS_STEP_M);
   const n = p.map((_, i) => {
     const a = p[Math.max(0, i - 1)]; const b = p[Math.min(p.length - 1, i + 1)];
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
     return [-(b[1] - a[1]) / L, (b[0] - a[0]) / L];
   });
   // the air side: lower ground beside the dam (the lake bed is higher than the gorge)
@@ -446,7 +447,7 @@ function buildAxisDam(m, d, groundAt) {
   const [mat, tint] = FACE[kind];
   const g = (x, y) => { const v = groundAt(x, y); return Number.isFinite(v) ? v : crest; };
   // (bent like an arch: how far its middle stands off the line between its ends)
-  const chord = Math.hypot(p.at(-1)[0] - p[0][0], p.at(-1)[1] - p[0][1]) || 1;
+  const chord = fastHypot(p.at(-1)[0] - p[0][0], p.at(-1)[1] - p[0][1]) || 1;
   const sag = Math.max(...p.map(([x, y]) => Math.abs((p.at(-1)[0] - p[0][0]) * (p[0][1] - y) - (p[0][0] - x) * (p.at(-1)[1] - p[0][1])) / chord));
   const arch = !air && sag / chord >= ARCH_SAG && gap >= ARCH_MIN_M;
   // (the survey holds the dam: most of the crest line's ground within SURVEYED_M of the crest)
@@ -509,7 +510,7 @@ function buildAxisDam(m, d, groundAt) {
   const levels = [];
   for (let dd = 0; dd <= gap + FACE_STEP_M; dd += FACE_STEP_M) levels.push(dd);
   const along = [0];
-  for (let i = 1; i < p.length; i++) along.push(along[i - 1] + Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]));
+  for (let i = 1; i < p.length; i++) along.push(along[i - 1] + fastHypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]));
   // a column per axis point and side: out level by level to where it meets the ground
   const columns = (sgn, out) => p.map(([x, y], i) => {
     const col = []; let landed = false;
@@ -562,7 +563,7 @@ function archTopGeometry(d, groundAt, uvM) {
   const { p, n, hc } = archFrame(d, groundAt || (() => NaN));
   const positions = []; const uvs = [];
   const along = [0];
-  for (let i = 1; i < p.length; i++) along.push(along[i - 1] + Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]));
+  for (let i = 1; i < p.length; i++) along.push(along[i - 1] + fastHypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]));
   const zAt = (i) => crestZAlong(d, along[i], along.at(-1));
   const pt = (i, t) => [p[i][0] + n[i][0] * t, p[i][1] + n[i][1] * t];
   const across = Math.max(1, Math.ceil((2 * hc) / TOP_EDGE_M));

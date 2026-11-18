@@ -25,6 +25,7 @@
 // features in, features out.
 import { createGridProjector } from './geoUtils.js';
 import { estimateRoadCrossSection, isOneWayRoad } from './roadWidth.js';
+import { fastHypot } from './fastMath.js';
 
 const NO_DATA_VALUE = -99999;
 const MAX_GRID_MPP = 2;
@@ -81,14 +82,14 @@ export function measureBenchWidths(heightMap, width, height, bounds, osmFeatures
     stats.roads++;
     const pts = f.geometry.map((g) => project(g.lat, g.lng));
     let total = 0;
-    for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y) * metersPerPixel;
+    for (let i = 1; i < pts.length; i++) total += fastHypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y) * metersPerPixel;
     const found = [];
     let sections = 0; let hill = 0;
     let run = 0; let next = Math.min(END_SKIP_M, total / 2);
     const last = Math.max(next, total - END_SKIP_M);
     for (let i = 1; i < pts.length; i++) {
       const a = pts[i - 1]; const b = pts[i];
-      const L = Math.hypot(b.x - a.x, b.y - a.y) * metersPerPixel;
+      const L = fastHypot(b.x - a.x, b.y - a.y) * metersPerPixel;
       if (!(L > 1e-6)) continue;
       const tx = (b.x - a.x) / (L * px); const ty = (b.y - a.y) / (L * px);   // unit, in pixels per pixel
       const nx = -ty; const ny = tx;

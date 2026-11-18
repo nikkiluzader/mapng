@@ -15,6 +15,7 @@
 
 import { GATE_BARRIERS } from './overpassQuery.js';
 import { partsOf } from './tagModels.js';
+import { fastHypot } from './fastMath.js';
 
 const TILE_GATES = new Set(GATE_BARRIERS);
 const WALK_ONLY = new Set(['wicket_gate', 'kissing_gate', 'stile', 'turnstile', 'full-height_turnstile', 'bump_gate']);
@@ -50,7 +51,7 @@ function lengths(pts) {
   let s = lineStations.get(pts);
   if (s) return s;
   s = [0];
-  for (let i = 1; i < pts.length; i++) s.push(s[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  for (let i = 1; i < pts.length; i++) s.push(s[i - 1] + fastHypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
   lineStations.set(pts, s);
   return s;
 }
@@ -68,7 +69,7 @@ function nearest(pts, x, y, s = lengths(pts)) {
     const a = pts[i]; const b = pts[i + 1]; const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L2 = dx * dx + dy * dy;
     if (L2 < 1e-9) continue;
     const u = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / L2));
-    const q = [a[0] + dx * u, a[1] + dy * u]; const d = Math.hypot(x - q[0], y - q[1]);
+    const q = [a[0] + dx * u, a[1] + dy * u]; const d = fastHypot(x - q[0], y - q[1]);
     if (!best || d < best.d) { const L = Math.sqrt(L2); best = { d, s: s[i] + L * u, q, t: [dx / L, dy / L] }; }
   }
   return best;
@@ -148,7 +149,7 @@ export function planGates({ barriers = [], ways = [], nodes = [] }) {
   const cuts = barriers.map(() => []); const gates = []; const lines = new Set();
   const stations = barriers.map((b) => lengths(b.pts));
   const roadWays = ways.map((w) => ({ ...w, walk: WALK_HIGHWAYS.has(w.highway) }));
-  const gateNear = (x, y) => gates.some((g) => Math.hypot(g.x - x, g.y - y) < SAME_GATE_M + g.width / 2);
+  const gateNear = (x, y) => gates.some((g) => fastHypot(g.x - x, g.y - y) < SAME_GATE_M + g.width / 2);
   const waysAt = (x, y) => {
     let best = null;
     for (const w of roadWays) {
@@ -200,7 +201,7 @@ export function planGates({ barriers = [], ways = [], nodes = [] }) {
       if (s[k + 1] >= L / 2) {
         const u = (L / 2 - s[k]) / (s[k + 1] - s[k] || 1); const p = b.pts[k]; const q = b.pts[k + 1];
         mid = [p[0] + (q[0] - p[0]) * u, p[1] + (q[1] - p[1]) * u];
-        const d = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1; t = [(q[0] - p[0]) / d, (q[1] - p[1]) / d];
+        const d = fastHypot(q[0] - p[0], q[1] - p[1]) || 1; t = [(q[0] - p[0]) / d, (q[1] - p[1]) / d];
         break;
       }
     }
@@ -275,9 +276,9 @@ export function wallOpenings(line, roads, { reach = 2, style = 'mesh' } = {}) {
     const wb = boxOf(w.pts);
     if (wb[0] - reach > lb[2] || wb[2] + reach < lb[0] || wb[1] - reach > lb[3] || wb[3] + reach < lb[1]) continue;
     const p = w.pts; const n = p.length;
-    const past = (a, b) => { const L = Math.hypot(a[0] - b[0], a[1] - b[1]) || 1; return [a[0] + (a[0] - b[0]) / L * reach, a[1] + (a[1] - b[1]) / L * reach]; };
+    const past = (a, b) => { const L = fastHypot(a[0] - b[0], a[1] - b[1]) || 1; return [a[0] + (a[0] - b[0]) / L * reach, a[1] + (a[1] - b[1]) / L * reach]; };
     for (const c of crossings(line, [past(p[0], p[1]), ...p, past(p[n - 1], p[n - 2])])) {
-      if (out.some((g) => Math.hypot(g.x - c.x, g.y - c.y) < g.width / 2 + SAME_GATE_M)) continue;
+      if (out.some((g) => fastHypot(g.x - c.x, g.y - c.y) < g.width / 2 + SAME_GATE_M)) continue;
       const width = drivenWidth(w) / Math.max(0.35, Math.abs(c.ta[0] * c.tb[1] - c.ta[1] * c.tb[0]));
       out.push({ x: c.x, y: c.y, along: c.ta, width, walk: false, type: 'mapng:crossing', style });
     }
@@ -288,7 +289,7 @@ export function wallOpenings(line, roads, { reach = 2, style = 'mesh' } = {}) {
 /** What's left of the segment a-b outside the openings, as [u0, u1] fractions of it. */
 export function clearOf(a, b, openings) {
   let spans = [[0, 1]];
-  const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const L = fastHypot(b[0] - a[0], b[1] - a[1]);
   if (L < 1e-6) return spans;
   const u = [(b[0] - a[0]) / L, (b[1] - a[1]) / L];
   for (const g of openings) {

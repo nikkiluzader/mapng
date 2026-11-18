@@ -29,6 +29,7 @@
 import * as THREE from 'three';
 import { cylinder, cone, dome, box, wallQuad, insetRing } from './buildingDetails.js';
 import { coverRing } from './waterCover.js';
+import { fastHypot } from './fastMath.js';
 
 export const FOUNTAIN_KINDS = ['tiered', 'jets', 'obelisk', 'pool', 'bowl', 'bubbler', 'wall', 'splash'];
 const KIND_OF_TAG = {
@@ -80,9 +81,9 @@ export function cleanRing(pts) {
   const out = [];
   for (const p of pts) {
     const q = out[out.length - 1];
-    if (!q || Math.hypot(p[0] - q[0], p[1] - q[1]) > 0.05) out.push([p[0], p[1]]);
+    if (!q || fastHypot(p[0] - q[0], p[1] - q[1]) > 0.05) out.push([p[0], p[1]]);
   }
-  if (out.length > 1 && Math.hypot(out[0][0] - out.at(-1)[0], out[0][1] - out.at(-1)[1]) < 0.05) out.pop();
+  if (out.length > 1 && fastHypot(out[0][0] - out.at(-1)[0], out[0][1] - out.at(-1)[1]) < 0.05) out.pop();
   return out;
 }
 export function inRing(x, y, ring) {
@@ -99,7 +100,7 @@ function edgeDistance(x, y, ring) {
     const [ax, ay] = ring[j]; const [bx, by] = ring[i];
     const dx = bx - ax; const dy = by - ay; const L2 = dx * dx + dy * dy || 1e-9;
     const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / L2));
-    best = Math.min(best, Math.hypot(ax + dx * t - x, ay + dy * t - y));
+    best = Math.min(best, fastHypot(ax + dx * t - x, ay + dy * t - y));
   }
   return best;
 }
@@ -126,7 +127,7 @@ function aspectOf(ring) {
   let best = 1; let bestArea = Infinity;
   for (let i = 0; i < ring.length; i++) {
     const a = ring[i]; const b = ring[(i + 1) % ring.length];
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]);
     if (L < 0.3) continue;
     const u = [(b[0] - a[0]) / L, (b[1] - a[1]) / L];
     let u0 = Infinity; let u1 = -Infinity; let v0 = Infinity; let v1 = -Infinity;
@@ -229,7 +230,7 @@ export function lathe(m, mat, cx, cy, profile, col, { n = 24, uvM = 1 } = {}) {
   let v = 0;
   for (let k = 0; k + 1 < profile.length; k++) {
     const [r0, z0] = profile[k]; const [r1, z1] = profile[k + 1];
-    const dv = Math.hypot(r1 - r0, z1 - z0) / uvM;
+    const dv = fastHypot(r1 - r0, z1 - z0) / uvM;
     for (let i = 0; i < n; i++) {
       const t0 = (2 * Math.PI * i) / n; const t1 = (2 * Math.PI * (i + 1)) / n;
       const c0 = Math.cos(t0); const s0 = Math.sin(t0); const c1 = Math.cos(t1); const s1 = Math.sin(t1);
@@ -374,7 +375,7 @@ export function buildFountain(stone, full, fo, streets = null) {
         let best = null;
         for (let i = 0; i < inner.length; i++) {
           const a = inner[i]; const b = inner[(i + 1) % inner.length];
-          const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+          const L = fastHypot(b[0] - a[0], b[1] - a[1]);
           if (!best || L > best.L) best = { L, u: [(b[0] - a[0]) / L, (b[1] - a[1]) / L] };
         }
         for (let s = -40; s <= 40; s += 3) {

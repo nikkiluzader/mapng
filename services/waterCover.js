@@ -5,11 +5,12 @@
 // Strips of one width in a row merge: a rectangle is one block.
 
 /** The best oriented box (by the ring's edge directions): { u (along the long side), s0, s1, t0, t1, area }. */
+import { fastHypot } from './fastMath.js';
 export function orientedBox(ring) {
   let best = null;
   for (let i = 0; i < ring.length; i++) {
     const a = ring[i]; const b = ring[(i + 1) % ring.length];
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]);
     if (L < 0.05) continue;
     let u = [(b[0] - a[0]) / L, (b[1] - a[1]) / L];
     let s0 = Infinity; let s1 = -Infinity; let t0 = Infinity; let t1 = -Infinity;

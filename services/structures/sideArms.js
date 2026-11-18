@@ -8,6 +8,7 @@
 // (and, on a hill, its descent from the centre line) cut a wedge out of the
 // through road's near lane, a step across it at every junction. Nothing here
 // knows about any place.
+import { fastHypot } from '../fastMath.js';
 
 const THROUGH_COS = -0.7;
 const FORK_COS = 0.7;      // an arm within this of a through arm's direction forks from it (a slip road): no side arm
@@ -22,7 +23,7 @@ function dirOf(e, end) {
   let j = 0;
   while (j + 1 < n && fromEnd(e, end, stationAt(e, end, j)) < DIR_M) j++;
   const i = stationAt(e, end, j);
-  const dx = e.x[i] - e.x[i0]; const dy = e.y[i] - e.y[i0]; const l = Math.hypot(dx, dy);
+  const dx = e.x[i] - e.x[i0]; const dy = e.y[i] - e.y[i0]; const l = fastHypot(dx, dy);
   return l > 1e-6 ? [dx / l, dy / l] : null;
 }
 
@@ -40,7 +41,7 @@ export function throughSurface(graph, mains, zOf, x, y) {
       if (fromEnd(e, m.end, a) > LOOK_M) break;
       const vx = e.x[b] - e.x[a]; const vy = e.y[b] - e.y[a]; const L2 = vx * vx + vy * vy;
       const u = L2 > 1e-12 ? Math.max(0, Math.min(1, ((x - e.x[a]) * vx + (y - e.y[a]) * vy) / L2)) : 0;
-      const d = Math.hypot(e.x[a] + vx * u - x, e.y[a] + vy * u - y);
+      const d = fastHypot(e.x[a] + vx * u - x, e.y[a] + vy * u - y);
       if (!best || d < best.d) { const za = zOf(m.edge, a); const zb = zOf(m.edge, b); best = { d, z: za + (zb - za) * u, half: e.half }; }
     }
   }
