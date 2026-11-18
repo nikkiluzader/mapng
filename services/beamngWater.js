@@ -120,13 +120,52 @@ const bboxOf = (ring) => {
   for (const [x, y] of ring) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
   return [x0, y0, x1, y1];
 };
-// A polygon with holes as a point test.
+// One row's crossings of a ring: the x of every edge crossing the row at y, as pointInRing works them out
+// (the same test, the same arithmetic), sorted. A point on the row is inside where an odd number lie past it.
+function ringRow(ring, y) {
+  const xs = [];
+  const n = ring.length;
+  if (n < RING_BANDS_FROM) {
+    for (let i = 0, j = n - 1; i < n; j = i++) {
+      const xi = ring[i][0]; const yi = ring[i][1]; const xj = ring[j][0]; const yj = ring[j][1];
+      if ((yi > y) !== (yj > y)) xs.push(((xj - xi) * (y - yi)) / (yj - yi) + xi);
+    }
+  } else {
+    const ix = bandsOf(ring);
+    if (y >= ix.y0 && y <= ix.y1) {
+      const edges = ix.edges[Math.min(ix.count - 1, Math.max(0, Math.floor((y - ix.y0) / ix.h)))];
+      const { xs: rx, ys: ry } = ix;
+      for (let e = 0; e < edges.length; e++) {
+        const i = edges[e]; const j = i === 0 ? n - 1 : i - 1;
+        const xi = rx[i]; const yi = ry[i]; const xj = rx[j]; const yj = ry[j];
+        if ((yi > y) !== (yj > y)) xs.push(((xj - xi) * (y - yi)) / (yj - yi) + xi);
+      }
+    }
+  }
+  return Float64Array.from(xs).sort();
+}
+// (how many of the sorted crossings lie past x, odd: x < crossing, as pointInRing's test)
+function oddPast(xs, x) {
+  let lo = 0; let hi = xs.length;
+  while (lo < hi) { const m = (lo + hi) >> 1; if (xs[m] <= x) lo = m + 1; else hi = m; }
+  return ((xs.length - lo) & 1) === 1;
+}
+// (a polygon's test for one row: its own row(y), else contains)
+export const rowTest = (poly, y) => (poly.row ? poly.row(y) : (x) => poly.contains(x, y));
+// A polygon with holes as a point test. row(y): the same test for points on one row, the outline's crossings
+// with it found once (the lake beds ask about every pixel of a lake's box, row by row: a great lake's outline
+// tested from scratch for each was half that pass).
 export const makePolygon = (outer, holes = []) => {
   const box = bboxOf(outer);
   return {
     outer, holes, box,
     contains: (x, y) => x >= box[0] && x <= box[2] && y >= box[1] && y <= box[3]
       && pointInRing(x, y, outer) && !holes.some((h) => pointInRing(x, y, h)),
+    row(y) {
+      if (!(y >= box[1] && y <= box[3])) return () => false;
+      const o = ringRow(outer, y); const hs = holes.map((h) => ringRow(h, y));
+      return (x) => x >= box[0] && x <= box[2] && oddPast(o, x) && !hs.some((h) => oddPast(h, x));
+    },
   };
 };
 
@@ -582,7 +621,10 @@ export function joinTouchingWater(lakes) {
 // twice, so its two sides join), contains() is any member's.
 export function unionOutline(polys) {
   const box = [Math.min(...polys.map((p) => p.box[0])), Math.min(...polys.map((p) => p.box[1])), Math.max(...polys.map((p) => p.box[2])), Math.max(...polys.map((p) => p.box[3]))];
-  return { outer: [], holes: polys.flatMap((p) => [p.outer, ...p.holes]), box, contains: (x, y) => polys.some((p) => p.contains(x, y)) };
+  return {
+    outer: [], holes: polys.flatMap((p) => [p.outer, ...p.holes]), box, contains: (x, y) => polys.some((p) => p.contains(x, y)),
+    row(y) { const rows = polys.map((p) => rowTest(p, y)); return (x) => rows.some((r) => r(x)); },
+  };
 }
 
 /**
@@ -945,12 +987,13 @@ export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [], shal
     const flaw = new Uint8Array(gw * gh);     // dry cells taken for water (the thin low strips below)
     const high = new Uint8Array(gw * gh);     // inside, LAKE_CUT_FULL_M to LAKE_CUT_TOP_M over the level (whatever the surface's kind)
     for (let gy = 0; gy < gh; gy++) {
+      const inRow = rowTest(poly, toWorld(0, r0 + gy * k + (k - 1) / 2)[1]);
       for (let gx = 0; gx < gw; gx++) {
         const c = c0 + gx * k + (k - 1) / 2; const r = r0 + gy * k + (k - 1) / 2;
         const onMap = c >= 0 && r >= 0 && c <= width - 1 && r <= height - 1;
         const [x, y] = toWorld(c, r);
         const i = gy * gw + gx;
-        if (poly.contains(x, y) && !keep(x, y)) {
+        if (inRow(x) && !keep(x, y)) {
           const above = onMap ? heightMap[Math.round(r) * width + Math.round(c)] - minHeight - level : 0;
           if (above >= LAKE_CUT_FULL_M && above < LAKE_CUT_TOP_M) high[i] = 1;
           if (above < LAKE_CUT_FULL_M || loose) wet[i] = 1;
@@ -1071,6 +1114,7 @@ export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [], shal
     // cells are several pixels wide, and the pixels of one beside a cut under a bridge stood on as spikes)
     const atSheet = (raw) => sheetLevels.some((z) => Math.abs(raw - z) <= SHEET_FLAT_M);
     for (let r = Math.max(0, Math.floor(pr0)); r <= Math.min(height - 1, Math.ceil(pr1)); r++) {
+      let inRow = null;   // (made at the row's first pixel that needs it)
       for (let c = Math.max(0, Math.floor(pc0)); c <= Math.min(width - 1, Math.ceil(pc1)); c++) {
         const idx = r * width + c;
         const ground = heightMap[idx] - minHeight;
@@ -1081,7 +1125,8 @@ export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [], shal
         if (loose ? above >= (shallow ? LAKE_CUT_FULL_M : LAKE_CUT_TOP_M)
           : above >= LAKE_CUT_FULL_M && !((flaw[gi] || atSheet(heightMap[idx])) && above < LAKE_CUT_TOP_M)) continue;
         const [x, y] = toWorld(c, r);
-        if (!poly.contains(x, y) || keep(x, y)) continue;
+        if (!inRow) inRow = rowTest(poly, y);
+        if (!inRow(x) || keep(x, y)) continue;
         const exact = sample(dist, c, r) * cell;
         const wn = Math.min(1, exact / nearOver);
         const ln = exact + (sample(near, c, r) * cell - exact) * wn * wn * (3 - 2 * wn);
