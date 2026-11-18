@@ -43,10 +43,22 @@ const num = (v) => { const n = Number.parseFloat(v); return Number.isFinite(n) &
 /** Is this OSM barrier a gate (node, or way drawn along the gate itself)? */
 export const isGateBarrier = (tags) => TILE_GATES.has(String(tags?.barrier || '').toLowerCase());
 
+// (each line's stations and box kept by its point list: a city's gates looked every way up for each gate)
+const lineStations = new WeakMap();
+const lineBoxes = new WeakMap();
 function lengths(pts) {
-  const s = [0];
+  let s = lineStations.get(pts);
+  if (s) return s;
+  s = [0];
   for (let i = 1; i < pts.length; i++) s.push(s[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  lineStations.set(pts, s);
   return s;
+}
+// (no point of the line within r of (x, y): its box is further than r; exact)
+function lineFar(pts, x, y, r) {
+  let b = lineBoxes.get(pts);
+  if (!b) { b = boxOf(pts); lineBoxes.set(pts, b); }
+  return x < b[0] - r || x > b[2] + r || y < b[1] - r || y > b[3] + r;
 }
 
 /** The nearest point of a line: { d, s, q, t } (distance, station, point, unit tangent). */
@@ -140,6 +152,7 @@ export function planGates({ barriers = [], ways = [], nodes = [] }) {
   const waysAt = (x, y) => {
     let best = null;
     for (const w of roadWays) {
+      if (lineFar(w.pts, x, y, w.half + NODE_WAY_M)) continue;
       const h = nearest(w.pts, x, y);
       if (!h || h.d > w.half + NODE_WAY_M) continue;
       // (a road beats a pavement beside it)
@@ -152,7 +165,7 @@ export function planGates({ barriers = [], ways = [], nodes = [] }) {
   const seats = (x, y) => {
     const out = [];
     barriers.forEach((b, i) => {
-      if (lines.has(i)) return;
+      if (lines.has(i) || lineFar(b.pts, x, y, NODE_LINE_M)) return;
       const h = nearest(b.pts, x, y, stations[i]);
       if (h && h.d <= NODE_LINE_M) out.push({ i, b, ...h });
     });

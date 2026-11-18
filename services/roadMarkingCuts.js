@@ -56,6 +56,21 @@ export function buildCarriagewayIndex(carriageways) {
  * The carriageways under (x, y), widened by `margin`: [{ owner, z }] with
  * each one's road height there.
  */
+/**
+ * The segments (their indexes, ascending: the order a scan of index.segments meets them) registered in any cell
+ * within r of (x, y). A segment is registered over its box padded by its half width and 4 m, so every segment
+ * within half + 4 + r of the point is among them.
+ */
+export function segmentsNear(index, x, y, r) {
+  const seen = new Set();
+  for (let gx = Math.floor((x - r) / CELL_M); gx <= Math.floor((x + r) / CELL_M); gx++) {
+    for (let gy = Math.floor((y - r) / CELL_M); gy <= Math.floor((y + r) / CELL_M); gy++) {
+      for (const idx of index.grid.get(cellKey(gx, gy)) || []) seen.add(idx);
+    }
+  }
+  return [...seen].sort((a, b) => a - b);
+}
+
 export function carriagewaysAt(index, x, y, margin, { sides = false } = {}) {
   const out = [];
   const cell = index.grid.get(cellKey(Math.floor(x / CELL_M), Math.floor(y / CELL_M)));

@@ -23,7 +23,7 @@ import {
   stripUv, makeCropper, makeCutFinder, makeLevelFinder, stripPanels, panelsForItem,
   unionTile, unionTiles as unionTilesLocal,
 } from './sidewalkPanels.js';
-import { buildCarriagewayIndex, carriagewaysAt, cutNodes, isInZone, isOnOtherCarriageway } from './roadMarkingCuts.js';
+import { buildCarriagewayIndex, carriagewaysAt, cutNodes, isInZone, isOnOtherCarriageway, segmentsNear } from './roadMarkingCuts.js';
 import { isOneWayRoad } from './roadWidth.js';
 import { PLAZA_MATERIAL, plazaTileM, pavedWalkSurface } from './plazas.js';
 import { smoothLine } from './lineSmoothing.js';
@@ -2644,7 +2644,10 @@ export function buildDeckRuns(paths, bridges, opts = {}) {
       const a = nodes[Math.max(0, i - 1)]; const b = nodes[Math.min(nodes.length - 1, i + 1)];
       const pl = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
       let best = null;
-      for (const s of index.segments) {
+      // (only segments near enough to count: those within half + SIDEWALK_DECK_M are registered within
+      // SIDEWALK_DECK_M - 4 of the point; a scan of every segment took a city's footbridges half a minute)
+      for (const k of segmentsNear(index, q[0], q[1], SIDEWALK_DECK_M)) {
+        const s = index.segments[k];
         if (!ours(s)) continue;
         const dx = s.bx - s.ax; const dy = s.by - s.ay; const L2 = dx * dx + dy * dy || 1;
         const tt = Math.max(0, Math.min(1, ((q[0] - s.ax) * dx + (q[1] - s.ay) * dy) / L2));

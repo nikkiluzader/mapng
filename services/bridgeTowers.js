@@ -27,11 +27,23 @@ const inRing = (x, y, ring) => {
 };
 
 /** The nearest deck part's centreline to (x, y): { deck, part, d, z } or null. */
+// (a part whose box is no nearer than the best found so far cannot beat it: skipped, exactly as a full scan)
+const partBoxes = new WeakMap();
+function boxGap(xy, x, y) {
+  let b = partBoxes.get(xy);
+  if (!b) {
+    b = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const [px, py] of xy) { if (px < b[0]) b[0] = px; if (px > b[2]) b[2] = px; if (py < b[1]) b[1] = py; if (py > b[3]) b[3] = py; }
+    partBoxes.set(xy, b);
+  }
+  return Math.hypot(Math.max(b[0] - x, 0, x - b[2]), Math.max(b[1] - y, 0, y - b[3]));
+}
 function nearestDeck(decks, x, y) {
   let best = null;
   for (const deck of decks) {
     for (const part of deck.parts || []) {
       const { xy, z } = part;
+      if (best && xy.length && boxGap(xy, x, y) >= best.d) continue;
       for (let i = 0; i + 1 < xy.length; i++) {
         const vx = xy[i + 1][0] - xy[i][0]; const vy = xy[i + 1][1] - xy[i][1];
         const L2 = vx * vx + vy * vy || 1e-9;

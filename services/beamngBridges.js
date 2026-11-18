@@ -480,6 +480,22 @@ function nearestInterior(part, x, y) {
   return bi >= 0 && !bEnd ? { d: bd, z: z[bi] + (z[bi + 1] - z[bi]) * bt, end: false } : null;
 }
 
+// A polyline's box, kept by its point list (a deck's parts are tested again and again, point after point), and
+// how far (x, y) is from it: a test that needs a part within r of a point skips the part outright when its box
+// is r or more away (exact: no point of the part is nearer than its box). A city's 708 decks spent most of
+// their 140 s in these scans (scratch/memprobe profile).
+const lineBoxes = new WeakMap();
+function lineBox(xy) {
+  let b = lineBoxes.get(xy);
+  if (!b) {
+    b = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const [x, y] of xy) { if (x < b[0]) b[0] = x; if (x > b[2]) b[2] = x; if (y < b[1]) b[1] = y; if (y > b[3]) b[3] = y; }
+    lineBoxes.set(xy, b);
+  }
+  return b;
+}
+const boxFar = (xy, x, y, r) => { const b = lineBox(xy); return x < b[0] - r || x > b[2] + r || y < b[1] - r || y > b[3] + r; };
+
 /** Merge the heights of a chain's branches where they overlap off a fork (edits z in place). */
 export function mergeOverlaps(parts) {
   const key = (p) => `${Math.round(p[0] / JOIN_M)},${Math.round(p[1] / JOIN_M)}`;
@@ -733,6 +749,7 @@ const nearAnySegment = (p, lines, r0) => lines.length > 0 && anySegmentNear(line
 // of a foot, at a height between the pier's foot and its top
 const deckUnder = (p, decks, zLow, zHigh) => decks.some((q) => {
   const r = (q.half ?? 0) + PIER_ROAD_EDGE_M;
+  if (boxFar(q.xy, p[0], p[1], r)) return false;
   for (let j = 0; j + 1 < q.xy.length; j++) {
     const [ax, ay] = q.xy[j]; const [bx, by] = q.xy[j + 1];
     const vx = bx - ax; const vy = by - ay;
@@ -907,6 +924,10 @@ export function widenDecksForSidewalks(decks, footways) {
           // (a way tagged as the street's sidewalk reaches further: parking or a verge between, South Main Street's
           // sidewalks over the Reedy stand 5 to 7 m out past angled parking, one deck with the street)
           const far = sidewalk ? SIDEWALK_DECK_REACH_M : WALK_DECK_REACH_M;
+          // (a footway counts only within ~26° of parallel, where its offset across is at least 0.9 of its
+          // distance: one whose box is further than its reach / 0.9 cannot count; exact, and a city's decks
+          // looked every footway up at every point)
+          if (boxFar(nodes, p[0], p[1], (part.half + half + far) / 0.9 + 1e-6)) continue;
           for (let i = 0; i + 1 < nodes.length; i++) {
             const q = nodes[i]; const r = nodes[i + 1]; const dx = r[0] - q[0]; const dy = r[1] - q[1]; const l = Math.hypot(dx, dy) || 1;
             if (Math.abs((dx * t[0] + dy * t[1]) / l) < 0.9) continue;
@@ -1032,6 +1053,7 @@ function medianAcross(deck, pi, xy, z, nrm, hl, hr, neighbours) {
     for (const [side, h, list] of [[1, hl[k], out.left], [-1, hr[k], out.right]]) {
       const ex = p[0] + nrm[k][0] * side * h; const ey = p[1] + nrm[k][1] * side * h;
       for (const q of others) {
+        if (boxFar(q.xy, ex, ey, q.half + MEDIAN_MAX_M)) continue;
         for (let i = 0; i + 1 < q.xy.length; i++) {
           const vx = q.xy[i + 1][0] - q.xy[i][0]; const vy = q.xy[i + 1][1] - q.xy[i][1];
           const L2 = vx * vx + vy * vy || 1e-9;
@@ -1143,11 +1165,12 @@ export function buildDeckGeometry(deck, { groundAt, roadLines = [], groundRoads:
     // there; alongside the other part, not past its end (the part a join
     // continues into)
     const onPart = (q, x, y, zk) => {
-      if (q.xy.length < 2) return false;
+      if (q.xy.length < 2 || boxFar(q.xy, x, y, q.half + PARAPET_W_M)) return false;
       const n = nearestInterior(q, x, y);
       return !!n && n.d < q.half + PARAPET_W_M - 0.05 && Math.abs(n.z - zk) < 2;
     };
     const onGroundRoad = (q, x, y, zk) => {
+      if (q.xy.length < 2 || boxFar(q.xy, x, y, q.half)) return false;
       const n = nearestInterior(q, x, y);
       return !!n && n.d < q.half - 0.3 && Math.abs(n.z - zk) < 1;
     };
