@@ -185,6 +185,13 @@
               {{ t('exportPanel.weight.size', { km: levelWeight.sizeKm < 10 ? levelWeight.sizeKm.toFixed(1) : Math.round(levelWeight.sizeKm), far: levelWeight.farthestKm < 10 ? levelWeight.farthestKm.toFixed(1) : Math.round(levelWeight.farthestKm), buildings: levelWeight.builtBuildings.toLocaleString() }) }}
               {{ t(`exportPanel.weight.summary_${levelWeight.rating}`) }}
             </p>
+            <!-- the memory the export will need at its peak, against this computer's (desktop: services/memoryEstimate.js) -->
+            <p
+              v-if="memoryNeed"
+              class="text-caption leading-snug"
+              :class="memoryNeed.fit === 'tooMuch' ? 'text-red-700 dark:text-red-300 font-semibold' : memoryNeed.fit === 'tight' ? 'text-amber-700 dark:text-amber-300' : 'text-gray-600 dark:text-gray-300'"
+              data-testid="weight-memory"
+            >{{ t(`exportPanel.weight.memory_${memoryNeed.fit}`, { gb: memoryNeed.gb, total: memoryNeed.total }) }}</p>
             <!-- (the top rating has a line of its own) -->
             <p v-if="levelWeight.rating === 'extreme'" class="text-caption italic leading-snug text-red-700 dark:text-red-300" data-testid="weight-serious">{{ t('exportPanel.weight.areYouSerious') }}</p>
             <!-- a terrain that is not a power-of-two square is cut to one (services/squareCrop.js) -->
@@ -735,6 +742,7 @@ import { markJobStart, markJobEnd } from '../../services/sessionGuard.js';
 import { heavyJobRunning } from '../../services/heavyJob.js';
 import { reportUsage, useUsageStats } from '../../composables/useUsageStats.js';
 import { estimateLevelWeight } from '../../services/levelWeight.js';
+import { countMapPoints, estimateExportMemory, memoryFit } from '../../services/memoryEstimate.js';
 import { sanitizeTreeKindsOff, sanitizeTreeModelsOff, sanitizeTreeSwaps } from '../../services/beamngTrees.js';
 import { squareCropNotice } from '../../services/squareCrop.js';
 import { CHECKBOX, SELECT_XS } from '../base/controlStyles.js';
@@ -1046,6 +1054,24 @@ const levelWeight = computed(() => estimateLevelWeight({
   safeCaps: !advancedMode.value || beamNGSafeCaps.value,
   includeBuildings: hasOsmData.value && built('buildings'),
 }));
+// (the memory the desktop export will need at its peak, against this computer's: services/memoryEstimate.js;
+// the computer's total comes with the desktop app's usage reports, each second)
+const machineMemory = ref(0);
+if (desktopApp?.onUsage) {
+  const stopMemory = desktopApp.onUsage((u) => { if (u?.memTotal && u.memTotal !== machineMemory.value) machineMemory.value = u.memTotal; });
+  onUnmounted(() => stopMemory?.());
+}
+const mapPoints = computed(() => countMapPoints(props.terrainData?.osmFeatures));
+const memoryNeed = computed(() => {
+  if (!desktopApp || !machineMemory.value || !props.terrainData?.width) return null;
+  const { gb } = estimateExportMemory({
+    terrainPx: Number(props.terrainData.width) || 0,
+    mapPoints: hasOsmData.value ? mapPoints.value : 0,
+    includeBuildings: hasOsmData.value && built('buildings'),
+  });
+  const fit = memoryFit(gb, machineMemory.value);
+  return fit ? { fit, gb: Math.ceil(gb), total: Math.round(machineMemory.value / 2 ** 30) } : null;
+});
 const squareCrop = computed(() => squareCropNotice(props.terrainData?.width, props.terrainData?.height, resolveProcessingMetersPerPixel(props.terrainData)));
 const isCustomUploadTerrain = computed(() => !!props.terrainData?.elevationUnitApplied);
 const canUseGpxzBackdrop = computed(() => props.elevationSource === 'gpxz' && !!props.gpxzApiKey);
