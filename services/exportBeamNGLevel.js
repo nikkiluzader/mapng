@@ -1078,7 +1078,7 @@ function getBridgeMaterialDefs() {
  * at the bridge's centre: visual mesh + a Colmesh-1 collision copy.
  * Returns [{ key, origin: [x, y, z], data, triangles }].
  */
-function generateBridgeDAEs(decks, groundAt, roadLines, groundRoads = [], tops = []) {
+async function generateBridgeDAEs(decks, groundAt, roadLines, groundRoads = [], tops = [], { onDeck = null } = {}) {
   const out = [];
   // one Collada shape (visual mesh + a Colmesh-1 collision copy), origin-relative
   const toDae = ({ positions: pos, uvs }, origin, material = BRIDGE_MATERIAL) => {
@@ -1108,9 +1108,12 @@ function generateBridgeDAEs(decks, groundAt, roadLines, groundRoads = [], tops =
     colGeo.dispose();
     return result?.data || null;
   };
-  decks.forEach((deck, i) => {
+  for (let i = 0; i < decks.length; i++) {
+    const deck = decks[i];
+    // (the progress card's line, and the window's thread back, every few decks)
+    if (onDeck && i % 8 === 0) await onDeck(i, decks.length);
     const g = buildDeckGeometry(deck, { groundAt, roadLines, groundRoads, neighbours: decks.filter((d) => d !== deck).flatMap((d) => d.parts) });
-    if (!g.positions.length) return;
+    if (!g.positions.length) continue;
     // its style (bridgeStyles.js): steel, concrete and stone apart
     // (a movable span is drawn on a deck of no other style too)
     const style = deck.style || deck.movableSpans?.length ? buildStyleGeometry(deck, { groundAt, newBuilder: newBridgeBuilder, depthOf: deckDepthOf }) : null;
@@ -1140,7 +1143,7 @@ function generateBridgeDAEs(decks, groundAt, roadLines, groundRoads = [], tops =
       }
     }
     if (data || deckData) out.push({ key: `b${String(i + 1).padStart(3, '0')}`, origin, data, deckData, extras, style: deck.style || null, triangles: g.positions.length / 9 + extras.reduce((n, e) => n + e.triangles, 0) });
-  });
+  }
   // other road surfaces built as decks are (a dam's crest top, services/dams.js):
   // the road decals clip onto them
   tops.forEach((g, i) => {
@@ -1428,9 +1431,16 @@ async function buildBuildingsOnWorkers(terrainData, features, project, options) 
     roads: ctx.features.filter((f) => f?.type === 'road'),
     passages: ctx.streets.passages,
   };
+  // (options.onTile: each finished tile handed over as its share comes back, and only what it returns kept:
+  // collected whole, a downtown's tiles were all in memory at once at the end of this step)
+  let sharesDone = 0;
+  options.onStatus?.('tiles', { done: 0, n: items.length });
+  const handOver = (sh) => { if (options.onTile && sh?.tiles) sh.tiles = sh.tiles.map((t) => (t.data ? options.onTile(t) : t)); };
   const shares = await parallelMap(items, {
     local: (item, sh) => import('./buildingWorker.js').then((m) => m.buildBuildingShare(item, sh)),
     module: new URL('./buildingWorker.js', import.meta.url).href, fn: 'buildBuildingShare', shared,
+    // (the first two are the extras: scenes, written below)
+    onResult: (i, sh) => { if (i >= 2) handOver(sh); sharesDone++; options.onStatus?.('tiles', { done: sharesDone, n: items.length }); },
   });
   // (the extras' stats first, as one builder would have them)
   const stats = {}; let count = 0; let meshes = 0; let triangles = 0;
@@ -1444,18 +1454,22 @@ async function buildBuildingsOnWorkers(terrainData, features, project, options) 
   // (the extras' tiles last, as before: water, then fields; they come as
   // scenes, written now on every thread)
   const extraTiles = [...shares[1].tiles, ...shares[0].tiles];
+  options.onStatus?.('extras');
   const extraData = await parallelMap(extraTiles.map((t) => t.scene), {
     local: writeDae, module: new URL('./daeWorker.js', import.meta.url).href, fn: 'writeDae',
   });
+  const kept = (t) => t.data || t.handedOver;
+  const extraDaes = extraTiles.map(({ scene, ...meta }, i) => ({ ...meta, data: extraData[i] })).filter((t) => t.data);
   const tileDaes = [
-    ...shares.slice(2).flatMap((sh) => sh.tiles.filter((t) => t.data)),
-    ...extraTiles.map(({ scene, ...meta }, i) => ({ ...meta, data: extraData[i] })).filter((t) => t.data),
+    ...shares.slice(2).flatMap((sh) => sh.tiles.filter(kept)),
+    ...(options.onTile ? extraDaes.map(options.onTile) : extraDaes),
   ];
   stats.tiles = tileDaes.length;
   return { count, stats, tileDaes, meshes, triangles };
 }
 
-async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null, { raceways = [], gateRoads = [], dams = null, replace = null } = {}) {
+async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null, { raceways = [], gateRoads = [], dams = null, replace = null, onTile = null, onStatus = null } = {}) {
+  onStatus?.('choose');
   if (!terrainData.osmFeatures?.length) return null;
 
   // Buildings: textured walls / roofs from BeamNG's own trim sheets, built
@@ -1467,7 +1481,7 @@ async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null,
     // (copies with export-only tags: a bridge's tower houses on their decks)
     .map((f) => replace?.get(f) || f);
   const project = (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0);
-  const buildOptions = { maxBuildings: caps.buildings, tileM: buildingTileSize(worldSize), squareSize, groundAt: terrainGroundAt(terrainData, squareSize), drape: terrainDrape(terrainData, squareSize), raceways, gateRoads, dams };
+  const buildOptions = { onTile, onStatus, maxBuildings: caps.buildings, tileM: buildingTileSize(worldSize), squareSize, groundAt: terrainGroundAt(terrainData, squareSize), drape: terrainDrape(terrainData, squareSize), raceways, gateRoads, dams };
   const parallel = await buildBuildingsOnWorkers(terrainData, features, project, buildOptions);
   let buildingCount; let buildingStats; let tileDaes; let meshCount; let triangles;
   if (parallel) {
@@ -1478,6 +1492,7 @@ async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null,
     triangles = built.meshes.reduce((n, m) => n + (m.geometry.index?.count ?? m.geometry.getAttribute('position')?.count ?? 0) / 3, 0);
     // (the buildings are their own tile shapes: buildBuildingTileDAEs)
     tileDaes = await buildBuildingTileDAEs(built.tiles || []);
+    if (onTile) tileDaes = tileDaes.map(onTile);
   }
   if (reportStats) {
     reportStats.built = buildingCount;
@@ -6036,6 +6051,7 @@ export async function generateDecalRoadsYielding(terrainData, squareSize, yieldF
   for (;;) {
     const { done, value } = steps.next();
     if (done) return value;
+    if (typeof value === 'string') opts.onStatus?.(value);
     await yieldFn();
   }
 }
@@ -6107,6 +6123,8 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   const includeBridges = opts.includeBridges !== false;
   const includeTunnels = opts.includeTunnels !== false;
   const shaping = shapingSwitches(opts.shaping);
+  // (each yield names the part about to run: generateDecalRoadsYielding's onStatus, the progress card's line)
+  yield 'network';
   const budget = chooseRoadNodeSpacing(terrainData.osmFeatures || []);
   if (budget.spacing > ROAD_NODE_SPACING_M) {
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Road nodes every ${budget.spacing.toFixed(2)} m (not ${ROAD_NODE_SPACING_M} m): ${budget.lengthKm.toFixed(0)} km of roads would make ~${budget.estimatedNodes} DecalRoad nodes, past what BeamNG draws at load.`);
@@ -6166,6 +6184,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   // The structure solver (graph, crossings, profile, classes). Shadow mode
   // unless options.structureSolver asks for it: a failure here is logged
   // and skipped, never an export failure.
+  yield 'crossings';
   let structureGraph = null;
   try {
     // The structure solver's road graph (stage A), built on the untouched
@@ -6203,7 +6222,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     structureGraph.crossings = findCrossings(structureGraph, { waterAt: buildWaterLookup(terrainData, squareSize) });
     // no bridges: nothing is lifted over anything, every road on its ground
     if (!includeBridges) structureGraph.crossings = { ...structureGraph.crossings, crossings: [], overlaps: [], water: [] };
-    yield;
+    yield 'tunnels';
     yield;
   } catch (err) {
     console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Structure solver skipped: ${err?.message || err}`);
@@ -6219,7 +6238,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   const noTunnels = () => ({ bySeg: new Map(), tunnels: [], skipped: [], holes: [], graded: new Set(), tube: new Set(), mouth: new Map() });
   // (railway tunnels too: their bores come from the same builder)
   const early = includeTunnels ? yield* solveExportTunnels(graphSegments, terrainData, squareSize, null, graphHalfOf, { done, shape: shaping.tunnels }) : noTunnels();
-  yield;
+  yield 'bridges';
   // (structure solver v2: the decks come from the solver after the road
   // layout, so today's bridge passes are skipped)
   // (no graph, e.g. it failed on this map: today's bridge passes instead)
@@ -6229,9 +6248,9 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   const bridges = (opts.structureSolver === 'v2' && structureGraph) || !includeBridges || !shaping.bridges || !shaping.overpasses
     ? noBridges()
     : solveExportBridges(drivableRoads, terrainData, squareSize, early.tunnels);
-  yield;
+  yield 'tunnels';
   const late = includeTunnels ? yield* solveExportTunnels(graphSegments, terrainData, squareSize, bridges, graphHalfOf, { done, shape: shaping.tunnels }) : noTunnels();
-  yield;
+  yield 'heights';
   const tunnels = joinTunnelPhases(early, late);
   // The structure solver's profile and classes (stages C, D), after today's
   // tunnels. Building the level ('v2'), today's tunnels' roads are pinned
@@ -6429,7 +6448,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
         // no bridges: a stretch the solve still left high is fill, never a deck
         if (!includeBridges) for (const seg of structureGraph.classes.segments) if (seg.kind === 'deck') seg.kind = 'embankment';
       }
-      yield;
+      yield 'surfaces';
     } catch (err) {
       console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Structure solver profile skipped: ${err?.message || err}`);
       structureGraph.profile = null; structureGraph.classes = null;
@@ -6786,7 +6805,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
 
   yield;
   const pedestrianStreets = buildPedestrianStreetDecals(terrainData, squareSize, carriageways, { raisedFootways: !!opts.raisedFootways, sidewalkStrips: !!opts.sidewalkStrips });
-  yield;
+  yield 'junctions';
   // A service road, a path or a pedestrian street along a dam's crest rides on it, as a road for traffic does
   // (splitAtDams, the pins above): these follow the ground everywhere else, and across a dam the survey left out
   // the ground is the valley floor. The road over Zapora Pilchowice (highway=service) lay 24 m down in the
@@ -6797,7 +6816,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
 
   const carriagewayIndex = buildCarriagewayIndex(carriageways);
   const junctionMarkings = generateJunctionMarkingDecals(terrainData, squareSize, { carriageways: carriagewayIndex });
-  yield;
+  yield 'cutting';
   // the solved road heights (structure solver): a road's height at (x, y), its nearest station
   const solvedHeightOf = (() => {
     const z = structureGraph?.profile?.z;
@@ -13232,8 +13251,34 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // level is no sea)
   const sourceHeightMap = exportTerrainData.heightMap;
 
+  // Each part of laying the roads has its own line under the progress bar, and the bar moves by how long each
+  // took on a dense 8 km downtown (Chicago's Loop, 470 s in all: scratch/memprobe). The road generator names the
+  // part it starts (decalRoadSteps' yields); the rest are named here.
+  const ROAD_PARTS = {
+    network: ['Joining the roads into one network…', 0],
+    crossings: ['Finding where roads cross over and under each other…', 0.02],
+    tunnels: ['Planning tunnels and their approaches…', 0.05],
+    bridges: ['Working out which roads are bridges…', 0.09],
+    heights: ['Setting road heights along the whole network (bridges, ramps, junctions)…', 0.12],
+    surfaces: ['Drawing the road surfaces and lane markings…', 0.32],
+    junctions: ['Painting junction markings (stop lines, crosswalks)…', 0.33],
+    cutting: ['Trimming paint and surfaces where roads meet…', 0.335],
+    terrain: ['Shaping the terrain under the roads…', 0.34],
+    railways: ['Laying railway track…', 0.41],
+    beds: ['Carving riverbeds and lake beds under the bridges…', 0.43],
+    styles: ['Choosing bridge styles (arches, trusses, cables) and fitting buildings to bridges…', 0.59],
+    bridgeModels: ['Building bridge models: {done} of {n}…', 0.61],
+    tunnelModels: ['Building tunnel models…', 0.995],
+  };
+  const roadPart = (key, values = {}) => {
+    if (currentStep?.phase !== 'roads') return null;
+    const [text, at] = ROAD_PARTS[key] || [];
+    if (text) report(text.replace(/\{(\w+)\}/g, (_, k) => values[k] ?? ''), at + (values.share || 0));
+    // (a moment for the line to reach the window, where the export runs on: the generator yields after it already)
+    return yield_();
+  };
   const decalRoads = includeRoads
-    ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_, { raisedFootways: includeSidewalks, sidewalkStrips, junctionMouths: options.junctionMouths, roadsFollowSurvey: options.roadsFollowSurvey !== false, structureSolver: options.structureSolver, includeBridges, includeTunnels, includeDams: includeBuildings && options.includeDams !== false, includeRailways: options.includeRailways !== false, shaping: shapingOptions, lidar: lidar?.grid ? lidar : null, rawAt: rawAtWorld })
+    ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_, { onStatus: roadPart, raisedFootways: includeSidewalks, sidewalkStrips, junctionMouths: options.junctionMouths, roadsFollowSurvey: options.roadsFollowSurvey !== false, structureSolver: options.structureSolver, includeBridges, includeTunnels, includeDams: includeBuildings && options.includeDams !== false, includeRailways: options.includeRailways !== false, shaping: shapingOptions, lidar: lidar?.grid ? lidar : null, rawAt: rawAtWorld })
     : [];
   // Bridges: decks for the bridge roads; nothing ground-bound (sidewalks,
   // props, lamps) is built along them, nothing tall stands up into them.
@@ -13243,6 +13288,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const sg = decalRoads.structureGraph;
   // v2: bridge decks from the solver's deck stretches, every road decal at
   // its solved height (the terrain is composed just below)
+  await roadPart('terrain');
   if (options.structureSolver === 'v2' && sg?.classes) {
     // the solver's widths up to the widths the roads are drawn at (shoulders,
     // parking lanes): the terrain cores and decks must cover the drawn road
@@ -13306,6 +13352,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   let railways = null;
   if (options.structureSolver === 'v2' && sg?.railSegments && sg.classes && sg.profile) {
     try {
+      await roadPart('railways');
       railways = buildLevelRailways(sg, exportTerrainData, squareSize, levelName);
       if (railways.decals.length) decalRoads.push({ class: 'SimGroup', name: 'railways', persistentId: generatePersistentId(), __parent: 'Decal_Roads', __items: railways.decals });
       console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Railways: ${railways.stats.trackKm} km of track, ${railways.daes.length} object(s), ${railways.stats.triangles} triangles, ${railways.stats.crossings} level crossing(s), ${railways.stats.streetTramKm} km of tram in streets.`);
@@ -13332,6 +13379,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const roadSpawn = findRoadSpawn(groundCarriageways, (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize), underDeck, { leftHandTraffic: resolvedRightHandDrive });
   if (roadSpawn) ({ position: spawnPosition, rotationMatrix: spawnRotationMatrix } = roadSpawn);
   await yield_();
+  await roadPart('beds');
   // water under the decks: its bed carved there (the elevation data often
   // holds the deck itself, a dam the river hid in), before the bridges are
   // built over it (their arches spring from the bed)
@@ -13453,6 +13501,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Water beds under decks skipped: ${err?.message || err}`);
     }
   }
+  await roadPart('styles');
   // what each bridge is (bridgeStyles.js): from its road's tags or its outline's
   const bridgeOutlines = (exportTerrainData.osmFeatures || [])
     .filter((f) => f.type === 'bridge_infra' && f.geometry?.length > 2)
@@ -13491,7 +13540,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         ...bridgeDecks.flatMap((d) => (d.parts || []).filter((p) => p.xy?.length > 1 && p.z?.length === p.xy.length).map((p) => ({ xy: p.xy, z: Array.from(p.z, (z) => z - (p.depth ?? UNDER_DECK_DEPTH_M)) }))),
         ...(railways?.lines || []).filter((l) => l.bridge && l.z?.length === l.points.length).map((l) => ({ xy: l.points, z: l.z.map((z) => z - RAIL_DEPTH_M - 1) })),   // (the rail's top: its bed, then the deck's slab)
       ];
-      const taken = new Set([...(bridgeTowerHouses || []).map(([f]) => f), ...portalBuildings.map((pb) => pb.f)]);
+      // (the tower houses are a Map: its keys are the buildings)
+      const taken = new Set([...(bridgeTowerHouses?.keys() || []), ...portalBuildings.map((pb) => pb.f)]);
       const res = buildingsUnderDecks((exportTerrainData.osmFeatures || []).filter((f) => f?.type === 'building' && !taken.has(f)), overhead, {
         toXY: (p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0),
         groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
@@ -13514,7 +13564,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // widths are final, its ribs outside the outer edges)
   const archTwins = linkArchCrossings(bridgeDecks, { groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize) });
   if (archTwins) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Bridge arches/trusses over twin decks: ${archTwins} run(s) drawn under their crossing's one structure.`);
-  const bridgeDaes = generateBridgeDAEs(
+  const bridgeDaes = await generateBridgeDAEs(
     bridgeDecks,
     (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
     decalRoads.bridges?.roadLines || [],
@@ -13523,11 +13573,13 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     groundCarriageways.map((cw) => ({ xy: cw.nodes.map((nd) => [nd[0], nd[1]]), z: cw.nodes.map((nd) => nd[2]), half: cw.half })),
     // dams' crest tops (their walls are in the building tiles)
     (decalRoads.structureGraph?.dams || []).map((d) => damTopGeometry(d)),
+    { onDeck: async (i, n) => { roadPart('bridgeModels', { done: i, n, share: (0.385 * i) / Math.max(1, n) }); await yield_(); } },
   );
   if (bridgeDecks.length > 0) {
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Bridges: ${bridgeDecks.length} deck(s), ${decalRoads.bridges?.ramps ?? 0} approach embankment(s), ${bridgeDaes.reduce((n, d) => n + d.triangles, 0)} triangles, one object per bridge.`);
   }
   await yield_();
+  await roadPart('tunnelModels');
   const tunnelDaes = generateTunnelDAEs(tunnelList);
   await yield_();
   const tunnelGroups = buildTunnelGroups(tunnelList, tunnelDaes, levelName);
@@ -14231,6 +14283,40 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     backdropHeights = backdropResult?.heights ?? null;
   }
 
+  // The level ZIP, open from here: the big model files (building and sidewalk tiles) go in as each step makes
+  // them, compressed in the background, and only their names and places are kept; held as text until the
+  // end, a dense downtown's tiles were the export's memory peak (28 GB at 8 km, scratch/memprobe).
+  const zip = new JSZip();
+  // Entry sizes for the compression progress (JSZip keeps none it exposes).
+  const zipEntryBytes = new Map();
+  const addZipFile = zip.file.bind(zip);
+  const entryDate = zipEntryDate();
+  // Big entries compressed as they come, natively and in the background: a
+  // city's model text (7 GB at 8 km) freed as the export goes on, not all
+  // held for the zip at the end (its memory peak) and compressed then.
+  const zipCompressor = await createZipCompressor(JSZip).catch(() => null);
+  const EAGER_ZIP_BYTES = 1024 * 1024;
+  // (arguments passed on as given: zip.file(name) alone reads an entry)
+  zip.file = (...args) => {
+    let bytes = 0;
+    if (args.length > 1 && typeof args[0] === 'string') {
+      bytes = byteSizeOf(args[1]);
+      zipEntryBytes.set(args[0], bytes);
+      args[2] = { date: entryDate, ...(args[2] || {}) };
+    }
+    const out = addZipFile(...args);
+    if (zipCompressor && bytes >= EAGER_ZIP_BYTES) zipCompressor.add(zip.files[args[0]]);
+    return out;
+  };
+  const base = `levels/${levelName}`;
+  const toZipBinary = async (value) => {
+    if (!value) return value;
+    if (value instanceof Uint8Array || value instanceof ArrayBuffer) return value;
+    if (typeof value.arrayBuffer === 'function') {
+      return new Uint8Array(await value.arrayBuffer());
+    }
+    return value;
+  };
   let osmDaeBlob = null;
   let buildingTileDaes = [];
   const buildingReport = { dragGrade };
@@ -14249,16 +14335,58 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     // that changed only trees or a name reuses the buildings)
     const stepCode = options.stepCodeVersion || STEP_CODE_BUILD;
     const buildingsKey = stepCode ? stepHash('buildings', STEP_CACHE_VERSION, stepCode, terrainFingerprint(exportTerrainData), worldSize, jsonOf(buildingInputs)) : null;
+    // (each tile into the zip as its worker hands it over, compressed in the background; the step keeps only
+    // its name, place and, for the step cache, its compressed bytes: services/zipCompress.js packedOf / putPacked)
+    // (a line under the progress bar for each part, the bar by how long each took on a dense 8 km downtown)
+    const BUILDING_PARTS = {
+      choose: ['Choosing which buildings to build…', 0],
+      tiles: ['Building 3D buildings: {done} of {n} groups…', 0.05],
+      extras: ['Building fountains, pools, fields and stands…', 0.85],
+      pack: ['Putting the building models into the level…', 0.93],
+    };
+    const buildingPart = (key, v = {}) => {
+      const [text, at] = BUILDING_PARTS[key] || [];
+      if (text && currentStep?.phase === 'buildings') report(text.replace(/\{(\w+)\}/g, (_, k) => v[k] ?? ''), at + (key === 'tiles' && v.n ? 0.8 * (v.done / v.n) : 0));
+    };
+    const tileName = (key) => `${base}/map_assets/custom_assets/osm_objects/buildings/bld_${key}.dae`;
+    const onTile = zipCompressor ? (t) => {
+      // (the model text comes as a Blob, which JSZip reads in Node only as bytes: handed over as their promise)
+      const isBlob = typeof Blob !== 'undefined' && t.data instanceof Blob;
+      zip.file(tileName(t.key), isBlob ? t.data.arrayBuffer().then((b) => new Uint8Array(b)) : t.data);
+      if (isBlob) zipEntryBytes.set(tileName(t.key), t.data.size);
+      zipCompressor.add(zip.files[tileName(t.key)]);
+      return { key: t.key, origin: t.origin, handedOver: true };
+    } : null;
     const { value: built, reused: buildingsReused } = await cachedStep(options.stepCache || null, buildingsKey, async () => {
       const stats = { dragGrade };
-      const out = await generateOSMObjectsDAE(exportTerrainData, worldSize, stats, buildingInputs);
-      return out ? { data: out.data || null, tiles: out.tiles || [], report: stats } : { data: null, tiles: [], report: stats };
+      const out = await generateOSMObjectsDAE(exportTerrainData, worldSize, stats, { ...buildingInputs, onTile, onStatus: buildingPart });
+      let tiles = out?.tiles || [];
+      if (onTile && tiles.some((t) => t.handedOver)) {
+        buildingPart('pack');
+        await zipCompressor.drain();
+        tiles = tiles.map((t) => {
+          if (!t.handedOver) return t;
+          const entry = zip.files[tileName(t.key)];
+          const packed = zipCompressor.packedOf(entry);
+          return packed ? { key: t.key, origin: t.origin, packed, inZip: true } : { key: t.key, origin: t.origin, data: entry?._data, inZip: true };
+        });
+      }
+      return out ? { data: out.data || null, tiles, report: stats } : { data: null, tiles: [], report: stats };
     });
     const osm = built;
     Object.assign(buildingReport, built?.report || {});
     if (buildingsReused) { reusedSteps.push('buildings'); console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Buildings reused from the last export (step cache).`); }
     osmDaeBlob = osm?.data || null;
-    buildingTileDaes = osm?.tiles || [];
+    buildingTileDaes = [];
+    for (const t of osm?.tiles || []) {
+      const name = tileName(t.key);
+      // (put in already as it was made; from the step cache: its compressed bytes, or its text)
+      if (!(t.inZip && !buildingsReused && zip.files[name])) {
+        if (t.packed && zipCompressor) { zipCompressor.putPacked(zip, name, t.packed); zipEntryBytes.set(name, t.packed.size); }
+        else if (t.data) { zip.file(name, await toZipBinary(t.data)); zipCompressor?.add(zip.files[name]); }
+      }
+      buildingTileDaes.push({ key: t.key, origin: t.origin });
+    }
     buildingReport.tiles = buildingTileDaes.length;
   } else {
     await yield_();
@@ -14348,6 +14476,22 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const cloudObjects = buildCloudObjects(biome);
 
   beginStep('furniture', 'Placing barriers, fences, road signs, traffic lights, lamps, benches and fuel stations…');
+  // (a line under the progress bar for each part; the bar by how long each took on a dense 8 km downtown)
+  const FURNITURE_PARTS = {
+    barriers: ['Placing barriers, fences and guardrails…', 0],
+    gutters: ['Laying gutters along the curbs…', 0.3],
+    corners: ['Filling the road surface inside rounded curbs…', 0.35],
+    walls: ['Building sidewalk walls and decks…', 0.4],
+    plazas: ['Paving pedestrian squares and courtyards…', 0.45],
+    wingWalls: ['Raising platforms and islands, building wing walls and quay walls…', 0.78],
+    monuments: ['Building monuments…', 0.85],
+    signs: ['Placing road signs…', 0.86],
+    lights: ['Placing street lamps, benches, bus stops and other mapped objects…', 0.97],
+    boats: ['Mooring boats at the piers and marinas…', 0.99],
+  };
+  // (then a moment for the line to reach the window: the export's own process sends it only between steps)
+  const furniturePart = async (key) => { const [text, at] = FURNITURE_PARTS[key] || []; if (text && currentStep?.phase === 'furniture') { report(text, at); await yield_(); } };
+  await furniturePart('barriers');
   await yield_();
   const onDrawnRoad = buildClearanceIndex(groundCarriageways.map((cw) => ({ points: cw.nodes, half: cw.half })));
   const gateWays = gateWaysOf(exportTerrainData, groundCarriageways, squareSize);
@@ -14386,6 +14530,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       });
     }
   }
+  await furniturePart('gutters');
   // gutters along the curbs, broken where a curb is lowered: the game's own
   // gutter1 decal (West Coast USA's settings at half its width; solid
   // concrete read as a pale band on the road)
@@ -14398,6 +14543,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     });
     if (gutters.length) decalRoads.push({ class: 'SimGroup', name: 'gutters', persistentId: generatePersistentId(), __parent: 'Decal_Roads', __items: gutters });
   }
+  await furniturePart('corners');
   // the road inside each rounded curb, in its street's own surface (the two
   // streets' decals leave the corner's triangle of ground bare)
   if (Array.isArray(decalRoads) && sidewalks.corners?.length) {
@@ -14423,9 +14569,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     });
     if (patches.length) decalRoads.push({ class: 'SimGroup', name: 'corner_paving', persistentId: generatePersistentId(), __parent: 'Decal_Roads', __items: patches });
   }
+  await furniturePart('walls');
   // the sidewalks' shape, with the decks on the walls now the walls stand
   const wallDeckMesh = buildWallDeckMesh(sidewalks.wallDecks, barrierObjects.wallTops, { sidewalkLook });
   if (wallDeckMesh) sidewalks.meshes.push(wallDeckMesh);
+  await furniturePart('plazas');
   // pedestrian squares, paved on the terrain as it now lies (plazas.js)
   if (includeRoads) {
     const toW = (p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0);
@@ -14495,6 +14643,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       }
     }
   }
+  await furniturePart('wingWalls');
   // wing walls: the walls a road's fill stands behind beside a bridge's end (structures/wingWalls.js). The terrain
   // there has steep sides by design; bare, they showed as rows of teeth at every raised bridge approach
   if (includeRoads && sg?.classes && sg.profile?.z && Array.isArray(sidewalks.meshes)) {
@@ -14563,6 +14712,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       .map((f) => { const r = f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0)); let x0 = Infinity; let x1 = -Infinity; let y0 = Infinity; let y1 = -Infinity; for (const [x, y] of r) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } return { r, x0, x1, y0, y1 }; });
     return (x, y) => rings.some(({ r, x0, x1, y0, y1 }) => { if (x < x0 || x > x1 || y < y0 || y > y1) return false; let k = false; for (let a2 = 0, b = r.length - 1; a2 < r.length; b = a2++) if (((r[a2][1] > y) !== (r[b][1] > y)) && (x < ((r[b][0] - r[a2][0]) * (y - r[a2][1])) / (r[b][1] - r[a2][1]) + r[a2][0])) k = !k; return k; });
   })();
+  await furniturePart('monuments');
   // obelisks, steles and memorial stones the game has no model for: built (monuments.js); on the ground, not on a
   // drawn road nor inside a building (a memorial stone mapped inside a church)
   if (built('statues') && Array.isArray(sidewalks.meshes)) {
@@ -14588,8 +14738,15 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Monuments: ${Object.entries(by).map(([k, n]) => `${n} ${k}`).join(', ')} built${skipped.road || skipped.building || skipped.water ? `; left out: ${skipped.road} on drawn roads, ${skipped.building} inside buildings, ${skipped.water} in water` : ''}.`);
     }
   }
-  const sidewalkTileDaes = await generateSidewalkTileDAEs(sidewalks.meshes, buildingTileSize(worldSize));
+  const sidewalkTileDaes = [];
+  for (const t of await generateSidewalkTileDAEs(sidewalks.meshes, buildingTileSize(worldSize))) {
+    const name = `${base}/map_assets/custom_assets/sidewalks/sidewalks_${t.key}.dae`;
+    zip.file(name, await toZipBinary(t.data));
+    zipCompressor?.add(zip.files[name]);
+    sidewalkTileDaes.push({ key: t.key, origin: t.origin });
+  }
   const sidewalksDae = sidewalkTileDaes.length > 0;
+  await furniturePart('signs');
   // signs off the drawn roads (onto the verge, the sidewalk or the median)
   // and on the finished ground (settleSigns)
   // (signs switched off in What to build: no speed signs placed along the roads either)
@@ -14631,6 +14788,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   });
   // (none in background areas: lamps along a road that runs on into them)
   keepOutOfBackground(streetFurnitureObjects);
+  await furniturePart('lights');
   // floodlights over the sports fields and racetracks
   const sportsLights = sportsLightObjects(buildingReport.stats?.lightPlan, terrainGroundAt(exportTerrainData, squareSize));
   appendAll(streetFurnitureObjects, sportsLights.objects);
@@ -14646,6 +14804,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       shapeName: shape.shapeFile, useInstanceRenderData: true,
     });
   });
+  await furniturePart('boats');
   // a few boats moored at the piers and in the marinas (services/boats.js)
   if (includeRoads) {
     const toW = (p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0);
@@ -14916,29 +15075,6 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   beginStep('zip', `Assembling the level files (levels/${levelName}/…)…`);
   await yield_();
 
-  const zip = new JSZip();
-  // Entry sizes for the compression progress (JSZip keeps none it exposes).
-  const zipEntryBytes = new Map();
-  const addZipFile = zip.file.bind(zip);
-  const entryDate = zipEntryDate();
-  // Big entries compressed as they come, natively and in the background: a
-  // city's model text (7 GB at 8 km) freed as the export goes on, not all
-  // held for the zip at the end (its memory peak) and compressed then.
-  const zipCompressor = await createZipCompressor(JSZip).catch(() => null);
-  const EAGER_ZIP_BYTES = 1024 * 1024;
-  // (arguments passed on as given: zip.file(name) alone reads an entry)
-  zip.file = (...args) => {
-    let bytes = 0;
-    if (args.length > 1 && typeof args[0] === 'string') {
-      bytes = byteSizeOf(args[1]);
-      zipEntryBytes.set(args[0], bytes);
-      args[2] = { date: entryDate, ...(args[2] || {}) };
-    }
-    const out = addZipFile(...args);
-    if (zipCompressor && bytes >= EAGER_ZIP_BYTES) zipCompressor.add(zip.files[args[0]]);
-    return out;
-  };
-  const base = `levels/${levelName}`;
 
   // Explicit directory entries so BeamNG's FS:directoryExists() works correctly
   zip.folder('levels');
@@ -15356,14 +15492,6 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     'return M',
   ].join('\n') + '\n');
 
-  const toZipBinary = async (value) => {
-    if (!value) return value;
-    if (value instanceof Uint8Array || value instanceof ArrayBuffer) return value;
-    if (typeof value.arrayBuffer === 'function') {
-      return new Uint8Array(await value.arrayBuffer());
-    }
-    return value;
-  };
 
   const previewData = await toZipBinary(previewBlob);
   const terrainBinaryData = await toZipBinary(terBlob);
@@ -15583,7 +15711,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       zip.folder(`${base}/map_assets/custom_assets/osm_objects`);
       if (osmDaeData) zip.file(`${base}/map_assets/custom_assets/osm_objects/osm_objects.dae`, osmDaeData);
       // the buildings, one shape per tile (full + lite detail levels)
-      for (const t of buildingTileDaes) zip.file(`${base}/map_assets/custom_assets/osm_objects/buildings/bld_${t.key}.dae`, await toZipBinary(t.data));
+      // (the building tiles went into the zip as they were made: above, after the buildings step)
       // lit windows at night for every window band (the official map lights one)
       let facadeEmissive = null;
       try {
@@ -15610,7 +15738,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     if (sidewalksDae) {
       zip.folder(`${base}/map_assets/custom_assets/sidewalks`);
       // (one shape per tile: generateSidewalkTileDAEs)
-      for (const t of sidewalkTileDaes) zip.file(`${base}/map_assets/custom_assets/sidewalks/sidewalks_${t.key}.dae`, await toZipBinary(t.data));
+      // (the sidewalk tiles went into the zip as they were made)
     }
     // (with the crosswalks' paint, wanted with or without sidewalks)
     if (sidewalksDae || includeRoads) zip.file(`${base}/map_assets/custom_assets/sidewalks/main.materials.json`, JSON.stringify({ ...getSidewalkMaterialDefs({ look: sidewalkLook }), ...getPlazaMaterialDefs() }, null, 2));

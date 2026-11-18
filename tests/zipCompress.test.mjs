@@ -51,3 +51,24 @@ test('a big entry deflated in pieces unzips to exactly what was added', async ()
   const back = await JSZip.loadAsync(await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' }), { checkCRC32: true });
   assert.equal(await back.file('big.dae').async('string'), text);
 });
+
+// A building tile is compressed as it is made, its compressed bytes kept in the step cache, and put into the next
+// export's zip as they are (packedOf / putPacked): unzipped, byte for byte what it was.
+test('an entry kept compressed and put back unzips as it was', async () => {
+  const { createZipCompressor } = await import('../services/zipCompress.js');
+  const text = 'bld '.repeat(40000);
+  const a = new JSZip();
+  const c = await createZipCompressor(JSZip);
+  assert.ok(c, 'compressor');
+  a.file('t.dae', text);
+  c.add(a.files['t.dae']);
+  await c.drain();
+  const kept = c.packedOf(a.files['t.dae']);
+  assert.ok(kept && kept.packed.length < text.length / 10, 'compressed');
+  assert.equal(kept.size, text.length);
+  const b = new JSZip();
+  c.putPacked(b, 'levels/x/t.dae', kept);
+  const back = await JSZip.loadAsync(await b.generateAsync({ type: 'uint8array' }));
+  assert.equal(await back.file('levels/x/t.dae').async('string'), text);
+  assert.equal(c.packedOf({ _data: 'small' }), null);
+});

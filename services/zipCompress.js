@@ -165,6 +165,20 @@ export async function createZipCompressor(JSZip, { concurrency, inFlightBytes = 
       return idle;
     },
     get count() { return count; },
+    // An entry's compressed bytes once done ({ packed, crc, size }), to keep (a step cache) and put back later
+    // without compressing it again; null while it is not compressed (small entries never are).
+    packedOf(entry) {
+      const d = entry?._data;
+      return isCompressed(d) ? { packed: d.compressedContent, crc: d.crc32, size: d.uncompressedSize } : null;
+    },
+    // A kept entry put into a zip as it was compressed (zip.file with a placeholder, then its bytes).
+    putPacked(zip, name, { packed, crc, size }, options) {
+      zip.file(name, '', options);
+      const entry = zip.files[name];
+      entry._data = make(packed.length, size, crc, DEFLATE, packed);
+      entry._dataBinary = true;
+      return entry;
+    },
     // (called with each entry as it finishes, done or left to JSZip)
     get onDoneHook() { return hook; },
     set onDoneHook(fn) { hook = fn; },

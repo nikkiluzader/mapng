@@ -341,7 +341,8 @@ function spawnRunner(script, dir) {
     // (a bigger young generation: the export's short-lived geometry is swept
     // there cheaply instead of promoted, where each sweep walks gigabytes;
     // a dense 4 km export spent 29% of its time collecting garbage, 19% so)
-    execArgv: [`--max-old-space-size=${heapMB}`, '--max-semi-space-size=64'],
+    // (MAPNG_RUNNER_NODE_ARGS: extra Node options for a developer's measurements, e.g. --cpu-prof; none otherwise)
+    execArgv: [`--max-old-space-size=${heapMB}`, '--max-semi-space-size=64', ...String(process.env.MAPNG_RUNNER_NODE_ARGS || '').split(' ').filter((a) => /^--[\w-]+(=[\w./:-]+)?$/.test(a))],
     // (UV_THREADPOOL_SIZE: native zlib compresses on that many threads, 4 by default)
     env: {
       ...process.env, MAPNG_ASSETS: DIST, MAPNG_API_ORIGIN: API_ORIGIN, MAPNG_VERSION: app.getVersion(),
