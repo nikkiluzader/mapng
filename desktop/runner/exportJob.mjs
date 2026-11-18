@@ -12,7 +12,7 @@ import path from 'node:path';
 import { installBrowserShims, installSourceRecorder } from './browserShims.mjs';
 import { reviveJobValue } from './jobFormat.mjs';
 import { diskStepCache } from './diskStepCache.mjs';
-import { appApiFetch, send, startMemoryReports } from './common.mjs';
+import { appApiFetch, send, startMemoryReports, exitAfterSending } from './common.mjs';
 
 // (MAPNG_ASSETS: set by the app; the repo's public/ when run by hand)
 installBrowserShims({
@@ -84,6 +84,6 @@ async function main() {
 }
 
 main().then(
-  () => process.exit(0),
-  (error) => { send({ type: 'error', message: String(error?.message || error), stack: error?.stack }); process.exit(1); },
+  () => exitAfterSending(0),
+  (error) => { send({ type: 'error', message: String(error?.message || error), stack: error?.stack }); exitAfterSending(1); },
 );

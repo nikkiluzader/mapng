@@ -14,7 +14,7 @@ import { jsonArrayChunks } from '../../services/bigJson.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { installBrowserShims, installSourceRecorder } from './browserShims.mjs';
-import { appApiFetch, cancelSignal, installLocalStorage, send, startMemoryReports } from './common.mjs';
+import { appApiFetch, cancelSignal, installLocalStorage, send, startMemoryReports, exitAfterSending } from './common.mjs';
 import { writeJobValue } from './jobFormat.mjs';
 
 installBrowserShims({
@@ -89,9 +89,9 @@ async function main() {
 }
 
 main().then(
-  () => process.exit(0),
+  () => exitAfterSending(0),
   (error) => {
     send({ type: 'error', message: String(error?.message || error), aborted: error?.name === 'AbortError', stack: error?.stack });
-    process.exit(1);
+    exitAfterSending(1);
   },
 );

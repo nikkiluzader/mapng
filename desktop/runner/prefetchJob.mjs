@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { installBrowserShims, installSourceRecorder } from './browserShims.mjs';
 import { reviveJobValue } from './jobFormat.mjs';
-import { appApiFetch, send } from './common.mjs';
+import { appApiFetch, send, exitAfterSending } from './common.mjs';
 
 installBrowserShims({
   assetsDir: path.resolve(process.env.MAPNG_ASSETS || new URL('../../public', import.meta.url).pathname),
@@ -35,6 +35,6 @@ async function main() {
 }
 
 main().then(
-  () => process.exit(0),
-  (error) => { send({ type: 'error', message: String(error?.message || error), stack: error?.stack }); process.exit(1); },
+  () => exitAfterSending(0),
+  (error) => { send({ type: 'error', message: String(error?.message || error), stack: error?.stack }); exitAfterSending(1); },
 );

@@ -4,6 +4,16 @@ import v8 from 'node:v8';
 
 export const send = (msg) => (process.send ? process.send(msg) : console.log(JSON.stringify(msg)));
 
+// Exit once every message sent so far has reached the app: process.send only queues it, and an exit straight after
+// can leave the last one unsent. The download step's 'done' was lost that way, nearly every time: the app took the
+// clean exit for a failure and the export downloaded everything again (a city: 30-40 s twice over).
+// (a last message with a callback: the channel delivers in order, so it is sent once all before it are)
+export function exitAfterSending(code) {
+  if (!process.send || !process.connected) process.exit(code);
+  setTimeout(() => process.exit(code), 5000).unref();
+  process.send({ type: 'flush' }, () => process.exit(code));
+}
+
 // A request that fails after nobody waits for it any more: a browser tab notes it and goes on, Node stops the
 // whole process (code 1). The 3DEP survey files are read in slices (geotiff); when the USGS servers drop a
 // connection, one slice's failure can arrive after the read it belonged to has already given up, and an 8 km
@@ -11,6 +21,21 @@ export const send = (msg) => (process.send ? process.send(msg) : console.log(JSO
 process.on('unhandledRejection', (reason) => {
   console.warn('[Runner] A request failed after its result was no longer awaited; carrying on:', reason?.message || reason);
 });
+
+// MAPNG_ALLOC_PROFILE=<dir>: a developer's measurement of where the job allocates, garbage included (Node's own
+// --heap-prof keeps only what is still alive at exit). Off unless set; written as <dir>/<pid>.heapprofile on exit.
+if (process.env.MAPNG_ALLOC_PROFILE) {
+  const dir = process.env.MAPNG_ALLOC_PROFILE;
+  const { Session } = await import('node:inspector');
+  const fs = await import('node:fs');
+  const session = new Session(); session.connect();
+  session.post('HeapProfiler.startSampling', { samplingInterval: 256 * 1024, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true });
+  process.on('exit', () => {
+    session.post('HeapProfiler.stopSampling', (err, res) => {
+      if (!err && res?.profile) { fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(`${dir}/${process.pid}.heapprofile`, JSON.stringify(res.profile)); }
+    });
+  });
+}
 
 /** This process's memory and busy cores to the app, each second. */
 export function startMemoryReports() {
