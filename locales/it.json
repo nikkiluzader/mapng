@@ -2269,7 +2269,8 @@
     "assemble": "Assemblaggio dei file del livello (levels/{name}/…)",
     "compressStart": "Compressione di {n} file ({size}) nello ZIP del livello",
     "compress": "Compressione dello ZIP del livello ({size}, {n} file)",
-    "compressFile": "Compressione dello ZIP del livello ({size}, {n} file): {file}"
+    "compressFile": "Compressione dello ZIP del livello ({size}, {n} file): {file}",
+    "dataFinishingOthers": "Completamento degli altri download (dintorni, acque attorno alla mappa)"
   },
   "net": {
     "live": "In diretta",

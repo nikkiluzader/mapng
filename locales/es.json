@@ -2269,7 +2269,8 @@
     "assemble": "Montando los archivos del nivel (levels/{name}/…)",
     "compressStart": "Comprimiendo {n} archivos ({size}) en el ZIP del nivel",
     "compress": "Comprimiendo el ZIP del nivel ({size}, {n} archivos)",
-    "compressFile": "Comprimiendo el ZIP del nivel ({size}, {n} archivos): {file}"
+    "compressFile": "Comprimiendo el ZIP del nivel ({size}, {n} archivos): {file}",
+    "dataFinishingOthers": "Terminando las otras descargas (alrededores, agua alrededor del mapa)"
   },
   "net": {
     "live": "En vivo",

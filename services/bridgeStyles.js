@@ -17,6 +17,7 @@
 // Every member stands outside the drawn lanes (the deck edge + the parapet + SIDE_GAP_M) or above the
 // headroom: nothing in a car's way. The deck's piers inside a styled span are left out (it spans them).
 // Pure geometry: in world metres, Z up; nothing here knows about any place.
+import { fastHypot } from './fastMath.js';
 
 const SPAN_CLEAR_M = 2.5;     // a span: the deck this far over its ground ...
 const MIN_RUN_M = 24;         // ... for at least this long (a truss's; arches spring lower and shorter)
@@ -80,7 +81,7 @@ export function typeOfTags({ structure, bridgeKind } = {}) {
 
 // ── geometry helpers ──────────────────────────────────────────────────────────
 
-const arcs = (xy) => { const s = [0]; for (let i = 1; i < xy.length; i++) s.push(s[i - 1] + Math.hypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1])); return s; };
+const arcs = (xy) => { const s = [0]; for (let i = 1; i < xy.length; i++) s.push(s[i - 1] + fastHypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1])); return s; };
 
 /** A part's point at arc length s, offset `off` to the left (negative: right): [x, y, z]. */
 function along(part, s, off = 0, sArr = arcs(part.xy)) {
@@ -115,7 +116,7 @@ export function beam(b, p, q, w, h, across = null) {
   const u = d.map((v) => v / L);
   // across: horizontal, perpendicular to the beam (a vertical beam: along x)
   let a = [-u[1], u[0], 0];
-  const al = Math.hypot(a[0], a[1]);
+  const al = fastHypot(a[0], a[1]);
   // (a vertical beam faces `across` when given, else x: a leg turned like the leaning leg it meets)
   a = al < 1e-6 ? (across ? [across[0], across[1], 0] : [1, 0, 0]) : [a[0] / al, a[1] / al, 0];
   // up: perpendicular to both
@@ -176,11 +177,26 @@ export function styleDecks(decks, { outlines = [], groundAt }) {
   }
   const parts = [];
   decks.forEach((deck, di) => deck.parts.forEach((part, pi) => parts.push({ deck, di, pi, part })));
+  // (each ring's box once; a part's points counted inside a ring only where the boxes meet: with none of its
+  // points in the box, none is in the ring. A city's 2500 parts tested every point against every outline)
+  const ringBox = new Map(outlines.map((o) => {
+    let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
+    for (const [x, y] of o.ring || []) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    return [o, [x0, y0, x1, y1]];
+  }));
+  const countIn = (xy, o, pb) => {
+    const b = ringBox.get(o);
+    if (pb[0] > b[2] || pb[2] < b[0] || pb[1] > b[3] || pb[3] < b[1]) return 0;
+    let k = 0; for (const [x, y] of xy) if (inRing(x, y, o.ring)) k++;
+    return k;
+  };
   for (const p of parts) {
     let type = typeOfTags(p.part); let source = type ? 'road tags' : null;
     let paint = p.part.paint || ''; let material = '';
+    const pb = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const [x, y] of p.part.xy) { if (x < pb[0]) pb[0] = x; if (x > pb[2]) pb[2] = x; if (y < pb[1]) pb[1] = y; if (y > pb[3]) pb[3] = y; }
     for (const o of outlines) {
-      const inside = p.part.xy.filter(([x, y]) => inRing(x, y, o.ring)).length;
+      const inside = countIn(p.part.xy, o, pb);
       if (inside < PART_IN_OUTLINE * p.part.xy.length) continue;
       const t = typeOfTags({ structure: o.tags['bridge:structure'], bridgeKind: o.tags.bridge });
       if (t && !type) { type = t; source = 'bridge outline'; }
@@ -195,13 +211,13 @@ export function styleDecks(decks, { outlines = [], groundAt }) {
     const n = p.part.xy.length;
     const within = type ? outlines.filter((o) => {
       if (typeOfTags({ structure: o.tags['bridge:structure'], bridgeKind: o.tags.bridge }) !== type) return false;
-      const k = p.part.xy.filter(([x, y]) => inRing(x, y, o.ring)).length;
+      const k = countIn(p.part.xy, o, pb);
       return k > 0 && k < 0.9 * n;
     }) : [];
     Object.assign(p, { type, source, paint, material, others, within });
   }
   // twins: an untyped part running alongside a typed one takes its type
-  const dirOf = (xy) => { const a = xy[0]; const b = xy[xy.length - 1]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; };
+  const dirOf = (xy) => { const a = xy[0]; const b = xy[xy.length - 1]; const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1; return [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; };
   const typed = parts.filter((p) => p.type);
   for (const p of parts) {
     if (p.type) continue;
@@ -217,7 +233,7 @@ export function styleDecks(decks, { outlines = [], groundAt }) {
       let near = 0;
       for (const [x, y] of p.part.xy) {
         let best = Infinity;
-        for (const [u, v] of q.part.xy) best = Math.min(best, Math.hypot(u - x, v - y));
+        for (const [u, v] of q.part.xy) best = Math.min(best, fastHypot(u - x, v - y));
         if (best <= CORRIDOR_M) near++;
       }
       if (near < PART_IN_OUTLINE * p.part.xy.length) continue;
@@ -274,7 +290,7 @@ export function inStyledSpan(deck, pi, x, y) {
     const [ax, ay] = part.xy[i]; const [bx, by] = part.xy[i + 1];
     const vx = bx - ax; const vy = by - ay; const L2 = vx * vx + vy * vy || 1;
     const t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / L2));
-    const d = Math.hypot(ax + vx * t - x, ay + vy * t - y);
+    const d = fastHypot(ax + vx * t - x, ay + vy * t - y);
     if (d < best) { best = d; at = s[i] + t * Math.sqrt(L2); }
   }
   return deck.style.spans.some((sp) => sp.part === pi && at > sp.s0 + 1 && at < sp.s1 - 1);
@@ -360,7 +376,7 @@ function carriesOn(a, b, fwd) {
   const head = (xy, fromEnd) => {
     const pts = fromEnd ? [...xy].reverse() : xy;
     let k = 1; let L = 0;
-    for (; k < pts.length - 1 && L < 30; k++) L += Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]);
+    for (; k < pts.length - 1 && L < 30; k++) L += fastHypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]);
     const d = [pts[0][0] - pts[k][0], pts[0][1] - pts[k][1]]; const n = Math.hypot(...d) || 1;
     return [d[0] / n, d[1] / n];   // pointing at the joint
   };
@@ -374,7 +390,7 @@ const STRAIGHT_DEV = 0.02; const STRAIGHT_MIN_M = 6;
 function straightRun(part, sArr, sp) {
   const L = sp.s1 - sp.s0;
   const a = along(part, sp.s0, 0, sArr); const c = along(part, sp.s1, 0, sArr);
-  const ux = c[0] - a[0]; const uy = c[1] - a[1]; const ul = Math.hypot(ux, uy) || 1;
+  const ux = c[0] - a[0]; const uy = c[1] - a[1]; const ul = fastHypot(ux, uy) || 1;
   let dev = 0;
   for (let k = 1; k < 16; k++) { const p = along(part, sp.s0 + (L * k) / 16, 0, sArr); dev = Math.max(dev, Math.abs(((p[0] - a[0]) * uy - (p[1] - a[1]) * ux) / ul)); }
   return dev <= Math.max(STRAIGHT_MIN_M, STRAIGHT_DEV * L);
@@ -389,7 +405,7 @@ function straightRun(part, sArr, sp) {
 function archRuns(deck, st) {
   if (st.type !== 'arch') return st.spans;
   const end = (p, last) => p.xy[last ? p.xy.length - 1 : 0];
-  const near = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) < 1;
+  const near = (a, b) => fastHypot(a[0] - b[0], a[1] - b[1]) < 1;
   const info = st.spans.map((sp) => { const part = deck.parts[sp.part]; const L = arcs(part.xy).at(-1); return { sp, part, L, atStart: sp.s0 < 1, atEnd: sp.s1 > L - 1 }; });
   const used = new Set(); const out = [];
   for (const a of info) {
@@ -464,7 +480,7 @@ function archPier(b, part, sArr, s, groundAt, depth, stone) {
   if (top - g < 1) return;
   const half = part.half + PARAPET_W_M;
   const a = along(part, s - 0.01, 0, sArr); const c = along(part, s + 0.01, 0, sArr);
-  const ul = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1; const u = [(c[0] - a[0]) / ul, (c[1] - a[1]) / ul];
+  const ul = fastHypot(c[0] - a[0], c[1] - a[1]) || 1; const u = [(c[0] - a[0]) / ul, (c[1] - a[1]) / ul];
   const t = stone ? 1.4 : 1.1;
   // along the road: the pier's thickness; across: the deck's width, pointed at both faces
   const n = [-u[1], u[0]];
@@ -571,7 +587,7 @@ function deckArch(b, part, sArr, sp, L, groundAt, depth, stone) {
         const t0 = i / m; const t1 = (i + 1) / m;
         const a = rows[k][i]; const c = rows[k][i + 1];
         const ta = along(part, sp.s0 + L * t0, o, sArr); const tc = along(part, sp.s0 + L * t1, o, sArr);
-        const want = (() => { const p = along(part, sp.s0 + L * t0, 0, sArr); const d = [a[0] - p[0], a[1] - p[1], 0]; const l = Math.hypot(d[0], d[1]) || 1; return [d[0] / l, d[1] / l, 0]; })();
+        const want = (() => { const p = along(part, sp.s0 + L * t0, 0, sArr); const d = [a[0] - p[0], a[1] - p[1], 0]; const l = fastHypot(d[0], d[1]) || 1; return [d[0] / l, d[1] / l, 0]; })();
         b.quad(a, c, [tc[0], tc[1], tc[2] - 0.05], [ta[0], ta[1], ta[2] - 0.05], want);
       }
     }
@@ -614,7 +630,7 @@ function movableSpan(out, part, m, groundAt, depth) {
   const pier = (s, lenM, across) => {
     const c = along(part, s, 0, sArr);
     const a = along(part, Math.max(0, s - 0.5), 0, sArr); const b = along(part, Math.min(sArr.at(-1), s + 0.5), 0, sArr);
-    const ul = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; const u = [(b[0] - a[0]) / ul, (b[1] - a[1]) / ul]; const n = [-u[1], u[0]];
+    const ul = fastHypot(b[0] - a[0], b[1] - a[1]) || 1; const u = [(b[0] - a[0]) / ul, (b[1] - a[1]) / ul]; const n = [-u[1], u[0]];
     const top = c[2] - MOVABLE_PIER_TOP_M;
     const P = (sa, sc) => [c[0] + u[0] * sa * lenM / 2 + n[0] * sc * across, c[1] + u[1] * sa * lenM / 2 + n[1] * sc * across];
     const ring = [P(-1, -1), P(1, -1), P(1, 1), P(-1, 1)];
@@ -665,7 +681,7 @@ export function linkArchCrossings(decks, { groundAt }) {
       if (steel) {
         run.pts = Array.from({ length: 9 }, (_, k) => along(part, sp.s0 + (L * k) / 8, 0, sArr));
         run.z = run.pts.reduce((t, p) => t + p[2], 0) / run.pts.length;
-        const a = run.pts[0]; const c = run.pts[8]; const ul = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1;
+        const a = run.pts[0]; const c = run.pts[8]; const ul = fastHypot(c[0] - a[0], c[1] - a[1]) || 1;
         run.dir = [(c[0] - a[0]) / ul, (c[1] - a[1]) / ul];
         runs.push(run);
       }
@@ -680,7 +696,7 @@ export function linkArchCrossings(decks, { groundAt }) {
       const s = nearestS(a.part, a.sArr, x, y);
       if (s < a.sp.s0 - 5 || s > a.sp.s1 + 5) continue;
       const q = along(a.part, s, 0, a.sArr);
-      if (Math.hypot(q[0] - x, q[1] - y) <= CORRIDOR_M) n++;
+      if (fastHypot(q[0] - x, q[1] - y) <= CORRIDOR_M) n++;
     }
     return n >= ARCH_TWIN_SHARE * b.pts.length;
   };
@@ -710,7 +726,7 @@ export function linkArchCrossings(decks, { groundAt }) {
         const s = nearestS(lead.part, lead.sArr, p[0], p[1]);
         if (s < lead.sp.s0 || s > lead.sp.s1) continue;
         const P = along(lead.part, s, 0, lead.sArr); const Q = along(lead.part, Math.min(lead.sArr.at(-1), s + 1), 0, lead.sArr);
-        const ul = Math.hypot(Q[0] - P[0], Q[1] - P[1]) || 1;
+        const ul = fastHypot(Q[0] - P[0], Q[1] - P[1]) || 1;
         const d = ((p[0] - P[0]) * -(Q[1] - P[1]) + (p[1] - P[1]) * (Q[0] - P[0])) / ul;   // + left
         if (d + roff > left) { left = Math.min(ARCH_TWIN_MAX_M, d + roff); drop[0].push(p[2] - P[2]); }
         if (-d + roff > right) { right = Math.min(ARCH_TWIN_MAX_M, -d + roff); drop[1].push(p[2] - P[2]); }
@@ -763,7 +779,7 @@ const TWIN_HALF_SHARE = 0.7;
 export function linkCrossings(decks, { roads = [] } = {}) {
   const cs = decks.filter((d) => d.style && (d.style.type === 'cable' || d.style.type === 'suspension'));
   const longest = (d) => Math.max(...d.style.spans.map((sp) => sp.s1 - sp.s0));
-  const near = (a, b) => a.parts.some((p) => p.xy.some(([x, y]) => b.parts.some((q) => q.xy.some(([u, v]) => Math.hypot(u - x, v - y) < CROSSING_M))));
+  const near = (a, b) => a.parts.some((p) => p.xy.some(([x, y]) => b.parts.some((q) => q.xy.some(([u, v]) => fastHypot(u - x, v - y) < CROSSING_M))));
   const groups = [];
   for (const d of cs) {
     const g = groups.find((gr) => gr[0].style.type === d.style.type && gr.some((o) => near(o, d)));
@@ -802,7 +818,7 @@ function nearestS(part, sArr, x, y) {
     const [ax, ay] = part.xy[i]; const [bx, by] = part.xy[i + 1];
     const vx = bx - ax; const vy = by - ay; const L2 = vx * vx + vy * vy || 1;
     const t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / L2));
-    const d = Math.hypot(ax + vx * t - x, ay + vy * t - y);
+    const d = fastHypot(ax + vx * t - x, ay + vy * t - y);
     if (d < best) { best = d; at = sArr[i] + t * Math.sqrt(L2); }
   }
   return at;
@@ -833,7 +849,7 @@ function outerEdgeLat(crossing, lead, s, side) {
 function leadEdges(crossing, lead, s) {
   const P = along(lead.part, s, 0, lead.sArr);
   const Q = along(lead.part, Math.min(lead.sArr.at(-1), s + 1), 0, lead.sArr);
-  const ul = Math.hypot(Q[0] - P[0], Q[1] - P[1]) || 1;
+  const ul = fastHypot(Q[0] - P[0], Q[1] - P[1]) || 1;
   const n = [-(Q[1] - P[1]) / ul, (Q[0] - P[0]) / ul];
   const edgeOf = (side) => sideHalf(lead.part, lead.sArr, s, side > 0 ? 0 : 1) + PARAPET_W_M;
   // along the line across the lead deck here: where another deck or a ground road lies (with its height,
@@ -907,7 +923,7 @@ function invertedY(b, feet, kneeZ, P, n, zDeck, H, groundAt, strutClear = () => 
     const ring = [c(-1, -1), c(1, -1), c(1, 1), c(-1, 1)];
     for (let i = 0; i < 4; i++) {
       const p0 = ring[i]; const p1 = ring[(i + 1) % 4];
-      const mx = (p0[0] + p1[0]) / 2 - P[0]; const my = (p0[1] + p1[1]) / 2 - P[1]; const ml = Math.hypot(mx, my) || 1;
+      const mx = (p0[0] + p1[0]) / 2 - P[0]; const my = (p0[1] + p1[1]) / 2 - P[1]; const ml = fastHypot(mx, my) || 1;
       b.tri(p0, p1, apex, [mx / ml, my / ml, 0.5]);
     }
   }
@@ -922,7 +938,7 @@ function invertedY(b, feet, kneeZ, P, n, zDeck, H, groundAt, strutClear = () => 
   // the height where leg k has come in over a lateral `lat` from the centre (its stays leave it no lower:
   // further out, over a neighbouring deck, they would cross its lanes)
   const overLat = (k, lat) => {
-    const footLat = Math.hypot(feet[k][0] - P[0], feet[k][1] - P[1]);
+    const footLat = fastHypot(feet[k][0] - P[0], feet[k][1] - P[1]);
     return footLat <= lat ? kneeZ[k] : kneeZ[k] + (1 - lat / footLat) * (zJ - kneeZ[k]);
   };
   return { anchor, overLat, zJ, top };
@@ -944,7 +960,7 @@ function obstacleAt(obstacles, x, y) {
       const vx = bx - ax; const vy = by - ay; const L2 = vx * vx + vy * vy || 1;
       const t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / L2));
       const r = (o.halfs ? o.halfs[i] + (o.halfs[i + 1] - o.halfs[i]) * t : o.half) + PARAPET_W_M + 0.3;
-      if (Math.hypot(ax + vx * t - x, ay + vy * t - y) > r) continue;
+      if (fastHypot(ax + vx * t - x, ay + vy * t - y) > r) continue;
       const z = o.z ? o.z[i] + (o.z[i + 1] - o.z[i]) * t : null;
       if (!hit || (z ?? -Infinity) > (hit.z ?? -Infinity)) hit = { z, twin: !!o.twin };
     }
@@ -1038,7 +1054,7 @@ function suspensionCrossing(towerB, cableB, deck, groundAt) {
     for (let i = 0; i < n; i++) beam(cableB, pts[i], pts[i + 1], CABLE[0], CABLE[1]);
     for (const [top, sEnd] of [[A, sp.s0], [B, sp.s1]]) {
       const e = foot(sEnd);
-      if (Math.hypot(e[0] - top[0], e[1] - top[1]) > 6) beam(cableB, top, e, CABLE[0], CABLE[1]);
+      if (fastHypot(e[0] - top[0], e[1] - top[1]) > 6) beam(cableB, top, e, CABLE[0], CABLE[1]);
     }
   }
 }

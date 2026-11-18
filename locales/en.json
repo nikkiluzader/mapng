@@ -2269,7 +2269,8 @@
     "assemble": "Assembling the level files (levels/{name}/…)",
     "compressStart": "Compressing {n} files ({size}) into the level ZIP",
     "compress": "Compressing the level ZIP ({size}, {n} files)",
-    "compressFile": "Compressing the level ZIP ({size}, {n} files): {file}"
+    "compressFile": "Compressing the level ZIP ({size}, {n} files): {file}",
+    "dataFinishingOthers": "Finishing the other downloads (surroundings, water round the map)"
   },
   "net": {
     "live": "Live",

@@ -2269,7 +2269,8 @@
     "assemble": "Składanie plików poziomu (levels/{name}/…)",
     "compressStart": "Kompresowanie plików ({n}, {size}) do ZIP poziomu",
     "compress": "Kompresowanie ZIP poziomu ({size}, plików: {n})",
-    "compressFile": "Kompresowanie ZIP poziomu ({size}, plików: {n}): {file}"
+    "compressFile": "Kompresowanie ZIP poziomu ({size}, plików: {n}): {file}",
+    "dataFinishingOthers": "Kończenie pozostałych pobrań (otoczenie, wody wokół mapy)"
   },
   "net": {
     "live": "Na żywo",

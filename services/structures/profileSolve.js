@@ -1,5 +1,6 @@
 import { findSideArms, findThroughJunctions, sideArmFromEnd, sideArmStation, throughSurface } from './sideArms.js';
 import { RAIL_GRADE_CEILING, RAIL_GRADE_LIMIT, RAIL_GROUND_BAND_M, railKindOfClass } from '../railways.js';
+import { fastHypot } from '../fastMath.js';
 
 // Structure solver, stage C: the vertical profile of every road at once
 // (refs/output/bridge-tunnel-plan.md).
@@ -259,12 +260,36 @@ const structureFor = (graph) => (e) => !!(e.bridge || (e.tunnel && (e.external |
 // Whether a bridge or tunnel joins edge k at its first / last point, and the stretches of it (from, to along
 // the edge) where it crosses another road at another level or runs over water: there too the surveyed ground is a
 // structure's, cut away or built up.
+// (each edge's crossing sides and water runs, gathered once per crossings list in their order: every edge
+// had looked through all of a city's crossings, and made a pair for each)
+const endsByEdge = new WeakMap();
+function crossingSidesOf(graph) {
+  const key = graph.crossings || graph;
+  let by = endsByEdge.get(key);
+  if (!by) {
+    by = { sides: new Map(), water: new Map() };
+    for (const c of graph.crossings?.crossings || []) {
+      for (const side of [c.a, c.b]) {
+        if (!side) continue;
+        if (!by.sides.has(side.edge)) by.sides.set(side.edge, []);
+        by.sides.get(side.edge).push(side);
+      }
+    }
+    for (const run of graph.crossings?.water || []) {
+      if (!by.water.has(run.edge)) by.water.set(run.edge, []);
+      by.water.get(run.edge).push(run);
+    }
+    endsByEdge.set(key, by);
+  }
+  return by;
+}
 function structureEnds(graph, k) {
   const asStructure = structureFor(graph); const e = graph.edges[k];
   const at = (id) => (graph.nodes.get(id)?.edges || []).some(({ edge }) => edge !== k && asStructure(graph.edges[edge]));
   const near = [];
-  for (const c of graph.crossings?.crossings || []) for (const side of [c.a, c.b]) if (side?.edge === k && Number.isFinite(e.s[side.i])) near.push([e.s[side.i], e.s[Math.min(side.i + 1, e.s.length - 1)]]);
-  for (const run of graph.crossings?.water || []) if (run.edge === k) near.push([e.s[run.i0], e.s[run.i1]]);
+  const by = crossingSidesOf(graph);
+  for (const side of by.sides.get(k) || []) if (Number.isFinite(e.s[side.i])) near.push([e.s[side.i], e.s[Math.min(side.i + 1, e.s.length - 1)]]);
+  for (const run of by.water.get(k) || []) near.push([e.s[run.i0], e.s[run.i1]]);
   return [at(e.from), at(e.to), near];
 }
 
@@ -464,8 +489,8 @@ export function* solveProfilesSteps(graph) {
         for (let ka = 1; ka < nA; ka++) {
           const xa = A.x[iA(ka)]; const ya = A.y[iA(ka)];
           // (B's nearest station, walking out with A)
-          while (kb + 1 < nB && Math.hypot(B.x[iB(kb + 1)] - xa, B.y[iB(kb + 1)] - ya) <= Math.hypot(B.x[iB(kb)] - xa, B.y[iB(kb)] - ya)) kb++;
-          const d = Math.hypot(B.x[iB(kb)] - xa, B.y[iB(kb)] - ya);
+          while (kb + 1 < nB && fastHypot(B.x[iB(kb + 1)] - xa, B.y[iB(kb + 1)] - ya) <= fastHypot(B.x[iB(kb)] - xa, B.y[iB(kb)] - ya)) kb++;
+          const d = fastHypot(B.x[iB(kb)] - xa, B.y[iB(kb)] - ya);
           if (d >= reach || kb === 0) { if (d >= reach) break; continue; }
           links.push(off[decks[a].edge] + iA(ka), off[decks[b].edge] + iB(kb), FORK_FALL * d + 0.02);
           // the minor road (a ramp) follows the main one, never the main
@@ -734,7 +759,7 @@ function tieTwinDecks(edges, Z, off, pinned, held, L, U, crossings = []) {
     });
     for (let i = 0; i < n; i++) {
       const ia = Math.min(i, n - 2);
-      const ux = ea.x[ia + 1] - ea.x[ia]; const uy = ea.y[ia + 1] - ea.y[ia]; const ul = Math.hypot(ux, uy) || 1;
+      const ux = ea.x[ia + 1] - ea.x[ia]; const uy = ea.y[ia + 1] - ea.y[ia]; const ul = fastHypot(ux, uy) || 1;
       for (const b of near) {
         const eb = edges[b];
         if ((eb.layer || 0) !== (ea.layer || 0)) continue;
@@ -748,7 +773,7 @@ function tieTwinDecks(edges, Z, off, pinned, held, L, U, crossings = []) {
           const vx = eb.x[j + 1] - eb.x[j]; const vy = eb.y[j + 1] - eb.y[j]; const L2 = vx * vx + vy * vy || 1e-9;
           const t = ((ea.x[i] - eb.x[j]) * vx + (ea.y[i] - eb.y[j]) * vy) / L2;
           if (t < 0 || t > 1) continue;
-          const d = Math.hypot(eb.x[j] + vx * t - ea.x[i], eb.y[j] + vy * t - ea.y[i]);
+          const d = fastHypot(eb.x[j] + vx * t - ea.x[i], eb.y[j] + vy * t - ea.y[i]);
           if (!best || d < best.d) best = { d, j, t, cos: Math.abs((ux * vx + uy * vy) / (ul * Math.sqrt(L2))) };
         }
         if (!best || best.cos < TWIN_COS || best.d > ea.half + eb.half + TWIN_GAP_M || best.d < 0.5 * (ea.half + eb.half)) continue;
@@ -823,7 +848,7 @@ function verticalCurves(graph, Z, L, U, off, pinned, held) {
     const e = edges[edge]; const n = e.s.length; const i0 = end === 0 ? 0 : n - 1;
     let i = i0; while (i >= 0 && i < n && Math.abs(e.s[i] - e.s[i0]) < 8) i += end === 0 ? 1 : -1;
     i = Math.max(0, Math.min(n - 1, i));
-    const dx = e.x[i] - e.x[i0]; const dy = e.y[i] - e.y[i0]; const l = Math.hypot(dx, dy) || 1;
+    const dx = e.x[i] - e.x[i0]; const dy = e.y[i] - e.y[i0]; const l = fastHypot(dx, dy) || 1;
     return [dx / l, dy / l];
   };
   const hermite = (z0, m0, z1, m1, len, d) => {

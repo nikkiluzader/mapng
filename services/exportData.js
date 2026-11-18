@@ -58,30 +58,35 @@ export async function downloadExportData(terrainData, options = {}, { onProgress
   let done = 0;
   const step = (text, f) => onProgress?.(text, (done + Math.max(0, Math.min(1, f || 0))) / parts);
   const out = { backdrop: false, lidar: null, surroundWater: null };
-  if (needs.backdrop) {
-    step('Downloading the surroundings (elevation and satellite, 8 tiles)…', 0);
-    await fetchSurroundings(td, (text) => step(`Surroundings: ${String(text).replace(/\.\.\.$/, '…')}`, 0), {
+  // The three downloads need nothing from each other: all at once, the step as long as the slowest (one after
+  // another, a city's took 70 s more than its bridge heights alone). One line under the bar: the bridge heights'
+  // when they are read (the longest), the surroundings' otherwise; the rest run beside it.
+  const lineOf = needs.lidar ? 'lidar' : needs.backdrop ? 'backdrop' : 'water';
+  const say = (who, text, f) => { if (who === lineOf) step(text, f); };
+  const backdropRun = needs.backdrop ? (async () => {
+    say('backdrop', 'Downloading the surroundings (elevation and satellite, 8 tiles)…', 0);
+    await fetchSurroundings(td, (text) => say('backdrop', `Surroundings: ${String(text).replace(/\.\.\.$/, '…')}`, 0), {
       ...BACKDROP_FETCH,
       ...needs.backdrop.imagery,
       elevationSource: needs.backdrop.source,
       gpxzApiKey: needs.backdrop.gpxz,
-      onDownloadProgress: ({ completedTotal, total }) => { if (total > 0) step('Downloading the surroundings…', completedTotal / total); },
+      onDownloadProgress: ({ completedTotal, total }) => { if (total > 0) say('backdrop', 'Downloading the surroundings…', completedTotal / total); },
     });
     out.backdrop = true;
     done++;
-  }
-  if (needs.lidar) {
-    step('Reading measured bridge heights (US lidar survey)…', 0);
+  })() : null;
+  const lidarRun = needs.lidar ? (async () => {
+    say('lidar', 'Reading measured bridge heights (US lidar survey)…', 0);
     try {
-      const r = await prefetchLidarDecks(td, squareSize, { lidarProvider }, (k, n) => step(`Bridge heights (US lidar): node ${k + 1} of ${n}…`, n ? k / n : 0));
+      const r = await prefetchLidarDecks(td, squareSize, { lidarProvider }, (k, n) => say('lidar', `Bridge heights (US lidar): node ${k + 1} of ${n}…`, n ? k / n : 0));
       out.lidar = r?.skipped ? { skipped: r.skipped } : { dataset: r.dataset, nodes: r.nodes, bytes: r.bytes };
     } catch (err) {
       out.lidar = { skipped: String(err?.message || err) };
     }
     done++;
-  }
-  if (needs.water) {
-    step('Downloading the lakes and rivers round the map…', 0);
+  })() : null;
+  const waterRun = needs.water ? (async () => {
+    say('water', 'Downloading the lakes and rivers round the map…', 0);
     try {
       out.surroundWater = await fetchOsmWater(backdropBounds(td.bounds));
     } catch (err) {
@@ -89,7 +94,15 @@ export async function downloadExportData(terrainData, options = {}, { onProgress
       out.surroundWater = null;
     }
     done++;
+  })() : null;
+  // (the line's own download done first, the others still going: said so)
+  const lineRun = { lidar: lidarRun, backdrop: backdropRun, water: waterRun }[lineOf];
+  if (lineRun) {
+    await lineRun;
+    const rest = [backdropRun, lidarRun, waterRun].filter((r) => r && r !== lineRun);
+    if (rest.length) { step('Finishing the other downloads (surroundings, water round the map)…', 0); await Promise.all(rest); }
   }
+  await Promise.all([backdropRun, lidarRun, waterRun].filter(Boolean));
   onProgress?.('Downloads ready', 1);
   return out;
 }

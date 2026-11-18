@@ -2269,7 +2269,8 @@
     "assemble": "Die Level-Dateien werden zusammengestellt (levels/{name}/…)",
     "compressStart": "{n} Dateien ({size}) werden in die Level-ZIP komprimiert",
     "compress": "Die Level-ZIP wird komprimiert ({size}, {n} Dateien)",
-    "compressFile": "Die Level-ZIP wird komprimiert ({size}, {n} Dateien): {file}"
+    "compressFile": "Die Level-ZIP wird komprimiert ({size}, {n} Dateien): {file}",
+    "dataFinishingOthers": "Restliche Downloads abschließen (Umgebung, Gewässer rund um die Karte)"
   },
   "net": {
     "live": "Live",

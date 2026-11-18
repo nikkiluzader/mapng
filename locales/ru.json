@@ -2269,7 +2269,8 @@
     "assemble": "Сборка файлов уровня (levels/{name}/…)",
     "compressStart": "Сжатие файлов ({n}, {size}) в ZIP уровня",
     "compress": "Сжатие ZIP уровня ({size}, файлов: {n})",
-    "compressFile": "Сжатие ZIP уровня ({size}, файлов: {n}): {file}"
+    "compressFile": "Сжатие ZIP уровня ({size}, файлов: {n}): {file}",
+    "dataFinishingOthers": "Завершение остальных загрузок (окрестности, вода вокруг карты)"
   },
   "net": {
     "live": "В реальном времени",
