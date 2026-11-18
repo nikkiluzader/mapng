@@ -14,7 +14,7 @@ import { WING_FILL_M } from './wingWalls.js';
 import { seatable } from './profileSolve.js';
 import { fastHypot } from '../fastMath.js';
 
-const TILE = 64;
+export const TILE = 64;
 const SHOULDER_M = 1;          // flat past the paved half width before the slope
 const GROUND_BLEND_M = 4;      // a road at ground level blends back over this far
 const RACEWAY_BANK_MAX = 0.62;  // steepest banking kept (32 degrees: past any real oval's)
@@ -83,6 +83,11 @@ function capsuleSpan(ax, ay, bx, by, R, y) {
  */
 export function composeTerrain(graph, grid) {
   const { heightMap, width, height, worldSize, minHeight = 0, keep = null, tube = null, skip = null } = grid;
+  // (a band of rows, for a worker: grid.rows = [from, to); grid.collect: the corridors' tiles returned as they
+  // are, before the passes over them; grid.prebuilt: those of every band, merged, the corridors not laid again.
+  // A pixel sees the roads in the same order whichever band lays it, so the bands' tiles are the whole one's:
+  // services/composeWorker.js)
+  const [rowFrom, rowTo] = grid.rows || [0, height];
   const z = graph.profile?.z;
   const segments = graph.classes?.segments || [];
   // the game's grid (services/terrainLookup.js terrainGroundAt): sample c at (c - W/2) squares,
@@ -101,7 +106,7 @@ export function composeTerrain(graph, grid) {
   const shoulderM = Math.max(SHOULDER_M, squareM);
   const blendM = Math.max(GROUND_BLEND_M, 2 * squareM);
   const slopeMinM = Math.max(SLOPE_MIN_M, 2 * squareM);
-  const tiles = new Map();
+  const tiles = grid.prebuilt?.tiles || new Map();
   const tileFor = (c, r) => {
     const key = Math.floor(c / TILE) * 65536 + Math.floor(r / TILE);
     let t = tiles.get(key);
@@ -190,7 +195,7 @@ export function composeTerrain(graph, grid) {
   // pixels a corridor reached but left alone (past a portal, a tunnel's
   // cutting): still despiked, a lone one among composed ground stood metres
   // proud
-  const left = new Set();
+  const left = grid.prebuilt?.left || new Set();
   const abutmentOff = (kind, k, j) => (kind === 'deck' && toAbutment[k][j] < ABUTMENT_M ? DECK_UNDER_M : 0);
   // a side road's pieces under its through road's lanes (sideArms.js): the
   // through road's surface there, so any other road's core wins the pixel
@@ -248,7 +253,8 @@ export function composeTerrain(graph, grid) {
       }
     }
   }
-  graph.edges.forEach((e, k) => {
+  if (grid.prebuilt) { stats.corridors = grid.prebuilt.corridors || 0; if (grid.prebuilt.skipped) stats.skipped = grid.prebuilt.skipped; }
+  else graph.edges.forEach((e, k) => {
     const zk = z[k];
     for (let i = 0; i + 1 < e.s.length; i++) {
       // A piece is its first station's kind, but not where a deck's last station hands over to the ground:
@@ -312,7 +318,7 @@ export function composeTerrain(graph, grid) {
       const [c1, r1] = toPixel(Math.max(ax, bx) + reach, Math.min(ay, by) - reach);
       stats.corridors++;
       const cBox0 = Math.max(0, Math.floor(c0)); const cBox1 = Math.min(width - 1, Math.ceil(c1));
-      for (let r = Math.max(0, Math.floor(r0)); r <= Math.min(height - 1, Math.ceil(r1)); r++) {
+      for (let r = Math.max(rowFrom, Math.floor(r0)); r <= Math.min(rowTo - 1, height - 1, Math.ceil(r1)); r++) {
         const y = yOfRow(r);
         let cFrom = cBox0; let cTo = cBox1;
         // (only the row's crossing of the corridor, a pixel either side; a
@@ -437,6 +443,7 @@ export function composeTerrain(graph, grid) {
       }
     }
   });
+  if (grid.collect) return { tiles, left, stats };
 
   // the edited value of a pixel in world z, or NaN if untouched (a despiked
   // pixel's value from `spiked`)

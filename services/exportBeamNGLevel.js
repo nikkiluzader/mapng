@@ -156,6 +156,7 @@ import {
 import { resolveRegionalBiome } from './beamngRegion.js';
 import { contentExportOptions, contentOn, filterOsmByTags, filterWaterKinds, filterFootBridges } from './buildContent.js';
 import { withProcessHandlersKept } from './keepProcessHandlers.js';
+import { composeTerrainParallel } from './composeWorker.js';
 import { fastHypot } from './fastMath.js';
 
 const BEAMNG_EXPORT_SERVICE_LOG = '[BeamNG Export Service]';
@@ -13333,11 +13334,15 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     // road's own surface is composed over it; their fill and cover is
     // composed as any ground)
     const tunnelGraded = decalRoads.tunnels?.graded;
-    const composed = composeTerrain(sg, {
+    // (on worker threads in bands of rows where there are some: services/composeWorker.js; the same result. The
+    // keep / tube tests go with the pixel sets they test, which the workers take as masks)
+    const composed = await composeTerrainParallel(sg, {
       heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
       worldSize: exportTerrainData.width * squareSize, minHeight: Number(exportTerrainData.minHeight) || 0,
       keep: tunnelGraded?.size ? (idx) => tunnelGraded.has(idx) : null,
+      keepSet: tunnelGraded?.size ? tunnelGraded : null,
       tube: decalRoads.tunnels?.tube?.size ? (idx) => decalRoads.tunnels.tube.has(idx) : null,
+      tubeSet: decalRoads.tunnels?.tube?.size ? decalRoads.tunnels.tube : null,
       skip: sg.shaping?.skip || null,
     });
     const hm = heightMapEditor(exportTerrainData);
