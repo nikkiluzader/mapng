@@ -1430,7 +1430,7 @@ export const lateral = (p, d) => [p.x + d * p.ty, p.y - d * p.tx];
  * (into: m past the nearer portal into the tube, < 0 outside), or null when
  * further than `reach`.
  */
-export function nearestOnTunnel(t, x, y, reach = Infinity) {
+export function nearestOnTunnel(t, x, y, reach = Infinity, out = null) {
   if (!t.index) t.index = indexLine(t.line);
   // (the best kept in numbers and the candidates in a reused array: this
   // runs for every heightmap square near a tunnel, millions in a city)
@@ -1458,7 +1458,10 @@ export function nearestOnTunnel(t, x, y, reach = Infinity) {
   let best = null;
   if (bi >= 0) {
     const a = t.line[bi]; const b = t.line[bi + 1];
-    best = { d2: bd2, i: bf < 0.5 ? bi : bi + 1, s: a.s + (b.s - a.s) * bf, d: bSide * Math.sqrt(bd2), z: a.z + (b.z - a.z) * bf, beyond: bBeyond };
+    // (out: a caller's own object, filled in place of a new one: tunnelGroundAt asks for every square near a
+    // tunnel, and a new object each time was a tenth of a city's export's garbage)
+    best = out || {};
+    best.d2 = bd2; best.i = bf < 0.5 ? bi : bi + 1; best.s = a.s + (b.s - a.s) * bf; best.d = bSide * Math.sqrt(bd2); best.z = a.z + (b.z - a.z) * bf; best.beyond = bBeyond;
   }
   if (!best) return null;
   const sS = t.portals[0] ? t.line[t.iS].s : -Infinity;
@@ -1570,6 +1573,9 @@ function cutsGroundAt(t, x, y, h) {
  * the hillside behind a wall down to its top then 1:1 slopes; behind a
  * headwall raised to its top; over the bore made up to the cover.
  */
+// (tunnelGroundAt's three lookups, each filling its own object: it runs for every square near a tunnel. Each is
+// read only before the next of its kind and the function returns a number; helpers it calls ask on their own)
+const NEAR_MOUTH = {}; const NEAR_FOREIGN = {}; const NEAR_HERE = {};
 export function tunnelGroundAt(t, x, y, h) {
   if (t.kind === 'gallery') return galleryGroundAt(t, x, y, h);
   // a low box's mouth: the survey's step often lies a few metres out from
@@ -1579,7 +1585,7 @@ export function tunnelGroundAt(t, x, y, h) {
   // is looked at: the only road in front of the face, inside the box's
   // width, is the one going in
   if (t.gradedCover) {
-    const m = nearestOnTunnel(t, x, y, Math.max(t.W + LINING_M, (t.wingD || 0) + (t.wingT || 0)) + 2 * t.squareSize);
+    const m = nearestOnTunnel(t, x, y, Math.max(t.W + LINING_M, (t.wingD || 0) + (t.wingT || 0)) + 2 * t.squareSize, NEAR_MOUTH);
     // (where a wingwall stands, out to a square behind its back: the ground
     // rising from the lane's edge stood through the wall's face in teeth)
     const side = Math.sign(m?.d) || 1;
@@ -1598,11 +1604,11 @@ export function tunnelGroundAt(t, x, y, h) {
   // over the tube still gets the cover over it: Deck Park's west streets,
   // their ground low behind the headwalls, had squares opened down to the box)
   if (t.foreign?.length && onForeignRoad(t, x, y, 0.5)) {
-    const m = nearestOnTunnel(t, x, y, t.W + (t.maxExtra || 0) + LINING_M + 1);
+    const m = nearestOnTunnel(t, x, y, t.W + (t.maxExtra || 0) + LINING_M + 1, NEAR_FOREIGN);
     if (!m || m.into < 0 || across(t, m) > t.W + LINING_M + 1) return h;
   }
   h = cutsGroundAt(t, x, y, h);
-  const n = nearestOnTunnel(t, x, y, t.headHalf + (t.maxExtra || 0) + FACE_REACH_M);
+  const n = nearestOnTunnel(t, x, y, t.headHalf + (t.maxExtra || 0) + FACE_REACH_M, NEAR_HERE);
   if (!n) return h;
   if (n.beyond) {
     // past the outer end of an approach's cutting or fill: its slopes run on
