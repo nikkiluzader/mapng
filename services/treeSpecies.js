@@ -135,13 +135,24 @@ async function fetchMixOver(bounds, minSpan, fetchImpl, timeoutMs) {
  * on the terrain as treeSpeciesMix: the export reads it and downloads
  * nothing (null: no records here, or offline; the climate rule decides).
  */
-export async function attachTreeSpecies(terrainData, { onProgress } = {}) {
+export async function attachTreeSpecies(terrainData, { onProgress, early = null } = {}) {
   if (!terrainData?.bounds || terrainData.treeSpeciesMix !== undefined) return terrainData;
   onProgress?.('Reading which trees grow here (iNaturalist records)...');
   try {
-    terrainData.treeSpeciesMix = await fetchTreeSpeciesMix(terrainData.bounds);
+    terrainData.treeSpeciesMix = await (early || fetchTreeSpeciesMix(terrainData.bounds));
   } catch {
     terrainData.treeSpeciesMix = null;
   }
   return terrainData;
+}
+
+/**
+ * The same request, started as soon as the bounds are known (Generate asks it beside the map data); attachTreeSpecies
+ * takes it as `early`. A failure waits there to be caught as attachTreeSpecies always did.
+ */
+export function includeTreeSpeciesEarly(bounds) {
+  if (!bounds) return null;
+  const p = fetchTreeSpeciesMix(bounds);
+  p.catch(() => {});   // (caught where it is awaited; not an unhandled rejection meanwhile)
+  return p;
 }

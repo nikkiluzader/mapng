@@ -1,6 +1,6 @@
 import { gpxzChunkGrid } from './gpxzChunks.js';
 import { attachLandCover } from './worldCover.js';
-import { attachTreeSpecies } from './treeSpecies.js';
+import { attachTreeSpecies, includeTreeSpeciesEarly } from './treeSpecies.js';
 import { withMeasuredWidths } from './satRoadWidth.js';
 import { withRegionalWidths } from './regionalWidths.js';
 import { loadDataImage } from './dataCache.js';
@@ -2497,6 +2497,9 @@ export const fetchTerrainData = async (
     null, // gapFillData
     { width: satelliteTexturePx, height: Math.round(satelliteTexturePx * height / width) },
   );
+  // which trees grow here (iNaturalist), asked now, beside the map data and the satellite road widths: another
+  // server, at its own pace as before, and needing only the bounds; one after another it added 14 s to a city
+  const treeSpeciesEarly = includeTreeSpeciesEarly(finalBounds);
 
   // 7. Fetch OSM Data
   let osmFeatures = [];
@@ -2654,8 +2657,9 @@ export const fetchTerrainData = async (
 
   // what covers the ground (ESA WorldCover), read once with the terrain
   await attachLandCover(terrainData, { onProgress: (m) => onProgress?.(m), signal });
-  // which trees grow here, for the export's woods (downloaded now: the export downloads nothing)
-  await attachTreeSpecies(terrainData, { onProgress: (m) => onProgress?.(m) });
+  // which trees grow here, for the export's woods (downloaded now: the export downloads nothing; asked since the
+  // bounds were known, above)
+  await attachTreeSpecies(terrainData, { onProgress: (m) => onProgress?.(m), early: treeSpeciesEarly });
 
   if (includeOSM && osmFeatures.length > 0) {
     const options = { Roads: true, baseColor, onProgress };
