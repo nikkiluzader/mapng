@@ -49,8 +49,16 @@ const DECK_UNDER_M = 2.2;     // deck depth under its road surface
 const WATER_OVER_GROUND_M = 0.5;   // over water, the deck's underside at least this over the ground at each station
 const MINOR_CROWN_M = 0.3;    // a deck over a stream: this far over the line between its banks at most
 const OUTER_ROUNDS = 6;       // crossing requirements refreshed this often
-const SWEEPS = 120;           // smoothing sweeps per round (or until settled)
-const SETTLED_M = 0.005;
+// A round sweeps until no station changed more than SETTLED_M over a whole sweep (end against start). It
+// once stopped at 120 sweeps, with a test that counted each step's own moves: a station lifted by the smoothing
+// and put back by the clamp, every sweep the same, never "settled", so every round ran all 120 and dense
+// interchanges stopped short of their settled heights (a Pittsburgh ramp bridge 0.9 m off). The tail of
+// settling is a few slow chains (a deck end eased down 0.2 mm a sweep by its ground approach): only the roads
+// still moving, and their neighbours, are swept there (ACTIVE_M), so the long tail costs next to nothing.
+const SWEEPS = 20000;         // a safety cap per round only
+const SETTLED_M = 0.0001;
+const ACTIVE_M = 0.00001;     // a road that moved this much over a sweep, and its neighbours, are swept again
+const ACTIVE_HOLD = 64;       // ... until it has not moved for this many sweeps
 const LONG_GRADE_M = 30;      // the terrain's own slope, over this far either side
 const HILLSIDE_M = 100;       // ... and over this far: as steep there, a real hillside
 const HILLSIDE_FACTOR = 1.5;  // a road on a hillside may run this much steeper (back down to it)
@@ -446,9 +454,11 @@ export function* solveProfilesSteps(graph) {
   // (each step's allowed rise in one flat array, at its first station's index: riseAt[base + i] = stepRise[k][i])
   const riseAt = new Float64Array(N);
   for (let k = 0; k < edges.length; k++) { const r = stepRise[k]; for (let i = 0; i < r.length; i++) riseAt[off[k] + i] = r[i]; }
-  const clampGrades = () => {
+  const clampGrades = (list = null) => {
     let moved = 0;
-    for (let k = 0; k < edges.length; k++) {
+    const count = list ? list.length : edges.length;
+    for (let q = 0; q < count; q++) {
+      const k = list ? list[q] : q;
       const base = off[k]; const n = edges[k].s.length;
       for (let i = 0; i + 1 < n; i++) {
         const v = base + i + 1;
@@ -577,12 +587,14 @@ export function* solveProfilesSteps(graph) {
   const LEAD = new Int8Array(links.length / 3);
   for (const [j, lead] of linkLead) LEAD[j / 3] = lead;
   const FREE = Float64Array.from(W, (w, v) => freedomOf(v));
-  const projectNetwork = () => {
+  // (list: the link indices to project, ascending; all of them without)
+  const projectNetwork = (list = null) => {
     let moved = 0;
-    const nl = LA.length;
+    const nl = list ? list.length : LA.length;
     for (let pass = 0; pass < 4; pass++) {
       const fwd = pass % 2 === 0;
-      for (let q = fwd ? 0 : nl - 1; fwd ? q < nl : q >= 0; q += fwd ? 1 : -1) {
+      for (let p = fwd ? 0 : nl - 1; fwd ? p < nl : p >= 0; p += fwd ? 1 : -1) {
+        const q = list ? list[p] : p;
         const a = LA[q]; const b = LB[q]; const rise = LR[q];
         const d = Z[b] - Z[a];
         const excess = Math.abs(d) - rise;
@@ -597,6 +609,24 @@ export function* solveProfilesSteps(graph) {
     }
     return moved;
   };
+  // (the active set's bookkeeping: each road's neighbours at its nodes and fork links, its links (each listed
+  // once, under its first station's road), the taut chains' roads)
+  const edgeNbrs = edges.map(() => []);
+  for (const node of nodes.values()) {
+    const ks = [...new Set(node.edges.map(({ edge }) => edge))];
+    for (const a of ks) for (const b of ks) if (a !== b) edgeNbrs[a].push(b);
+  }
+  const linksOfEdge = edges.map(() => []);
+  for (let q = 0; q < LA.length; q++) {
+    const ka = edgeOf[LA[q]]; const kb = edgeOf[LB[q]];
+    linksOfEdge[ka].push(q);
+    if (ka !== kb) { edgeNbrs[ka].push(kb); edgeNbrs[kb].push(ka); }
+  }
+  const chainEdges = chains.map((c) => [...new Set(Array.from(c.idx, (v) => edgeOf[v]))]);
+  const chainFirst = chainEdges.map((es) => es[0]);
+  const edgeOn = new Uint8Array(edges.length);
+  const lastMoved = new Int32Array(edges.length);
+  const Zs = new Float64Array(N);
   const Z = Float64Array.from(P, (g, v) => Math.min(g, U[v]));
   let L = new Float64Array(N).fill(-Infinity);
   let rounds = 0;
@@ -669,41 +699,78 @@ export function* solveProfilesSteps(graph) {
     const followers = [];
     for (const [j, lead] of linkLead) followers.push(lead === 1 ? [links[j + 1], links[j], links[j + 2]] : [links[j], links[j + 1], links[j + 2]]);
     const FL = followers.length ? Float64Array.from(L) : L; const FU = followers.length ? Float64Array.from(U) : U;
+    // (every road active at a round's start: its envelopes have changed)
+    let all = true; let act = null; let actLinks = null;
+    lastMoved.fill(-ACTIVE_HOLD);
     for (let sweep = 0; sweep < SWEEPS; sweep++) {
-      let moved = 0;
+      if (all) Zs.set(Z); else for (let a = 0; a < act.length; a++) { const k = act[a]; Zs.set(Z.subarray(off[k], off[k] + edges[k].s.length), off[k]); }
       for (const [f] of followers) { FL[f] = L[f]; FU[f] = U[f]; }
       for (const [f, ld, rise] of followers) {
         FL[f] = Math.max(FL[f], Z[ld] - rise); FU[f] = Math.max(FL[f], Math.min(FU[f], Z[ld] + rise));
       }
       // (a plain loop: in a forEach callback the running maximum was a captured variable, boxed at every store)
-      for (let k = 0; k < edges.length; k++) {
+      const count = all ? edges.length : act.length;
+      for (let a = 0; a < count; a++) {
+        const k = all ? a : act[a];
         // (a structure with no pull to its ground anywhere: straight between its ends, inside the envelopes)
         if (taut[k]) continue;   // (solved as chains below)
         const base = off[k]; const n = edges[k].s.length;
         for (let i = 1; i + 1 < n; i++) {
           const v = base + i;
-          const next = Math.min(U[v], Math.max(L[v], (W[v] * P[v] + SMOOTH * (Z[v - 1] + Z[v + 1])) / (W[v] + 2 * SMOOTH)));
-          moved = Math.max(moved, Math.abs(next - Z[v])); Z[v] = next;
+          Z[v] = Math.min(U[v], Math.max(L[v], (W[v] * P[v] + SMOOTH * (Z[v - 1] + Z[v + 1])) / (W[v] + 2 * SMOOTH)));
         }
       }
       // (a structure with no pull to its ground anywhere: straight between its ends, inside the envelopes)
-      for (const c of chains) moved = Math.max(moved, tautProfile(Z, FL, FU, c.idx, c.s, c.freeA, c.freeB, G));
-      for (const ends of meets) {
+      for (let c = 0; c < chains.length; c++) if (all || edgeOn[chainFirst[c]]) { const ch = chains[c]; tautProfile(Z, FL, FU, ch.idx, ch.s, ch.freeA, ch.freeB, G); }
+      for (let m = 0; m < meets.length; m++) {
+        const ends = meets[m];
+        if (!all && !ends.every((v) => edgeOn[edgeOf[v]])) continue;   // (only roads being swept are written)
         let sw = 0; let sz = 0; let lo = -Infinity; let hi = Infinity;
         for (const v of ends) { sw += W[v]; sz += W[v] * Z[v]; lo = Math.max(lo, L[v]); hi = Math.min(hi, U[v]); }
         // (all structure ends: no ground pull anywhere, a plain average)
-        const avg = sw > 0 ? sz / sw : ends.reduce((a, v) => a + Z[v], 0) / ends.length;
+        const avg = sw > 0 ? sz / sw : ends.reduce((acc, v) => acc + Z[v], 0) / ends.length;
         const mean = Math.min(Math.max(avg, lo), Math.max(lo, hi));
-        for (const v of ends) { moved = Math.max(moved, Math.abs(Z[v] - mean)); Z[v] = mean; }
+        for (const v of ends) Z[v] = mean;
       }
       // grades last, inward from the junction values (so a junction
       // averaged toward one road never leaves a jump on another), then over
       // the whole network: junction heights must also be reachable along the
       // roads between them
-      moved = Math.max(moved, clampGrades());
-      moved = Math.max(moved, projectNetwork());
+      clampGrades(all ? null : act);
+      projectNetwork(all ? null : actLinks);
       if (sweep % 30 === 29) yield;
-      if (moved < SETTLED_M) break;
+      // settled: no station changed more than SETTLED_M over the sweep (a road not swept did not change)
+      let net = 0;
+      const moving = [];
+      for (let a = 0; a < count; a++) {
+        const k = all ? a : act[a];
+        let mk = 0;
+        for (let v = off[k], end = off[k] + edges[k].s.length; v < end; v++) { const d = Math.abs(Z[v] - Zs[v]); if (d > mk) mk = d; }
+        if (mk > net) net = mk;
+        if (mk > ACTIVE_M) moving.push(k);
+      }
+      if (net < SETTLED_M) break;
+      // the next sweep: the roads that moved in the last ACTIVE_HOLD sweeps, every road meeting them at a node or
+      // a fork link, and whole taut chains (one is solved at once); in the order of the full sweep. (Dropped as
+      // soon as it stood still for one sweep and taken back as it moved, the set's own changes kept 15 roads
+      // swinging 0.3 m for 20000 sweeps on a lakefront where the full sweep settled; held for good, the busy
+      // first sweeps' half of Pittsburgh was swept 5000 times for 25 roads still moving)
+      for (const k of moving) lastMoved[k] = sweep;
+      edgeOn.fill(0);
+      for (let k = 0; k < edges.length; k++) if (sweep - lastMoved[k] < ACTIVE_HOLD) { edgeOn[k] = 1; for (const o of edgeNbrs[k]) edgeOn[o] = 1; }
+      for (let c = 0; c < chains.length; c++) {
+        const es = chainEdges[c];
+        if (es.some((k) => edgeOn[k])) for (const k of es) edgeOn[k] = 1;
+      }
+      const list = [];
+      for (let k = 0; k < edges.length; k++) if (edgeOn[k]) list.push(k);
+      if (list.length > edges.length / 2) { all = true; continue; }
+      all = false; act = Int32Array.from(list);
+      // (the links with both stations on active roads, ascending: the full sweep's order)
+      const ls = [];
+      for (const k of list) for (const q of linksOfEdge[k]) if (edgeOn[edgeOf[LB[q]]]) ls.push(q);
+      ls.sort((x, y) => x - y);
+      actLinks = Int32Array.from(ls);
     }
     yield;
   }
