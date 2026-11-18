@@ -230,6 +230,22 @@ Found, worst first:
    through the road at the deck joint).
 7. Not seen: Leap of Faith Overlook (a wooden platform under trees, the camera could not get a clear line).
 
+Fixed the same day (49922f4, drawn before and after with scratch/devareas/fbplot.py, fbtop.py, wallplot.py, then
+looked at in game): 1 (the road deck widens out to a mapped sidewalk up to 10 m from its edge, parapets outside it;
+the drawings also caught South Church Street's long sidewalk and River Street's, which fell 5 to 6 m off their decks
+past the 3.5 m reach), 2 (ends take the walk they join or the surveyed bank, no gangways on footbridges), 3 (a quay
+wall needs a steep face in the survey, run median 0.6 m in 1 m, and no green land behind; Falls Park 958 m to none;
+Utrecht keeps 62 %, its outer canal's grass banks dropped, some Nieuwegracht walls too, which are probably real), 5.
+Wing walls also keep off deck carriageways now.
+
+Left:
+- 4 was not a sidewalk slab: at South Church Street's north end the two carriageways are solved 1.2 m apart, and the
+  wing wall rule stands a retaining wall with a parapet in the gap between them. The heights are the fault (twin
+  carriageways of one street should come out level with each other at a bridge end).
+- A sidewalk on a road bridge meets the walk that carries on past the bridge with a step where that walk stays on
+  the ground beside the raised approach: River Street 2.7 m, 409177921 1.6 m, South Church Street 1.0 m.
+- 6, the jagged seam across South Church Street at the deck joints.
+
 ## 2. Checks owed on work already on dev
 
 1. "Extremely heavy" card, the Mapterhorn base tile and the new size selector looked at in the running app.
@@ -259,13 +275,68 @@ the source comparison in the desktop app: looked at by the project owner, 2026-1
 
 1. The next desktop test build (0.3.3-dev.6) with the next batch of fixes.
 
-## 4. Optimization pass (asked for, one item done)
+## 4. Speed pass: every step (started 2026-11-18)
 
-1. Texture painting still on one core (about 13 s at 8 km): canvas read-backs, the remaining passes.
-2. About 15 s of garbage collection in an 8 km export.
-3. The website, with its memory limits in mind (heavy parallel work stays on desktop).
-4. GPU work: recommended against for now (a few seconds at 8 km for a fallback path on every card).
-5. Backdrop from Poland's 1 m model: 6 minutes for a 512 m map's backdrop.
+Every step of Generate and the export gets the whole toolkit, not only the big hot spots:
+- algorithms: indexes and pruning, no full scans;
+- memory layout: flat typed arrays, no per-point objects;
+- caching and lookup tables;
+- async I/O: independent downloads overlapped, different servers at once;
+- zero-copy: shared buffers and transfers;
+- reused buffers;
+- parallel work: workers, strips over a SharedArrayBuffer;
+- JIT-friendly code.
+
+Out: approximate geometry, raising any third-party request rate, a bigger young generation.
+
+Each change: the same level (byte for byte, or within 1 mm where agreed), then measured on Chicago 8192 (Mapterhorn, 30 m backdrop, scratch/memprobe).
+
+Chicago 8192 export: about 1050 s on the morning of 2026-11-18, 447 s that evening (peak 28-30 GB -> 18-21 GB).
+
+**Export steps** (seconds at Chicago 8192, latest; status):
+
+| Step | Time | Status |
+|---|---|---|
+| Data step (downloads) | 45 | done: one run (exit fix), 3 downloads at once, lidar 8 ahead |
+| Preparing / bridge lidar read | 12 | open: a third lidar decode in the export itself |
+| Laying roads | 168 | in progress |
+| - structure solver | 57 | done: twin decks, structureEnds, clamp loop; open: worklist (needs care to stay exact), projectNetwork, tautProfile |
+| - tunnels (nearestOnTunnel, ground) | ~20 | open |
+| - terrain under roads (composeTerrain) | 20 | open: strips |
+| - lake and river beds | ~16 | open |
+| - bridge models | 8 | done: box pre-checks |
+| - railways, beds under decks, styles | ~15 | partly (styles done) |
+| Sidewalks, curbs, ramps | 67 | partly (deck sidewalks done); open: polygon merging, grading |
+| Street props | 3 | open |
+| Base texture | 12 | open |
+| Terrain materials | 29 | open: strips |
+| terrain.ter | 8 | open |
+| Heightmap PNG | 2 | open |
+| Backdrop | 8 | open |
+| 3D buildings | 18 | done: 8 workers, streamed tiles; open: per-worker copies of roads |
+| Water | 3 | open |
+| Barriers, signs, furniture | 41 | partly (gates done) |
+| Trees and ground cover | 3 | open |
+| Zip | ~40 | partly (building tiles streamed) |
+
+**Generate steps** (121 s at Chicago 8192):
+
+| Step | Status |
+|---|---|
+| Elevation | open |
+| Resample | parallel already |
+| Map data | open: start beside elevation |
+| Road widths (Esri) | rate-bound, kept; cache on repeats |
+| Land cover | open: beside road widths |
+| Tree species | done: beside road widths |
+| Road alignment and smoothing (~10 s) | open |
+| Textures (~25 s) | open |
+| Saving | open |
+
+**Other:**
+- Garbage collection is 68 s of the export (94 before fastHypot and the clamp loop).
+- The window's 11.8 GB in the crash report is unexplained (16 km window listing).
+- Speed work on the website keeps its memory limits in mind.
 
 ## 5. Small fixes
 
