@@ -443,21 +443,25 @@ export function* solveProfilesSteps(graph) {
   }
   // (a plain loop: in a forEach callback the running maximum was a captured variable, and V8 boxed a new number
   // for every store, twice per station per pass: the solver's largest source of garbage)
+  // (each step's allowed rise in one flat array, at its first station's index: riseAt[base + i] = stepRise[k][i])
+  const riseAt = new Float64Array(N);
+  for (let k = 0; k < edges.length; k++) { const r = stepRise[k]; for (let i = 0; i < r.length; i++) riseAt[off[k] + i] = r[i]; }
   const clampGrades = () => {
     let moved = 0;
     for (let k = 0; k < edges.length; k++) {
-      const e = edges[k];
-      const base = off[k]; const rise = stepRise[k]; const n = e.s.length;
+      const base = off[k]; const n = edges[k].s.length;
       for (let i = 0; i + 1 < n; i++) {
         const v = base + i + 1;
         if (nodeEnd[v]) continue;
-        const next = Math.min(U[v], Math.max(L[v], Math.min(Z[v - 1] + rise[i], Math.max(Z[v - 1] - rise[i], Z[v]))));
+        const rise = riseAt[v - 1];
+        const next = Math.min(U[v], Math.max(L[v], Math.min(Z[v - 1] + rise, Math.max(Z[v - 1] - rise, Z[v]))));
         moved = Math.max(moved, Math.abs(next - Z[v])); Z[v] = next;
       }
       for (let i = n - 2; i >= 0; i--) {
         const v = base + i;
         if (nodeEnd[v]) continue;
-        const next = Math.min(U[v], Math.max(L[v], Math.min(Z[v + 1] + rise[i], Math.max(Z[v + 1] - rise[i], Z[v]))));
+        const rise = riseAt[v];
+        const next = Math.min(U[v], Math.max(L[v], Math.min(Z[v + 1] + rise, Math.max(Z[v + 1] - rise, Z[v]))));
         moved = Math.max(moved, Math.abs(next - Z[v])); Z[v] = next;
       }
     }
@@ -565,17 +569,26 @@ export function* solveProfilesSteps(graph) {
       });
     });
   }
+  // (the links as typed arrays, each link's lead and each station's freedom looked up once: per link per pass,
+  // a Map lookup and a call, 4 passes a sweep)
+  const LA = Int32Array.from({ length: links.length / 3 }, (_, q) => links[3 * q]);
+  const LB = Int32Array.from({ length: links.length / 3 }, (_, q) => links[3 * q + 1]);
+  const LR = Float64Array.from({ length: links.length / 3 }, (_, q) => links[3 * q + 2]);
+  const LEAD = new Int8Array(links.length / 3);
+  for (const [j, lead] of linkLead) LEAD[j / 3] = lead;
+  const FREE = Float64Array.from(W, (w, v) => freedomOf(v));
   const projectNetwork = () => {
     let moved = 0;
+    const nl = LA.length;
     for (let pass = 0; pass < 4; pass++) {
       const fwd = pass % 2 === 0;
-      for (let j = fwd ? 0 : links.length - 3; fwd ? j < links.length : j >= 0; j += fwd ? 3 : -3) {
-        const a = links[j]; const b = links[j + 1]; const rise = links[j + 2];
+      for (let q = fwd ? 0 : nl - 1; fwd ? q < nl : q >= 0; q += fwd ? 1 : -1) {
+        const a = LA[q]; const b = LB[q]; const rise = LR[q];
         const d = Z[b] - Z[a];
         const excess = Math.abs(d) - rise;
         if (excess <= 1e-6) continue;
-        const lead = linkLead.get(j);
-        const fa = lead === 1 ? 0 : freedomOf(a); const fb = lead === -1 ? 0 : freedomOf(b); const sign = Math.sign(d);
+        const lead = LEAD[q];
+        const fa = lead === 1 ? 0 : FREE[a]; const fb = lead === -1 ? 0 : FREE[b]; const sign = Math.sign(d);
         const za = Math.min(U[a], Math.max(L[a], Z[a] + sign * excess * fa / (fa + fb)));
         const zb = Math.min(U[b], Math.max(L[b], Z[b] - sign * excess * fb / (fa + fb)));
         moved = Math.max(moved, Math.abs(za - Z[a]), Math.abs(zb - Z[b]));
@@ -662,16 +675,17 @@ export function* solveProfilesSteps(graph) {
       for (const [f, ld, rise] of followers) {
         FL[f] = Math.max(FL[f], Z[ld] - rise); FU[f] = Math.max(FL[f], Math.min(FU[f], Z[ld] + rise));
       }
-      edges.forEach((e, k) => {
-        const base = off[k];
+      // (a plain loop: in a forEach callback the running maximum was a captured variable, boxed at every store)
+      for (let k = 0; k < edges.length; k++) {
         // (a structure with no pull to its ground anywhere: straight between its ends, inside the envelopes)
-        if (taut[k]) return;   // (solved as chains below)
-        for (let i = 1; i + 1 < e.s.length; i++) {
+        if (taut[k]) continue;   // (solved as chains below)
+        const base = off[k]; const n = edges[k].s.length;
+        for (let i = 1; i + 1 < n; i++) {
           const v = base + i;
           const next = Math.min(U[v], Math.max(L[v], (W[v] * P[v] + SMOOTH * (Z[v - 1] + Z[v + 1])) / (W[v] + 2 * SMOOTH)));
           moved = Math.max(moved, Math.abs(next - Z[v])); Z[v] = next;
         }
-      });
+      }
       // (a structure with no pull to its ground anywhere: straight between its ends, inside the envelopes)
       for (const c of chains) moved = Math.max(moved, tautProfile(Z, FL, FU, c.idx, c.s, c.freeA, c.freeB, G));
       for (const ends of meets) {
