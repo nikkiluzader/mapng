@@ -5,6 +5,7 @@
 // need, and the triangles come back per strip, replayed in strip order.
 import * as THREE from 'three';
 import polygonClipping, { snapGeom } from './polyClip.js';
+import { fastHypot } from './fastMath.js';
 
 export const SLAB_TILE_M = 10;        // m of sidewalk to one unit of texture space, along and across alike
 export const PANEL_SCRAP_M2 = 0.002;
@@ -291,4 +292,51 @@ export function unionTile({ tb, shapes, boxes, pockets }) {
 /** Several tiles' unions (one work item: the tiles of a few hundred metres). */
 export function unionTiles(tiles) {
   return tiles.map(unionTile);
+}
+
+// A walk strip cut by the curb cuts near it by box (beamngSidewalks.js mergeWalks): its kept pieces, each a
+// polygon ([outer, ...holes]), slivers dropped. Strips are cut one by one and none depends on another, so
+// mergeWalks has them cut on worker threads (cutStrips), the same pieces in the same order.
+export const CUT_SLIVER_W_M = 0.15;      // nor one thinner than this on average (twice its area over its outline)
+export const CUT_SLIVER_M2 = 0.25;     // a piece of walk this small left by a corner's cut: dropped
+export function cutStrip(shape, nearBox) {
+  // (only the cuts that reach the strip itself: of those near it by box,
+  // about one in thirty does, and each other one made the clip dearer;
+  // with none it still goes through the clip, which tidies its outline
+  // into pieces as before)
+  const near = nearBox.filter((c) => ringTouches(c[0], shape));
+  // (polygon-clipping fails now and then on near-touching edges: rounded to
+  // the centimetre, then cut by one ring at a time, skipping any that
+  // fail; kept whole, a strip's outline stood as bare walls on the road
+  // where its panels had been cut away)
+  const r2 = (sh) => sh.map((ring) => ring.map(([x, y]) => [Math.round(x * 100) / 100, Math.round(y * 100) / 100]));
+  let pieces = null;
+  for (const attempt of [() => polygonClipping.difference(shape, ...near),
+    () => polygonClipping.difference(r2(shape), ...near.map((c) => r2(c)))]) {
+    try { pieces = attempt(); break; } catch { /* next */ }
+  }
+  if (!pieces) {
+    pieces = [r2(shape)];
+    for (const c of near) {
+      try { pieces = polygonClipping.difference(pieces, r2(c)); } catch { /* this ring skipped */ }
+    }
+  }
+  // (slivers left between a straight curb's face and its back: dropped)
+  // (and long thin ones: by area alone a 5 cm sliver along a cut kept its
+  // outline while each panel's piece of it was dropped, bare walls left)
+  const perimeter = (ring) => ring.reduce((sum, q, i) => (i ? sum + fastHypot(q[0] - ring[i - 1][0], q[1] - ring[i - 1][1]) : 0), 0);
+  const kept = [];
+  for (const piece of pieces) {
+    const area = Math.abs(ringArea(piece[0])) - piece.slice(1).reduce((a, h) => a + Math.abs(ringArea(h)), 0);
+    if (area >= CUT_SLIVER_M2 && (2 * area) / (perimeter(piece[0]) || 1) >= CUT_SLIVER_W_M) kept.push(piece);
+  }
+  return kept;
+}
+/** A batch of strips for a worker: [[shape, nearBoxShapes]] -> each one's kept pieces. */
+export function cutStrips(jobs) { return jobs.map(([shape, near]) => cutStrip(shape, near)); }
+
+/** Seawall pockets' unions for a worker (beamngSidewalks.js findWallPockets): each list of shapes' union, or
+ * null where polygon-clipping fails (the wall skipped, as on the export's own thread). */
+export function unionsOrNull(jobs) {
+  return jobs.map((shapes) => { try { return polygonClipping.union(...shapes); } catch { return null; } });
 }

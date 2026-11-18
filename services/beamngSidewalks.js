@@ -21,7 +21,7 @@ import { parallelMap, parallelThreads } from './parallel.js';
 import {
   SLAB_TILE_M, PANEL_SCRAP_M2, PANEL_TRI_FLOATS, LEVEL_REACH_CELLS, ringArea, pointInRing, ringTouches,
   stripUv, makeCropper, makeCutFinder, makeLevelFinder, stripPanels, panelsForItem,
-  unionTile, unionTiles as unionTilesLocal,
+  unionTile, unionTiles as unionTilesLocal, cutStrip, cutStrips as cutStripsLocal, unionsOrNull as unionsOrNullLocal,
 } from './sidewalkPanels.js';
 import { buildCarriagewayIndex, carriagewaysAt, cutNodes, isInZone, isOnOtherCarriageway, segmentsNear } from './roadMarkingCuts.js';
 import { isOneWayRoad } from './roadWidth.js';
@@ -1552,8 +1552,6 @@ function joinCorners(runs, index, walkRuns = []) {
   return corners;
 }
 const SIDEWALK_WALK_JOIN_M = 0.6;
-const CUT_SLIVER_W_M = 0.15;      // nor one thinner than this on average (twice its area over its outline)
-const CUT_SLIVER_M2 = 0.25;     // a piece of walk this small left by a corner's cut: dropped
 
 // A walkway ending on a street's sidewalk (a walk leaving the street round a
 // fountain: its end by the curb) meets the slab at its top, not ramped down
@@ -3128,7 +3126,14 @@ function segmentQuad(a, b, half, pad = 0) {
  * clear of buildings. Returns polygons (rings, closed) clear of the roads and
  * the curbside sidewalks.
  */
-export function findWallPockets(walkRuns, streetRuns, carriageways, { walls = [], wallAreas = [], groundAt = null, seaZ = -Infinity, water = [], buildings = [] } = {}) {
+export function findWallPockets(...args) {
+  const gen = findWallPocketsSteps(...args);
+  let step = gen.next();
+  while (!step.done) step = gen.next(null);
+  return step.value;
+}
+// (a generator: the unions round each seawall asked of the driver, on worker threads where there are some)
+function* findWallPocketsSteps(walkRuns, streetRuns, carriageways, { walls = [], wallAreas = [], groundAt = null, seaZ = -Infinity, water = [], buildings = [] } = {}) {
   if (!walls?.length || !groundAt) return [];
   const inWater = water?.length ? buildingIndex(water) : () => false;
   const inBuilding = buildings?.length ? buildingIndex(buildings) : () => false;
@@ -3212,12 +3217,17 @@ export function findWallPockets(walkRuns, streetRuns, carriageways, { walls = []
   const holes = []; const seen = new Set();
   const closerGrid = boxGrid(closers.map((sh) => boxOf(sh[0])));
   const seaStarts = boxGrid(sea.map(([a]) => [a[0], a[1], a[0], a[1]]));
+  const jobs = [];
   for (const wall of walls) {
     const [wx0, wy0, wx1, wy1] = boxOf(wall);
     if (!seaStarts.any([wx0, wy0, wx1, wy1])) continue;
     const local = closerGrid.overlapping([wx0 - POCKET_REACH_M, wy0 - POCKET_REACH_M, wx1 + POCKET_REACH_M, wy1 + POCKET_REACH_M]).map((k) => closers[k]);
-    let union;
-    try { union = polygonClipping.union(...local.map(round)); } catch { continue; }
+    jobs.push(local.map(round));
+  }
+  // (each wall's union on its own: on worker threads where there are some, read back in the walls' order)
+  const unions = (jobs.length ? yield { kind: 'pocketUnions', jobs } : null) || unionsOrNullLocal(jobs);
+  for (const union of unions) {
+    if (!union) continue;
     for (const polygon of union) {
       for (const hole of polygon.slice(1)) {
         const key = hole.slice(0, -1).map((q) => `${Math.round(q[0])},${Math.round(q[1])}`).sort()[0] + hole.length;
@@ -3376,40 +3386,20 @@ function* mergeWalks(builder, runs, { top = 'slab', edge = 'curb', pockets = [],
   if (cuts.length) {
     const boxOf = boxOfRing;
     const kept = [];
+    // (each strip with cuts near it by box cut on its own: on worker threads where there are some, the same
+    // pieces: sidewalkPanels.js cutStrip)
+    const jobs = []; const jobOf = [];
     for (const strip of strips) {
       const b = boxOf(strip.shape[0]);
       const nearBox = cutsNear(b[0], b[1], b[2], b[3]);
-      if (!nearBox.length) { kept.push(strip); continue; }
-      // (only the cuts that reach the strip itself: of those near it by box,
-      // about one in thirty does, and each other one made the clip dearer;
-      // with none it still goes through the clip, which tidies its outline
-      // into pieces as before)
-      const near = nearBox.filter((c) => ringTouches(c.shape[0], strip.shape));
-      // (polygon-clipping fails now and then on near-touching edges: rounded to
-      // the centimetre, then cut by one ring at a time, skipping any that
-      // fail; kept whole, a strip's outline stood as bare walls on the road
-      // where its panels had been cut away)
-      const r2 = (sh) => sh.map((ring) => ring.map(([x, y]) => [Math.round(x * 100) / 100, Math.round(y * 100) / 100]));
-      let pieces = null;
-      for (const attempt of [() => polygonClipping.difference(strip.shape, ...near.map((c) => c.shape)),
-        () => polygonClipping.difference(r2(strip.shape), ...near.map((c) => r2(c.shape)))]) {
-        try { pieces = attempt(); break; } catch { /* next */ }
-      }
-      if (!pieces) {
-        pieces = [r2(strip.shape)];
-        for (const c of near) {
-          try { pieces = polygonClipping.difference(pieces, r2(c.shape)); } catch { /* this ring skipped */ }
-        }
-      }
-      // (slivers left between a straight curb's face and its back: dropped)
-      // (and long thin ones: by area alone a 5 cm sliver along a cut kept its
-      // outline while each panel's piece of it was dropped, bare walls left)
-      const perimeter = (ring) => ring.reduce((sum, q, i) => (i ? sum + fastHypot(q[0] - ring[i - 1][0], q[1] - ring[i - 1][1]) : 0), 0);
-      for (const shape of pieces) {
-        const area = Math.abs(ringArea(shape[0])) - shape.slice(1).reduce((a, h) => a + Math.abs(ringArea(h)), 0);
-        if (area >= CUT_SLIVER_M2 && (2 * area) / (perimeter(shape[0]) || 1) >= CUT_SLIVER_W_M) kept.push({ ...strip, shape, piece: true });
-      }
+      if (!nearBox.length) { jobOf.push(-1); continue; }
+      jobOf.push(jobs.length); jobs.push([strip.shape, nearBox.map((c) => c.shape)]);
     }
+    const cutPieces = (jobs.length ? yield { kind: 'cuts', jobs } : null) || jobs.map(([shape, near]) => cutStrip(shape, near));
+    strips.forEach((strip, i) => {
+      if (jobOf[i] < 0) { kept.push(strip); return; }
+      for (const shape of cutPieces[jobOf[i]]) kept.push({ ...strip, shape, piece: true });
+    });
     // (not `strips.push(...kept)`: a big city has more strips than a call takes arguments, services/keepInPlace.js)
     strips.length = 0;
     appendAll(strips, kept);
@@ -3603,8 +3593,43 @@ export function buildSidewalkMeshes(carriageways, options = {}) {
 export async function buildSidewalkMeshesParallel(carriageways, options = {}) {
   const gen = sidewalkMeshes(carriageways, options);
   let step = gen.next();
-  while (!step.done) step = gen.next(step.value.kind === 'unions' ? await unionsOnWorkers(step.value) : await panelsOnWorkers(step.value));
+  while (!step.done) {
+    const kind = step.value.kind;
+    step = gen.next(kind === 'unions' ? await unionsOnWorkers(step.value) : kind === 'cuts' ? await cutsOnWorkers(step.value)
+      : kind === 'pocketUnions' ? await pocketUnionsOnWorkers(step.value) : await panelsOnWorkers(step.value));
+  }
   return step.value;
+}
+
+// The walk strips cut by the curb cuts near them on worker threads (sidewalkPanels.js cutStrips), a batch of
+// strips per work item; null (cut on this thread) where there are no worker threads or few strips.
+const PARALLEL_CUTS_FROM = 200;
+const CUT_BATCH = 64;
+async function cutsOnWorkers({ jobs }) {
+  if (jobs.length < PARALLEL_CUTS_FROM || (await parallelThreads()) <= 1) return null;
+  const items = [];
+  for (let i = 0; i < jobs.length; i += CUT_BATCH) items.push(jobs.slice(i, i + CUT_BATCH));
+  const results = await parallelMap(items, {
+    local: cutStripsLocal,
+    module: new URL(['./sidewalk', 'Panels.js'].join(''), import.meta.url).href,
+    fn: 'cutStrips',
+  });
+  return results.flat();
+}
+
+// The unions round each seawall (findWallPockets) on worker threads, a few walls per work item; null (on this
+// thread) where there are no worker threads or few walls.
+const PARALLEL_POCKETS_FROM = 16;
+async function pocketUnionsOnWorkers({ jobs }) {
+  if (jobs.length < PARALLEL_POCKETS_FROM || (await parallelThreads()) <= 1) return null;
+  const items = [];
+  for (let i = 0; i < jobs.length; i += 4) items.push(jobs.slice(i, i + 4));
+  const results = await parallelMap(items, {
+    local: unionsOrNullLocal,
+    module: new URL(['./sidewalk', 'Panels.js'].join(''), import.meta.url).href,
+    fn: 'unionsOrNull',
+  });
+  return results.flat();
 }
 
 // The walks' outline tiles merged on worker threads (sidewalkPanels.js
@@ -3734,7 +3759,7 @@ function* sidewalkMeshes(carriageways, options = {}) {
   // (a union can fail on bad geometry: strips that overlap beat no sidewalks)
   let pockets = [];
   try {
-    pockets = findWallPockets(walkRuns, runs, carriageways, options);
+    pockets = yield* findWallPocketsSteps(walkRuns, runs, carriageways, options);
   } catch (err) {
     console.warn('Sidewalks: could not find the paved pockets by the seawalls:', err?.message);
   }
