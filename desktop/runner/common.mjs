@@ -4,6 +4,14 @@ import v8 from 'node:v8';
 
 export const send = (msg) => (process.send ? process.send(msg) : console.log(JSON.stringify(msg)));
 
+// A request that fails after nobody waits for it any more: a browser tab notes it and goes on, Node stops the
+// whole process (code 1). The 3DEP survey files are read in slices (geotiff); when the USGS servers drop a
+// connection, one slice's failure can arrive after the read it belonged to has already given up, and an 8 km
+// export stopped there, minutes in, with no level. What was awaited still fails where it is awaited.
+process.on('unhandledRejection', (reason) => {
+  console.warn('[Runner] A request failed after its result was no longer awaited; carrying on:', reason?.message || reason);
+});
+
 /** This process's memory and busy cores to the app, each second. */
 export function startMemoryReports() {
   if (!process.send) return;

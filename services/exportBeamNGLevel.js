@@ -155,6 +155,7 @@ import {
 } from './beamngBiomeCatalog.js';
 import { resolveRegionalBiome } from './beamngRegion.js';
 import { contentExportOptions, contentOn, filterOsmByTags, filterWaterKinds, filterFootBridges } from './buildContent.js';
+import { withProcessHandlersKept } from './keepProcessHandlers.js';
 
 const BEAMNG_EXPORT_SERVICE_LOG = '[BeamNG Export Service]';
 
@@ -8714,7 +8715,8 @@ export async function defaultLidarProvider() {
   // installed app built every bridge deck without its measured height)
   const inNode = typeof process !== 'undefined' && !!process.versions?.node && typeof window === 'undefined';
   const lp = inNode
-    ? await (await import(/* @vite-ignore */ ['laz-perf', 'lib', 'node', 'index.js'].join('/'))).createLazPerf()
+    // (without the handlers its Emscripten start-up adds, which throw any stray failure: services/keepProcessHandlers.js)
+    ? await withProcessHandlersKept(async () => (await import(/* @vite-ignore */ ['laz-perf', 'lib', 'node', 'index.js'].join('/'))).createLazPerf())
     : await (await import('laz-perf/lib/web')).createLazPerf({ locateFile: (path) => (path.endsWith('.wasm') ? '/laz-perf.wasm' : path) });
   const index = (await (await fetch('/ept-index.json')).json()).datasets;
   return { index, lp, fetchImpl: (...a) => fetch(...a) };
