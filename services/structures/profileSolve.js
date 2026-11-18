@@ -441,9 +441,12 @@ export function* solveProfilesSteps(graph) {
     if (node.edges.length < 2) continue;
     for (const { edge, end } of node.edges) nodeEnd[off[edge] + (end === 0 ? 0 : edges[edge].s.length - 1)] = 1;
   }
+  // (a plain loop: in a forEach callback the running maximum was a captured variable, and V8 boxed a new number
+  // for every store, twice per station per pass: the solver's largest source of garbage)
   const clampGrades = () => {
     let moved = 0;
-    edges.forEach((e, k) => {
+    for (let k = 0; k < edges.length; k++) {
+      const e = edges[k];
       const base = off[k]; const rise = stepRise[k]; const n = e.s.length;
       for (let i = 0; i + 1 < n; i++) {
         const v = base + i + 1;
@@ -457,7 +460,7 @@ export function* solveProfilesSteps(graph) {
         const next = Math.min(U[v], Math.max(L[v], Math.min(Z[v + 1] + rise[i], Math.max(Z[v + 1] - rise[i], Z[v]))));
         moved = Math.max(moved, Math.abs(next - Z[v])); Z[v] = next;
       }
-    });
+    }
     return moved;
   };
   // grade links over the whole network: along every edge (its allowed rise

@@ -32,6 +32,12 @@ function inRing(x, y, ring) {
 export function findPortalBuildings({ buildings = [], tunnels = [], groundAt }) {
   const out = [];
   const taken = new Set();
+  // (each footprint's box once, not again at every portal of a city's 39 tunnels for its 36,000 buildings)
+  const boxes = buildings.map((b) => {
+    let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
+    for (const [x, y] of b.ring || []) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+    return [x0, y0, x1, y1];
+  });
   for (const t of tunnels) {
     if (t.kind === 'cutcover' || !t.line?.length) continue;
     for (const end of [0, 1]) {
@@ -56,11 +62,15 @@ export function findPortalBuildings({ buildings = [], tunnels = [], groundAt }) 
         const dx = x - p.x; const dy = y - p.y;
         return Math.abs(dx * -(p.ty ?? 0) + dy * (p.tx ?? 0)) <= (t.W || 5) + MOUTH_SIDE_M && Math.abs(dx * (p.tx ?? 0) + dy * (p.ty ?? 0)) <= STEP_M;
       });
-      for (const b of buildings) {
+      // (the mouth's samples' box: a footprint whose box misses it has no sample inside; exactly the test below)
+      let mx0 = Infinity; let my0 = Infinity; let mx1 = -Infinity; let my1 = -Infinity;
+      for (const [x, y] of pts) { if (x < mx0) mx0 = x; if (x > mx1) mx1 = x; if (y < my0) my0 = y; if (y > my1) my1 = y; }
+      for (let bi = 0; bi < buildings.length; bi++) {
+        const b = buildings[bi];
         if (taken.has(b.f)) continue;
         const ring = b.ring;
-        let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
-        for (const [x, y] of ring) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+        const [x0, y0, x1, y1] = boxes[bi];
+        if (x0 > mx1 || x1 < mx0 || y0 > my1 || y1 < my0) continue;
         if (!pts.some(([x, y]) => x >= x0 && x <= x1 && y >= y0 && y <= y1 && inRing(x, y, ring))) continue;
         // (its own ground: the lowest under its corners; already over the headwall, it stands on the hill)
         const ground = Math.min(...ring.map(([x, y]) => groundAt(x, y)).filter(Number.isFinite));

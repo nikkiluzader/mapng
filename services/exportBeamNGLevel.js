@@ -4034,10 +4034,15 @@ const SINK_SHOULDER_M = 1.5;
 /** Where polylines a and b cross in plan: [[x, y]]. */
 function planCrossingPoints(a, b) {
   const out = [];
+  // (points read by index, and segment pairs whose boxes lie more than a micrometre apart skipped: they cannot
+  // cross, the margin far over any rounding. It ran for every pair of roads near each other in a city)
+  const GAP = 1e-6;
   for (let i = 0; i + 1 < a.length; i++) {
-    const [ax, ay] = a[i]; const [bx, by] = a[i + 1];
+    const ax = a[i][0]; const ay = a[i][1]; const bx = a[i + 1][0]; const by = a[i + 1][1];
+    const sx0 = Math.min(ax, bx) - GAP; const sx1 = Math.max(ax, bx) + GAP; const sy0 = Math.min(ay, by) - GAP; const sy1 = Math.max(ay, by) + GAP;
     for (let j = 0; j + 1 < b.length; j++) {
-      const [cx, cy] = b[j]; const [dx, dy] = b[j + 1];
+      const cx = b[j][0]; const cy = b[j][1]; const dx = b[j + 1][0]; const dy = b[j + 1][1];
+      if ((cx < sx0 && dx < sx0) || (cx > sx1 && dx > sx1) || (cy < sy0 && dy < sy0) || (cy > sy1 && dy > sy1)) continue;
       const den = (bx - ax) * (dy - cy) - (by - ay) * (dx - cx);
       if (Math.abs(den) < 1e-9) continue;
       const t = ((cx - ax) * (dy - cy) - (cy - ay) * (dx - cx)) / den;
@@ -13447,10 +13452,24 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         heightAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
       }).lakes.map((l) => l.poly) : [];
       const riverSegs = (riverPlan?.rivers || []).flatMap((r) => r.nodes.slice(0, -1).map((a, i) => [a, r.nodes[i + 1]]));
+      // (river segments by grid cell, each over its box padded by its own reach: a point looks only at its cell's,
+      // the same answer as asking every segment; it ran for every pixel under a city's decks)
+      const RIVER_CELL = 32;
+      const riverCells = new Map();
+      for (const seg of riverSegs) {
+        const [a, b] = seg; const r = Math.max(a[3] || 0, b[3] || 0) / 2 + 1 + 1e-6;
+        if (!Number.isFinite(r)) { riverCells.clear(); riverCells.set('all', riverSegs); break; }
+        for (let gx = Math.floor((Math.min(a[0], b[0]) - r) / RIVER_CELL); gx <= Math.floor((Math.max(a[0], b[0]) + r) / RIVER_CELL); gx++) {
+          for (let gy = Math.floor((Math.min(a[1], b[1]) - r) / RIVER_CELL); gy <= Math.floor((Math.max(a[1], b[1]) + r) / RIVER_CELL); gy++) {
+            const k = `${gx},${gy}`; if (!riverCells.has(k)) riverCells.set(k, []); riverCells.get(k).push(seg);
+          }
+        }
+      }
+      const riversAt = (x, y) => riverCells.get('all') || riverCells.get(`${Math.floor(x / RIVER_CELL)},${Math.floor(y / RIVER_CELL)}`) || [];
       const wet = (x, y) => {
         if (getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize) <= seaLocal + 0.5) return true;
         if (lakePolys.some((p) => p.contains(x, y))) return true;
-        return riverSegs.some(([a, b]) => {
+        return riversAt(x, y).some(([a, b]) => {
           const vx = b[0] - a[0]; const vy = b[1] - a[1]; const L2 = vx * vx + vy * vy || 1e-9;
           const t = Math.max(0, Math.min(1, ((x - a[0]) * vx + (y - a[1]) * vy) / L2));
           return fastHypot(a[0] + vx * t - x, a[1] + vy * t - y) <= (a[3] + (b[3] - a[3]) * t) / 2 + 1;
