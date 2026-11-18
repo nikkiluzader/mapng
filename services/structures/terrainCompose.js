@@ -375,7 +375,8 @@ export function composeTerrain(graph, grid) {
           let hEdge = h0;
           if (d > core) {
             const f = core / d; const qx = ax + vx * u; const qy = ay + vy * u;
-            const [pc, pr] = toPixel(qx + (x - qx) * f, qy + (y - qy) * f);
+            // (toPixel's arithmetic written out: an array per pixel of every side slope was this loop's garbage)
+            const pc = (qx + (x - qx) * f) / squareM + width / 2; const pr = (height - 1) - ((qy + (y - qy) * f) / squareM + height / 2);
             hEdge = raw(Math.max(0, Math.min(width - 1, Math.round(pc))), Math.max(0, Math.min(height - 1, Math.round(pr)))) - minHeight;
           }
           const off2 = Math.abs(zc - hEdge);
