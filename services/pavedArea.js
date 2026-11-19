@@ -317,3 +317,71 @@ function simplifyLine(pts, tol) {
   }
   return pts.filter((_, i) => keep[i]);
 }
+
+/**
+ * Meshes for the paved outlines (step 3c). rings: traceOutlines' (outer counter-clockwise, holes clockwise);
+ * cells / g: the grid they came from (an edge with road outside it is a curb); heightAt(x, y): the slab top's z.
+ * The slab is cut into cellM squares (each ring clipped to the square: a square is convex, the clip cannot fail)
+ * and triangulated per square with its holes, so it follows the road's grade. Returns flat Float32Array
+ * triangles (x, y, z per corner): slab, curb (vertical faces from the top down curbH, road outside), skirt
+ * (faces skirtM into the ground, ground outside).
+ */
+export function buildPavedMesh(rings, cells, g, { heightAt = () => 0, cellM = 4, curbH = 0.15, skirtM = 0.3, THREE } = {}) {
+  if (!THREE) throw new Error('buildPavedMesh needs THREE (ShapeUtils.triangulateShape)');
+  const slab = []; const curb = []; const skirt = [];
+  // polygons: each outer ring with the holes inside it
+  const outers = rings.filter((r) => ringSignedArea(r) > 0); const holes = rings.filter((r) => ringSignedArea(r) < 0);
+  const inside = (p, ring) => { let s = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const a = ring[i]; const b = ring[j]; if ((a[1] > p[1]) !== (b[1] > p[1]) && p[0] < a[0] + ((p[1] - a[1]) * (b[0] - a[0])) / (b[1] - a[1])) s = !s; } return s; };
+  const polys = outers.map((o) => ({ outer: o, holes: [] }));
+  for (const hr of holes) {
+    const owner = polys.filter((p) => inside(hr[0], p.outer)).sort((a, b) => ringSignedArea(a.outer) - ringSignedArea(b.outer))[0];
+    if (owner) owner.holes.push(hr);
+  }
+  const box = (ring) => { let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity; for (const [x, y] of ring) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } return [x0, y0, x1, y1]; };
+  // Sutherland-Hodgman against an axis-aligned square
+  const clip = (ring, sx0, sy0, sx1, sy1) => {
+    let out = ring;
+    const edges = [[(p) => p[0] >= sx0, (a, b) => [sx0, a[1] + ((sx0 - a[0]) * (b[1] - a[1])) / (b[0] - a[0])]],
+      [(p) => p[0] <= sx1, (a, b) => [sx1, a[1] + ((sx1 - a[0]) * (b[1] - a[1])) / (b[0] - a[0])]],
+      [(p) => p[1] >= sy0, (a, b) => [a[0] + ((sy0 - a[1]) * (b[0] - a[0])) / (b[1] - a[1]), sy0]],
+      [(p) => p[1] <= sy1, (a, b) => [a[0] + ((sy1 - a[1]) * (b[0] - a[0])) / (b[1] - a[1]), sy1]]];
+    for (const [keep, cut] of edges) {
+      const inp = out; out = [];
+      for (let i = 0; i < inp.length; i++) {
+        const a = inp[(i + inp.length - 1) % inp.length]; const b = inp[i];
+        if (keep(b)) { if (!keep(a)) out.push(cut(a, b)); out.push(b); } else if (keep(a)) out.push(cut(a, b));
+      }
+      if (!out.length) return out;
+    }
+    return out;
+  };
+  const push3 = (arr, p) => arr.push(p[0], p[1], heightAt(p[0], p[1]));
+  for (const p of polys) {
+    const [x0, y0, x1, y1] = box(p.outer);
+    for (let sx = Math.floor(x0 / cellM) * cellM; sx < x1; sx += cellM) {
+      for (let sy = Math.floor(y0 / cellM) * cellM; sy < y1; sy += cellM) {
+        const o = clip(p.outer, sx, sy, sx + cellM, sy + cellM);
+        if (o.length < 3 || Math.abs(ringSignedArea(o)) < 1e-4) continue;
+        const hs = p.holes.map((h) => clip(h, sx, sy, sx + cellM, sy + cellM)).filter((h) => h.length >= 3 && Math.abs(ringSignedArea(h)) > 1e-4);
+        const contour = o.map(([x, y]) => new THREE.Vector2(x, y)); const hv = hs.map((h) => h.map(([x, y]) => new THREE.Vector2(x, y)));
+        const all = [...o, ...hs.flat()];
+        for (const [a, b, c] of THREE.ShapeUtils.triangulateShape(contour, hv)) { push3(slab, all[a]); push3(slab, all[b]); push3(slab, all[c]); }
+      }
+    }
+  }
+  // edge faces: road just outside the edge (on its right, the outside of a counter-clockwise outer / clockwise hole) -> curb
+  const roadAt = (x, y) => { const c = Math.floor((x - g.x0) / g.res); const r = Math.floor((g.y1 - y) / g.res); return c >= 0 && r >= 0 && c < g.w && r < g.h && (cells[r * g.w + c] & ROAD) !== 0; };
+  for (const ring of rings) {
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i]; const b = ring[(i + 1) % ring.length];
+      const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L = fastHypot(dx, dy); if (L < 1e-6) continue;
+      const ox = dy / L; const oy = -dx / L;   // the outside (right of the direction of travel)
+      const mx = (a[0] + b[0]) / 2; const my = (a[1] + b[1]) / 2;
+      const isCurb = roadAt(mx + ox * 0.4, my + oy * 0.4) || roadAt(mx + ox * 0.75, my + oy * 0.75);
+      const drop = isCurb ? curbH : skirtM; const into = isCurb ? curb : skirt;
+      const za = heightAt(a[0], a[1]); const zb = heightAt(b[0], b[1]);
+      into.push(a[0], a[1], za, b[0], b[1], zb, b[0], b[1], zb - drop, a[0], a[1], za, b[0], b[1], zb - drop, a[0], a[1], za - drop);
+    }
+  }
+  return { slab: Float32Array.from(slab), curb: Float32Array.from(curb), skirt: Float32Array.from(skirt), polygons: polys.length };
+}

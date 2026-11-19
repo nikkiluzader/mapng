@@ -76,3 +76,23 @@ test('traceOutlines: a disc traces to one ring of its area; a square with a hole
   assert.deepEqual(signs, [-1, 1], 'one outer, one hole, opposite windings');
   assert.ok(r2.every((r) => r.length <= 8), `square rings simplified to corners: ${r2.map((r) => r.length)}`);
 });
+
+test('buildPavedMesh: the slab covers the outline\'s area; the edge facing the road is a curb, the far edge a skirt', async () => {
+  const THREE = await import('three');
+  const { makeGrid: mk, buildPavedGrid: build, traceOutlines, buildPavedMesh, WALK: W, GAP: G, ringSignedArea } = await import('../services/pavedArea.js');
+  const g = mk(-30, -30, 30, 30);
+  const { cells } = build(g, { roads: [{ pts: [[-40, 0], [40, 0]], half: 4 }], walks: [{ pts: [[-40, 9.5], [40, 9.5]], half: 1, sidewalk: true }] });
+  const rings = traceOutlines(cells, g, W | G);
+  const area = rings.reduce((a, r) => a + ringSignedArea(r), 0);
+  const m = buildPavedMesh(rings, cells, g, { THREE, heightAt: (x, y) => 0.15 + 0.01 * x });
+  let tri = 0;
+  for (let i = 0; i < m.slab.length; i += 9) tri += Math.abs((m.slab[i + 3] - m.slab[i]) * (m.slab[i + 7] - m.slab[i + 1]) - (m.slab[i + 6] - m.slab[i]) * (m.slab[i + 4] - m.slab[i + 1])) / 2;
+  assert.ok(Math.abs(tri - area) < 0.5, `slab ${tri.toFixed(2)} m2 vs outline ${area.toFixed(2)} m2`);
+  // curb faces sit along y = 4 (the road edge), skirts along y = 10.5 (the walk's far edge)
+  const ys = (arr) => { const out = []; for (let i = 0; i < arr.length; i += 18) out.push((arr[i + 1] + arr[i + 4]) / 2); return out; };
+  assert.ok(m.curb.length && ys(m.curb).every((y) => Math.abs(y - 4) < 0.5), 'curbs along the road edge');
+  assert.ok(ys(m.skirt).some((y) => Math.abs(y - 10.5) < 0.5), 'a skirt along the walk\'s far edge');
+  // the slab follows heightAt (a 1 % grade along x)
+  let worst = 0; for (let i = 0; i < m.slab.length; i += 3) worst = Math.max(worst, Math.abs(m.slab[i + 2] - (0.15 + 0.01 * m.slab[i])));
+  assert.ok(worst < 1e-5);
+});
