@@ -205,7 +205,10 @@ export async function lintLevelZip(bytes, { gameHas = null, gameMaterials = null
   for (const t of textures) {
     if (resolves(t.path)) continue;
     const rel = t.path.replace(/^\//, '');
-    if (!rel.startsWith(base) && gameDangling?.(rel)) { add('warn', 'textures', `${t.mat}: ${t.path} missing in the game too (its own materials reference it)`, t.file); continue; }
+    // (a note, not a warning: the game ships the same dangling reference in its own levels, so a level matching it
+    // is right and nothing an export can mend; it heals if BeamNG restores the file. Counted as a warning, every
+    // level with beech trees failed the sweep once the trees reached it)
+    if (!rel.startsWith(base) && gameDangling?.(rel)) { add('note', 'textures', `${t.mat}: ${t.path} missing in the game too (its own materials reference it)`, t.file); continue; }
     missingTex++; add('error', 'textures', `${t.mat}: ${t.path} missing`, t.file);
   }
   counts.textures = textures.length; counts.missingTextures = missingTex;

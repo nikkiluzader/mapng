@@ -3779,6 +3779,7 @@ function* sidewalkMeshes(carriageways, options = {}) {
       mapBox: options.mapBox || null,
       water: options.water || [],
       seaMask: options.seaMask || null,
+      walkH: WALK_H,
       carriageways, corners, walks: options.walks || [], runs, openGround: options.openGround || [], buildings: options.buildings || [], driveways: options.driveways || [],
       curbH: CURB_H, crossSlope: CROSS_SLOPE, curbOnlyM: CURB_ONLY_M, THREE, groundAt: options.groundAt || null,
     });

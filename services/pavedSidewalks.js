@@ -24,7 +24,8 @@ export const BARE_CURB_M = 0.5;
 export const FOLLOW_FROM_M = 0.5;   // terrain not shaped: the slab follows the road this far from its edge,
 export const FOLLOW_M = 2;          // then onto the ground over this much
 export const FOLLOW_OVER_M = 0.05;  // ... this far over it
-export const OVERHEAD_FLOAT_M = 1;  // a slab this far over ground with something overhead follows the ground   // a bare curb (no sidewalk): a strip this wide along the road edge, its curb and top band
+export const OVERHEAD_FLOAT_M = 1;
+export const SURFACE_AGREE_M = 0.5;   // the terrain at a road's edge is its surface while within this of its solved height  // a slab this far over ground with something overhead follows the ground   // a bare curb (no sidewalk): a strip this wide along the road edge, its curb and top band
 
 /** The part of a polyline from s0 to s1 metres along it. */
 export function pieceAlong(points, s0, s1) {
@@ -136,7 +137,7 @@ export function addPavedSidewalks(builder, opts = {}) {
 
 // (a generator: the tiles' grids asked of the driver as one batch, { kind: 'pavedTiles', items }, built on worker
 // threads where there are some; null back: built here)
-export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = [], walks = [], runs = [], openGround = [], buildings = [], driveways = [], pockets = [], uvBands = null, followGround = false, overhead = null, mapBox = null, water = [], seaMask = null, curbH = 0.15, crossSlope = 0.015, curbOnlyM = 0.3, THREE, groundAt = null } = {}) {
+export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = [], walks = [], runs = [], openGround = [], buildings = [], driveways = [], pockets = [], uvBands = null, followGround = false, overhead = null, mapBox = null, water = [], seaMask = null, walkH = 0.1, curbH = 0.15, crossSlope = 0.015, curbOnlyM = 0.3, THREE, groundAt = null } = {}) {
   const road = makeRoadHeight(carriageways);
   // (a driveway counts only where it crosses the sidewalk to reach the road: the part of its line within
   // CROSS_REACH_M of where it comes to the road's edge. Whole, an alley along a street dropped the curb along it)
@@ -160,12 +161,24 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
   const dipLines = runs.flatMap((r) => (r.dips || []).map(([a, b]) => pieceAlong(r.points, a, b)).filter((l) => l.length > 1));
   const toDip = dipLines.length ? makeLineDistance(dipLines, DIP_RAMP_M) : () => Infinity;
   // the road surface at the nearest edge (a curb face comes down to it)
-  const surfaceAt = (x, y) => { const h = road(x, y); if (!h) return groundAt ? groundAt(x, y) : 0; return groundAt ? groundAt(h.ex, h.ey) : h.z; };
+  // (the shaped terrain at the edge, while it agrees with the road's own solved height: beside a bridge's abutment
+  // the edge point lies where the bank drops to the water, and a slab off the low ground there dug a 4 m pit)
+  const edgeSurface = (h) => { if (!groundAt) return h.z; const g = groundAt(h.ex, h.ey); return Math.abs(g - h.z) <= SURFACE_AGREE_M ? g : h.z; };
+  const surfaceAt = (x, y) => { const h = road(x, y); if (!h) return groundAt ? groundAt(x, y) : 0; return edgeSurface(h); };
+  // (the mapped walks' own heights, which follow what they run on, a bridge's approach among them: on a walk the
+  // slab is its height plus walkH, as today's walkways; between the curb and a walk it goes from the curb's top to the
+  // walk's. Off the roads alone, the walk to a bridge's footway sat 2-3 m under the deck walk it met)
+  const walkHeight = makeRoadHeight(walks.filter((w) => !w.crossing && (w.nodes || []).length > 1 && w.nodes.every((p) => Number.isFinite(p[2]))).map((w) => ({ nodes: w.nodes, half: w.half || 1 })));
   const heightAt = (x, y) => {
     const h = road(x, y); if (!h) return groundAt ? groundAt(x, y) : 0;
-    const surface = groundAt ? groundAt(h.ex, h.ey) : h.z;
+    const surface = edgeSurface(h);
     const share = Math.min(smooth01((toDriveway(x, y) - DRIVEWAY_HALF_M) / DIP_RAMP_M), smooth01(toDip(x, y) / DIP_RAMP_M));
-    const top = surface + curbH * share + DIP_LIP_M * (1 - share) + crossSlope * Math.min(h.d, 6);
+    let top = surface + curbH * share + DIP_LIP_M * (1 - share) + crossSlope * Math.min(h.d, 6);
+    const wk = walkHeight(x, y);
+    if (wk && wk.d < SIDEWALK_GAP_M) {
+      const walkTop = wk.z + walkH;
+      top = wk.d <= 0 ? walkTop : top + (walkTop - top) * smooth01(h.d / (h.d + wk.d));
+    }
     if (!groundAt) return top;
     // the terrain left as it is (no shaping): the curb at the road, the slab onto the ground within FOLLOW_M of it
     if (followGround) {
