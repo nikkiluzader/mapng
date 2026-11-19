@@ -481,7 +481,11 @@ stubs at crossings; B is 15.7 s of Chicago 8192's ~45 s of sidewalk work and hol
   - step 3c done: buildPavedMesh (4 m squares, curb faces, skirts); Chicago 27,642 triangles vs 76,087 today, 173 ms.
     To finish at wiring: 0.25 m jogs where a fillet meets a straight curb; a curb top strip in the curb look.
   - step 3d done: gradePaved (under the slab, blend back by one distance transform, roads left).
-    Next: 3e wiring behind a switch (heights from the road edges, tiles on workers), (slabs, curb faces) at today's heights; 3d grading
+  - step 3e done: services/pavedSidewalks.js, switch MAPNG_PAVED_SIDEWALKS=1 (off: levels unchanged). Chicago test
+    area: 4 tiles, 14.9k slab / 2.5k curb / 9.2k edge triangles; section checked (slab 15 cm over the road at the
+    curb, ground 14 cm under the slab). Still to do: driveway dips and car-park openings, the curb top strip, the
+    0.25 m corner jogs, the seawall pockets (off in paved mode), tiles on workers; then the side-by-side.
+    Was: 3e wiring behind a switch (heights from the road edges, tiles on workers), (slabs, curb faces) at today's heights; 3d grading
     from the grid; tiles on workers; decks and waterfront unchanged at first; behind a switch until approved.
 - Then: plots and paved-area numbers on the test areas against today, in-game check, and the user's go-ahead
   before it replaces A and B.
