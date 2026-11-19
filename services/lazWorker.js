@@ -14,6 +14,7 @@ import proj4 from 'proj4';
 // Import the worker-specific build (ENVIRONMENT_IS_WORKER=true).
 // WASM is resolved via locateFile → /laz-perf.wasm in public/.
 import { createLazPerf } from 'laz-perf/lib/worker';
+import { POOL_BELOW_SPACING, poolFineCells, relaxFilled } from './lazGrid.js';
 import { getBuiltInProj4 } from './uploadGeoMetadata.js';
 
 const NO_DATA = -99999;
@@ -348,10 +349,14 @@ const countLayers = (L, cls, intensity, rgbAt, i) => {
 // own projection (FRAC); the rest by a straight-line fit of it across the tile, used only where it agrees with the
 // exact projection to a tenth of a cell (a display, not geometry).
 const PREVIEW_MAX_PX = 2048;
-const newPreview = (width, height, metersPerPixel, tiles) => {
+// (the tiles' average point spacing from their headers, m)
+const pointSpacingOf = (tiles) => {
   let pts = 0; let area = 0;
   for (const t of tiles) { pts += Number(t.pointCount) || 0; area += Math.max(0, (t.maxX - t.minX) * (t.maxY - t.minY)); }
-  const spacing = pts > 0 && area > 0 ? Math.sqrt(area / pts) : 1;
+  return pts > 0 && area > 0 ? Math.sqrt(area / pts) : 1;
+};
+const newPreview = (width, height, metersPerPixel, tiles) => {
+  const spacing = pointSpacingOf(tiles);
   const mpp = Number(metersPerPixel) > 0 ? Number(metersPerPixel) : 1;
   const cellM = Math.max(2 * spacing, 0.25, (Math.max(width, height) * mpp) / PREVIEW_MAX_PX);
   const w = Math.max(1, Math.round(width * mpp / cellM)); const h = Math.max(1, Math.round(height * mpp / cellM));
@@ -522,6 +527,10 @@ const rasterize = async (params, id) => {
     await accumulateTilePoints(tile, gridMapper, groundSum, groundCnt, onPoint, layers, preview);
   }
 
+  // (cells finer than the points: each takes its neighbours' points too)
+  const cellM = Number(params.metersPerPixel) > 0 ? Number(params.metersPerPixel) : 1;
+  if (cellM < POOL_BELOW_SPACING * pointSpacingOf(tiles)) poolFineCells(groundSum, groundCnt, width, height);
+
   // ── Build final heightmap ─────────────────────────────────────────────────
   // Cells with no ground/water returns are left as NO_DATA; the pyramid
   // hole-filler below interpolates them from surrounding ground points.
@@ -546,7 +555,13 @@ const rasterize = async (params, id) => {
   const exteriorNoDataMask = markExteriorNoData(heightMap, width, height);
 
   self.postMessage({ id, type: 'progress', current: processed, total: processed, status: 'Filling holes…' });
+  // (the cells to fill inside the footprint, before filling: smoothed after)
+  let nHoles = 0;
+  for (let i = 0; i < totalCells; i++) if (heightMap[i] === NO_DATA && !exteriorNoDataMask[i]) nHoles++;
+  const holes = new Int32Array(nHoles);
+  for (let i = 0, k = 0; i < totalCells; i++) if (heightMap[i] === NO_DATA && !exteriorNoDataMask[i]) holes[k++] = i;
   fillHoles(heightMap, width, height);
+  relaxFilled(heightMap, width, height, holes);
 
   // Restore border-connected no-data after filling so only interior gaps are
   // interpolated; this avoids warped edges around sparse footprints.
