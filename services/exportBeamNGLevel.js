@@ -157,6 +157,7 @@ import { resolveRegionalBiome } from './beamngRegion.js';
 import { contentExportOptions, contentOn, filterOsmByTags, filterWaterKinds, filterFootBridges } from './buildContent.js';
 import { withProcessHandlersKept } from './keepProcessHandlers.js';
 import { composeTerrainParallel } from './composeWorker.js';
+import { gradePaved } from './pavedArea.js';
 import { fastHypot } from './fastMath.js';
 
 const BEAMNG_EXPORT_SERVICE_LOG = '[BeamNG Export Service]';
@@ -13676,6 +13677,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       seaZ: -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0),
       // the sidewalks away from the curb: raised over their decals
       walks: decalRoads.footpaths,
+      // (the sidewalk rework, under test: one paved area, services/pavedSidewalks.js)
+      pavedModel: typeof process !== 'undefined' && process.env?.MAPNG_PAVED_SIDEWALKS === '1',
       sidewalkLook,
       // (paving stones laid as the streets' decals lay them: red brick in the Americas)
       americas: getMarkingStyle(exportTerrainData.roadRules) === 'americas',
@@ -13692,10 +13695,21 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const sidewalkGroundIdx = (() => { const flags = new Uint8Array(exportTerrainData.width * exportTerrainData.height); return { add: (i) => { flags[i] = 1; }, has: (i) => flags[i] === 1 }; })();
   if (sidewalks.runs.length > 0 && shapeExtras) {
     // the ground under the slabs (they hang at road height + the curb)
-    const graded = gradeSidewalkGround([...sidewalks.runs, ...sidewalks.walkRuns, ...sidewalks.cornerRuns, ...sidewalks.cornerGround], groundCarriageways, {
+    const terrainGrid = {
       heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
       worldSize: exportTerrainData.width * squareSize, minHeight: Number(exportTerrainData.minHeight) || 0,
-    }, { overhead: underDeck, besideDeck: besideDeckAt(bridgeDecks) });
+    };
+    // (the paved model: graded from its own tiles, each its core)
+    const graded = sidewalks.paved
+      ? (() => {
+        const idx = []; const z = [];
+        for (const t of sidewalks.paved.tiles) {
+          const e = gradePaved(t.cells, t.g, terrainGrid, { heightAt: sidewalks.paved.heightAt, core: t.core });
+          for (let k = 0; k < e.idx.length; k++) { idx.push(e.idx[k]); z.push(e.z[k]); }
+        }
+        return { pixels: idx.length, apply(set) { for (let k = 0; k < idx.length; k++) set(idx[k], z[k]); } };
+      })()
+      : gradeSidewalkGround([...sidewalks.runs, ...sidewalks.walkRuns, ...sidewalks.cornerRuns, ...sidewalks.cornerGround], groundCarriageways, terrainGrid, { overhead: underDeck, besideDeck: besideDeckAt(bridgeDecks) });
     const hmSide = heightMapEditor(exportTerrainData);
     graded.apply((idx, v) => { hmSide.set(idx, v); sidewalkGroundIdx.add(idx); });
     lowerUnderWallDecks(sidewalks.wallDecks, {

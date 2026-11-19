@@ -326,7 +326,8 @@ function simplifyLine(pts, tol) {
  * triangles (x, y, z per corner): slab, curb (vertical faces from the top down curbH, road outside), skirt
  * (faces skirtM into the ground, ground outside).
  */
-export function buildPavedMesh(rings, cells, g, { heightAt = () => 0, cellM = 4, curbH = 0.15, skirtM = 0.3, THREE } = {}) {
+// core: [x0, y0, x1, y1], only the slab squares and edges inside it (a tile's own part, its margin left to its neighbours)
+export function buildPavedMesh(rings, cells, g, { heightAt = () => 0, cellM = 4, curbH = 0.15, skirtM = 0.3, THREE, core = null } = {}) {
   if (!THREE) throw new Error('buildPavedMesh needs THREE (ShapeUtils.triangulateShape)');
   const slab = []; const curb = []; const skirt = [];
   // polygons: each outer ring with the holes inside it
@@ -359,7 +360,9 @@ export function buildPavedMesh(rings, cells, g, { heightAt = () => 0, cellM = 4,
   for (const p of polys) {
     const [x0, y0, x1, y1] = box(p.outer);
     for (let sx = Math.floor(x0 / cellM) * cellM; sx < x1; sx += cellM) {
+      if (core && (sx + cellM <= core[0] || sx >= core[2])) continue;
       for (let sy = Math.floor(y0 / cellM) * cellM; sy < y1; sy += cellM) {
+        if (core && (sy + cellM <= core[1] || sy >= core[3])) continue;
         const o = clip(p.outer, sx, sy, sx + cellM, sy + cellM);
         if (o.length < 3 || Math.abs(ringSignedArea(o)) < 1e-4) continue;
         const hs = p.holes.map((h) => clip(h, sx, sy, sx + cellM, sy + cellM)).filter((h) => h.length >= 3 && Math.abs(ringSignedArea(h)) > 1e-4);
@@ -377,6 +380,7 @@ export function buildPavedMesh(rings, cells, g, { heightAt = () => 0, cellM = 4,
       const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L = fastHypot(dx, dy); if (L < 1e-6) continue;
       const ox = dy / L; const oy = -dx / L;   // the outside (right of the direction of travel)
       const mx = (a[0] + b[0]) / 2; const my = (a[1] + b[1]) / 2;
+      if (core && (mx < core[0] || mx >= core[2] || my < core[1] || my >= core[3])) continue;
       const isCurb = roadAt(mx + ox * 0.4, my + oy * 0.4) || roadAt(mx + ox * 0.75, my + oy * 0.75);
       const drop = isCurb ? curbH : skirtM; const into = isCurb ? curb : skirt;
       const za = heightAt(a[0], a[1]); const zb = heightAt(b[0], b[1]);
@@ -399,7 +403,7 @@ const smooth01 = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
  * slab; round it, it blends back to the natural ground over BLEND_RUN per metre of difference (BLEND_MIN_M to
  * BLEND_MAX_M); road pixels are left to the roads' own grading. Returns { idx: Int32Array, z: Float64Array } (raw).
  */
-export function gradePaved(cells, g, terrain, { heightAt = () => 0 } = {}) {
+export function gradePaved(cells, g, terrain, { heightAt = () => 0, core = null } = {}) {
   const { heightMap, width, height, worldSize, minHeight = 0 } = terrain;
   const N = width * height; const sq = worldSize / width;
   // (the terrain grid's convention: pixel (c, r) at ((c / W) - 0.5) * size, (0.5 - (r + 1) / H) * size)
@@ -425,6 +429,7 @@ export function gradePaved(cells, g, terrain, { heightAt = () => 0 } = {}) {
     for (let c = 0; c < sw; c++) {
       const k = r * sw + c; const gi = (r + r0) * width + (c + c0);
       if (gi < 0 || gi >= N || road[k]) continue;
+      if (core) { const x = wx(c + c0); const y = wy(r + r0); if (x < core[0] || x >= core[2] || y < core[1] || y >= core[3]) continue; }
       if (paved[k]) { idx.push(gi); z.push(top[k] + minHeight); continue; }
       if (near[k] < 0 || d2[k] > reach * reach) continue;
       const ground = heightMap[gi] - minHeight; const t = top[near[k]];

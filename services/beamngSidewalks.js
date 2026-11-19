@@ -28,6 +28,7 @@ import { isOneWayRoad } from './roadWidth.js';
 import { PLAZA_MATERIAL, plazaTileM, pavedWalkSurface } from './plazas.js';
 import { smoothLine } from './lineSmoothing.js';
 import { fastHypot } from './fastMath.js';
+import { addPavedSidewalks } from './pavedSidewalks.js';
 
 let CURB_H = 0.15;            // m above the road (setCurbHeight: the Curb height choice)
 const SINK = 0.10;            // m the faces reach below the road
@@ -3741,14 +3742,26 @@ function* sidewalkMeshes(carriageways, options = {}) {
     builder = new PartBuilder(paveAt, options.sidewalkLook);
     inBatch = 0;
   };
-  for (const run of runs) {
-    if (run.points.length < 2) continue;
-    sweepRun(builder, run);
-    if (++inBatch >= RUNS_PER_MESH) flush();
-  }
-  for (const corner of corners) {
-    sweepCorner(builder, corner);
-    if (++inBatch >= RUNS_PER_MESH) flush();
+  // (the sidewalk rework, behind a switch: street-side sidewalks, corners and mapped footways as one paved area,
+  // services/pavedSidewalks.js; medians, decks, gangways and the waterfront as before)
+  let paved = null;
+  if (options.pavedModel) {
+    paved = addPavedSidewalks(builder, {
+      carriageways, corners, walks: options.walks || [], runs, openGround: options.openGround || [], buildings: options.buildings || [],
+      curbH: CURB_H, crossSlope: CROSS_SLOPE, curbOnlyM: CURB_ONLY_M, THREE, groundAt: options.groundAt || null,
+    });
+    console.log(`Sidewalks (paved model): ${paved.stats.tiles} tiles, ${Math.round(paved.stats.slab)} slab / ${Math.round(paved.stats.curb)} curb / ${Math.round(paved.stats.skirt)} edge triangles in ${paved.stats.ms} ms`);
+    flush();
+  } else {
+    for (const run of runs) {
+      if (run.points.length < 2) continue;
+      sweepRun(builder, run);
+      if (++inBatch >= RUNS_PER_MESH) flush();
+    }
+    for (const corner of corners) {
+      sweepCorner(builder, corner);
+      if (++inBatch >= RUNS_PER_MESH) flush();
+    }
   }
   for (const run of medianRuns) {
     sweepRun(builder, run);
@@ -3758,12 +3771,12 @@ function* sidewalkMeshes(carriageways, options = {}) {
   flush();
   // (a union can fail on bad geometry: strips that overlap beat no sidewalks)
   let pockets = [];
-  try {
+  if (!paved) try {
     pockets = yield* findWallPocketsSteps(walkRuns, runs, carriageways, options);
   } catch (err) {
     console.warn('Sidewalks: could not find the paved pockets by the seawalls:', err?.message);
   }
-  try {
+  if (!paved) try {
     yield* mergeWalks(builder, walkRuns, { pockets, streetRuns: runs, groundAt: options.groundAt, cuts: [...cornerCuts(corners), ...cornerSlabRings(corners), ...curbKeepOuts(runs, carriageways)] });
   } catch (err) {
     console.warn('Sidewalks: could not merge the walkways, drawing them apart:', err?.message);
@@ -3830,7 +3843,7 @@ function* sidewalkMeshes(carriageways, options = {}) {
     const toApex = left[0] * (apex[0] - p[0]) + left[1] * (apex[1] - p[1]) >= 0 ? 1 : -1;
     return [{ points: c.arc.map((o) => [o[0], o[1], o[2] - WALK_H]), side: toApex, width: fastHypot(apex[0] - p[0], apex[1] - p[1]) + 1, walk: true }];
   })];
-  const result = { meshes, runs, corners, cornerRuns, cornerGround, medianRuns, walkRuns, deckRuns, deckAt, gangways, wallDecks, pockets, triangles };
+  const result = { meshes, runs, corners, cornerRuns, cornerGround, medianRuns, walkRuns, deckRuns, deckAt, gangways, wallDecks, pockets, triangles, paved };
   // (a test probe's look at what was built: scratch top-down plots)
   if (typeof globalThis.__MAPNG_SIDEWALK_PROBE === 'function') globalThis.__MAPNG_SIDEWALK_PROBE({ ...result, carriageways, options });
   return result;
