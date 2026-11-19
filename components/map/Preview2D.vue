@@ -6,9 +6,9 @@
     <div ref="mapEl" class="absolute inset-0" />
 
     <div class="absolute top-4 left-4 z-[500] w-60 space-y-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white/95 dark:bg-gray-800/95 backdrop-blur p-3 shadow-lg text-xs text-gray-700 dark:text-gray-200">
-      <label class="flex items-center justify-between gap-2" :class="terrainView === 'normal' ? '' : 'opacity-50'">
+      <label class="flex items-center justify-between gap-2" :class="terrainView === 'normal' && cloudView === 'off' ? '' : 'opacity-50'">
         <span>{{ t('preview2d.texture') }}</span>
-        <select v-model="texture" :disabled="terrainView !== 'normal'" :class="SELECT_XS">
+        <select v-model="texture" :disabled="terrainView !== 'normal' || cloudView !== 'off'" :class="SELECT_XS">
           <option v-for="o in textureOptions" :key="o.id" :value="o.id">{{ o.label }}</option>
         </select>
       </label>
@@ -28,6 +28,28 @@
       <div v-else-if="terrainView === 'elevation'" class="space-y-0.5">
         <div class="h-2 rounded" :style="{ background: `linear-gradient(to right, ${ELEVATION_RAMP.join(', ')})` }" />
         <div class="flex justify-between text-micro text-gray-500 dark:text-gray-400"><span>{{ Math.round(terrainData.minHeight) }} m</span><span>{{ Math.round(terrainData.maxHeight) }} m</span></div>
+      </div>
+      <!-- an uploaded point cloud, seen from above in place of the texture: its classes, or how bright its laser
+           returns are (paint and signs). The map data can stay drawn over it, to compare -->
+      <div v-if="hasCloud" class="space-y-1" data-testid="preview2d-cloud">
+        <div class="flex items-center gap-2">
+          <span class="shrink-0">{{ t('preview2d.cloud') }}</span>
+          <div class="flex flex-1 gap-1 p-0.5 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700" role="radiogroup" :aria-label="t('preview2d.cloud')">
+            <button
+              v-for="v in CLOUD_VIEWS" :key="v" type="button" role="radio" :aria-checked="cloudView === v" :data-testid="`preview2d-cloud-${v}`"
+              class="flex-1 rounded px-1 py-0.5 text-caption transition-colors"
+              :class="cloudView === v ? 'bg-brand text-white shadow-sm font-medium' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700'"
+              @click="cloudView = v"
+            >{{ t(`preview2d.cloud_${v}`) }}</button>
+          </div>
+        </div>
+        <ul v-if="cloudView === 'classes'" class="grid grid-cols-2 gap-x-2 gap-y-0.5">
+          <li v-for="c in cloudLegend" :key="c.code" class="flex items-center gap-1.5 min-w-0">
+            <span class="w-2.5 h-2.5 rounded-sm shrink-0" :style="{ background: c.colour }" />
+            <span class="truncate text-caption">{{ c.label }}</span>
+          </li>
+        </ul>
+        <p v-else-if="cloudView === 'intensity'" class="text-micro text-gray-500 dark:text-gray-400">{{ t('preview2d.cloudIntensityHint') }}</p>
       </div>
       <label class="flex items-center justify-between gap-2 cursor-pointer">
         <span>{{ t('preview.contours', { m: contourStep }) }}</span>
@@ -107,6 +129,7 @@ import { terrainView, showContours } from '../../composables/useTerrainView.js';
 import { TERRAIN_VIEWS, SLOPE_BANDS, ELEVATION_RAMP, contourInterval } from '../three/terrainView.js';
 import { sampleHeights, shadeTerrain, contourPixels } from '../../services/terrainView2d.js';
 import { POSITIONS, getAdjacentBounds } from '../../services/surroundingTiles.js';
+import { POINT_CLASS_KEYS, POINT_CLASS_COLOURS, POINT_CLASS_OTHER, POINT_CLASS_HIDDEN, classPixels, intensityPixels } from '../../services/pointClasses.js';
 
 const props = defineProps({ terrainData: { type: Object, required: true } });
 const { t } = useI18n({ useScope: 'global' });
@@ -152,6 +175,15 @@ const texture = computed({
   },
   set: (v) => setBaseTexture(v),
 });
+
+// (an uploaded point cloud's own views: services/lazWorker.js builds the grids at Generate)
+const CLOUD_VIEWS = ['off', 'classes', 'intensity'];
+const cloudView = ref('off');
+const hasCloud = computed(() => !!props.terrainData?.pointPreview);
+const cloudLegend = computed(() => (props.terrainData?.pointLayers?.classes || [])
+  .filter((c) => !POINT_CLASS_HIDDEN.has(c.code))
+  .map((c) => ({ code: c.code, colour: POINT_CLASS_COLOURS[c.code] || POINT_CLASS_OTHER, label: POINT_CLASS_KEYS[c.code] ? t(`upload.layerClass.${POINT_CLASS_KEYS[c.code]}`) : t('upload.layerClass.other', { code: c.code }) })));
+let cloudCanvas = null; let cloudFor = '';
 
 const legend = computed(() => CONTENT_GROUPS.map((g) => ({
   id: g.id, colour: GROUP_COLOURS[g.id], label: t(`build.group_${g.id}`),
@@ -317,6 +349,20 @@ const drawContours = () => {
 const drawTexture = () => {
   if (!map) return;
   const b = bounds(); if (!b) return;
+  // (the point cloud from above, in place of the texture)
+  const cloud = cloudView.value !== 'off' ? td()?.pointPreview : null;
+  if (cloud) {
+    if (overlay) { map.removeLayer(overlay); overlay = null; }
+    const key = `${cloudView.value}:${cloud.w}x${cloud.h}`;
+    if (cloudFor !== key || !cloudCanvas) {
+      const px = cloudView.value === 'classes' ? classPixels(cloud.classes, cloud.w, cloud.h) : intensityPixels(cloud.intensity, cloud.w, cloud.h);
+      cloudCanvas = canvasOf(px, cloud.w, cloud.h, cloudCanvas); cloudFor = key;
+    }
+    shownKind = `cloud:${cloudView.value}`;
+    overlay = new CanvasOverlay(cloudCanvas, b, { interactive: false, className: 'mapng-preview2d-texture mapng-preview2d-cloud', pane: 'mapngTexture' }).addTo(map);
+    if (!outline) outline = L.rectangle(b, { color: '#f97316', weight: 1.5, fill: false, interactive: false }).addTo(map); else outline.setStyle({ fill: false });
+    return;
+  }
   // (a terrain view: the land's shape in place of its photo)
   const shape = terrainView.value !== 'normal' ? heights() : null;
   if (shape) {
@@ -405,12 +451,15 @@ onMounted(() => {
 });
 onBeforeUnmount(() => { offData?.(); loadTicket++; if (hoverRaf) cancelAnimationFrame(hoverRaf); content?.remove(); map?.remove(); map = null; });
 
-watch(() => [texture.value, store.textureRevision, store.texturesMade, terrainView.value], drawTexture);
+watch(() => [texture.value, store.textureRevision, store.texturesMade, terrainView.value, cloudView.value], drawTexture);
+// (a terrain view picked: the point cloud view steps aside for it)
+watch(terrainView, (v) => { if (v !== 'normal') cloudView.value = 'off'; });
+watch(cloudView, (v) => { if (v !== 'off' && terrainView.value !== 'normal') terrainView.value = 'normal'; });
 watch(() => [hasBackdrop.value, store.exportDataOptions], syncBackdrop);
 watch(() => [hasBackdrop.value, showBackdrop.value, terrainView.value], drawBackdrop);
 watch(() => [showContours.value, contourStep.value, terrainView.value === 'normal', texture.value === 'none'], drawContours);
 watch(() => [colourMap.value, off.value, store.advancedMode], () => { content?.update(); if (!colourMap.value) hover.value = null; });
-watch(() => props.terrainData, () => { outline && map?.removeLayer(outline); outline = null; shownKind = null; sampledFor = null; backdropTiles = null; backdropKey = ''; drawTexture(); drawContours(); drawBackdrop(); syncBackdrop(); content?.update(); fit(); });
+watch(() => props.terrainData, () => { cloudFor = ''; if (!props.terrainData?.pointPreview) cloudView.value = 'off'; outline && map?.removeLayer(outline); outline = null; shownKind = null; sampledFor = null; backdropTiles = null; backdropKey = ''; drawTexture(); drawContours(); drawBackdrop(); syncBackdrop(); content?.update(); fit(); });
 </script>
 
 <style>

@@ -93,7 +93,7 @@ const getWorker = () => {
  * @param {function} onProgress - (current, total, status?) callback
  * @param {AbortSignal} [signal]
  */
-export const rasterizeLazOffThread = async (lazMeta, center, width, height, targetBounds, onProgress, signal) => {
+export const rasterizeLazOffThread = async (lazMeta, center, width, height, targetBounds, onProgress, signal, { metersPerPixel = 1 } = {}) => {
   signal?.throwIfAborted();
   const w = getWorker();
   if (!w) return Promise.reject(new Error('LAZ worker unavailable'));
@@ -167,6 +167,7 @@ export const rasterizeLazOffThread = async (lazMeta, center, width, height, targ
       height,
       targetBounds,
       epsgDefs,
+      metersPerPixel,
     }, transferables);
   });
 };

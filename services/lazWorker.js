@@ -64,6 +64,9 @@ const removeSpikes = (heightMap, width, height) => {
 };
 
 // ─── Build a point→grid-index mapper ─────────────────────────────────────────
+// (where the last mapped point fell inside the grid, as fractions 0-1 across and down; every mapper sets it before
+// its bounds test. The point cloud preview bins on it at its own resolution; the terrain's cells are unchanged)
+const FRAC = { u: 0, v: 0 };
 const buildGridMapper = ({ epsgCode, center, width, height, minX, maxX, minY, maxY, targetBounds, epsgDefs }) => {
   if (epsgDefs) {
     for (const [key, def] of Object.entries(epsgDefs)) {
@@ -109,6 +112,7 @@ const buildGridMapper = ({ epsgCode, center, width, height, minX, maxX, minY, ma
           const toWGS84 = proj4(epsg, 'EPSG:4326');
           return (px, py) => {
             const [lng, lat] = toWGS84.forward([px, py]);
+            FRAC.u = (lng - west) / lngSpan; FRAC.v = (north - lat) / latSpan;
             if (lng < west || lng > east || lat < south || lat > north) return -1;
             const col = Math.min(width - 1, Math.max(0, Math.floor((lng - west) / lngSpan * width)));
             const row = Math.min(height - 1, Math.max(0, Math.floor((north - lat) / latSpan * height)));
@@ -146,6 +150,7 @@ const buildGridMapper = ({ epsgCode, center, width, height, minX, maxX, minY, ma
         // Solve [u v] * [east north]^T = d for local metre offsets.
         const eastMeters = (dx * vy - dy * vx) / det;
         const northMeters = (ux * dy - uy * dx) / det;
+        FRAC.u = (eastMeters + halfW) / (2 * halfW); FRAC.v = (halfH - northMeters) / (2 * halfH);
 
         if (eastMeters < -halfW || eastMeters > halfW || northMeters < -halfH || northMeters > halfH) return -1;
 
@@ -171,6 +176,7 @@ const buildGridMapper = ({ epsgCode, center, width, height, minX, maxX, minY, ma
       const spanY = north - south;
       if (spanX > 0 && spanY > 0) {
         return (px, py) => {
+          FRAC.u = (px - west) / spanX; FRAC.v = (north - py) / spanY;
           if (px < west || px > east || py < south || py > north) return -1;
           const col = Math.min(width - 1, Math.max(0, Math.floor((px - west) / spanX * width)));
           const row = Math.min(height - 1, Math.max(0, Math.floor((north - py) / spanY * height)));
@@ -184,6 +190,7 @@ const buildGridMapper = ({ epsgCode, center, width, height, minX, maxX, minY, ma
     return (px, py) => {
       const dx = (px - center.lng) * mPerDegLng;
       const dy = (py - center.lat) * mPerDegLat;
+      FRAC.u = (dx + halfW) / width; FRAC.v = (halfH - dy) / height;
       if (dx < -halfW || dx > halfW || dy < -halfH || dy > halfH) return -1;
       const col = Math.min(width  - 1, Math.floor((dx + halfW) / width  * width));
       const row = Math.min(height - 1, Math.floor((halfH - dy) / height * height));
@@ -195,6 +202,7 @@ const buildGridMapper = ({ epsgCode, center, width, height, minX, maxX, minY, ma
   const extW = maxX - minX || 1;
   const extH = maxY - minY || 1;
   return (px, py) => {
+    FRAC.u = (px - minX) / extW; FRAC.v = (maxY - py) / extH;
     if (px < minX || px > maxX || py < minY || py > maxY) return -1;
     const col = Math.min(width  - 1, Math.floor((px - minX) / extW * width));
     const row = Math.min(height - 1, Math.floor((maxY - py) / extH * height));
@@ -333,7 +341,47 @@ const countLayers = (L, cls, intensity, rgbAt, i) => {
   if (intensity > 0) { L.intensityPoints++; if (intensity > L.intensityMax) L.intensityMax = intensity; }
   if (rgbAt && i % RGB_SAMPLE_EVERY === 0) { L.rgbSamples++; if (rgbAt()) L.rgbColoured++; }
 };
-const accumulateTilePoints = async (tile, gridMapper, groundSum, groundCnt, onPoint, layers = null) => {
+// ─── Point cloud preview (the 2D preview's Classes and Intensity views) ───────
+// A grid at its own resolution (about two point spacings a cell, at most PREVIEW_MAX_PX a side) over the same
+// bounds as the terrain: per cell the class of the highest point (an aerial view: noise and flight-strip overlap
+// left out) and the average return (paint and signs show bright). Ground and water points are placed by the terrain's
+// own projection (FRAC); the rest by a straight-line fit of it across the tile, used only where it agrees with the
+// exact projection to a tenth of a cell (a display, not geometry).
+const PREVIEW_MAX_PX = 2048;
+const newPreview = (width, height, metersPerPixel, tiles) => {
+  let pts = 0; let area = 0;
+  for (const t of tiles) { pts += Number(t.pointCount) || 0; area += Math.max(0, (t.maxX - t.minX) * (t.maxY - t.minY)); }
+  const spacing = pts > 0 && area > 0 ? Math.sqrt(area / pts) : 1;
+  const mpp = Number(metersPerPixel) > 0 ? Number(metersPerPixel) : 1;
+  const cellM = Math.max(2 * spacing, 0.25, (Math.max(width, height) * mpp) / PREVIEW_MAX_PX);
+  const w = Math.max(1, Math.round(width * mpp / cellM)); const h = Math.max(1, Math.round(height * mpp / cellM));
+  const top = new Float32Array(w * h).fill(-Infinity);
+  return { w, h, top, cls: new Uint8Array(w * h).fill(255), isum: new Uint32Array(w * h), icnt: new Uint16Array(w * h) };
+};
+const previewAdd = (P, u, v, z, cls, intensity) => {
+  if (!(u >= 0 && u < 1 && v >= 0 && v < 1) || cls === 7 || cls === 18) return;
+  const i = ((v * P.h) | 0) * P.w + ((u * P.w) | 0);
+  if (intensity > 0 && P.icnt[i] < 65535) { P.isum[i] += intensity; P.icnt[i]++; }
+  if (cls !== 12 && z > P.top[i]) { P.top[i] = z; P.cls[i] = cls; }
+};
+// (a straight-line fit u, v = a + b·x + c·y of the exact mapper across a tile, or null where it is off by more
+// than a tenth of a preview cell at the tile's corners and middle)
+const fitTileFrac = (gridMapper, tile, P) => {
+  const at = (x, y) => { gridMapper(x, y); return [FRAC.u, FRAC.v]; };
+  const { minX, maxX, minY, maxY } = tile; const dx = maxX - minX; const dy = maxY - minY;
+  if (!(dx > 0 && dy > 0)) return null;
+  const [u0, v0] = at(minX, minY); const [u1, v1] = at(maxX, minY); const [u2, v2] = at(minX, maxY);
+  const fit = { u0, v0, ux: (u1 - u0) / dx, vx: (v1 - v0) / dx, uy: (u2 - u0) / dy, vy: (v2 - v0) / dy, minX, minY };
+  if (![fit.ux, fit.vx, fit.uy, fit.vy, u0, v0].every(Number.isFinite)) return null;
+  const tolU = 0.1 / P.w; const tolV = 0.1 / P.h;
+  for (const [x, y] of [[maxX, maxY], [(minX + maxX) / 2, (minY + maxY) / 2], [minX + dx / 4, maxY - dy / 4]]) {
+    const [eu, ev] = at(x, y);
+    const fu = fit.u0 + (x - minX) * fit.ux + (y - minY) * fit.uy; const fv = fit.v0 + (x - minX) * fit.vx + (y - minY) * fit.vy;
+    if (!(Math.abs(fu - eu) <= tolU && Math.abs(fv - ev) <= tolV)) return null;
+  }
+  return fit;
+};
+const accumulateTilePoints = async (tile, gridMapper, groundSum, groundCnt, onPoint, layers = null, preview = null) => {
   const {
     buffer, isLaz,
     pointFormat, pointDataRecordLength, pointDataOffset, pointCount,
@@ -342,6 +390,12 @@ const accumulateTilePoints = async (tile, gridMapper, groundSum, groundCnt, onPo
   const clsOff = classificationOffset(pointFormat);
   const clsMask = pointFormat >= 6 ? 0xFF : 0x1F;
   const rgbOff = rgbOffset(pointFormat);
+  const fit = preview ? fitTileFrac(gridMapper, tile, preview) : null;
+  // (a point the terrain skips, onto the preview: by the fit, else by the exact mapper)
+  const previewOther = (px, py, pz, c, inten) => {
+    if (fit) previewAdd(preview, fit.u0 + (px - fit.minX) * fit.ux + (py - fit.minY) * fit.uy, fit.v0 + (px - fit.minX) * fit.vx + (py - fit.minY) * fit.vy, pz, c, inten);
+    else { gridMapper(px, py); previewAdd(preview, FRAC.u, FRAC.v, pz, c, inten); }
+  };
 
   if (isLaz) {
     // ── LAZ: decompress via laz-perf WASM ──────────────────────────────────
@@ -374,9 +428,14 @@ const accumulateTilePoints = async (tile, gridMapper, groundSum, groundCnt, onPo
       const rawY = heap32[(pointPtr >> 2) + 1];
       const rawZ = heap32[(pointPtr >> 2) + 2];
       const cls = heap8[pointPtr + clsOff] & 0x1F;
-      if (layers) countLayers(layers, heap8[pointPtr + clsOff] & clsMask, heap8[pointPtr + 12] | (heap8[pointPtr + 13] << 8), rgbOff >= 0 ? () => (heap8[pointPtr + rgbOff] | heap8[pointPtr + rgbOff + 1] | heap8[pointPtr + rgbOff + 2] | heap8[pointPtr + rgbOff + 3] | heap8[pointPtr + rgbOff + 4] | heap8[pointPtr + rgbOff + 5]) > 0 : null, i);
+      const fullCls = heap8[pointPtr + clsOff] & clsMask;
+      const inten = heap8[pointPtr + 12] | (heap8[pointPtr + 13] << 8);
+      if (layers) countLayers(layers, fullCls, inten, rgbOff >= 0 ? () => (heap8[pointPtr + rgbOff] | heap8[pointPtr + rgbOff + 1] | heap8[pointPtr + rgbOff + 2] | heap8[pointPtr + rgbOff + 3] | heap8[pointPtr + rgbOff + 4] | heap8[pointPtr + rgbOff + 5]) > 0 : null, i);
       // Only ground (2) and water (9) — everything else is vegetation/noise
-      if (cls !== 2 && cls !== 9) { onPoint(); continue; }
+      if (cls !== 2 && cls !== 9) {
+        if (preview) previewOther(rawX * scaleX + offsetX, rawY * scaleY + offsetY, rawZ * scaleZ + offsetZ, fullCls, inten);
+        onPoint(); continue;
+      }
 
       const px = rawX * scaleX + offsetX;
       const py = rawY * scaleY + offsetY;
@@ -384,6 +443,7 @@ const accumulateTilePoints = async (tile, gridMapper, groundSum, groundCnt, onPo
 
       const idx = gridMapper(px, py);
       if (idx >= 0) { groundSum[idx] += pz; groundCnt[idx]++; }
+      if (preview) previewAdd(preview, FRAC.u, FRAC.v, pz, fullCls, inten);
       onPoint();
     }
 
@@ -404,8 +464,13 @@ const accumulateTilePoints = async (tile, gridMapper, groundSum, groundCnt, onPo
       const rawY = dataView.getInt32(base + 4, true);
       const rawZ = dataView.getInt32(base + 8, true);
       const cls = bytes[base + clsOff] & 0x1F;
-      if (layers) countLayers(layers, bytes[base + clsOff] & clsMask, dataView.getUint16(base + 12, true), rgbOff >= 0 ? () => (dataView.getUint16(base + rgbOff, true) | dataView.getUint16(base + rgbOff + 2, true) | dataView.getUint16(base + rgbOff + 4, true)) > 0 : null, i);
-      if (cls !== 2 && cls !== 9) { onPoint(); continue; }
+      const fullCls = bytes[base + clsOff] & clsMask;
+      const inten = dataView.getUint16(base + 12, true);
+      if (layers) countLayers(layers, fullCls, inten, rgbOff >= 0 ? () => (dataView.getUint16(base + rgbOff, true) | dataView.getUint16(base + rgbOff + 2, true) | dataView.getUint16(base + rgbOff + 4, true)) > 0 : null, i);
+      if (cls !== 2 && cls !== 9) {
+        if (preview) previewOther(rawX * scaleX + offsetX, rawY * scaleY + offsetY, rawZ * scaleZ + offsetZ, fullCls, inten);
+        onPoint(); continue;
+      }
 
       const px = rawX * scaleX + offsetX;
       const py = rawY * scaleY + offsetY;
@@ -413,6 +478,7 @@ const accumulateTilePoints = async (tile, gridMapper, groundSum, groundCnt, onPo
 
       const idx = gridMapper(px, py);
       if (idx >= 0) { groundSum[idx] += pz; groundCnt[idx]++; }
+      if (preview) previewAdd(preview, FRAC.u, FRAC.v, pz, fullCls, inten);
       onPoint();
     }
   }
@@ -436,6 +502,7 @@ const rasterize = async (params, id) => {
   const groundCnt = new Uint32Array(totalCells);
 
   const layers = newLayerStats();
+  const preview = params.pointPreview === false ? null : newPreview(width, height, params.metersPerPixel, tiles);
   const PROGRESS_EVERY = 250_000;
   const totalPoints = tiles.reduce((sum, t) => sum + Number(t.pointCount || 0), 0) || 1;
   let processed = 0;
@@ -452,7 +519,7 @@ const rasterize = async (params, id) => {
       minX: tile.minX, maxX: tile.maxX, minY: tile.minY, maxY: tile.maxY,
       targetBounds, epsgDefs,
     });
-    await accumulateTilePoints(tile, gridMapper, groundSum, groundCnt, onPoint, layers);
+    await accumulateTilePoints(tile, gridMapper, groundSum, groundCnt, onPoint, layers, preview);
   }
 
   // ── Build final heightmap ─────────────────────────────────────────────────
@@ -487,7 +554,23 @@ const rasterize = async (params, id) => {
     if (exteriorNoDataMask[i]) heightMap[i] = NO_DATA;
   }
 
-  return { heightMap, layers: summarizeLayers(layers) };
+  return { heightMap, layers: summarizeLayers(layers), pointPreview: preview ? finishPreview(preview) : null };
+};
+// (the preview as the page keeps it: class codes (255 empty) and brightness 1-255 (0 empty): each cell's average
+// return, stretched between the 2nd and 99.5th percentile of the cells, so asphalt is dark and paint and signs bright)
+const finishPreview = (P) => {
+  const n = P.w * P.h; const hist = new Uint32Array(65536); let filled = 0;
+  const mean = new Uint16Array(n);
+  for (let i = 0; i < n; i++) { if (P.icnt[i]) { const m = Math.round(P.isum[i] / P.icnt[i]); mean[i] = m; hist[m]++; filled++; } }
+  let lo = 0; let hi = 1;
+  if (filled) {
+    let acc = 0; let gotLo = false;
+    for (let v = 0; v < 65536; v++) { acc += hist[v]; if (!gotLo && acc >= filled * 0.02) { lo = v; gotLo = true; } if (acc >= filled * 0.995) { hi = v; break; } }
+  }
+  const span = Math.max(1, hi - lo);
+  const intensity = new Uint8Array(n);
+  for (let i = 0; i < n; i++) { if (P.icnt[i]) intensity[i] = 1 + Math.max(0, Math.min(254, Math.round((mean[i] - lo) / span * 254))); }
+  return { w: P.w, h: P.h, classes: P.cls, intensity };
 };
 // (the layer counts as the page shows them: shares per classification code over 0.1 %, intensity and colour)
 const summarizeLayers = (L) => {
@@ -503,8 +586,10 @@ self.onmessage = async (e) => {
   const { id, type, ...data } = e.data;
   try {
     if (type === 'rasterize') {
-      const { heightMap, layers } = await rasterize(data, id);
-      self.postMessage({ id, type: 'done', heightMap, layers }, [heightMap.buffer]);
+      const { heightMap, layers, pointPreview } = await rasterize(data, id);
+      const transfer = [heightMap.buffer];
+      if (pointPreview) transfer.push(pointPreview.classes.buffer, pointPreview.intensity.buffer);
+      self.postMessage({ id, type: 'done', heightMap, layers, pointPreview }, transfer);
     }
   } catch (err) {
     self.postMessage({ id, type: 'error', error: err.message });

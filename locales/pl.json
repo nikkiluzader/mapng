@@ -71,7 +71,12 @@
     "backdropLoading": "Tło: odczyt pobranych kafli…",
     "backdropFailed": "Tło: pobieranie nie powiodło się. Eksport spróbuje ponownie.",
     "backdropWaiting": "Tło: jeszcze nie pobrane.",
-    "backdropQuality": "Obraz tła: {quality}, ok. {mpp} m na piksel."
+    "backdropQuality": "Obraz tła: {quality}, ok. {mpp} m na piksel.",
+    "cloud": "Chmura punktów",
+    "cloud_off": "Wył.",
+    "cloud_classes": "Klasy",
+    "cloud_intensity": "Jasność",
+    "cloudIntensityHint": "Jak silnie wrócił laser: oznakowanie i znaki są jasne."
   },
   "mobile": {
     "desktopRequired": "Wymagany komputer",
@@ -322,7 +327,7 @@
     "feetUs": "Stopy (US Survey)",
     "coordinateSystem": "Układ współrzędnych",
     "crsPl1992": "PL-1992 (EPSG:2180)",
-    "crsGuessed": "współrzędne odgadnięte: {name}, sprawdź miejsce na mapie",
+    "crsGuessed": "miejsce odgadnięte ({name}), sprawdź na mapie",
     "crsPicked": "wybrany układ współrzędnych: {name}",
     "crsAutoGuess": "Auto: najlepsze przypuszczenie {name}",
     "removeUploaded": "Usuń przesłany plik",
@@ -406,9 +411,7 @@
     },
     "pointSpacing": "Odstęp punktów około {cm} cm ({density} punktów na m²)",
     "resolutionAverages": "Przy {mpp} m na piksel drobniejsze szczegóły są uśredniane: ten plik zawiera szczegóły do około {cm} cm.",
-    "resolutionHere": "Rozdzielczość przetwarzania:",
     "exportSquare": "Poziom to kwadrat {size} × {size} m ({px} px) ze środka {w} × {h} m pliku: BeamNG potrzebuje kwadratu o boku będącym potęgą dwójki. Jest zaznaczony na pomarańczowo na mapie; Kwadratowe przycięcie pozwala go przesunąć. Zmiana rozdzielczości zmienia jego rozmiar.",
-    "resolutionNative": "Użyj rozdzielczości pliku: {cm} cm ({m} m na piksel)",
     "resolutionNativeNote": "Przy {m} m na piksel poziom ma {px} × {px} px ({size} m): znacznie więcej punktów terenu niż zwykle, wolniejsze wczytywanie i większe obciążenie w BeamNG.",
     "resolutionNativeHeavy": "Przy {m} m na piksel poziom ma {px} × {px} px ({size} m): największy rozmiar terenu w BeamNG. Na większości komputerów długie wczytywanie, dużo pamięci i wolna gra.",
     "layersCounted": "Policzone warstwy:",
@@ -436,7 +439,15 @@
       "bridge": "pomosty mostów",
       "highNoise": "wysoki szum",
       "other": "klasa {code}"
-    }
+    },
+    "resShort": "Rozdzielczość (m)",
+    "resNativeShort": "Jak w pliku: {cm} cm ({m} m)",
+    "levelShort": "Poziom: środkowe {size} × {size} m (na pomarańczowo na mapie)",
+    "coarseShort": "drobniejsze szczegóły są uśredniane",
+    "heavyShort": "ciężkie dla BeamNG ({px} px)",
+    "layersShort": "Warstwy: {list}",
+    "layerBrightShort": "jasność",
+    "layersPreviewHint": "Podgląd 2D je pokazuje: Chmura punktów."
   },
   "preview": {
     "hideSettings": "Ukryj ustawienia sceny",

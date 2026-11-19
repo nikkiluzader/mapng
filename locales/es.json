@@ -71,7 +71,12 @@
     "backdropLoading": "Telón de fondo: leyendo las teselas descargadas…",
     "backdropFailed": "Telón de fondo: la descarga falló. La exportación lo intentará de nuevo.",
     "backdropWaiting": "Telón de fondo: aún no descargado.",
-    "backdropQuality": "Imagen del telón de fondo: {quality}, unos {mpp} m por píxel."
+    "backdropQuality": "Imagen del telón de fondo: {quality}, unos {mpp} m por píxel.",
+    "cloud": "Nube de puntos",
+    "cloud_off": "No",
+    "cloud_classes": "Clases",
+    "cloud_intensity": "Brillo",
+    "cloudIntensityHint": "Con qué fuerza volvió el láser: las marcas viales y las señales se ven claras."
   },
   "mobile": {
     "desktopRequired": "Se requiere un ordenador",
@@ -322,7 +327,7 @@
     "feetUs": "Pies (US survey)",
     "coordinateSystem": "Sistema de coordenadas",
     "crsPl1992": "PL-1992 (EPSG:2180)",
-    "crsGuessed": "coordenadas estimadas: {name}, comprueba el lugar en el mapa",
+    "crsGuessed": "ubicación estimada ({name}), compruébala en el mapa",
     "crsPicked": "sistema de coordenadas elegido: {name}",
     "crsAutoGuess": "Auto: mejor estimación {name}",
     "removeUploaded": "Eliminar archivo cargado",
@@ -406,9 +411,7 @@
     },
     "pointSpacing": "Separación entre puntos de unos {cm} cm ({density} puntos por m²)",
     "resolutionAverages": "A {mpp} m por píxel se promedia el detalle más fino: este archivo tiene detalle de hasta unos {cm} cm.",
-    "resolutionHere": "Resolución de procesado:",
     "exportSquare": "El nivel es el cuadrado de {size} × {size} m ({px} px) del centro de los {w} × {h} m del archivo: BeamNG necesita un cuadrado potencia de dos. Se muestra en naranja en el mapa; Recorte cuadrado permite moverlo. Cambiar la resolución cambia su tamaño.",
-    "resolutionNative": "Usar la del archivo: {cm} cm ({m} m por píxel)",
     "resolutionNativeNote": "A {m} m por píxel el nivel mide {px} × {px} px ({size} m): muchos más puntos de terreno de lo habitual, carga más lenta y más pesado en BeamNG.",
     "resolutionNativeHeavy": "A {m} m por píxel el nivel mide {px} × {px} px ({size} m): el mayor tamaño de terreno de BeamNG. Espera cargas largas, mucha memoria y un juego lento en la mayoría de PCs.",
     "layersCounted": "Capas contadas:",
@@ -436,7 +439,15 @@
       "bridge": "tableros de puente",
       "highNoise": "ruido alto",
       "other": "clase {code}"
-    }
+    },
+    "resShort": "Resolución (m)",
+    "resNativeShort": "La del archivo: {cm} cm ({m} m)",
+    "levelShort": "Nivel: los {size} × {size} m centrales (naranja en el mapa)",
+    "coarseShort": "el detalle más fino se promedia",
+    "heavyShort": "pesado en BeamNG ({px} px)",
+    "layersShort": "Capas: {list}",
+    "layerBrightShort": "brillo",
+    "layersPreviewHint": "La vista previa 2D las muestra: Nube de puntos."
   },
   "preview": {
     "hideSettings": "Ocultar ajustes de escena",

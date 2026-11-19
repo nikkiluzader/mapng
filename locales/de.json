@@ -71,7 +71,12 @@
     "backdropLoading": "Kulisse: heruntergeladene Kacheln werden gelesen…",
     "backdropFailed": "Kulisse: Download fehlgeschlagen. Der Export versucht es erneut.",
     "backdropWaiting": "Kulisse: noch nicht heruntergeladen.",
-    "backdropQuality": "Kulissenbild: {quality}, etwa {mpp} m pro Pixel."
+    "backdropQuality": "Kulissenbild: {quality}, etwa {mpp} m pro Pixel.",
+    "cloud": "Punktwolke",
+    "cloud_off": "Aus",
+    "cloud_classes": "Klassen",
+    "cloud_intensity": "Helligkeit",
+    "cloudIntensityHint": "Wie stark der Laser zurückkam: Fahrbahnmarkierungen und Schilder erscheinen hell."
   },
   "mobile": {
     "desktopRequired": "Desktop erforderlich",
@@ -322,7 +327,7 @@
     "feetUs": "Fuß (US-Survey)",
     "coordinateSystem": "Koordinatensystem",
     "crsPl1992": "PL-1992 (EPSG:2180)",
-    "crsGuessed": "Koordinaten geschätzt: {name}, Ort auf der Karte prüfen",
+    "crsGuessed": "Ort geschätzt ({name}), auf der Karte prüfen",
     "crsPicked": "Koordinatensystem gewählt: {name}",
     "crsAutoGuess": "Auto: beste Schätzung {name}",
     "removeUploaded": "Hochgeladene Datei entfernen",
@@ -406,9 +411,7 @@
     },
     "pointSpacing": "Punktabstand etwa {cm} cm ({density} Punkte pro m²)",
     "resolutionAverages": "Bei {mpp} m pro Pixel werden feinere Details gemittelt: Diese Datei enthält Details bis etwa {cm} cm.",
-    "resolutionHere": "Verarbeitungsauflösung:",
     "exportSquare": "Das Level ist das {size} × {size} m große Quadrat ({px} px) aus der Mitte der {w} × {h} m der Datei: BeamNG braucht ein Quadrat mit Zweierpotenz. Es ist auf der Karte orange markiert; mit „Quadratischer Ausschnitt“ lässt es sich verschieben. Eine andere Auflösung ändert seine Größe.",
-    "resolutionNative": "Auflösung der Datei verwenden: {cm} cm ({m} m pro Pixel)",
     "resolutionNativeNote": "Bei {m} m pro Pixel ist das Level {px} × {px} px ({size} m) groß: weit mehr Geländepunkte als üblich, langsamer zu laden und schwerer für BeamNG.",
     "resolutionNativeHeavy": "Bei {m} m pro Pixel ist das Level {px} × {px} px ({size} m) groß: BeamNGs größte Geländegröße. Auf den meisten PCs langes Laden, viel Speicher und ein langsames Spiel.",
     "layersCounted": "Gezählte Ebenen:",
@@ -436,7 +439,15 @@
       "bridge": "Brückenfahrbahnen",
       "highNoise": "hohes Rauschen",
       "other": "Klasse {code}"
-    }
+    },
+    "resShort": "Auflösung (m)",
+    "resNativeShort": "Wie die Datei: {cm} cm ({m} m)",
+    "levelShort": "Level: die mittleren {size} × {size} m (orange auf der Karte)",
+    "coarseShort": "feinere Details werden gemittelt",
+    "heavyShort": "schwer für BeamNG ({px} px)",
+    "layersShort": "Ebenen: {list}",
+    "layerBrightShort": "Helligkeit",
+    "layersPreviewHint": "Die 2D-Vorschau zeigt sie: Punktwolke."
   },
   "preview": {
     "hideSettings": "Szeneneinstellungen ausblenden",

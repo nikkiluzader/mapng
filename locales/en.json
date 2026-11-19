@@ -76,7 +76,12 @@
     "backdropLoading": "Backdrop: reading the downloaded tiles…",
     "backdropFailed": "Backdrop: the download failed. The export will try again.",
     "backdropWaiting": "Backdrop: not downloaded yet.",
-    "backdropQuality": "Backdrop imagery: {quality}, about {mpp} m per pixel."
+    "backdropQuality": "Backdrop imagery: {quality}, about {mpp} m per pixel.",
+    "cloud": "Point cloud",
+    "cloud_off": "Off",
+    "cloud_classes": "Classes",
+    "cloud_intensity": "Brightness",
+    "cloudIntensityHint": "How strongly the laser came back: road paint and signs show bright."
   },
   "mobile": {
     "desktopRequired": "Desktop required",
@@ -327,7 +332,7 @@
     "feetUs": "Feet (US survey)",
     "coordinateSystem": "Coordinate system",
     "crsPl1992": "PL-1992 (EPSG:2180)",
-    "crsGuessed": "coordinates guessed: {name}, check the place on the map",
+    "crsGuessed": "location guessed ({name}), check the map",
     "crsPicked": "coordinate system picked: {name}",
     "crsAutoGuess": "Auto: best guess {name}",
     "removeUploaded": "Remove uploaded file",
@@ -411,9 +416,7 @@
     },
     "pointSpacing": "Point spacing about {cm} cm ({density} points per m²)",
     "resolutionAverages": "At {mpp} m per pixel, detail finer than that is averaged out: this file holds detail down to about {cm} cm.",
-    "resolutionHere": "Processing resolution:",
     "exportSquare": "The level is the {size} × {size} m square ({px} px) from the middle of the file's {w} × {h} m: BeamNG needs a square, a power of two. It is shown in orange on the map; Square crop lets you move it. Changing the resolution resizes it.",
-    "resolutionNative": "Use the file's own: {cm} cm ({m} m per pixel)",
     "resolutionNativeNote": "At {m} m per pixel the level is {px} × {px} px ({size} m): far more terrain points than usual, slower to load and heavier in BeamNG.",
     "resolutionNativeHeavy": "At {m} m per pixel the level is {px} × {px} px ({size} m): BeamNG's largest terrain size. Expect long loading, a lot of memory and a slow game on most PCs.",
     "layersCounted": "Layers counted:",
@@ -441,7 +444,15 @@
       "bridge": "bridge decks",
       "highNoise": "high noise",
       "other": "class {code}"
-    }
+    },
+    "resShort": "Resolution (m)",
+    "resNativeShort": "File's own: {cm} cm ({m} m)",
+    "levelShort": "Level: the middle {size} × {size} m (orange on the map)",
+    "coarseShort": "finer detail is averaged out",
+    "heavyShort": "heavy in BeamNG ({px} px)",
+    "layersShort": "Layers: {list}",
+    "layerBrightShort": "brightness",
+    "layersPreviewHint": "The 2D preview shows them: Point cloud."
   },
   "preview": {
     "hideSettings": "Hide scene settings",

@@ -71,7 +71,12 @@
     "backdropLoading": "Sfondo: lettura dei riquadri scaricati…",
     "backdropFailed": "Sfondo: download non riuscito. L'esportazione riproverà.",
     "backdropWaiting": "Sfondo: non ancora scaricato.",
-    "backdropQuality": "Immagine dello sfondo: {quality}, circa {mpp} m per pixel."
+    "backdropQuality": "Immagine dello sfondo: {quality}, circa {mpp} m per pixel.",
+    "cloud": "Nuvola di punti",
+    "cloud_off": "No",
+    "cloud_classes": "Classi",
+    "cloud_intensity": "Luminosità",
+    "cloudIntensityHint": "Quanto forte è tornato il laser: segnaletica e cartelli appaiono chiari."
   },
   "mobile": {
     "desktopRequired": "Serve un computer desktop",
@@ -322,7 +327,7 @@
     "feetUs": "Piedi (rilievo USA)",
     "coordinateSystem": "Sistema di coordinate",
     "crsPl1992": "PL-1992 (EPSG:2180)",
-    "crsGuessed": "coordinate stimate: {name}, controlla il luogo sulla mappa",
+    "crsGuessed": "luogo stimato ({name}), controlla sulla mappa",
     "crsPicked": "sistema di coordinate scelto: {name}",
     "crsAutoGuess": "Auto: stima migliore {name}",
     "removeUploaded": "Rimuovi il file caricato",
@@ -406,9 +411,7 @@
     },
     "pointSpacing": "Distanza tra i punti circa {cm} cm ({density} punti per m²)",
     "resolutionAverages": "A {mpp} m per pixel i dettagli più fini vengono mediati: questo file contiene dettagli fino a circa {cm} cm.",
-    "resolutionHere": "Risoluzione di elaborazione:",
     "exportSquare": "Il livello è il quadrato di {size} × {size} m ({px} px) al centro dei {w} × {h} m del file: BeamNG richiede un quadrato con lato potenza di due. È mostrato in arancione sulla mappa; Ritaglio quadrato permette di spostarlo. Cambiare la risoluzione ne cambia la dimensione.",
-    "resolutionNative": "Usa quella del file: {cm} cm ({m} m per pixel)",
     "resolutionNativeNote": "A {m} m per pixel il livello è {px} × {px} px ({size} m): molti più punti di terreno del solito, più lento da caricare e più pesante in BeamNG.",
     "resolutionNativeHeavy": "A {m} m per pixel il livello è {px} × {px} px ({size} m): la dimensione di terreno più grande di BeamNG. Aspettati caricamenti lunghi, molta memoria e un gioco lento sulla maggior parte dei PC.",
     "layersCounted": "Livelli contati:",
@@ -436,7 +439,15 @@
       "bridge": "impalcati di ponte",
       "highNoise": "rumore alto",
       "other": "classe {code}"
-    }
+    },
+    "resShort": "Risoluzione (m)",
+    "resNativeShort": "Quella del file: {cm} cm ({m} m)",
+    "levelShort": "Livello: i {size} × {size} m centrali (in arancione sulla mappa)",
+    "coarseShort": "i dettagli più fini vengono mediati",
+    "heavyShort": "pesante in BeamNG ({px} px)",
+    "layersShort": "Livelli: {list}",
+    "layerBrightShort": "luminosità",
+    "layersPreviewHint": "L'anteprima 2D li mostra: Nuvola di punti."
   },
   "preview": {
     "hideSettings": "Nascondi impostazioni scena",

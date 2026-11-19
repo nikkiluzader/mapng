@@ -3181,7 +3181,7 @@ export const loadTerrainFromLaz = async (
 
   // Multiple tiles (lazData.tiles) are accumulated into a single output grid
   // inside the worker, so overlapping point clouds merge seamlessly.
-  const { heightMap, layers: pointLayers } = await rasterizeLazOffThread(
+  const { heightMap, layers: pointLayers, pointPreview } = await rasterizeLazOffThread(
     lazData,
     rasterCenter,
     width,
@@ -3192,6 +3192,7 @@ export const loadTerrainFromLaz = async (
       onProgress?.(status || `Processing point cloud… ${pct}%`);
     },
     signal,
+    { metersPerPixel: effectiveMetersPerPixel },
   );
 
   const lazUnit = resolveElevationUnitScale(lazData, elevationUnitOverride);
@@ -3317,6 +3318,8 @@ export const loadTerrainFromLaz = async (
   releaseCanvas(hybridSatelliteCanvas);
   // (what the point cloud carries: its classification layers, intensity and colour, for the upload card)
   if (pointLayers) terrainData.pointLayers = pointLayers;
+  // (the 2D preview's Classes and Intensity views of it: services/lazWorker.js finishPreview)
+  if (pointPreview) terrainData.pointPreview = pointPreview;
   return terrainData;
 };
 

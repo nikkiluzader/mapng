@@ -110,38 +110,44 @@
           </div>
         </div>
 
-        <!-- (a point cloud: its own detail against the processing resolution, a chance to change that here, and the
-             square the level keeps from it) -->
+        <!-- (a point cloud: the resolution to build at (its own among them), the square the level keeps, the layers it
+             carries; the reasons and numbers behind them under More about this) -->
         <div v-if="pointSpacing || exportSquare" class="space-y-1 text-micro text-blue-800 dark:text-blue-200" data-testid="upload-resolution">
-          <p v-if="pointSpacing">{{ t('upload.pointSpacing', { cm: Math.round(pointSpacing.spacing * 100), density: pointSpacing.density >= 10 ? Math.round(pointSpacing.density) : pointSpacing.density.toFixed(1) }) }}</p>
-          <p v-if="pointSpacing && currentMpp > pointSpacing.spacing * 1.5" class="text-amber-700 dark:text-amber-300">{{ t('upload.resolutionAverages', { mpp: currentMpp, cm: Math.round(pointSpacing.spacing * 100) }) }}</p>
           <div class="flex flex-wrap items-center gap-1">
-            <span>{{ t('upload.resolutionHere') }}</span>
+            <span>{{ t('upload.resShort') }}</span>
             <button
               v-for="m in [0.25, 0.5, 1, 2]"
               :key="m"
               type="button"
               :data-testid="`upload-mpp-${m}`"
-              :class="['px-1.5 py-0.5 rounded border leading-tight', currentMpp === m ? 'bg-brand border-brand text-white' : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-brand']"
+              :class="['px-1 py-px rounded border leading-tight', currentMpp === m && currentMpp !== nativeMpp ? 'bg-brand border-brand text-white' : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-brand']"
               @click="$emit('update:processingMetersPerPixel', m)"
-            >{{ m }} m</button>
-          </div>
-          <!-- (the file's own resolution: its point spacing, in centimetres and as the metres per pixel the processing
-               resolution and the game's terrain squares take) -->
-          <div v-if="nativeMpp" class="flex flex-wrap items-center gap-1">
+            >{{ m }}</button>
+            <!-- (the file's own: its point spacing in centimetres and as the metres per pixel the processing resolution,
+                 the game's terrain square size, takes) -->
             <button
+              v-if="nativeMpp"
               type="button"
               data-testid="upload-mpp-native"
-              :class="['px-1.5 py-0.5 rounded border leading-tight', currentMpp === nativeMpp ? 'bg-brand border-brand text-white' : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-brand']"
+              :class="['px-1 py-px rounded border leading-tight', currentMpp === nativeMpp ? 'bg-brand border-brand text-white' : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-brand']"
               @click="$emit('update:processingMetersPerPixel', nativeMpp)"
-            >{{ t('upload.resolutionNative', { cm: Math.round(nativeMpp * 100), m: nativeMpp }) }}</button>
+            >{{ t('upload.resNativeShort', { cm: Math.round(nativeMpp * 100), m: nativeMpp }) }}</button>
           </div>
-          <p v-if="nativeMpp && currentMpp === nativeMpp && exportSquare" class="text-amber-700 dark:text-amber-300" data-testid="upload-native-warning">
-            {{ t(exportSquare.sizePx >= 8192 ? 'upload.resolutionNativeHeavy' : 'upload.resolutionNativeNote', { px: exportSquare.sizePx, m: nativeMpp, size: Math.round(exportSquare.sizeMeters) }) }}
+          <p v-if="exportSquare" data-testid="upload-export-square">
+            {{ t('upload.levelShort', { size: Math.round(exportSquare.sizeMeters) }) }}<template v-if="resNote"> · <span class="text-amber-700 dark:text-amber-300" data-testid="upload-res-note">{{ resNote }}</span></template>
           </p>
-          <!-- (the layers the cloud carries: from its point format before Generate, counted at Generate) -->
-          <p v-if="pointLayersText" data-testid="upload-point-layers">{{ pointLayersText }}</p>
-          <p v-if="exportSquare" data-testid="upload-export-square">{{ t('upload.exportSquare', { size: Math.round(exportSquare.sizeMeters), w: Math.round(exportSquare.fileWidthMeters), h: Math.round(exportSquare.fileHeightMeters), px: exportSquare.sizePx }) }}</p>
+          <p v-if="layersShort" data-testid="upload-point-layers">{{ layersShort }}</p>
+          <button type="button" class="text-brand hover:underline" :aria-expanded="resMore" data-testid="upload-res-more" @click="resMore = !resMore">{{ resMore ? t('build.tune.less') : t('build.tune.more') }}</button>
+          <div v-if="resMore" class="space-y-1 rounded-lg bg-blue-100/70 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800 px-2 py-1.5 leading-relaxed" data-testid="upload-res-details">
+            <p v-if="pointSpacing">{{ t('upload.pointSpacing', { cm: Math.round(pointSpacing.spacing * 100), density: pointSpacing.density >= 10 ? Math.round(pointSpacing.density) : pointSpacing.density.toFixed(1) }) }}</p>
+            <p v-if="pointSpacing && currentMpp > pointSpacing.spacing * 1.5">{{ t('upload.resolutionAverages', { mpp: currentMpp, cm: Math.round(pointSpacing.spacing * 100) }) }}</p>
+            <p v-if="nativeMpp && currentMpp === nativeMpp && exportSquare" data-testid="upload-native-warning">
+              {{ t(exportSquare.sizePx >= 8192 ? 'upload.resolutionNativeHeavy' : 'upload.resolutionNativeNote', { px: exportSquare.sizePx, m: nativeMpp, size: Math.round(exportSquare.sizeMeters) }) }}
+            </p>
+            <p v-if="exportSquare">{{ t('upload.exportSquare', { size: Math.round(exportSquare.sizeMeters), w: Math.round(exportSquare.fileWidthMeters), h: Math.round(exportSquare.fileHeightMeters), px: exportSquare.sizePx }) }}</p>
+            <p v-if="pointLayersText">{{ pointLayersText }}</p>
+            <p v-if="pointLayers?.classes?.length">{{ t('upload.layersPreviewHint') }}</p>
+          </div>
         </div>
 
         <div v-if="showAscCoordinateSelector" class="flex items-center gap-2">
@@ -324,6 +330,7 @@ import { ascNeedsPlacing, ascGroundSize } from '../../services/ascLoader.js';
 import { applyLayerOrder } from '../../services/elevationLayers.js';
 import { GAP_FILL_STANDARD, GAP_FILL_GPXZ, GAP_FILL_NONE } from '../../services/gapFillSources.js';
 import { nativeExportSquare, pointCloudSpacing } from '../../services/uploadBounds.js';
+import { POINT_CLASS_KEYS } from '../../services/pointClasses.js';
 
 const { t } = useI18n({ useScope: 'global' });
 
@@ -525,8 +532,24 @@ const currentMpp = computed(() => { const m = Number(props.processingMetersPerPi
 const pointSpacing = computed(() => (isLazFile.value ? pointCloudSpacing(props.uploadedElevationMeta) : null));
 // (a point cloud's layers: its classification codes with their shares (counted at Generate), intensity and colour.
 // Before Generate, what its point format can hold)
-const CLASS_KEYS = { 0: 'never', 1: 'unclassified', 2: 'ground', 3: 'lowVeg', 4: 'mediumVeg', 5: 'highVeg', 6: 'building', 7: 'noise', 9: 'water', 10: 'rail', 11: 'road', 12: 'overlap', 13: 'wireGuard', 14: 'wire', 15: 'tower', 17: 'bridge', 18: 'highNoise' };
+const CLASS_KEYS = POINT_CLASS_KEYS;
 const className = (code) => (CLASS_KEYS[code] ? t(`upload.layerClass.${CLASS_KEYS[code]}`) : t('upload.layerClass.other', { code }));
+const resMore = ref(false);
+// (the one short note beside the level's size: finer detail averaged away, or the file's own resolution's weight)
+const resNote = computed(() => {
+  if (nativeMpp.value && currentMpp.value === nativeMpp.value) return exportSquare.value?.sizePx >= 4096 ? t('upload.heavyShort', { px: exportSquare.value.sizePx }) : '';
+  if (pointSpacing.value && currentMpp.value > pointSpacing.value.spacing * 1.5) return t('upload.coarseShort');
+  return '';
+});
+// (the layers counted at Generate, by name only: the biggest few, noise and flight-strip overlap left out)
+const layersShort = computed(() => {
+  const L = props.pointLayers; if (!isLazFile.value || !L?.classes?.length) return '';
+  const named = L.classes.filter((c) => ![7, 12, 18].includes(c.code));
+  const names = named.slice(0, 4).map((c) => className(c.code));
+  if (named.length > 4) names.push(`+${named.length - 4}`);
+  if (L.intensity) names.push(t('upload.layerBrightShort'));
+  return t('upload.layersShort', { list: names.join(', ') });
+});
 const pointLayersText = computed(() => {
   if (!isLazFile.value) return '';
   const L = props.pointLayers;
