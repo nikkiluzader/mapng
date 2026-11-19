@@ -13616,6 +13616,17 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     beginStep('sidewalks', `Building sidewalks, curbs and ramps along ${groundCarriageways.length} carriageways${bridgeDecks.length ? ` (${bridgeDecks.length} bridge decks built)` : ''}…`);
     await yield_();
   }
+  // (the lakes as the water step plans them, their beds dug after the sidewalks: no paving over them. The mapped-water
+  // filter alone let a lake through (Zion), and paving over its dug bed floated metres up)
+  const sidewalkLakeRings = includeRoads && includeSidewalks && includeWater ? (() => {
+    try {
+      return planLakes({
+        features: exportTerrainData.osmFeatures || [],
+        toWorld: (lat, lng) => geoToWorldPoint(lat, lng, exportTerrainData, squareSize, 0),
+        heightAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
+      }).lakes.map((l) => l.poly?.outer).filter((r) => r?.length > 2);
+    } catch { return []; }
+  })() : [];
   // (the sea floor that the water step lowers further on, worked out once: no ground for a pier to follow, and no
   // paving over it)
   const sidewalkSeaPlan = includeRoads && includeSidewalks ? (() => { try { return lowerSeabed({
@@ -13662,6 +13673,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       water: (exportTerrainData.osmFeatures || [])
         .filter((f) => (f.tags?.natural === 'water' || f.tags?.waterway === 'riverbank') && f.geometry?.length > 3)
         .map((f) => f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0))),
+      // (the planned lakes' outlines: the paved model keeps off them)
+      lakeRings: sidewalkLakeRings,
       // piers and footbridges: decks clear of the ground (and sidewalks on road bridges)
       decks: buildDeckPaths(exportTerrainData, squareSize),
       // (the sea floor that the water step lowers further on: no ground for a pier to follow)
@@ -13681,6 +13694,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       pavedModel: !(typeof process !== 'undefined' && process.env?.MAPNG_PAVED_SIDEWALKS === '0'),
       // (the terrain left as it is: the paved slabs follow it away from the curb; and what is built overhead)
       pavedFollowGround: !shapeExtras,
+      // (the rivers' channels, planned before: no paving across them, their beds are dug after the sidewalks)
+      riverChannels: (riverPlan?.rivers || []).flatMap((r) => (r.nodes || []).slice(1).map((n, i) => ({ pts: [[r.nodes[i][0], r.nodes[i][1]], [n[0], n[1]]], half: Math.max(Number(r.nodes[i][3]) || 0, Number(n[3]) || 0) / 2 + 0.5 }))).filter((c) => c.half > 0.5),
       // (the map's own square: no paving tiles past its edge)
       mapBox: (() => { const h = (exportTerrainData.width * squareSize) / 2; return [-h, -h, h, h]; })(),
       overhead: (x, y, z0, z1) => underDeck(x, y, z0, z1),
@@ -13698,7 +13713,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // million entries; a 16 km city at a metre a square has more graded squares than that, and the export ended
   // after 46 minutes with "Set maximum size exceeded")
   const sidewalkGroundIdx = (() => { const flags = new Uint8Array(exportTerrainData.width * exportTerrainData.height); return { add: (i) => { flags[i] = 1; }, has: (i) => flags[i] === 1 }; })();
-  if (sidewalks.runs.length > 0 && shapeExtras) {
+  // (graded wherever there is paving: the paved model's tiles too; on street-side runs alone, an area whose sidewalks
+  // are all mapped footways (Zion's canyon road) had its paving left ungraded, floating metres over the ground)
+  if ((sidewalks.runs.length > 0 || sidewalks.paved?.tiles?.length > 0) && shapeExtras) {
     // the ground under the slabs (they hang at road height + the curb)
     const terrainGrid = {
       heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,

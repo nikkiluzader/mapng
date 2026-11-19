@@ -23,7 +23,8 @@ export const PLAIN_GAP_M = 1;
 export const CLOSE_M = 5;
 export const POCKET_M2 = 20;      // an unpaved pocket this small between road and pavement is paved (crossing landings)
 export const SPECK_M2 = 0.5;      // a traced ring this small is dropped
-export const CURB_TOP_LIFT_M = 0.003;  // the curb's top band this far over the slab (no flicker between the two)
+export const CURB_TOP_LIFT_M = 0.003;
+export const SKIRT_PAST_M = 0.1;       // a skirt runs this far past the ground it meets  // the curb's top band this far over the slab (no flicker between the two)
 
 // layer bits
 export const ROAD = 1; export const WALK = 2; export const GAP = 4; export const VERGE = 8;
@@ -361,7 +362,8 @@ function simplifyLine(pts, tol) {
 // fineAt(x, y): true where the slab must follow quick changes (a driveway's dip): there the squares are fineM.
 // Edges are split to at most edgeM so a curb's height can change along a straight run.
 // curbW: the curb's top band, drawn in the curb's material just inside each curb edge, CURB_TOP_LIFT_M over the slab
-export function buildPavedMesh(rings0, cells, g, { heightAt = () => 0, bottomAt = null, cellM = 4, fineM = 1, fineAt = null, edgeM = 1, curbH = 0.15, curbW = 0.15, skirtM = 0.3, THREE, core = null } = {}) {
+// groundAt(x, y): where an edge facing the ground must reach (its skirt runs down past the ground there)
+export function buildPavedMesh(rings0, cells, g, { heightAt = () => 0, bottomAt = null, groundAt = null, cellM = 4, fineM = 1, fineAt = null, edgeM = 1, curbH = 0.15, curbW = 0.15, skirtM = 0.3, THREE, core = null } = {}) {
   if (!THREE) throw new Error('buildPavedMesh needs THREE (ShapeUtils.triangulateShape)');
   const rings = rings0.map((ring) => {
     const out = [];
@@ -459,8 +461,11 @@ export function buildPavedMesh(rings0, cells, g, { heightAt = () => 0, bottomAt 
       const isCurb = roadAt(mx + ox * 0.4, my + oy * 0.4) || roadAt(mx + ox * 0.75, my + oy * 0.75);
       const into = isCurb ? curb : skirt;
       const za = heightAt(a[0], a[1]); const zb = heightAt(b[0], b[1]);
-      const da = isCurb && bottomAt ? Math.max(0, za - bottomAt(a[0], a[1])) : isCurb ? curbH : skirtM;
-      const db = isCurb && bottomAt ? Math.max(0, zb - bottomAt(b[0], b[1])) : isCurb ? curbH : skirtM;
+      // (a skirt reaches at least skirtM down, and past the ground where it falls further: on a steep hillside the ground
+      // beside a curb strip dropped more than the skirt reached, a gap under its edge)
+      const skirtTo = (p, z) => (groundAt ? Math.max(skirtM, z - groundAt(p[0], p[1]) + SKIRT_PAST_M) : skirtM);
+      const da = isCurb && bottomAt ? Math.max(0, za - bottomAt(a[0], a[1])) : isCurb ? curbH : skirtTo(a, za);
+      const db = isCurb && bottomAt ? Math.max(0, zb - bottomAt(b[0], b[1])) : isCurb ? curbH : skirtTo(b, zb);
       if (isCurb && da < 0.005 && db < 0.005) continue;   // (flush: no face)
       into.push(a[0], a[1], za, b[0], b[1], zb, b[0], b[1], zb - db, a[0], a[1], za, b[0], b[1], zb - db, a[0], a[1], za - da);
       if (isCurb && curbW > 0) {

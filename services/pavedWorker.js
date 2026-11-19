@@ -1,6 +1,6 @@
 // A paved-area tile on a worker thread (services/pavedSidewalks.js): the grid and its outlines, plain data in and
 // out (no heights: meshing and grading, which read the terrain, stay on the export's thread and are cheap).
-import { makeGrid, buildPavedGrid, traceOutlines, markPolygon, WALK, GAP, ROAD } from './pavedArea.js';
+import { makeGrid, buildPavedGrid, traceOutlines, markPolygon, markLine, WALK, GAP, ROAD } from './pavedArea.js';
 
 /** item: { box, roads, cornerArcs, walks, streetWalks, greenery, buildings } -> { cells, g, rings } */
 export function pavedTile(item) {
@@ -19,6 +19,12 @@ export function pavedTile(item) {
     const inW = new Uint8Array(cells.length);
     for (const ring of item.water) markPolygon(inW, g, ring, 1);
     for (let i = 0; i < cells.length; i++) if (inW[i]) cells[i] &= ~(WALK | GAP);
+  }
+  // (nor across a river's channel: its bed is dug after the sidewalks, and paving over it floated over the dug bed)
+  if (item.rivers?.length) {
+    const inR = new Uint8Array(cells.length);
+    for (const rc of item.rivers) markLine(inR, g, rc.pts, rc.half, 1);
+    for (let i = 0; i < cells.length; i++) if (inR[i]) cells[i] &= ~(WALK | GAP);
   }
   // (nor over the sea the water step lowers: the coast's water is no mapped area, the terrain under it a pixel mask)
   if (item.sea) {

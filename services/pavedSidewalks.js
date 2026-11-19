@@ -25,7 +25,9 @@ export const FOLLOW_FROM_M = 0.5;   // terrain not shaped: the slab follows the 
 export const FOLLOW_M = 2;          // then onto the ground over this much
 export const FOLLOW_OVER_M = 0.05;  // ... this far over it
 export const OVERHEAD_FLOAT_M = 1;
-export const SURFACE_AGREE_M = 0.5;   // the terrain at a road's edge is its surface while within this of its solved height  // a slab this far over ground with something overhead follows the ground   // a bare curb (no sidewalk): a strip this wide along the road edge, its curb and top band
+export const SURFACE_AGREE_M = 0.5;
+export const GAP_STEEP_M = 1;      // curb and walk this far apart in height: the strip between follows the ground
+export const CURB_STRIP_M = 0.6;   // ... beyond this much at the curb, which stays at the road   // the terrain at a road's edge is its surface while within this of its solved height  // a slab this far over ground with something overhead follows the ground   // a bare curb (no sidewalk): a strip this wide along the road edge, its curb and top band
 
 /** The part of a polyline from s0 to s1 metres along it. */
 export function pieceAlong(points, s0, s1) {
@@ -137,7 +139,7 @@ export function addPavedSidewalks(builder, opts = {}) {
 
 // (a generator: the tiles' grids asked of the driver as one batch, { kind: 'pavedTiles', items }, built on worker
 // threads where there are some; null back: built here)
-export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = [], walks = [], runs = [], openGround = [], buildings = [], driveways = [], pockets = [], uvBands = null, followGround = false, overhead = null, mapBox = null, water = [], seaMask = null, walkH = 0.1, curbH = 0.15, crossSlope = 0.015, curbOnlyM = 0.3, THREE, groundAt = null } = {}) {
+export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = [], walks = [], runs = [], openGround = [], buildings = [], driveways = [], pockets = [], uvBands = null, followGround = false, overhead = null, mapBox = null, water = [], seaMask = null, walkH = 0.1, riverChannels = [], curbH = 0.15, crossSlope = 0.015, curbOnlyM = 0.3, THREE, groundAt = null } = {}) {
   const road = makeRoadHeight(carriageways);
   // (a driveway counts only where it crosses the sidewalk to reach the road: the part of its line within
   // CROSS_REACH_M of where it comes to the road's edge. Whole, an alley along a street dropped the curb along it)
@@ -177,7 +179,12 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
     const wk = walkHeight(x, y);
     if (wk && wk.d < SIDEWALK_GAP_M) {
       const walkTop = wk.z + walkH;
-      top = wk.d <= 0 ? walkTop : top + (walkTop - top) * smooth01(h.d / (h.d + wk.d));
+      if (wk.d <= 0) top = walkTop;
+      // (the strip between the curb and a walk much higher or lower than it lies on a bank or a cutting's slope: on
+      // the ground there, curb and walk each at their own height. Blended, a walk on the rim of a 15 m road cutting
+      // hung its paving in mid-air across the cut (Zion))
+      else if (Math.abs(walkTop - top) > GAP_STEEP_M && groundAt && h.d > CURB_STRIP_M) top = groundAt(x, y) + FOLLOW_OVER_M;
+      else top += (walkTop - top) * smooth01(h.d / (h.d + wk.d));
     }
     if (!groundAt) return top;
     // the terrain left as it is (no shaping): the curb at the road, the slab onto the ground within FOLLOW_M of it
@@ -220,6 +227,7 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
   const G = withBox(openGround.filter((r) => r.length > 2), (o) => o); const B = withBox(buildings.filter((r) => r.length > 2), (o) => o);
   const PK = withBox(pockets.filter((p) => p?.[0]?.length > 2), (o) => o[0]);
   const WA = withBox(water.filter((r) => r.length > 2), (o) => o);
+  const RC = withBox(riverChannels, (o) => o.pts);
   // (the sea mask's piece under a tile's box, in terrain pixels: (c, r) at ((c / W) - 0.5) * size, (0.5 - (r + 1) / H) * size)
   const seaPiece = (bx) => {
     if (!seaMask) return null;
@@ -252,14 +260,14 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
       // whatever roads cross it)
       const tw = near(W, box); const ts = near(S, box); const tp = near(PK, box);
       if (!tw.length && !ts.length && !tp.length) continue;
-      items.push({ box, roads: tr, cornerArcs: near(A, box), walks: tw, streetWalks: ts, greenery: near(G, box), buildings: near(B, box), pockets: tp, water: near(WA, box), sea: seaPiece(box) });
+      items.push({ box, roads: tr, cornerArcs: near(A, box), walks: tw, streetWalks: ts, greenery: near(G, box), buildings: near(B, box), pockets: tp, water: near(WA, box), rivers: near(RC, box), sea: seaPiece(box) });
       cores.push(core);
     }
   }
   const fineAt = crossings.length || dipLines.length ? (x, y) => toDriveway(x, y) < DRIVEWAY_HALF_M + DIP_RAMP_M + 1 || toDip(x, y) < DIP_RAMP_M + 1 : null;
   const meshTile = ({ cells, g, rings }, k) => {
     const core = cores[k];
-    const m = buildPavedMesh(rings, cells, g, { heightAt, bottomAt: surfaceAt, curbH, THREE, core, fineAt });
+    const m = buildPavedMesh(rings, cells, g, { heightAt, bottomAt: surfaceAt, groundAt, curbH, THREE, core, fineAt });
     addToBuilder(builder, m, uvBands);
     stats.tiles++; stats.slab += m.slab.length / 9; stats.curb += m.curb.length / 9; stats.skirt += m.skirt.length / 9;
     tiles.push({ cells, g, core });
