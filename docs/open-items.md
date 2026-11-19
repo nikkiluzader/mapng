@@ -494,6 +494,9 @@ stubs at crossings; B is 15.7 s of Chicago 8192's ~45 s of sidewalk work and hol
     triangles (today 2.12M; slab 1.21M, curb 0.53M, edge 0.82M). Next: fewer edge/curb faces (jagged walk outlines
     traced at 0.25 m; skirts on every terrain edge), then profile again; then curb top strip, corner jogs, car parks,
     seawall pockets; then the side-by-side and the user's go-ahead.
+    Update (e7d17f3 and after): outlines simplified within one cell, tiles meshed in order as workers return them,
+    row pass as linear scans: NYC sidewalk step 15.7 s with the switch on (today 17.8 s), 1.48M triangles (2.12M).
+    The 0.25 m corner jogs are gone with the looser outlines (curb within one cell of the road edge).
     Was: 3e wiring behind a switch (heights from the road edges, tiles on workers), (slabs, curb faces) at today's heights; 3d grading
     from the grid; tiles on workers; decks and waterfront unchanged at first; behind a switch until approved.
 - Then: plots and paved-area numbers on the test areas against today, in-game check, and the user's go-ahead
