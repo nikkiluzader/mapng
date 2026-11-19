@@ -3777,6 +3777,8 @@ function* sidewalkMeshes(carriageways, options = {}) {
       // (terrain not shaped: the slab onto the ground away from the curb; under a deck the ground cannot be raised)
       followGround: options.pavedFollowGround === true, overhead: options.overhead || null,
       mapBox: options.mapBox || null,
+      water: options.water || [],
+      seaMask: options.seaMask || null,
       carriageways, corners, walks: options.walks || [], runs, openGround: options.openGround || [], buildings: options.buildings || [], driveways: options.driveways || [],
       curbH: CURB_H, crossSlope: CROSS_SLOPE, curbOnlyM: CURB_ONLY_M, THREE, groundAt: options.groundAt || null,
     });

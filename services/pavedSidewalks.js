@@ -136,7 +136,7 @@ export function addPavedSidewalks(builder, opts = {}) {
 
 // (a generator: the tiles' grids asked of the driver as one batch, { kind: 'pavedTiles', items }, built on worker
 // threads where there are some; null back: built here)
-export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = [], walks = [], runs = [], openGround = [], buildings = [], driveways = [], pockets = [], uvBands = null, followGround = false, overhead = null, mapBox = null, curbH = 0.15, crossSlope = 0.015, curbOnlyM = 0.3, THREE, groundAt = null } = {}) {
+export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = [], walks = [], runs = [], openGround = [], buildings = [], driveways = [], pockets = [], uvBands = null, followGround = false, overhead = null, mapBox = null, water = [], seaMask = null, curbH = 0.15, crossSlope = 0.015, curbOnlyM = 0.3, THREE, groundAt = null } = {}) {
   const road = makeRoadHeight(carriageways);
   // (a driveway counts only where it crosses the sidewalk to reach the road: the part of its line within
   // CROSS_REACH_M of where it comes to the road's edge. Whole, an alley along a street dropped the curb along it)
@@ -206,6 +206,18 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
   const R = withBox(roads, (o) => o.pts); const A = withBox(arcs, (o) => o); const W = withBox(ws, (o) => o.pts); const S = withBox(street, (o) => o.pts);
   const G = withBox(openGround.filter((r) => r.length > 2), (o) => o); const B = withBox(buildings.filter((r) => r.length > 2), (o) => o);
   const PK = withBox(pockets.filter((p) => p?.[0]?.length > 2), (o) => o[0]);
+  const WA = withBox(water.filter((r) => r.length > 2), (o) => o);
+  // (the sea mask's piece under a tile's box, in terrain pixels: (c, r) at ((c / W) - 0.5) * size, (0.5 - (r + 1) / H) * size)
+  const seaPiece = (bx) => {
+    if (!seaMask) return null;
+    const { mask, width: W, height: Hh, worldSize: ws } = seaMask;
+    const c0 = Math.max(0, Math.floor((bx[0] / ws + 0.5) * W) - 1); const c1 = Math.min(W - 1, Math.ceil((bx[2] / ws + 0.5) * W) + 1);
+    const r0 = Math.max(0, Math.floor((0.5 - bx[3] / ws) * Hh - 1) - 1); const r1 = Math.min(Hh - 1, Math.ceil((0.5 - bx[1] / ws) * Hh - 1) + 1);
+    if (c1 < c0 || r1 < r0) return null;
+    const w = c1 - c0 + 1; const h = r1 - r0 + 1; const sub = new Uint8Array(w * h); let any = false;
+    for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) { const v = mask[(r + r0) * W + c + c0]; sub[r * w + c] = v; if (v) any = true; }
+    return any ? { mask: sub, c0, r0, w, h, W, H: Hh, ws } : null;
+  };
   const near = (list, bx) => list.filter(({ b }) => b[0] <= bx[2] && b[2] >= bx[0] && b[1] <= bx[3] && b[3] >= bx[1]).map(({ o }) => o);
   // (the tiles over the roads' box grown by the margin: the paving reaches past the outermost centrelines; over
   // the bare box a straight street along one line had no tile row at all)
@@ -227,7 +239,7 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
       // whatever roads cross it)
       const tw = near(W, box); const ts = near(S, box); const tp = near(PK, box);
       if (!tw.length && !ts.length && !tp.length) continue;
-      items.push({ box, roads: tr, cornerArcs: near(A, box), walks: tw, streetWalks: ts, greenery: near(G, box), buildings: near(B, box), pockets: tp });
+      items.push({ box, roads: tr, cornerArcs: near(A, box), walks: tw, streetWalks: ts, greenery: near(G, box), buildings: near(B, box), pockets: tp, water: near(WA, box), sea: seaPiece(box) });
       cores.push(core);
     }
   }

@@ -13616,6 +13616,12 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     beginStep('sidewalks', `Building sidewalks, curbs and ramps along ${groundCarriageways.length} carriageways${bridgeDecks.length ? ` (${bridgeDecks.length} bridge decks built)` : ''}…`);
     await yield_();
   }
+  // (the sea floor that the water step lowers further on, worked out once: no ground for a pier to follow, and no
+  // paving over it)
+  const sidewalkSeaPlan = includeRoads && includeSidewalks ? (() => { try { return lowerSeabed({
+            heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
+            minHeight: Number(exportTerrainData.minHeight) || 0, worldSize: exportTerrainData.width * squareSize,
+          }, exportTerrainData.landCover, -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0), { coarse: !!terrainData?.coarseElevation, coast: coastLinesOf(exportTerrainData, squareSize) }); } catch { return null; } })() : null;
   // (the walkway tops on worker threads in the desktop app; here otherwise)
   const sidewalks = includeRoads && includeSidewalks
     ? await buildSidewalkMeshesParallel(groundCarriageways, {
@@ -13659,15 +13665,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       // piers and footbridges: decks clear of the ground (and sidewalks on road bridges)
       decks: buildDeckPaths(exportTerrainData, squareSize),
       // (the sea floor that the water step lowers further on: no ground for a pier to follow)
-      seaAt: (() => {
-        try {
-          const plan = lowerSeabed({
-            heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
-            minHeight: Number(exportTerrainData.minHeight) || 0, worldSize: exportTerrainData.width * squareSize,
-          }, exportTerrainData.landCover, -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0), { coarse: !!terrainData?.coarseElevation, coast: coastLinesOf(exportTerrainData, squareSize) });
-          return plan.pixels ? (x, y) => plan.under(x, y) : null;
-        } catch { return null; }
-      })(),
+      seaAt: sidewalkSeaPlan?.pixels ? (x, y) => sidewalkSeaPlan.under(x, y) : null,
+      // (the sea's pixels as a mask: no paving over them; the paved tiles take it to their workers)
+      seaMask: sidewalkSeaPlan?.pixels ? (() => { const mask = new Uint8Array(exportTerrainData.width * exportTerrainData.height); sidewalkSeaPlan.apply((idx) => { mask[idx] = 1; }); return { mask, width: exportTerrainData.width, height: exportTerrainData.height, worldSize: exportTerrainData.width * squareSize }; })() : null,
       // (a road bridge's own deck: its road's line, at the deck's height)
       // (its layer: a path mapped on another layer, a low crossing under it, is not on it)
       bridgeRoads: bridgeDecks.flatMap((d, di) => d.parts.filter((part) => part.xy?.length > 1).map((part, i) => ({
