@@ -137,5 +137,5 @@ its own output small:
   and keep only its numbers.
 - **Report scratch size** (`du -sh scratch`) in the morning report or when it passes 50 GB.
 - **Deleting files inside WSL doesn't shrink the disk image on C:.** After a big cleanup, ask the user to compact
-  it from Windows (`wsl --shutdown`, then `wsl --manage <distro> --set-sparse true` or Optimize-VHD).
+  it from Windows: `sudo fstrim -av` in an Ubuntu terminal, close every WSL window (this session too), `wsl --shutdown`, then diskpart `compact vdisk` on the ext4.vhdx (not `--set-sparse`: disabled by Microsoft, never `--allow-unsafe`).
 - **On Windows test builds,** never run Setup.exe; test the unpacked folder.
