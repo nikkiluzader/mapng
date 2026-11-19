@@ -27,8 +27,11 @@ test('coordinate system guesses: national grids by their area of use, the map vi
     assert.equal(top?.epsg, epsg, `${x}, ${y}: ${top?.name}`);
     assert.ok(Math.abs(top.center.lat - lat) < 0.02 && Math.abs(top.center.lng - lng) < 0.02, `${top.name} at ${top.center.lat}, ${top.center.lng}`);
   }
-  // the others stay on offer
-  assert.ok(guess(496000, 6086000, FLAGSTAFF).length > 1);
+  // the others stay on offer, the UTM zones among them round where the best guess puts the file, not round the view
+  const all = guess(496000, 6086000, FLAGSTAFF);
+  assert.ok(all.length > 1);
+  const firstUtm = all.find((c) => c.utm);
+  assert.ok(firstUtm && Math.abs(firstUtm.center.lng - 24) < 12, `${firstUtm?.name} at ${firstUtm?.center.lng}`);
 });
 
 // A LAS file with no GeoKeys or WKT (LAStools las2las output): placed by the guess, reported as one.

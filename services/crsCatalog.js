@@ -80,5 +80,12 @@ export function guessCoordinateSystems({ minX, maxX, minY, maxY }, { near = null
   const utms = out.filter((c) => c.utm).sort((a, b) => dist(a) - dist(b));
   const nearestNational = nationals.length ? dist(nationals[0]) : Infinity;
   const utmFirst = utms.length && (!nationals.length || (hasNear && dist(utms[0]) < UTM_NEAR_KM && dist(utms[0]) + UTM_PENALTY_KM < nearestNational));
-  return (utmFirst ? [...utms.slice(0, 1), ...nationals, ...utms.slice(1)] : [...nationals, ...utms]).slice(0, max);
+  if (utmFirst) return [...utms.slice(0, 1), ...nationals, ...utms.slice(1)].slice(0, max);
+  // (a national grid first: the zones on offer after it are the ones round where it puts the file, not round the
+  // map's view: a Lithuanian tile with the map left at Flagstaff offered UTM 12N, 11N, 13N)
+  if (nationals.length) {
+    const at = nationals[0].center;
+    utms.sort((a, b) => haversineKm(a.center, at) - haversineKm(b.center, at));
+  }
+  return [...nationals, ...utms].slice(0, max);
 }
