@@ -486,7 +486,8 @@ const smooth01 = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
  * slab; round it, it blends back to the natural ground over BLEND_RUN per metre of difference (BLEND_MIN_M to
  * BLEND_MAX_M); road pixels are left to the roads' own grading. Returns { idx: Int32Array, z: Float64Array } (raw).
  */
-export function gradePaved(cells, g, terrain, { heightAt = () => 0, core = null } = {}) {
+// overhead(x, y, z0, z1): something built over that span (a deck, a tunnel's roof): the ground is never raised into it
+export function gradePaved(cells, g, terrain, { heightAt = () => 0, core = null, overhead = null } = {}) {
   const { heightMap, width, height, worldSize, minHeight = 0 } = terrain;
   const N = width * height; const sq = worldSize / width;
   // (the terrain grid's convention: pixel (c, r) at ((c / W) - 0.5) * size, (0.5 - (r + 1) / H) * size)
@@ -513,13 +514,21 @@ export function gradePaved(cells, g, terrain, { heightAt = () => 0, core = null 
       const k = r * sw + c; const gi = (r + r0) * width + (c + c0);
       if (gi < 0 || gi >= N || road[k]) continue;
       if (core) { const x = wx(c + c0); const y = wy(r + r0); if (x < core[0] || x >= core[2] || y < core[1] || y >= core[3]) continue; }
-      if (paved[k]) { idx.push(gi); z.push(top[k] + minHeight); continue; }
+      if (paved[k]) {
+        // (never raised up into a deck or a tunnel over it: the old grading's guard, missing at first: terrain stood
+        // through a bridge deck over a paved strip)
+        const ground = heightMap[gi] - minHeight;
+        if (overhead && top[k] > ground && overhead(wx(c + c0), wy(r + r0), top[k], top[k] + 6)) continue;
+        idx.push(gi); z.push(top[k] + minHeight); continue;
+      }
       if (near[k] < 0 || d2[k] > reach * reach) continue;
       const ground = heightMap[gi] - minHeight; const t = top[near[k]];
       const blend = Math.min(BLEND_MAX_M, Math.max(BLEND_MIN_M, Math.abs(ground - t) * BLEND_RUN));
       const f = (Math.sqrt(d2[k]) * sq) / blend;
       if (f >= 1) continue;
-      idx.push(gi); z.push(t + (ground - t) * smooth01(f) + minHeight);
+      const zb = t + (ground - t) * smooth01(f);
+      if (overhead && zb > ground && overhead(wx(c + c0), wy(r + r0), zb, zb + 6)) continue;
+      idx.push(gi); z.push(zb + minHeight);
     }
   }
   return { idx: Int32Array.from(idx), z: Float64Array.from(z) };

@@ -20,7 +20,11 @@ export const DRIVEWAY_HALF_M = 2.5;
 export const DIP_RAMP_M = 1.0;
 export const DIP_LIP_M = 0.02;
 export const CROSS_REACH_M = SIDEWALK_GAP_M + 2;
-export const BARE_CURB_M = 0.5;   // a bare curb (no sidewalk): a strip this wide along the road edge, its curb and top band
+export const BARE_CURB_M = 0.5;
+export const FOLLOW_FROM_M = 0.5;   // terrain not shaped: the slab follows the road this far from its edge,
+export const FOLLOW_M = 2;          // then onto the ground over this much
+export const FOLLOW_OVER_M = 0.05;  // ... this far over it
+export const OVERHEAD_FLOAT_M = 1;  // a slab this far over ground with something overhead follows the ground   // a bare curb (no sidewalk): a strip this wide along the road edge, its curb and top band
 
 /** The part of a polyline from s0 to s1 metres along it. */
 export function pieceAlong(points, s0, s1) {
@@ -132,7 +136,7 @@ export function addPavedSidewalks(builder, opts = {}) {
 
 // (a generator: the tiles' grids asked of the driver as one batch, { kind: 'pavedTiles', items }, built on worker
 // threads where there are some; null back: built here)
-export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = [], walks = [], runs = [], openGround = [], buildings = [], driveways = [], pockets = [], uvBands = null, curbH = 0.15, crossSlope = 0.015, curbOnlyM = 0.3, THREE, groundAt = null } = {}) {
+export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = [], walks = [], runs = [], openGround = [], buildings = [], driveways = [], pockets = [], uvBands = null, followGround = false, overhead = null, curbH = 0.15, crossSlope = 0.015, curbOnlyM = 0.3, THREE, groundAt = null } = {}) {
   const road = makeRoadHeight(carriageways);
   // (a driveway counts only where it crosses the sidewalk to reach the road: the part of its line within
   // CROSS_REACH_M of where it comes to the road's edge. Whole, an alley along a street dropped the curb along it)
@@ -161,7 +165,18 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
     const h = road(x, y); if (!h) return groundAt ? groundAt(x, y) : 0;
     const surface = groundAt ? groundAt(h.ex, h.ey) : h.z;
     const share = Math.min(smooth01((toDriveway(x, y) - DRIVEWAY_HALF_M) / DIP_RAMP_M), smooth01(toDip(x, y) / DIP_RAMP_M));
-    return surface + curbH * share + DIP_LIP_M * (1 - share) + crossSlope * Math.min(h.d, 6);
+    const top = surface + curbH * share + DIP_LIP_M * (1 - share) + crossSlope * Math.min(h.d, 6);
+    if (!groundAt) return top;
+    // the terrain left as it is (no shaping): the curb at the road, the slab onto the ground within FOLLOW_M of it
+    if (followGround) {
+      const w = smooth01((h.d - FOLLOW_FROM_M) / FOLLOW_M);
+      return w > 0 ? top * (1 - w) + (groundAt(x, y) + FOLLOW_OVER_M) * w : top;
+    }
+    // (floating well over ground the grading may not raise, something built over it: on the ground instead. Beside
+    // a bridge the nearest ground road is the approach on its fill, and a slab under the deck stood 6.9 m up)
+    const ground = groundAt(x, y);
+    if (overhead && top - ground > OVERHEAD_FLOAT_M && overhead(x, y, ground, top + 0.5)) return ground + FOLLOW_OVER_M;
+    return top;
   };
   let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
   for (const cw of carriageways) for (const p of cw.nodes || []) { if (p[0] < x0) x0 = p[0]; if (p[0] > x1) x1 = p[0]; if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1]; }

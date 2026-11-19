@@ -3772,6 +3772,8 @@ function* sidewalkMeshes(carriageways, options = {}) {
       pockets: pavedPockets,
       // (the curb sheet's bands and repeat, as today's curbs use them)
       uvBands: { curbRepeat: CURB_REPEAT_M, face: [V_BAND_LOW, V_LIGHT_LOW], top: [V_LIGHT_LOW, V_BAND_TOP] },
+      // (terrain not shaped: the slab onto the ground away from the curb; under a deck the ground cannot be raised)
+      followGround: options.pavedFollowGround === true, overhead: options.overhead || null,
       carriageways, corners, walks: options.walks || [], runs, openGround: options.openGround || [], buildings: options.buildings || [], driveways: options.driveways || [],
       curbH: CURB_H, crossSlope: CROSS_SLOPE, curbOnlyM: CURB_ONLY_M, THREE, groundAt: options.groundAt || null,
     });
@@ -4029,6 +4031,37 @@ export function gradeSidewalkGround(runs, carriageways, grid, { overhead = () =>
  * Floating: a gap under the slab deeper than its faces reach (CURB_H + SINK);
  * buried: the terrain over the slab's top. groundAt(x, y): world z.
  */
+/**
+ * How well the paved model's slabs sit on the terrain (the paved model's own check: today's samples the old runs'
+ * slab profile, which the paved model does not build): every step metres over each tile's paved cells, the slab
+ * top (paved.heightAt) against the terrain. Floating and buried as checkSidewalkGround counts them.
+ */
+export function checkPavedGround(paved, groundAt, { step = 2 } = {}) {
+  let samples = 0; let floating = 0; let buried = 0; let worst = null;
+  const FLOAT_M = CURB_H + SINK + 0.1;
+  const BURIED_M = 0.08;
+  for (const { cells, g, core } of paved?.tiles || []) {
+    const k = Math.max(1, Math.round(step / g.res));
+    for (let r = 0; r < g.h; r += k) {
+      const y = g.y1 - (r + 0.5) * g.res;
+      if (y < core[1] || y >= core[3]) continue;
+      for (let c = 0; c < g.w; c += k) {
+        if (!(cells[r * g.w + c] & 6)) continue;   // (WALK | GAP: paved)
+        const x = g.x0 + (c + 0.5) * g.res;
+        if (x < core[0] || x >= core[2]) continue;
+        const top = paved.heightAt(x, y); const ground = groundAt(x, y);
+        if (!Number.isFinite(top) || !Number.isFinite(ground)) continue;
+        samples++;
+        const gap = top - ground;
+        // (worst in the report's shape, as checkSidewalkGround gives it)
+        if (gap > FLOAT_M) { floating++; if (!worst || gap > worst.gap) worst = { gap: Math.round(gap * 100) / 100, at: [Math.round(x), Math.round(y)], road: 'paved walk' }; }
+        if (ground - top > BURIED_M) buried++;
+      }
+    }
+  }
+  return { samples, floating, buried, worst };
+}
+
 export function checkSidewalkGround(runs, groundAt, { step = 2 } = {}) {
   let samples = 0; let floating = 0; let buried = 0; let worst = null;
   const list = [];

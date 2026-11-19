@@ -100,7 +100,7 @@ import { generateRoadLamps } from './streetLamps.js';
 import { buildIngameProbes } from './ingameProbes.js';
 import { smoothLine } from './lineSmoothing.js';
 import { buildPlazaMeshes, courtyardPathHalf, courtyardPaved, getPlazaMaterialDefs, isCourtyard, isPlaza, plazaSurface, PLAZA_MATERIAL, plazaTileM } from './plazas.js';
-import { buildSidewalkMeshesParallel, cornerPatches, inferCrossingSidewalks, buildWallDeckMesh, gutterLines, isCurbedClass, lowerUnderWallDecks, checkSidewalkGround, CURB_ONLY_M, ZEBRA_CROSSING_MATERIAL, gradeSidewalkGround, getSidewalkMaterialDefs, SIDEWALK_MATERIALS, sidewalkFootways, streetSides, DEFAULT_SIDEWALK_LOOK, setCurbHeight, CURB_HEIGHTS_M,
+import { buildSidewalkMeshesParallel, cornerPatches, inferCrossingSidewalks, buildWallDeckMesh, gutterLines, isCurbedClass, lowerUnderWallDecks, checkSidewalkGround, checkPavedGround, CURB_ONLY_M, ZEBRA_CROSSING_MATERIAL, gradeSidewalkGround, getSidewalkMaterialDefs, SIDEWALK_MATERIALS, sidewalkFootways, streetSides, DEFAULT_SIDEWALK_LOOK, setCurbHeight, CURB_HEIGHTS_M,
 } from './beamngSidewalks.js';
 import { buildRoadNameZones } from './roadNameZones.js';
 import { placeStreetProps, POLE_LAMP_REACH_M, POLE_TYPES, hash01 as propHash, roadsidePolesRegion } from './streetProps.js';
@@ -13679,6 +13679,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       walks: decalRoads.footpaths,
       // (one paved area, services/pavedSidewalks.js: the default; MAPNG_PAVED_SIDEWALKS=0 the old builders, until they go)
       pavedModel: !(typeof process !== 'undefined' && process.env?.MAPNG_PAVED_SIDEWALKS === '0'),
+      // (the terrain left as it is: the paved slabs follow it away from the curb; and what is built overhead)
+      pavedFollowGround: !shapeExtras,
+      overhead: (x, y, z0, z1) => underDeck(x, y, z0, z1),
       sidewalkLook,
       // (paving stones laid as the streets' decals lay them: red brick in the Americas)
       americas: getMarkingStyle(exportTerrainData.roadRules) === 'americas',
@@ -13704,7 +13707,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       ? (() => {
         const idx = []; const z = [];
         for (const t of sidewalks.paved.tiles) {
-          const e = gradePaved(t.cells, t.g, terrainGrid, { heightAt: sidewalks.paved.heightAt, core: t.core });
+          const e = gradePaved(t.cells, t.g, terrainGrid, { heightAt: sidewalks.paved.heightAt, core: t.core, overhead: underDeck });
           for (let k = 0; k < e.idx.length; k++) { idx.push(e.idx[k]); z.push(e.z[k]); }
         }
         return { pixels: idx.length, apply(set) { for (let k = 0; k < idx.length; k++) set(idx[k], z[k]); } };
@@ -15594,7 +15597,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
       grid: { heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height, worldSize: exportTerrainData.width * squareSize },
     });
-    structureChecks.sidewalks = checkSidewalkGround(sidewalks.runs, (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize));
+    structureChecks.sidewalks = sidewalks.paved
+      ? checkPavedGround(sidewalks.paved, (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize))
+      : checkSidewalkGround(sidewalks.runs, (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize));
   } catch (err) {
     console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Structure checks skipped: ${err?.message || err}`);
   }
