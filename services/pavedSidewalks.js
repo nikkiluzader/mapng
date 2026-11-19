@@ -139,7 +139,7 @@ export function addPavedSidewalks(builder, opts = {}) {
 
 // (a generator: the tiles' grids asked of the driver as one batch, { kind: 'pavedTiles', items }, built on worker
 // threads where there are some; null back: built here)
-export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = [], walks = [], runs = [], openGround = [], buildings = [], driveways = [], pockets = [], uvBands = null, followGround = false, overhead = null, mapBox = null, water = [], seaMask = null, walkH = 0.1, riverChannels = [], curbH = 0.15, crossSlope = 0.015, curbOnlyM = 0.3, THREE, groundAt = null } = {}) {
+export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = [], walks = [], runs = [], openGround = [], buildings = [], driveways = [], pockets = [], uvBands = null, followGround = false, overhead = null, mapBox = null, water = [], seaMask = null, walkH = 0.1, riverChannels = [], houses = [], curbH = 0.15, crossSlope = 0.015, curbOnlyM = 0.3, THREE, groundAt = null } = {}) {
   const road = makeRoadHeight(carriageways);
   // (a driveway counts only where it crosses the sidewalk to reach the road: the part of its line within
   // CROSS_REACH_M of where it comes to the road's edge. Whole, an alley along a street dropped the curb along it)
@@ -228,6 +228,7 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
   const PK = withBox(pockets.filter((p) => p?.[0]?.length > 2), (o) => o[0]);
   const WA = withBox(water.filter((r) => r.length > 2), (o) => o);
   const RC = withBox(riverChannels, (o) => o.pts);
+  const HO = withBox(houses.filter((r) => r.length > 2), (o) => o);
   // (the sea mask's piece under a tile's box, in terrain pixels: (c, r) at ((c / W) - 0.5) * size, (0.5 - (r + 1) / H) * size)
   const seaPiece = (bx) => {
     if (!seaMask) return null;
@@ -260,7 +261,7 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
       // whatever roads cross it)
       const tw = near(W, box); const ts = near(S, box); const tp = near(PK, box);
       if (!tw.length && !ts.length && !tp.length) continue;
-      items.push({ box, roads: tr, cornerArcs: near(A, box), walks: tw, streetWalks: ts, greenery: near(G, box), buildings: near(B, box), pockets: tp, water: near(WA, box), rivers: near(RC, box), sea: seaPiece(box) });
+      items.push({ box, roads: tr, cornerArcs: near(A, box), walks: tw, streetWalks: ts, greenery: near(G, box), buildings: near(B, box), pockets: tp, water: near(WA, box), rivers: near(RC, box), houses: near(HO, [box[0] - 30, box[1] - 30, box[2] + 30, box[3] + 30]), sea: seaPiece(box) });
       cores.push(core);
     }
   }

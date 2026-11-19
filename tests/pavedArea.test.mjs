@@ -129,3 +129,15 @@ test('buildPavedMesh: a curb top band runs along the curb edge, inside it and ju
     assert.ok(Math.abs(z - (0.15 + CURB_TOP_LIFT_M)) < 1e-5);
   }
 });
+
+test('a residential street (houses near) keeps its verge between curb and sidewalk as lawn; downtown paves it', async () => {
+  const { makeGrid: mk, buildPavedGrid: build, GAP: G, VERGE: V } = await import('../services/pavedArea.js');
+  const g = mk(-30, -30, 30, 30);
+  const base = { roads: [{ pts: [[-40, 0], [40, 0]], half: 4 }], walks: [{ pts: [[-40, 8.5], [40, 8.5]], half: 1, sidewalk: true }] };
+  const at = (cells, x, y) => cells[Math.floor((30 - y) / g.res) * g.w + Math.floor((x + 30) / g.res)];
+  const town = build(g, base).cells;
+  assert.ok(at(town, 0, 6) & G, 'downtown: paved to the curb');
+  const house = [[-5, 14], [5, 14], [5, 22], [-5, 22]];
+  const sub = build(g, { ...base, houses: [house] }).cells;
+  assert.ok(at(sub, 0, 6) & V && !(at(sub, 0, 6) & G), 'with a house behind: lawn');
+});

@@ -3781,6 +3781,7 @@ function* sidewalkMeshes(carriageways, options = {}) {
       seaMask: options.seaMask || null,
       walkH: WALK_H,
       riverChannels: options.riverChannels || [],
+      houses: options.houses || [],
       carriageways, corners, walks: options.walks || [], runs, openGround: options.openGround || [], buildings: options.buildings || [], driveways: options.driveways || [],
       curbH: CURB_H, crossSlope: CROSS_SLOPE, curbOnlyM: CURB_ONLY_M, THREE, groundAt: options.groundAt || null,
     });
@@ -4044,7 +4045,7 @@ export function gradeSidewalkGround(runs, carriageways, grid, { overhead = () =>
  * top (paved.heightAt) against the terrain. Floating and buried as checkSidewalkGround counts them.
  */
 export function checkPavedGround(paved, groundAt, { step = 2 } = {}) {
-  let samples = 0; let floating = 0; let buried = 0; let worst = null;
+  let samples = 0; let floating = 0; let buried = 0; let worst = null; let worstBuried = null;
   const FLOAT_M = CURB_H + SINK + 0.1;
   const BURIED_M = 0.08;
   for (const { cells, g, core } of paved?.tiles || []) {
@@ -4062,11 +4063,11 @@ export function checkPavedGround(paved, groundAt, { step = 2 } = {}) {
         const gap = top - ground;
         // (worst in the report's shape, as checkSidewalkGround gives it)
         if (gap > FLOAT_M) { floating++; if (!worst || gap > worst.gap) worst = { gap: Math.round(gap * 100) / 100, at: [Math.round(x), Math.round(y)], road: 'paved walk' }; }
-        if (ground - top > BURIED_M) buried++;
+        if (ground - top > BURIED_M) { buried++; const b = ground - top; if (!worstBuried || b > worstBuried.by) worstBuried = { by: Math.round(b * 100) / 100, at: [Math.round(x), Math.round(y)] }; }
       }
     }
   }
-  return { samples, floating, buried, worst };
+  return { samples, floating, buried, worst, worstBuried };
 }
 
 export function checkSidewalkGround(runs, groundAt, { step = 2 } = {}) {

@@ -21,6 +21,8 @@ export const PAVED_RES_M = 0.25;
 export const SIDEWALK_GAP_M = 12;
 export const PLAIN_GAP_M = 1;
 export const CLOSE_M = 5;
+export const LAWN_REACH_M = 25;     // houses this near: the street's verge between curb and sidewalk is a lawn
+export const LAWN_MIN_GAP_M = 1.5;  // ... unless the walk is this near the curb (mapped against it)
 export const POCKET_M2 = 20;      // an unpaved pocket this small between road and pavement is paved (crossing landings)
 export const SPECK_M2 = 0.5;      // a traced ring this small is dropped
 export const CURB_TOP_LIFT_M = 0.003;
@@ -148,7 +150,8 @@ function closeMask(mask, w, h, rCells) {
  * [{ pts, half }] street-side sidewalk bands (already offset to their middle); greenery: [[[x, y]...]] rings.
  * Returns { cells: Uint8Array (ROAD | WALK | GAP | VERGE bits), grid }.
  */
-export function buildPavedGrid(g, { roads = [], cornerArcs = [], walks = [], streetWalks = [], greenery = [] } = {}) {
+// houses: rings of houses (a residential street: the strip from curb to sidewalk is a lawn, not paving)
+export function buildPavedGrid(g, { roads = [], cornerArcs = [], walks = [], streetWalks = [], greenery = [], houses = [] } = {}) {
   const N = g.w * g.h;
   const cells = new Uint8Array(N);
   for (const r of roads) if (r.pts.length > 1) markLine(cells, g, r.pts, r.half, ROAD);
@@ -176,6 +179,18 @@ export function buildPavedGrid(g, { roads = [], cornerArcs = [], walks = [], str
   const { d2: dRoad2, near: roadNear } = distanceWithNearest(road, g.w, g.h);
   const { d2: dSw2, near: swNear } = distanceWithNearest(sw, g.w, g.h);
   const swMax = SIDEWALK_GAP_M / res;
+  // (a residential street, houses within LAWN_REACH_M: its verge from the curb to the sidewalk is grass. Paved to
+  // the curb, a suburb's tree lawns and cul-de-sac bulbs came out solid concrete. Downtown, with no houses, paved)
+  let lawn = null;
+  if (houses.length) {
+    const hm = new Uint8Array(N);
+    for (const ring of houses) if (ring.length > 2) markPolygon(hm, g, ring, 1);
+    const { d2: dh } = distanceWithNearest(hm, g.w, g.h);
+    const reach2 = (LAWN_REACH_M / res) * (LAWN_REACH_M / res);
+    lawn = new Uint8Array(N);
+    for (let i = 0; i < N; i++) if (dh[i] <= reach2) lawn[i] = 1;
+  }
+  const lawnGap = LAWN_MIN_GAP_M / res;
   for (let i = 0; i < N; i++) {
     if (road[i] || walk[i]) continue;
     const dr = Math.sqrt(dRoad2[i]);
@@ -183,7 +198,10 @@ export function buildPavedGrid(g, { roads = [], cornerArcs = [], walks = [], str
     if (plainNear[i] && roadBand[i]) take = true;
     else if (swNear[i] >= 0) {
       const D = Math.sqrt(dRoad2[swNear[i]]);
-      if (D <= swMax && dr + Math.sqrt(dSw2[i]) <= D + 0.5 / res) take = true;
+      if (D <= swMax && dr + Math.sqrt(dSw2[i]) <= D + 0.5 / res) {
+        if (lawn && lawn[i] && D > lawnGap) { cells[i] |= VERGE; continue; }
+        take = true;
+      }
     }
     if (!take) continue;
     // (no filling past a walk: the straight way to the nearest road cell crosses no walk cell)
@@ -209,7 +227,7 @@ export function buildPavedGrid(g, { roads = [], cornerArcs = [], walks = [], str
   // (only near a sidewalk footway: the closing rounds the sidewalk paving at corners; let loose, it paved the strip
   // beside a plain footway 4.5 m off the curb too)
   const closeReach2 = (CLOSE_M / res) * (CLOSE_M / res);
-  for (let i = 0; i < N; i++) if (closed[i] && !(cells[i] & (ROAD | WALK | GAP)) && dSw2[i] <= closeReach2) cells[i] |= GAP;
+  for (let i = 0; i < N; i++) if (closed[i] && !(cells[i] & (ROAD | WALK | GAP | VERGE)) && dSw2[i] <= closeReach2 && !(lawn && lawn[i])) cells[i] |= GAP;
   // pockets: small unpaved areas wedged between road and pavement (a crossing's landing, a kerb ramp's sides) paved
   {
     const label = new Int32Array(N).fill(-1); const stack = []; const maxCells = POCKET_M2 / (res * res);
