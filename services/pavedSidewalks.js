@@ -12,6 +12,40 @@ export const TILE_M = 256;
 export const MARGIN_M = SIDEWALK_GAP_M + 8;
 const SEG_CELL_M = 16;
 const EDGE_IN_M = 0.3;   // the road surface read this far inside its edge
+// a driveway crossing the sidewalk: the curb dropped across its width, ramped back up either side (today's values,
+// beamngSidewalks.js DRIVEWAY_HALF_M, DIP_RAMP_M), a small lip left in the dip
+export const DRIVEWAY_HALF_M = 2.5;
+export const DIP_RAMP_M = 1.0;
+export const DIP_LIP_M = 0.02;
+export const CROSS_REACH_M = SIDEWALK_GAP_M + 2;   // a driveway's crossing: this far back from the road along its line
+const smooth01 = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
+
+/** The distance from (x, y) to the nearest of lines ([[x, y]...]), through a grid of segments; Infinity far off. */
+export function makeLineDistance(lines, reach) {
+  const cells = new Map(); const segs = [];
+  const key = (cx, cy) => cx * 1048576 + cy;
+  for (const pts of lines) {
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const a = pts[i]; const b = pts[i + 1]; const s = segs.length; segs.push(a[0], a[1], b[0], b[1]);
+      for (let gx = Math.floor((Math.min(a[0], b[0]) - reach) / SEG_CELL_M); gx <= Math.floor((Math.max(a[0], b[0]) + reach) / SEG_CELL_M); gx++) {
+        for (let gy = Math.floor((Math.min(a[1], b[1]) - reach) / SEG_CELL_M); gy <= Math.floor((Math.max(a[1], b[1]) + reach) / SEG_CELL_M); gy++) {
+          const k = key(gx, gy); let l = cells.get(k); if (!l) { l = []; cells.set(k, l); } l.push(s);
+        }
+      }
+    }
+  }
+  return (x, y) => {
+    const l = cells.get(key(Math.floor(x / SEG_CELL_M), Math.floor(y / SEG_CELL_M)));
+    if (!l) return Infinity;
+    let best = Infinity;
+    for (const s of l) {
+      const ax = segs[s]; const ay = segs[s + 1]; const dx = segs[s + 2] - ax; const dy = segs[s + 3] - ay; const L2 = dx * dx + dy * dy || 1e-12;
+      const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / L2));
+      const d = fastHypot(ax + dx * t - x, ay + dy * t - y); if (d < best) best = d;
+    }
+    return best;
+  };
+}
 
 /** The road surface's height near (x, y): the nearest carriageway centreline point's z (a grid of segments). */
 export function makeRoadHeight(carriageways) {
@@ -62,12 +96,32 @@ export function makeRoadHeight(carriageways) {
  */
 // groundAt(x, y): the shaped terrain (the road surface lies on it): the slab top is the road surface at the nearest
 // edge plus the curb (read off the centreline's z, the solver's, it stood 10 cm over the road a curb ended short of)
-export function addPavedSidewalks(builder, { carriageways = [], corners = [], walks = [], runs = [], openGround = [], buildings = [], curbH = 0.15, crossSlope = 0.015, curbOnlyM = 0.3, THREE, groundAt = null } = {}) {
+export function addPavedSidewalks(builder, { carriageways = [], corners = [], walks = [], runs = [], openGround = [], buildings = [], driveways = [], curbH = 0.15, crossSlope = 0.015, curbOnlyM = 0.3, THREE, groundAt = null } = {}) {
   const road = makeRoadHeight(carriageways);
+  // (a driveway counts only where it crosses the sidewalk to reach the road: the part of its line within
+  // CROSS_REACH_M of where it comes to the road's edge. Whole, an alley along a street dropped the curb along it)
+  const crossings = [];
+  for (const line of driveways) {
+    const ends = [];
+    for (const p of line) { const h = road(p[0], p[1]); if (h && h.d < 1.5) ends.push(p); }
+    if (!ends.length) continue;
+    let piece = [];
+    for (const p of line) {
+      const near = ends.some((q) => fastHypot(p[0] - q[0], p[1] - q[1]) <= CROSS_REACH_M);
+      if (near) piece.push(p); else if (piece.length) { if (piece.length > 1) crossings.push(piece); piece = []; }
+    }
+    if (piece.length > 1) crossings.push(piece);
+    // (a crossing mapped with one node at the road: its line to the next node)
+    if (!crossings.length && ends.length) crossings.push(line);
+  }
+  const toDriveway = crossings.length ? makeLineDistance(crossings, DRIVEWAY_HALF_M + DIP_RAMP_M) : () => Infinity;
+  // the road surface at the nearest edge (a curb face comes down to it)
+  const surfaceAt = (x, y) => { const h = road(x, y); if (!h) return groundAt ? groundAt(x, y) : 0; return groundAt ? groundAt(h.ex, h.ey) : h.z; };
   const heightAt = (x, y) => {
     const h = road(x, y); if (!h) return groundAt ? groundAt(x, y) : 0;
     const surface = groundAt ? groundAt(h.ex, h.ey) : h.z;
-    return surface + curbH + crossSlope * Math.min(h.d, 6);
+    const share = smooth01((toDriveway(x, y) - DRIVEWAY_HALF_M) / DIP_RAMP_M);
+    return surface + curbH * share + DIP_LIP_M * (1 - share) + crossSlope * Math.min(h.d, 6);
   };
   let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
   for (const cw of carriageways) for (const p of cw.nodes || []) { if (p[0] < x0) x0 = p[0]; if (p[0] > x1) x1 = p[0]; if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1]; }
@@ -75,7 +129,8 @@ export function addPavedSidewalks(builder, { carriageways = [], corners = [], wa
   const tiles = [];
   if (!Number.isFinite(x0)) return { tiles, heightAt, stats };
   const t0 = Date.now();
-  const roads = carriageways.filter((c) => c.nodes?.length > 1).map((c) => ({ pts: c.nodes, half: c.half || 3 }));
+  // (not a lift's or a stair's way mapped as a carriageway)
+  const roads = carriageways.filter((c) => c.nodes?.length > 1 && !['elevator', 'steps', 'footway', 'path'].includes(c.highway)).map((c) => ({ pts: c.nodes, half: c.half || 3 }));
   const arcs = corners.filter((c) => c.arc?.length > 1).map((c) => c.arc);
   const ws = walks.filter((w) => w.nodes?.length > 1).map((w) => ({ pts: w.nodes, half: w.half || 1, sidewalk: !!w.sidewalk, crossing: !!w.crossing }));
   // (a street-side run's band: its points are on the curb line, the walk out to one side)
@@ -90,8 +145,11 @@ export function addPavedSidewalks(builder, { carriageways = [], corners = [], wa
   const R = withBox(roads, (o) => o.pts); const A = withBox(arcs, (o) => o); const W = withBox(ws, (o) => o.pts); const S = withBox(street, (o) => o.pts);
   const G = withBox(openGround.filter((r) => r.length > 2), (o) => o); const B = withBox(buildings.filter((r) => r.length > 2), (o) => o);
   const near = (list, bx) => list.filter(({ b }) => b[0] <= bx[2] && b[2] >= bx[0] && b[1] <= bx[3] && b[3] >= bx[1]).map(({ o }) => o);
-  for (let tx = Math.floor(x0 / TILE_M) * TILE_M; tx < x1; tx += TILE_M) {
-    for (let ty = Math.floor(y0 / TILE_M) * TILE_M; ty < y1; ty += TILE_M) {
+  // (the tiles over the roads' box grown by the margin: the paving reaches past the outermost centrelines; over
+  // the bare box a straight street along one line had no tile row at all)
+  x0 -= MARGIN_M; y0 -= MARGIN_M; x1 += MARGIN_M; y1 += MARGIN_M;
+  for (let tx = Math.floor(x0 / TILE_M) * TILE_M; tx <= x1; tx += TILE_M) {
+    for (let ty = Math.floor(y0 / TILE_M) * TILE_M; ty <= y1; ty += TILE_M) {
       const core = [tx, ty, tx + TILE_M, ty + TILE_M];
       const box = [tx - MARGIN_M, ty - MARGIN_M, tx + TILE_M + MARGIN_M, ty + TILE_M + MARGIN_M];
       const tr = near(R, box);
@@ -103,7 +161,7 @@ export function addPavedSidewalks(builder, { carriageways = [], corners = [], wa
       for (const ring of near(B, box)) markPolygon(inB, g, ring, 1);
       for (let i = 0; i < cells.length; i++) if (inB[i]) cells[i] &= ~(WALK | GAP);
       const rings = traceOutlines(cells, g, WALK | GAP);
-      const m = buildPavedMesh(rings, cells, g, { heightAt, curbH, THREE, core });
+      const m = buildPavedMesh(rings, cells, g, { heightAt, bottomAt: surfaceAt, curbH, THREE, core, fineAt: crossings.length ? (x, y) => toDriveway(x, y) < DRIVEWAY_HALF_M + DIP_RAMP_M + 1 : null });
       addToBuilder(builder, m);
       stats.tiles++; stats.slab += m.slab.length / 9; stats.curb += m.curb.length / 9; stats.skirt += m.skirt.length / 9;
       tiles.push({ cells, g, core });

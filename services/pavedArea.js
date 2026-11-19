@@ -327,8 +327,31 @@ function simplifyLine(pts, tol) {
  * (faces skirtM into the ground, ground outside).
  */
 // core: [x0, y0, x1, y1], only the slab squares and edges inside it (a tile's own part, its margin left to its neighbours)
-export function buildPavedMesh(rings, cells, g, { heightAt = () => 0, cellM = 4, curbH = 0.15, skirtM = 0.3, THREE, core = null } = {}) {
+// bottomAt(x, y): the road surface a curb face comes down to (default: curbH under the top; a dropped curb at a
+// driveway then has next to no face)
+// fineAt(x, y): true where the slab must follow quick changes (a driveway's dip): there the squares are fineM.
+// Edges are split to at most edgeM so a curb's height can change along a straight run.
+export function buildPavedMesh(rings0, cells, g, { heightAt = () => 0, bottomAt = null, cellM = 4, fineM = 1, fineAt = null, edgeM = 1, curbH = 0.15, skirtM = 0.3, THREE, core = null } = {}) {
   if (!THREE) throw new Error('buildPavedMesh needs THREE (ShapeUtils.triangulateShape)');
+  const rings = rings0.map((ring) => {
+    const out = [];
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i]; const b = ring[(i + 1) % ring.length]; out.push(a);
+      // (to the slab's squares, then finely where the height changes quickly, a driveway's dip, each piece by its own
+      // middle: a long edge's middle could lie far from a driveway the edge passes)
+      const n = Math.ceil(fastHypot(b[0] - a[0], b[1] - a[1]) / cellM);
+      for (let k = 0; k < n; k++) {
+        const p0 = [a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n];
+        const p1 = [a[0] + ((b[0] - a[0]) * (k + 1)) / n, a[1] + ((b[1] - a[1]) * (k + 1)) / n];
+        if (k > 0) out.push(p0);
+        if (fineAt && fineAt((p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2)) {
+          const m = Math.ceil(fastHypot(p1[0] - p0[0], p1[1] - p0[1]) / edgeM);
+          for (let j = 1; j < m; j++) out.push([p0[0] + ((p1[0] - p0[0]) * j) / m, p0[1] + ((p1[1] - p0[1]) * j) / m]);
+        }
+      }
+    }
+    return out;
+  });
   const slab = []; const curb = []; const skirt = [];
   // polygons: each outer ring with the holes inside it
   const outers = rings.filter((r) => ringSignedArea(r) > 0); const holes = rings.filter((r) => ringSignedArea(r) < 0);
@@ -363,12 +386,18 @@ export function buildPavedMesh(rings, cells, g, { heightAt = () => 0, cellM = 4,
       if (core && (sx + cellM <= core[0] || sx >= core[2])) continue;
       for (let sy = Math.floor(y0 / cellM) * cellM; sy < y1; sy += cellM) {
         if (core && (sy + cellM <= core[1] || sy >= core[3])) continue;
-        const o = clip(p.outer, sx, sy, sx + cellM, sy + cellM);
-        if (o.length < 3 || Math.abs(ringSignedArea(o)) < 1e-4) continue;
-        const hs = p.holes.map((h) => clip(h, sx, sy, sx + cellM, sy + cellM)).filter((h) => h.length >= 3 && Math.abs(ringSignedArea(h)) > 1e-4);
-        const contour = o.map(([x, y]) => new THREE.Vector2(x, y)); const hv = hs.map((h) => h.map(([x, y]) => new THREE.Vector2(x, y)));
-        const all = [...o, ...hs.flat()];
-        for (const [a, b, c] of THREE.ShapeUtils.triangulateShape(contour, hv)) { push3(slab, all[a]); push3(slab, all[b]); push3(slab, all[c]); }
+        const fine = fineAt && fineAt(sx + cellM / 2, sy + cellM / 2);
+        const step = fine ? fineM : cellM;
+        for (let fx = sx; fx < sx + cellM - 1e-9; fx += step) {
+          for (let fy = sy; fy < sy + cellM - 1e-9; fy += step) {
+            const o = clip(p.outer, fx, fy, fx + step, fy + step);
+            if (o.length < 3 || Math.abs(ringSignedArea(o)) < 1e-4) continue;
+            const hs = p.holes.map((h) => clip(h, fx, fy, fx + step, fy + step)).filter((h) => h.length >= 3 && Math.abs(ringSignedArea(h)) > 1e-4);
+            const contour = o.map(([x, y]) => new THREE.Vector2(x, y)); const hv = hs.map((h) => h.map(([x, y]) => new THREE.Vector2(x, y)));
+            const all = [...o, ...hs.flat()];
+            for (const [a, b, c] of THREE.ShapeUtils.triangulateShape(contour, hv)) { push3(slab, all[a]); push3(slab, all[b]); push3(slab, all[c]); }
+          }
+        }
       }
     }
   }
@@ -382,9 +411,12 @@ export function buildPavedMesh(rings, cells, g, { heightAt = () => 0, cellM = 4,
       const mx = (a[0] + b[0]) / 2; const my = (a[1] + b[1]) / 2;
       if (core && (mx < core[0] || mx >= core[2] || my < core[1] || my >= core[3])) continue;
       const isCurb = roadAt(mx + ox * 0.4, my + oy * 0.4) || roadAt(mx + ox * 0.75, my + oy * 0.75);
-      const drop = isCurb ? curbH : skirtM; const into = isCurb ? curb : skirt;
+      const into = isCurb ? curb : skirt;
       const za = heightAt(a[0], a[1]); const zb = heightAt(b[0], b[1]);
-      into.push(a[0], a[1], za, b[0], b[1], zb, b[0], b[1], zb - drop, a[0], a[1], za, b[0], b[1], zb - drop, a[0], a[1], za - drop);
+      const da = isCurb && bottomAt ? Math.max(0, za - bottomAt(a[0], a[1])) : isCurb ? curbH : skirtM;
+      const db = isCurb && bottomAt ? Math.max(0, zb - bottomAt(b[0], b[1])) : isCurb ? curbH : skirtM;
+      if (isCurb && da < 0.005 && db < 0.005) continue;   // (flush: no face)
+      into.push(a[0], a[1], za, b[0], b[1], zb, b[0], b[1], zb - db, a[0], a[1], za, b[0], b[1], zb - db, a[0], a[1], za - da);
     }
   }
   return { slab: Float32Array.from(slab), curb: Float32Array.from(curb), skirt: Float32Array.from(skirt), polygons: polys.length };

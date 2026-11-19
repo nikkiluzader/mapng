@@ -3747,7 +3747,7 @@ function* sidewalkMeshes(carriageways, options = {}) {
   let paved = null;
   if (options.pavedModel) {
     paved = addPavedSidewalks(builder, {
-      carriageways, corners, walks: options.walks || [], runs, openGround: options.openGround || [], buildings: options.buildings || [],
+      carriageways, corners, walks: options.walks || [], runs, openGround: options.openGround || [], buildings: options.buildings || [], driveways: options.driveways || [],
       curbH: CURB_H, crossSlope: CROSS_SLOPE, curbOnlyM: CURB_ONLY_M, THREE, groundAt: options.groundAt || null,
     });
     console.log(`Sidewalks (paved model): ${paved.stats.tiles} tiles, ${Math.round(paved.stats.slab)} slab / ${Math.round(paved.stats.curb)} curb / ${Math.round(paved.stats.skirt)} edge triangles in ${paved.stats.ms} ms`);
