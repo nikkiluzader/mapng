@@ -144,6 +144,16 @@
             >
               <LifeBuoy :size="11" />{{ t('report.sendReport') }}
             </button>
+            <!-- both reports (Markdown, and JSON with the map data) saved as one zip, to send anywhere -->
+            <button
+              type="button"
+              class="flex items-center gap-1 px-2 py-0.5 text-micro rounded text-gray-500 dark:text-gray-400 hover:text-brand transition-colors"
+              :title="t('exportPanel.done.reportBundleHint')"
+              data-testid="level-save-report"
+              @click="saveReport(level)"
+            >
+              <Download :size="11" />{{ t('exportPanel.done.reportBundle') }}
+            </button>
             <button
               type="button"
               class="ml-auto flex items-center gap-1 px-1.5 py-0.5 text-micro rounded text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 transition-colors"
@@ -211,9 +221,24 @@
 import { PERSONAL_STORAGE_KEYS } from '../../services/personalKeys.js';
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { ChevronDown, FolderOpen, Hammer, HardDrive, History, Library, LifeBuoy, Loader2, MapPin, Mountain, PanelRightClose, RefreshCw, SlidersHorizontal, Trash2 } from 'lucide-vue-next';
+import { ChevronDown, Download, FolderOpen, Hammer, HardDrive, History, Library, LifeBuoy, Loader2, MapPin, Mountain, PanelRightClose, RefreshCw, SlidersHorizontal, Trash2 } from 'lucide-vue-next';
 import { desktopApp } from '../../services/platform/desktop.js';
 import { openReportDialog } from '../../composables/useReportDialog.js';
+
+// A level's two reports (export_report.md, and export_report.json with the map data) as one zip to send.
+const saveReport = async (level) => {
+  try {
+    const f = await desktopApp.levelReportFiles(level.zipName, level.levelName);
+    if (!f?.md && !f?.json) return;
+    const { default: JSZip } = await import('jszip');
+    const zip = new JSZip();
+    if (f.md) zip.file('export_report.md', f.md);
+    if (f.json) zip.file('export_report.json', f.json);
+    const url = URL.createObjectURL(await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } }));
+    const a = document.createElement('a'); a.href = url; a.download = `${level.levelName}_mapng_report.zip`; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (err) { console.warn('[Levels] Report not saved:', err?.message || err); }
+};
 
 defineEmits(['show-on-map', 'modify']);
 const { t, locale } = useI18n();

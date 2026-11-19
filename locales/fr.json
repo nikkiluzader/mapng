@@ -577,7 +577,9 @@
       "report": "Rapport d'export",
       "reportHide": "Masquer le rapport",
       "reportDownload": "Télécharger le rapport",
-      "reportMissing": "Le rapport n'a pas pu être lu."
+      "reportMissing": "Le rapport n'a pas pu être lu.",
+      "reportBundle": "Enregistrer le rapport pour un bug",
+      "reportBundleHint": "Enregistre export_report.md (à lire) et export_report.json (chaque vérification et les données de la carte ayant servi au niveau) dans un seul zip. Envoyez ce zip avec le rapport de bug."
     },
     "mayTakeWhile": "Cela peut prendre un moment pour les grandes cartes",
     "elapsed": "Écoulé",

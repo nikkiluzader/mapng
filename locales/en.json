@@ -582,7 +582,9 @@
       "report": "Export report",
       "reportHide": "Hide report",
       "reportDownload": "Download report",
-      "reportMissing": "The report could not be read."
+      "reportMissing": "The report could not be read.",
+      "reportBundle": "Save report for bug reports",
+      "reportBundleHint": "Saves export_report.md (to read) and export_report.json (every check, and the map data the level was built from) as one zip. Send that zip with a bug report."
     },
     "mayTakeWhile": "This may take a while for large maps",
     "elapsed": "Elapsed",

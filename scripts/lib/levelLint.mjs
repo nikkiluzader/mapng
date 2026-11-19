@@ -334,7 +334,7 @@ export async function lintLevelZip(bytes, { gameHas = null, gameMaterials = null
   // (a gallery, open to the daylight on its valley side, has no Zone by design: when the
   // export report says every tunnel built is one, none is missing)
   let onlyGalleries = false;
-  const reportName = names.find((n) => n.endsWith('export_report.txt'));
+  const reportName = names.find((n) => n.endsWith('export_report.md')) || names.find((n) => n.endsWith('export_report.txt'));
   if (reportName && tunnelShapes.length) {
     const m = /Tunnels built: (\d+) \(\d+ cut and cover, (\d+) galler/.exec(await text(reportName));
     onlyGalleries = !!m && Number(m[1]) > 0 && Number(m[2]) === Number(m[1]);

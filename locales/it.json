@@ -577,7 +577,9 @@
       "report": "Rapporto di esportazione",
       "reportHide": "Nascondi rapporto",
       "reportDownload": "Scarica rapporto",
-      "reportMissing": "Impossibile leggere il rapporto."
+      "reportMissing": "Impossibile leggere il rapporto.",
+      "reportBundle": "Salva il rapporto per le segnalazioni",
+      "reportBundleHint": "Salva export_report.md (da leggere) ed export_report.json (ogni controllo e i dati della mappa con cui è stato costruito il livello) in un unico zip. Invia quello zip con la segnalazione."
     },
     "mayTakeWhile": "Per le mappe di grandi dimensioni potrebbe essere necessario del tempo",
     "elapsed": "Tempo trascorso",

@@ -577,7 +577,9 @@
       "report": "Exportbericht",
       "reportHide": "Bericht ausblenden",
       "reportDownload": "Bericht herunterladen",
-      "reportMissing": "Der Bericht konnte nicht gelesen werden."
+      "reportMissing": "Der Bericht konnte nicht gelesen werden.",
+      "reportBundle": "Bericht für Fehlerberichte speichern",
+      "reportBundleHint": "Speichert export_report.md (zum Lesen) und export_report.json (jede Prüfung und die Kartendaten, aus denen das Level gebaut wurde) als eine ZIP-Datei. Diese ZIP mit einem Fehlerbericht schicken."
     },
     "mayTakeWhile": "Das kann bei großen Karten etwas dauern",
     "elapsed": "Verstrichen",

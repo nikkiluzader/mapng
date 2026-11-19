@@ -577,7 +577,9 @@
       "report": "Raport eksportu",
       "reportHide": "Ukryj raport",
       "reportDownload": "Pobierz raport",
-      "reportMissing": "Nie udało się odczytać raportu."
+      "reportMissing": "Nie udało się odczytać raportu.",
+      "reportBundle": "Zapisz raport do zgłoszenia błędu",
+      "reportBundleHint": "Zapisuje export_report.md (do czytania) i export_report.json (każde sprawdzenie i dane mapy, z których zbudowano poziom) w jednym pliku zip. Wyślij ten zip ze zgłoszeniem błędu."
     },
     "mayTakeWhile": "Przy dużych mapach może to chwilę potrwać",
     "elapsed": "Upłynęło",

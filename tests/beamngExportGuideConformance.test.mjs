@@ -258,7 +258,7 @@ test('spawn points: user points become SpawnSpheres + info.json entries, the def
     const q = drops[1];
     // (aimed north-east: the car faces the sphere's -Y, so its +Y row points south-west)
     assert.ok(Math.abs(q.rotationMatrix[3] + Math.SQRT1_2) < 1e-3 && Math.abs(q.rotationMatrix[4] + Math.SQRT1_2) < 1e-3);
-    const report = await readText(zip, 'export_report.txt');
+    const report = await readText(zip, 'export_report.md');
     assert.match(report, /Start here \(default spawn\): on /);
     assert.match(report, /Elsewhere: skipped, outside the map/);
     const stamp = JSON.parse(await readText(zip, 'mapng.json'));
@@ -979,7 +979,7 @@ test('sidewalks: tagged street gets a curb mesh with collision, materials and a 
     assert.ok(strips.every((o) => /walk_st/.test(o.name)), 'only the street tagged with sidewalks (sidewalk=separate has none of its own)');
     assert.ok(strips.every((o) => o.nodes.length >= 2 && o.nodes.every((n) => n[3] > 0.5 && n[3] < 4)), 'each a sidewalk\'s width');
     assert.equal((await stripsIn(zip)).length, 0, 'none in the mesh style');
-    assert.match(await readText(decal, 'export_report.txt'), /Sidewalks drawn as decals[^\n]*strip\(s\)/);
+    assert.match(await readText(decal, 'export_report.md'), /Sidewalks drawn as decals[^\n]*strip\(s\)/);
     // the Curb height choice: the same slabs, 7 cm lower at 'low' (8 cm against 15)
     const topOf = async (z) => {
       let top = -Infinity;
@@ -993,7 +993,7 @@ test('sidewalks: tagged street gets a curb mesh with collision, materials and a 
     const low = await run({ curbHeight: 'low' });
     const drop = (await topOf(zip)) - (await topOf(low));
     assert.ok(Math.abs(drop - 0.07) < 0.01, `low curbs stand 7 cm lower (got ${drop.toFixed(3)} m)`);
-    assert.match(await readText(low, 'export_report.txt'), /raised slabs with curbs, 8 cm high/);
+    assert.match(await readText(low, 'export_report.md'), /raised slabs with curbs, 8 cm high/);
     // (and the standard height is back for the next export)
     assert.ok(Math.abs((await topOf(await run())) - (await topOf(zip))) < 1e-6);
     // switched off altogether: neither

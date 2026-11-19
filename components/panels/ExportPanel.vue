@@ -634,6 +634,8 @@
                 <FileText :size="13" />{{ reportShown ? t('exportPanel.done.reportHide') : t('exportPanel.done.report') }}
               </button>
               <a v-if="reportUrl" :href="reportUrl" :download="reportFileName" data-testid="export-done-report-download" class="flex items-center gap-1 text-brand hover:underline"><Download :size="13" />{{ t('exportPanel.done.reportDownload') }}</a>
+              <!-- both reports (Markdown, and JSON with the map data) as one zip to send with a bug report -->
+              <button type="button" data-testid="export-done-report-bundle" class="flex items-center gap-1 text-brand hover:underline" :title="t('exportPanel.done.reportBundleHint')" @click="saveReportBundle"><Download :size="13" />{{ t('exportPanel.done.reportBundle') }}</button>
             </div>
             <p v-if="reportShown && reportText === null" class="text-caption text-amber-700 dark:text-amber-300">{{ t('exportPanel.done.reportMissing') }}</p>
             <pre v-else-if="reportShown" data-testid="export-done-report-text" tabindex="0" class="max-h-64 overflow-auto rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-2 font-mono text-micro leading-snug text-gray-700 dark:text-gray-200 whitespace-pre-wrap [overflow-wrap:anywhere]">{{ reportText }}</pre>
@@ -806,13 +808,30 @@ let announceWhenClosed = null;
 const reportShown = ref(false);
 const reportText = ref('');      // '' not asked yet, null not readable
 const reportUrl = ref('');
-const reportFileName = computed(() => `${String(exportDone.value?.filename || 'level').replace(/\.zip$/i, '')}_export_report.txt`);
+const reportFileName = computed(() => `${String(exportDone.value?.filename || 'level').replace(/\.zip$/i, '')}_export_report.md`);
+// Both reports as one zip to send with a bug report: export_report.md (to read) and export_report.json (every check
+// as data, and the map data the level was built from). From this export in the page, or out of the level in the mods
+// folder (desktop app).
+const saveReportBundle = async () => {
+  const done = exportDone.value; if (!done) return;
+  let md = done.report || null; let json = done.reportJson || null;
+  if ((!md || !json) && desktopApp?.levelReportFiles) { try { const f = await desktopApp.levelReportFiles(done.filename); md = md || f?.md || null; json = json || f?.json || null; } catch { /* (read what there is) */ } }
+  await downloadReportBundle(String(done.filename || 'level').replace(/\.zip$/i, ''), md, json);
+};
+const downloadReportBundle = async (base, md, json) => {
+  if (!md && !json) { reportText.value = null; reportShown.value = true; return; }
+  const { default: JSZip } = await import('jszip');
+  const zip = new JSZip();
+  if (md) zip.file('export_report.md', md);
+  if (json) zip.file('export_report.json', json);
+  triggerDownload(await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } }), `${base}_mapng_report.zip`);
+};
 const loadExportReport = async () => {
   if (reportText.value) return;
   let text = exportDone.value?.report || null;
   if (!text && desktopApp?.levelExportReport) { try { text = await desktopApp.levelExportReport(exportDone.value?.filename); } catch { text = null; } }
   reportText.value = text || null;
-  if (text && !reportUrl.value) reportUrl.value = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+  if (text && !reportUrl.value) reportUrl.value = URL.createObjectURL(new Blob([text], { type: 'text/markdown' }));
 };
 const toggleExportReport = async () => { reportShown.value = !reportShown.value; if (reportShown.value) await loadExportReport(); };
 const forgetExportReport = () => { reportShown.value = false; reportText.value = ''; if (reportUrl.value) { URL.revokeObjectURL(reportUrl.value); reportUrl.value = ''; } };
@@ -2506,7 +2525,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
 
     // (under the download guard: anything still downloaded is logged, services/dataCache.js;
     // the steps nothing changed for since the last export reused: services/stepCache.js)
-    const { blob, filename, report: exportReportText } = await withDownloadGuard(() => exportBeamNGLevel(td, props.center, { ...levelOptions, stepCache: pageStepCache() }));
+    const { blob, filename, report: exportReportText, reportJson: exportReportJson } = await withDownloadGuard(() => exportBeamNGLevel(td, props.center, { ...levelOptions, stepCache: pageStepCache() }));
 
     if (effectiveBackdropSource === 'gpxz' && !effectiveBackdropGpxzApiKey) {
       console.warn(`${BEAMNG_EXPORT_UI_LOG} GPXZ backdrop selected but no GPXZ key was passed to export.`);
@@ -2541,7 +2560,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       await writable.close();
       console.log(`${BEAMNG_EXPORT_UI_LOG} Download written via File System Access API.`);
       // (the name the visitor gave it in the save window)
-      doneInfo = { filename: beamNGSaveHandle.name || filename, size: blob.size, where: 'chosen', report: exportReportText };
+      doneInfo = { filename: beamNGSaveHandle.name || filename, size: blob.size, where: 'chosen', report: exportReportText, reportJson: exportReportJson };
       announceWhenClosed = ['beamng_level_zip', filename];
       console.log(`${BEAMNG_EXPORT_UI_LOG} Export success notification emitted.`);
     } else {
@@ -2549,7 +2568,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       beamNGPendingDownloadUrl.value = URL.createObjectURL(blob);
       beamNGPendingDownloadName.value = filename;
       console.warn(`${BEAMNG_EXPORT_UI_LOG} Auto-download fallback blocked risk detected; awaiting explicit anchor click.`);
-      doneInfo = { filename, size: blob.size, where: 'download', report: exportReportText };
+      doneInfo = { filename, size: blob.size, where: 'download', report: exportReportText, reportJson: exportReportJson };
     }
     exportSucceeded = true;
   } catch (error) {

@@ -577,7 +577,9 @@
       "report": "Informe de exportación",
       "reportHide": "Ocultar informe",
       "reportDownload": "Descargar informe",
-      "reportMissing": "No se pudo leer el informe."
+      "reportMissing": "No se pudo leer el informe.",
+      "reportBundle": "Guardar informe para errores",
+      "reportBundleHint": "Guarda export_report.md (para leer) y export_report.json (cada comprobación y los datos del mapa con los que se construyó el nivel) en un solo zip. Envía ese zip con el informe de error."
     },
     "mayTakeWhile": "Esto puede tardar en mapas grandes",
     "elapsed": "Transcurrido",

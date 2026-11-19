@@ -62,8 +62,10 @@ contextBridge.exposeInMainWorld('mapngDesktop', {
   // the levels sidebar: { folder, appVersion, levels: [...] }
   listLevels: () => ipcRenderer.invoke('levels:list'),
   showLevelInFolder: (zipName) => ipcRenderer.invoke('levels:showInFolder', zipName),
-  // a level's export_report.txt, as text (null when the zip or the report is not there)
+  // a level's export report (export_report.md, or .txt in older levels), as text (null when the zip or the report is not there)
   levelExportReport: (zipName) => ipcRenderer.invoke('levels:exportReport', zipName),
+  // a level's two reports for "Save report": { level, md, json } (json: export_report.json with the map data), or null
+  levelReportFiles: (zipName, levelName) => ipcRenderer.invoke('levels:reportFiles', zipName, levelName),
   // "Check level": the exported zip in the mods folder looked over: { ok, problems, changed }
   verifyLevel: (file, size) => ipcRenderer.invoke('levels:verify', file, size),
   // a level's last exports, newest first: [{ at, kind, seconds, changed, slowest, reused, downloaded, ... }]

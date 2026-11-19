@@ -106,7 +106,8 @@ async function runCell({ a, key: cellKey, dem, level, env }) {
   const row = { ...rowOf(checks), lintErrors: lint.findings.filter((f) => f.level === 'error').length, lintWarnings: lint.findings.filter((f) => f.level === 'warn').length };
   // structure summary from the report (decks, how high, deck length, tunnels)
   try {
-    const rep = await (await JSZip.loadAsync(bytes)).file(`levels/${level}/export_report.txt`).async('string');
+    const zipped = await JSZip.loadAsync(bytes);
+    const rep = await (zipped.file(`levels/${level}/export_report.md`) || zipped.file(`levels/${level}/export_report.txt`)).async('string');
     const decks = [...rep.matchAll(/Deck over ground: max (-?[\d.]+) m/g)].map((m) => +m[1]);
     row.decks = decks.length; row.maxDeckH = decks.length ? Math.max(...decks) : 0;
     row.deckKm = +(rep.match(/- deck: \d+ stretch\(es\), ([\d.]+) km/)?.[1] ?? rep.match(/classes: deck \d+ \(([\d.]+) km\)/)?.[1] ?? 0);

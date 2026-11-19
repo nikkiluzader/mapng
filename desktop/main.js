@@ -1065,6 +1065,20 @@ ipcMain.handle('levels:exportReport', (_event, zipName) => {
   const level = listMapngLevels(folder).find((l) => l.zipName === name);
   return level ? (levelExportReport(name, level.levelName)?.text ?? null) : null;
 });
+// A level's two reports for "Save report" (the Markdown one, and the JSON one with the map data): { level, md, json }, or null.
+ipcMain.handle('levels:reportFiles', (_event, zipName, levelName) => {
+  const folder = modsFolder();
+  if (!folder) return null;
+  const name = path.basename(String(zipName || ''));
+  const level = listMapngLevels(folder).find((l) => l.zipName === name && (!levelName || l.levelName === String(levelName)));
+  if (!level) return null;
+  try {
+    const file = path.join(folder, name); const dir = `levels/${level.levelName}`;
+    const md = readZipFile(file, `${dir}/export_report.md`) || readZipFile(file, `${dir}/export_report.txt`);
+    const json = readZipFile(file, `${dir}/mapng_source/export_report.json`);
+    return { level: level.levelName, md: md ? Buffer.from(md).toString('utf8') : null, json: json ? Buffer.from(json).toString('utf8') : null };
+  } catch { return null; }
+});
 ipcMain.handle('levels:showInFolder', (_event, zipName) => {
   const folder = modsFolder();
   const file = folder && path.join(folder, path.basename(String(zipName)));
@@ -1350,7 +1364,8 @@ const levelExportReport = (zipName, levelName) => {
   const level = listMapngLevels(folder).find((l) => l.zipName === name && l.levelName === String(levelName || ''));
   if (!level) return null;
   try {
-    const buf = readZipFile(path.join(folder, name), `levels/${level.levelName}/export_report.txt`);
+    // (export_report.md since 2026-11-19; export_report.txt in older levels)
+    const buf = readZipFile(path.join(folder, name), `levels/${level.levelName}/export_report.md`) || readZipFile(path.join(folder, name), `levels/${level.levelName}/export_report.txt`);
     return buf ? { level: level.title || level.levelName, text: Buffer.from(buf).toString('utf8') } : null;
   } catch { return null; }
 };
