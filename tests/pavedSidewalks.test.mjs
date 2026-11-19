@@ -67,3 +67,31 @@ test('a bare curb (no sidewalk) keeps a curb along the road, open across its dip
   // none in the open stretch (x from -10 to 10)
   assert.ok(!faces.some((t) => t.every((p) => p[0] > -8 && p[0] < 8)), 'open along the car park');
 });
+
+test('texture scale as today: the slab at a metre over SLAB_TILE_M, curb faces in the curb sheet\'s face band', async () => {
+  const { SLAB_TILE_M } = await import('../services/sidewalkPanels.js');
+  const tris = [];
+  const b = { tri(mat, a, bb, c, ua, ub, uc) { tris.push({ mat, p: [a, bb, c], uv: [ua, ub, uc] }); } };
+  addPavedSidewalks(b, {
+    carriageways: [{ nodes: [[-60, 0, 0], [60, 0, 0]], half: 4, highway: 'residential' }],
+    walks: [{ nodes: [[-60, 9.5], [60, 9.5]], half: 1, sidewalk: true }],
+    curbH: 0.15, THREE, groundAt: () => 0,
+    uvBands: { curbRepeat: 9, face: [0.88, 0.92], top: [0.92, 0.998] },
+  });
+  // (a slab's UVs were once raw metres: the texture repeated ten times too densely, seen only in game)
+  for (const t of tris.filter((x) => x.mat === 'slab')) {
+    for (let k = 0; k < 3; k++) {
+      assert.ok(Math.abs(t.uv[k][0] - t.p[k][0] / SLAB_TILE_M) < 1e-9 && Math.abs(t.uv[k][1] - t.p[k][1] / SLAB_TILE_M) < 1e-9);
+    }
+  }
+  // curb faces (vertical) in the face band, the top band (flat) in the top band
+  const curbs = tris.filter((x) => x.mat === 'curb');
+  assert.ok(curbs.length > 0);
+  for (const t of curbs) {
+    // (a face is vertical when it has no footprint from above; the top band follows the slab's slight slope)
+    const [p0, p1, p2] = t.p;
+    const flat = Math.abs((p1[0] - p0[0]) * (p2[1] - p0[1]) - (p2[0] - p0[0]) * (p1[1] - p0[1])) > 1e-6;
+    const [lo, hi] = flat ? [0.92, 0.998] : [0.88, 0.92];
+    for (const uv of t.uv) assert.ok(uv[1] >= lo - 1e-9 && uv[1] <= hi + 1e-9, `v ${uv[1]} outside ${lo}..${hi}`);
+  }
+});
