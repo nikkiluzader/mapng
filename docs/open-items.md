@@ -469,8 +469,11 @@ stubs at crossings; B is 15.7 s of Chicago 8192's ~45 s of sidewalk work and hol
 - Prototype: scratch/swaudit/proto.py, a 0.25 m paved grid. Done: paved from the curb out to a footway tagged
   footway=sidewalk (256 of 263 Chicago footways, all 143 in Hong Kong carry it), only between road and walk (no
   filling past a walk), notches under ~5 m closed at corners; plain footways keep the 1 m snap. Next:
-  - real road-surface shapes (corner curbs, flares) instead of thick centre lines;
-  - greenery from OSM (grass, parks, planters) as evidence for a verge;
+  - done: rounded corner curbs (the road takes each corner arc's fillet up to where the edges meet; 27 Chicago,
+    16 Hong Kong corners);
+  - done: greenery as evidence for a verge (OSM grass, flowerbed, meadow, park, garden at ground level; rooftop and
+    upper-level greenery skipped; street trees don't block paving): Chicago keeps 2,832 m2 of verge, mostly the
+    riverside planters along Wacker;
   - outlines traced to smooth lines before meshes; heights as today; decks and waterfront unchanged at first.
 - Then: plots and paved-area numbers on the test areas against today, in-game check, and the user's go-ahead
   before it replaces A and B.
