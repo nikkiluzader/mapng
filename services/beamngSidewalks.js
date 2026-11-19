@@ -28,7 +28,8 @@ import { isOneWayRoad } from './roadWidth.js';
 import { PLAZA_MATERIAL, plazaTileM, pavedWalkSurface } from './plazas.js';
 import { smoothLine } from './lineSmoothing.js';
 import { fastHypot } from './fastMath.js';
-import { addPavedSidewalks } from './pavedSidewalks.js';
+import { addPavedSidewalksSteps } from './pavedSidewalks.js';
+import { pavedTiles as pavedTilesLocal } from './pavedWorker.js';
 
 let CURB_H = 0.15;            // m above the road (setCurbHeight: the Curb height choice)
 const SINK = 0.10;            // m the faces reach below the road
@@ -3597,7 +3598,8 @@ export async function buildSidewalkMeshesParallel(carriageways, options = {}) {
   while (!step.done) {
     const kind = step.value.kind;
     step = gen.next(kind === 'unions' ? await unionsOnWorkers(step.value) : kind === 'cuts' ? await cutsOnWorkers(step.value)
-      : kind === 'pocketUnions' ? await pocketUnionsOnWorkers(step.value) : await panelsOnWorkers(step.value));
+      : kind === 'pocketUnions' ? await pocketUnionsOnWorkers(step.value) : kind === 'pavedTiles' ? await pavedTilesOnWorkers(step.value)
+        : await panelsOnWorkers(step.value));
   }
   return step.value;
 }
@@ -3614,6 +3616,21 @@ async function cutsOnWorkers({ jobs }) {
     local: cutStripsLocal,
     module: new URL(['./sidewalk', 'Panels.js'].join(''), import.meta.url).href,
     fn: 'cutStrips',
+  });
+  return results.flat();
+}
+
+// The paved model's tiles (services/pavedWorker.js: the grid and outlines of each) on worker threads, a few per
+// work item; null (built on this thread) where there are no worker threads or few tiles.
+const PARALLEL_PAVED_FROM = 4;
+async function pavedTilesOnWorkers({ items }) {
+  if (items.length < PARALLEL_PAVED_FROM || (await parallelThreads()) <= 1) return null;
+  const batches = [];
+  for (let i = 0; i < items.length; i += 2) batches.push(items.slice(i, i + 2));
+  const results = await parallelMap(batches, {
+    local: pavedTilesLocal,
+    module: new URL(['./paved', 'Worker.js'].join(''), import.meta.url).href,
+    fn: 'pavedTiles',
   });
   return results.flat();
 }
@@ -3746,7 +3763,7 @@ function* sidewalkMeshes(carriageways, options = {}) {
   // services/pavedSidewalks.js; medians, decks, gangways and the waterfront as before)
   let paved = null;
   if (options.pavedModel) {
-    paved = addPavedSidewalks(builder, {
+    paved = yield* addPavedSidewalksSteps(builder, {
       carriageways, corners, walks: options.walks || [], runs, openGround: options.openGround || [], buildings: options.buildings || [], driveways: options.driveways || [],
       curbH: CURB_H, crossSlope: CROSS_SLOPE, curbOnlyM: CURB_ONLY_M, THREE, groundAt: options.groundAt || null,
     });

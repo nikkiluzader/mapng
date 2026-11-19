@@ -5,7 +5,8 @@
 // Tiles: TILE_M squares with MARGIN_M round each (the rules reach SIDEWALK_GAP_M from a curb and close corners), each
 // tile meshing and grading only its own core, so neighbours meet without overlaps. A whole 8 km map at 0.25 m
 // would be a billion cells; a tile is about 1.3 million.
-import { makeGrid, buildPavedGrid, traceOutlines, buildPavedMesh, markPolygon, WALK, GAP, SIDEWALK_GAP_M } from './pavedArea.js';
+import { buildPavedMesh, SIDEWALK_GAP_M } from './pavedArea.js';
+import { pavedTile } from './pavedWorker.js';
 import { fastHypot } from './fastMath.js';
 
 export const TILE_M = 256;
@@ -96,7 +97,16 @@ export function makeRoadHeight(carriageways) {
  */
 // groundAt(x, y): the shaped terrain (the road surface lies on it): the slab top is the road surface at the nearest
 // edge plus the curb (read off the centreline's z, the solver's, it stood 10 cm over the road a curb ended short of)
-export function addPavedSidewalks(builder, { carriageways = [], corners = [], walks = [], runs = [], openGround = [], buildings = [], driveways = [], curbH = 0.15, crossSlope = 0.015, curbOnlyM = 0.3, THREE, groundAt = null } = {}) {
+export function addPavedSidewalks(builder, opts = {}) {
+  const gen = addPavedSidewalksSteps(builder, opts);
+  let step = gen.next();
+  while (!step.done) step = gen.next(null);
+  return step.value;
+}
+
+// (a generator: the tiles' grids asked of the driver as one batch, { kind: 'pavedTiles', items }, built on worker
+// threads where there are some; null back: built here)
+export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = [], walks = [], runs = [], openGround = [], buildings = [], driveways = [], curbH = 0.15, crossSlope = 0.015, curbOnlyM = 0.3, THREE, groundAt = null } = {}) {
   const road = makeRoadHeight(carriageways);
   // (a driveway counts only where it crosses the sidewalk to reach the road: the part of its line within
   // CROSS_REACH_M of where it comes to the road's edge. Whole, an alley along a street dropped the curb along it)
@@ -148,25 +158,26 @@ export function addPavedSidewalks(builder, { carriageways = [], corners = [], wa
   // (the tiles over the roads' box grown by the margin: the paving reaches past the outermost centrelines; over
   // the bare box a straight street along one line had no tile row at all)
   x0 -= MARGIN_M; y0 -= MARGIN_M; x1 += MARGIN_M; y1 += MARGIN_M;
+  const items = []; const cores = [];
   for (let tx = Math.floor(x0 / TILE_M) * TILE_M; tx <= x1; tx += TILE_M) {
     for (let ty = Math.floor(y0 / TILE_M) * TILE_M; ty <= y1; ty += TILE_M) {
       const core = [tx, ty, tx + TILE_M, ty + TILE_M];
       const box = [tx - MARGIN_M, ty - MARGIN_M, tx + TILE_M + MARGIN_M, ty + TILE_M + MARGIN_M];
       const tr = near(R, box);
       if (!tr.length) continue;
-      const g = makeGrid(box[0], box[1], box[2], box[3]);
-      const { cells } = buildPavedGrid(g, { roads: tr, cornerArcs: near(A, box), walks: near(W, box), streetWalks: near(S, box), greenery: near(G, box) });
-      // (no slab into a building)
-      const inB = new Uint8Array(cells.length);
-      for (const ring of near(B, box)) markPolygon(inB, g, ring, 1);
-      for (let i = 0; i < cells.length; i++) if (inB[i]) cells[i] &= ~(WALK | GAP);
-      const rings = traceOutlines(cells, g, WALK | GAP);
-      const m = buildPavedMesh(rings, cells, g, { heightAt, bottomAt: surfaceAt, curbH, THREE, core, fineAt: crossings.length ? (x, y) => toDriveway(x, y) < DRIVEWAY_HALF_M + DIP_RAMP_M + 1 : null });
-      addToBuilder(builder, m);
-      stats.tiles++; stats.slab += m.slab.length / 9; stats.curb += m.curb.length / 9; stats.skirt += m.skirt.length / 9;
-      tiles.push({ cells, g, core });
+      items.push({ box, roads: tr, cornerArcs: near(A, box), walks: near(W, box), streetWalks: near(S, box), greenery: near(G, box), buildings: near(B, box) });
+      cores.push(core);
     }
   }
+  const built = (items.length ? yield { kind: 'pavedTiles', items } : null) || items.map(pavedTile);
+  const fineAt = crossings.length ? (x, y) => toDriveway(x, y) < DRIVEWAY_HALF_M + DIP_RAMP_M + 1 : null;
+  built.forEach(({ cells, g, rings }, k) => {
+    const core = cores[k];
+    const m = buildPavedMesh(rings, cells, g, { heightAt, bottomAt: surfaceAt, curbH, THREE, core, fineAt });
+    addToBuilder(builder, m);
+    stats.tiles++; stats.slab += m.slab.length / 9; stats.curb += m.curb.length / 9; stats.skirt += m.skirt.length / 9;
+    tiles.push({ cells, g, core });
+  });
   stats.ms = Date.now() - t0;
   return { tiles, heightAt, stats };
 }
