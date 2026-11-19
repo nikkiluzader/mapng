@@ -557,3 +557,21 @@ The user: keep working through the night, report in the morning. In order:
     the export bar is now within 4 points of the time on average; Generate's end jump went from 43 to 16 points.
   - Left: Generate's stage weights are old guesses (refit them like the export's); the OSM wait can't be
     predicted.
+
+**Later on 2026-11-19 (dev 109fdf0, 5879a47, dc8cd53):**
+- **Bank rule:** no paving down a road's bank. Found before tracing and cleared on the workers; the NYC 4 km paved
+  step is back to 10.45 s.
+- **Ground check:** measures the built slab, sampled 1 m inside the paving.
+- **Unshaped terrain:** 1 m squares where the slab bends (and under decks).
+- **Under decks:** the slab follows the ground wherever the grading leaves it (6 m reach, as the grading's guard).
+- **Old builders removed.** Aprons to seawalls and walks away from roads are paved again. The water step leaves the
+  ground under paving.
+- **Sweep: 17 flagged cells** (was 29 the night before), all small:
+  - naldo (quay terraces, walks away from roads);
+  - deckpark and kingst lidar buried counts;
+  - stelvio (a steep cutting with no walk, 16 of 168 samples);
+  - Amsterdam creases;
+  - val d'Isère and szczyrk cross counts;
+  - 4 buried samples in pilchowice.
+- **Progress bars recorded with the planet tiles** (scratch/speed/progress_1024d.json): Generate and export are both
+  within 5 points of real time on average.
