@@ -500,6 +500,10 @@ stubs at crossings; B is 15.7 s of Chicago 8192's ~45 s of sidewalk work and hol
     Details done: curb top band, bare curbs (0.5 m strip, open across dips), today's dips (crosswalks, walkway ends,
     car parks), seawall pockets. NYC with the switch on: 16.3 s (today 17.8 s). Next: the side-by-side on all test
     areas (plots, paved area and triangle numbers, timing), then the game check at the test intersections.
+    Side-by-side done (scratch/swaudit/sbs.sh + sbs_report.py): faster and fewer triangles on every area with a
+    sidewalk step (NYC 22.8 -> 21.8 s, 2.12M -> 1.95M; Pittsburgh 21.7 -> 19.9 s, 2.53M -> 1.76M; lakefront 9.1 -> 7.6 s),
+    paved area up (NYC 0.40 -> 1.85 km2): today's build lays no slabs on many mapped NYC sidewalks (18 tagged footways
+    in one window, zero slab triangles), the paved model paves them. Next: the game check, then the user's decision.
     Was: 3e wiring behind a switch (heights from the road edges, tiles on workers), (slabs, curb faces) at today's heights; 3d grading
     from the grid; tiles on workers; decks and waterfront unchanged at first; behind a switch until approved.
 - Then: plots and paved-area numbers on the test areas against today, in-game check, and the user's go-ahead
