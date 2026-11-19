@@ -575,3 +575,19 @@ The user: keep working through the night, report in the morning. In order:
   - 4 buried samples in pilchowice.
 - **Progress bars recorded with the planet tiles** (scratch/speed/progress_1024d.json): Generate and export are both
   within 5 points of real time on average.
+
+**Bridges in St. Augustine (2026-11-19, dev 957fa96, 9f4c690):**
+- **Fixed:** bridge rise over water capped by its reach from its ends; a thin slab's clearance dug under low decks;
+  deck sidewalks set out past the lanes, taking the nearest deck segment's height. Details in the commit messages.
+- **Open:**
+  - **Bridge-end joints where a mapped sidewalk meets the deck walkway** (Bridge of Lions east end). The ground
+    walk's own heights come from the bank's terrain, so the paving dips down the bank between the deck walkway and the
+    street (plot scratch/cordova/diag/lions_east_corner.png). A keep-out of ground paving under low decks plus deck
+    roads in the paving heights was tried and taken out: the walk heights still win. Needs walk heights at bridge ends
+    from the deck.
+  - **A 0.3 m sag on a short approach road between a street and a deck** (Lions west, 11 m). The solver pulls it
+    to the ground within its grade limit. Wants a smoothness rule at bridge ends.
+  - **Website speed:** the paved sidewalks run single-threaded on the website (12.5 s on a 2048 St. Augustine export
+    in the browser, about 4 s in Node with workers). Web workers for that step would close most of the gap.
+  - **Railings:** short low bridges like the visitor centre bus lane have open metal railings in reality, but the
+    export builds solid concrete parapets. OSM has no tag for it.
