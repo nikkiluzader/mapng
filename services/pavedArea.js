@@ -58,7 +58,18 @@ export function distanceWithNearest(seed, w, h) {
       g[i] = d; near[i] = d >= INF ? -1 : fi[p];
     }
   };
-  for (let y = 0; y < h; y++) pass(y * w, 1, w);
+  // rows: on a yes/no seed the first pass is only the nearest seed to the left or right, two plain scans (the
+  // parabola pass is kept for the columns, whose input is no longer yes/no)
+  for (let y = 0; y < h; y++) {
+    const o = y * w;
+    let last = -1;
+    for (let x = 0; x < w; x++) { if (seed[o + x]) last = x; if (last >= 0) { const d = x - last; g[o + x] = d * d; near[o + x] = o + last; } }
+    last = -1;
+    for (let x = w - 1; x >= 0; x--) {
+      if (seed[o + x]) last = x;
+      if (last >= 0) { const d = last - x; const d2 = d * d; if (d2 < g[o + x]) { g[o + x] = d2; near[o + x] = o + last; } }
+    }
+  }
   for (let x = 0; x < w; x++) pass(x, w, h);
   return { d2: g, near };
 }
@@ -208,7 +219,9 @@ export function buildPavedGrid(g, { roads = [], cornerArcs = [], walks = [], str
         const i = stack.pop(); comp.push(i);
         const r = (i / g.w) | 0; const c = i - r * g.w;
         if (r === 0 || c === 0 || r === g.h - 1 || c === g.w - 1) edge = true;
-        for (const j of [c > 0 ? i - 1 : -1, c < g.w - 1 ? i + 1 : -1, r > 0 ? i - g.w : -1, r < g.h - 1 ? i + g.w : -1]) {
+        // (the four neighbours checked in place: an array of them per cell was most of this fill's time)
+        for (let nb = 0; nb < 4; nb++) {
+          const j = nb === 0 ? (c > 0 ? i - 1 : -1) : nb === 1 ? (c < g.w - 1 ? i + 1 : -1) : nb === 2 ? (r > 0 ? i - g.w : -1) : (r < g.h - 1 ? i + g.w : -1);
           if (j < 0) continue;
           const v = cells[j];
           if (v & ROAD) road1 = true; else if (v & (WALK | GAP)) paved1 = true;
