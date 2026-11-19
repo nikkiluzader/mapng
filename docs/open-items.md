@@ -477,7 +477,10 @@ stubs at crossings; B is 15.7 s of Chicago 8192's ~45 s of sidewalk work and hol
   - step 3a done: services/pavedArea.js (grid, tests; not wired in). Chicago test area 2147x2147 cells in 1.3 s on
     one thread; scratch/swaudit/jsgrid.mjs + plotgrid.py draw it. Small notches left at walk ends by crossings.
   - step 3b done: traceOutlines (marching squares + Douglas-Peucker), pockets under 20 m2 between road and
-    pavement paved, specks under 0.5 m2 dropped; Chicago 103 rings in 92 ms. Next: 3c meshes (slabs, curb faces) at today's heights; 3d grading
+    pavement paved, specks under 0.5 m2 dropped; Chicago 103 rings in 92 ms.
+  - step 3c done: buildPavedMesh (4 m squares, curb faces, skirts); Chicago 27,642 triangles vs 76,087 today, 173 ms.
+    To finish at wiring: 0.25 m jogs where a fillet meets a straight curb; a curb top strip in the curb look.
+    Next: 3d grading from the grid, 3e wiring behind a switch (heights from the road edges, tiles on workers), (slabs, curb faces) at today's heights; 3d grading
     from the grid; tiles on workers; decks and waterfront unchanged at first; behind a switch until approved.
 - Then: plots and paved-area numbers on the test areas against today, in-game check, and the user's go-ahead
   before it replaces A and B.
