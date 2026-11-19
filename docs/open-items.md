@@ -455,3 +455,21 @@ MapNG's data, this looks at what the game built.
 - `scratch/junctions/gsteps.py prof.json [threshold]`: the steps in such a profile, grouped into places and kinds.
 - `scratch/junctions/gplot.py prof.json road index out.png [title] [reach]`: one place from the game: top view with
   the decks and their node heights, the long section, and the change of slope. Use this one first.
+
+## 5. Sidewalk rework: one paved-area model (started 2026-11-18)
+
+Agreed with the user 2026-11-18 after an audit. Today two builders never join: street-side strips (A) and mapped
+footways cut and merged as polygons (B). Downtown that leaves bare strips of 1-3 m between curb and walkway, and
+stubs at crossings; B is 15.7 s of Chicago 8192's ~45 s of sidewalk work and holds all the retry code.
+
+- Audit: scratch/swaudit (probe.mjs dumps the builder's output through `__MAPNG_SIDEWALK_PROBE`; plot.py,
+  pipeline.py, swstages.py for times per stage).
+- Photo check (Mapillary): Chicago W Kinzie and Hong Kong Kwai Chung paved from the curb; planting exists beside the
+  pavement, not between curb and walkway. Rule: close the strip unless mapped greenery covers it.
+- Prototype: scratch/swaudit/proto.py, a 0.25 m paved grid. First pass closes the strips on one street; next:
+  - pave from the curb out to a footway tagged footway=sidewalk (a fixed 3.5 m limit missed 6-8 m downtown walks);
+  - real road-surface shapes (corner curbs, flares) instead of thick centre lines;
+  - greenery from OSM (grass, parks, planters) as evidence for a verge;
+  - outlines traced to smooth lines before meshes; heights as today; decks and waterfront unchanged at first.
+- Then: plots and paved-area numbers on the test areas against today, in-game check, and the user's go-ahead
+  before it replaces A and B.
