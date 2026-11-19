@@ -13635,13 +13635,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const sidewalkSeaPlan = includeRoads && includeSidewalks ? (() => { try { return lowerSeabed({
             heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
             minHeight: Number(exportTerrainData.minHeight) || 0, worldSize: exportTerrainData.width * squareSize,
-          }, exportTerrainData.landCover, -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0), {
-            coarse: !!terrainData?.coarseElevation, coast: coastLinesOf(exportTerrainData, squareSize),
-            // (with the water step's own piers and road keep-out: without the piers, the water dug round them was paved
-            // over, a harbour path floating 2 m over its dug dock)
-            piers: pierAreasOf(exportTerrainData, squareSize),
-            keep: (() => { const q = buildCarriagewayIndex(riverRoads().map((r) => ({ nodes: r.points, half: (r.half || 3) + LAKE_KEEP_M }))); return (x, y) => isOnOtherCarriageway(q, x, y, 0, () => false); })(),
-          }); } catch { return null; } })() : null;
+          }, exportTerrainData.landCover, -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0), { coarse: !!terrainData?.coarseElevation, coast: coastLinesOf(exportTerrainData, squareSize) }); } catch { return null; } })() : null;
   // (the walkway tops on worker threads in the desktop app; here otherwise)
   const sidewalks = includeRoads && includeSidewalks
     ? await buildSidewalkMeshesParallel(groundCarriageways, {
