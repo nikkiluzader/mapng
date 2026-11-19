@@ -56,3 +56,23 @@ test('cornerApex: where a rounded corner\'s two road edges meet', () => {
   const q = cornerApex(arc);
   assert.ok(q && Math.abs(q[0]) < 0.1 && Math.abs(q[1]) < 0.1, JSON.stringify(q));
 });
+
+test('traceOutlines: a disc traces to one ring of its area; a square with a hole to an outer and a hole', async () => {
+  const { traceOutlines, ringSignedArea, makeGrid: mk, markPolygon } = await import('../services/pavedArea.js');
+  const g = mk(-10, -10, 10, 10);
+  const cells = new Uint8Array(g.w * g.h);
+  for (let r = 0; r < g.h; r++) for (let c = 0; c < g.w; c++) { const x = -10 + (c + 0.5) * g.res; const y = 10 - (r + 0.5) * g.res; if (x * x + y * y <= 36) cells[r * g.w + c] = 4; }
+  const rings = traceOutlines(cells, g, 4);
+  assert.equal(rings.length, 1);
+  const area = Math.abs(ringSignedArea(rings[0]));
+  assert.ok(Math.abs(area - Math.PI * 36) < 2, `area ${area}`);
+  assert.ok(rings[0].length < 120, `simplified to ${rings[0].length} points`);
+  const sq = new Uint8Array(g.w * g.h);
+  markPolygon(sq, g, [[-6, -6], [6, -6], [6, 6], [-6, 6]], 2);
+  for (let r = 0; r < g.h; r++) for (let c = 0; c < g.w; c++) { const x = -10 + (c + 0.5) * g.res; const y = 10 - (r + 0.5) * g.res; if (Math.abs(x) < 2 && Math.abs(y) < 2) sq[r * g.w + c] = 0; }
+  const r2 = traceOutlines(sq, g, 2);
+  assert.equal(r2.length, 2);
+  const signs = r2.map((r) => Math.sign(ringSignedArea(r))).sort();
+  assert.deepEqual(signs, [-1, 1], 'one outer, one hole, opposite windings');
+  assert.ok(r2.every((r) => r.length <= 8), `square rings simplified to corners: ${r2.map((r) => r.length)}`);
+});

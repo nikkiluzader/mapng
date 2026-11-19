@@ -21,6 +21,8 @@ export const PAVED_RES_M = 0.25;
 export const SIDEWALK_GAP_M = 12;
 export const PLAIN_GAP_M = 1;
 export const CLOSE_M = 5;
+export const POCKET_M2 = 20;      // an unpaved pocket this small between road and pavement is paved (crossing landings)
+export const SPECK_M2 = 0.5;      // a traced ring this small is dropped
 
 // layer bits
 export const ROAD = 1; export const WALK = 2; export const GAP = 4; export const VERGE = 8;
@@ -181,6 +183,27 @@ export function buildPavedGrid(g, { roads = [], cornerArcs = [], walks = [], str
   // beside a plain footway 4.5 m off the curb too)
   const closeReach2 = (CLOSE_M / res) * (CLOSE_M / res);
   for (let i = 0; i < N; i++) if (closed[i] && !(cells[i] & (ROAD | WALK | GAP)) && dSw2[i] <= closeReach2) cells[i] |= GAP;
+  // pockets: small unpaved areas wedged between road and pavement (a crossing's landing, a kerb ramp's sides) paved
+  {
+    const label = new Int32Array(N).fill(-1); const stack = []; const maxCells = POCKET_M2 / (res * res);
+    for (let s0 = 0; s0 < N; s0++) {
+      if (label[s0] >= 0 || cells[s0]) continue;
+      const comp = []; let road1 = false; let paved1 = false; let edge = false;
+      label[s0] = s0; stack.push(s0);
+      while (stack.length) {
+        const i = stack.pop(); comp.push(i);
+        const r = (i / g.w) | 0; const c = i - r * g.w;
+        if (r === 0 || c === 0 || r === g.h - 1 || c === g.w - 1) edge = true;
+        for (const j of [c > 0 ? i - 1 : -1, c < g.w - 1 ? i + 1 : -1, r > 0 ? i - g.w : -1, r < g.h - 1 ? i + g.w : -1]) {
+          if (j < 0) continue;
+          const v = cells[j];
+          if (v & ROAD) road1 = true; else if (v & (WALK | GAP)) paved1 = true;
+          else if (!v && label[j] < 0 && comp.length <= maxCells) { label[j] = s0; stack.push(j); }
+        }
+      }
+      if (!edge && road1 && paved1 && comp.length <= maxCells) for (const i of comp) cells[i] |= GAP;
+    }
+  }
   // verges: a closed strip inside mapped greenery stays unpaved
   if (greenery.length) {
     const green = new Uint8Array(N);
@@ -213,3 +236,84 @@ export function cornerApex(arc) {
   return t > 0 && fastHypot(px - a0[0], py - a0[1]) < 20 ? [px, py] : null;
 }
 
+
+/**
+ * The outlines of the cells with any of bits set (step 3b): closed rings in world metres, traced along the
+ * cell-edge midpoints (marching squares: stair-steps become diagonals), then simplified within tol (Douglas-
+ * Peucker). Outer rings run counter-clockwise, holes clockwise (signed area > 0 outer).
+ */
+export function traceOutlines(cells, g, bits, tol = PAVED_RES_M / 2) {
+  const { w, h } = g;
+  const on = (c, r) => c >= 0 && r >= 0 && c < w && r < h && (cells[r * w + c] & bits) !== 0;
+  // corner samples are cell centres; a square (c, r) .. (c + 1, r + 1) of samples, edges midway between them.
+  // segments keyed by integer half-cell coordinates, chained into loops
+  const next = new Map();
+  const key = (x2, y2) => x2 * 1048576 + y2;   // doubled coordinates, offset
+  const add = (ax, ay, bx, by) => { next.set(key(ax, ay), [bx, by]); };
+  for (let r = -1; r < h; r++) {
+    for (let c = -1; c < w; c++) {
+      const a = on(c, r); const b = on(c + 1, r); const d = on(c, r + 1); const e = on(c + 1, r + 1);
+      const k = (a ? 8 : 0) | (b ? 4 : 0) | (e ? 2 : 0) | (d ? 1 : 0);
+      if (k === 0 || k === 15) continue;
+      // edge midpoints (doubled, +2 so -1 rows stay non-negative): top, right, bottom, left of the sample square
+      const X = 2 * c + 2; const Y = 2 * r + 2;
+      const T = [X + 1, Y]; const R = [X + 2, Y + 1]; const B = [X + 1, Y + 2]; const L = [X, Y + 1];
+      // filled on the left of each segment's direction (in row-down cell space)
+      const seg = (p, q) => add(p[0], p[1], q[0], q[1]);
+      switch (k) {
+        case 1: seg(B, L); break; case 2: seg(R, B); break; case 3: seg(R, L); break; case 4: seg(T, R); break;
+        case 5: seg(T, L); seg(B, R); break; case 6: seg(T, B); break; case 7: seg(T, L); break; case 8: seg(L, T); break;
+        case 9: seg(B, T); break; case 10: seg(L, B); seg(R, T); break; case 11: seg(R, T); break; case 12: seg(L, R); break;
+        case 13: seg(B, R); break; case 14: seg(L, B); break; default: break;
+      }
+    }
+  }
+  const rings = [];
+  const seen = new Set();
+  for (const [k0] of next) {
+    if (seen.has(k0)) continue;
+    const loop = [];
+    let k = k0;
+    while (!seen.has(k)) {
+      seen.add(k);
+      const x2 = Math.floor(k / 1048576); const y2 = k - x2 * 1048576;
+      loop.push([g.x0 + ((x2 - 2) / 2 + 0.5) * g.res, g.y1 - ((y2 - 2) / 2 + 0.5) * g.res]);
+      const n = next.get(k); if (!n) break;
+      k = key(n[0], n[1]);
+    }
+    if (loop.length >= 3) rings.push(simplifyRing(loop, tol));
+  }
+  return rings.filter((r) => r.length >= 3 && Math.abs(ringSignedArea(r)) >= SPECK_M2);
+}
+
+/** Signed area of a ring (counter-clockwise > 0). */
+export function ringSignedArea(ring) {
+  let a = 0;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) a += (ring[j][0] - ring[i][0]) * (ring[j][1] + ring[i][1]);
+  return a / 2;
+}
+
+// Douglas-Peucker on a closed ring: split at the two farthest-apart points, simplify both halves
+function simplifyRing(ring, tol) {
+  if (ring.length < 8) return ring;
+  let far = 0; let best = -1;
+  for (let i = 1; i < ring.length; i++) { const d = (ring[i][0] - ring[0][0]) ** 2 + (ring[i][1] - ring[0][1]) ** 2; if (d > best) { best = d; far = i; } }
+  const a = simplifyLine(ring.slice(0, far + 1), tol); const b = simplifyLine([...ring.slice(far), ring[0]], tol);
+  return [...a.slice(0, -1), ...b.slice(0, -1)];
+}
+function simplifyLine(pts, tol) {
+  const keep = new Uint8Array(pts.length); keep[0] = 1; keep[pts.length - 1] = 1;
+  const stack = [[0, pts.length - 1]]; const t2 = tol * tol;
+  while (stack.length) {
+    const [i0, i1] = stack.pop();
+    const ax = pts[i0][0]; const ay = pts[i0][1]; const dx = pts[i1][0] - ax; const dy = pts[i1][1] - ay; const L2 = dx * dx + dy * dy || 1e-12;
+    let worst = -1; let wi = -1;
+    for (let i = i0 + 1; i < i1; i++) {
+      const t = Math.max(0, Math.min(1, ((pts[i][0] - ax) * dx + (pts[i][1] - ay) * dy) / L2));
+      const ex = ax + dx * t - pts[i][0]; const ey = ay + dy * t - pts[i][1]; const e = ex * ex + ey * ey;
+      if (e > worst) { worst = e; wi = i; }
+    }
+    if (worst > t2) { keep[wi] = 1; stack.push([i0, wi], [wi, i1]); }
+  }
+  return pts.filter((_, i) => keep[i]);
+}
