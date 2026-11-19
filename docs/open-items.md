@@ -531,3 +531,29 @@ The user: keep working through the night, report in the morning. In order:
 3. Review the Generate and Export progress cards: percentages, bars and info text accurate and smooth (jumpy on
    dev.mapng.com now, likely since the speed work changed step lengths).
 
+
+**Where it stands (morning of 2026-11-19):**
+- **Sidewalks:**
+  - In game, Hong Kong (Kwai hillside bend) and the suburb (lawn verges, cul-de-sac) look right. Shots are in
+    scratch/swaudit/game/shots.
+  - The 5th sweep (lawn rule) still flags 29 regressions, nearly all swFloat/swBuried. As a share of samples they
+    are small: naldo 0.18 %, kingst t30 0.3 %, pilchowice 2 %. Zion t30 is 14 %, and its baseline (200) was
+    already bad.
+  - scratch/swaudit/spotclass.py sorts them: most stand where the terrain spans more than 2 m within 3 m. Those are
+    road embankments with the paved strip running down their side (pilchowice 255,935: road flat, then a 3.5 m
+    drop), quay walls (naldo 942,-316: a 9 m step) and footway ends at a hairpin. The paved check now lists its
+    first 64 spots of each kind.
+  - **Not fixed yet.** Candidate rule: no paving where the ground under a strip falls more than about 1 m from the
+    curb (leave the embankment slope as terrain).
+  - Main not pushed and the old code not removed: both wait on these.
+- **Optimization pass:**
+  - The paved code meets the checklist: spatial-index Maps only, fastHypot, typed grids. One small leftover: the
+    small arrays traceOutlines makes per outline segment.
+  - Added the missing test that the worker path and the single-thread path give the same tiles.
+- **Progress cards:**
+  - Export weights refitted (d77076f).
+  - The card is paced by time (66970a4, services/progressPace.js).
+  - Recorded in the built site (scratch/verify-pw/e2e_progress_watch.mjs, scratch/speed/progress_1024*.json):
+    the export bar is now within 4 points of the time on average; Generate's end jump went from 43 to 16 points.
+  - Left: Generate's stage weights are old guesses (refit them like the export's); the OSM wait can't be
+    predicted.
