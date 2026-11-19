@@ -376,40 +376,56 @@ export function buildPavedMesh(rings0, cells, g, { heightAt = () => 0, bottomAt 
     if (owner) owner.holes.push(hr);
   }
   const box = (ring) => { let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity; for (const [x, y] of ring) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } return [x0, y0, x1, y1]; };
-  // Sutherland-Hodgman against an axis-aligned square
-  const clip = (ring, sx0, sy0, sx1, sy1) => {
-    let out = ring;
-    const edges = [[(p) => p[0] >= sx0, (a, b) => [sx0, a[1] + ((sx0 - a[0]) * (b[1] - a[1])) / (b[0] - a[0])]],
-      [(p) => p[0] <= sx1, (a, b) => [sx1, a[1] + ((sx1 - a[0]) * (b[1] - a[1])) / (b[0] - a[0])]],
-      [(p) => p[1] >= sy0, (a, b) => [a[0] + ((sy0 - a[1]) * (b[0] - a[0])) / (b[1] - a[1]), sy0]],
-      [(p) => p[1] <= sy1, (a, b) => [a[0] + ((sy1 - a[1]) * (b[0] - a[0])) / (b[1] - a[1]), sy1]]];
-    for (const [keep, cut] of edges) {
-      const inp = out; out = [];
-      for (let i = 0; i < inp.length; i++) {
-        const a = inp[(i + inp.length - 1) % inp.length]; const b = inp[i];
-        if (keep(b)) { if (!keep(a)) out.push(cut(a, b)); out.push(b); } else if (keep(a)) out.push(cut(a, b));
+  // Sutherland-Hodgman against one axis's band lo..hi (axis 0: x, 1: y), no functions made per call
+  const clipAxis = (ring, axis, lo, hi) => {
+    let inp = ring;
+    for (let side = 0; side < 2; side++) {
+      const out = [];
+      const bound = side === 0 ? lo : hi;
+      const n = inp.length;
+      for (let i = 0; i < n; i++) {
+        const a = inp[(i + n - 1) % n]; const b = inp[i];
+        const ina = side === 0 ? a[axis] >= bound : a[axis] <= bound; const inb = side === 0 ? b[axis] >= bound : b[axis] <= bound;
+        if (inb) {
+          if (!ina) { const t = (bound - a[axis]) / (b[axis] - a[axis]); out.push(axis === 0 ? [bound, a[1] + t * (b[1] - a[1])] : [a[0] + t * (b[0] - a[0]), bound]); }
+          out.push(b);
+        } else if (ina) { const t = (bound - a[axis]) / (b[axis] - a[axis]); out.push(axis === 0 ? [bound, a[1] + t * (b[1] - a[1])] : [a[0] + t * (b[0] - a[0]), bound]); }
       }
-      if (!out.length) return out;
+      inp = out;
+      if (!inp.length) return inp;
     }
-    return out;
+    return inp;
   };
   const push3 = (arr, p) => arr.push(p[0], p[1], heightAt(p[0], p[1]));
+  // (each ring clipped to a row strip once, then the strip's ring to each square in the row: clipping the whole ring
+  // per square was quadratic, 13 s of a dense 4 km city's 34)
+  const valid = (r) => r.length >= 3 && Math.abs(ringSignedArea(r)) > 1e-4;
+  const tri = (o, hs) => {
+    const contour = o.map(([x, y]) => new THREE.Vector2(x, y)); const hv = hs.map((h) => h.map(([x, y]) => new THREE.Vector2(x, y)));
+    const all = [...o, ...hs.flat()];
+    for (const [a, b, c] of THREE.ShapeUtils.triangulateShape(contour, hv)) { push3(slab, all[a]); push3(slab, all[b]); push3(slab, all[c]); }
+  };
   for (const p of polys) {
     const [x0, y0, x1, y1] = box(p.outer);
-    for (let sx = Math.floor(x0 / cellM) * cellM; sx < x1; sx += cellM) {
-      if (core && (sx + cellM <= core[0] || sx >= core[2])) continue;
-      for (let sy = Math.floor(y0 / cellM) * cellM; sy < y1; sy += cellM) {
-        if (core && (sy + cellM <= core[1] || sy >= core[3])) continue;
+    for (let sy = Math.floor(y0 / cellM) * cellM; sy < y1; sy += cellM) {
+      if (core && (sy + cellM <= core[1] || sy >= core[3])) continue;
+      const rowO = clipAxis(p.outer, 1, sy, sy + cellM);
+      if (!valid(rowO)) continue;
+      const rowH = p.holes.map((h) => clipAxis(h, 1, sy, sy + cellM)).filter(valid);
+      for (let sx = Math.floor(x0 / cellM) * cellM; sx < x1; sx += cellM) {
+        if (core && (sx + cellM <= core[0] || sx >= core[2])) continue;
         const fine = fineAt && fineAt(sx + cellM / 2, sy + cellM / 2);
-        const step = fine ? fineM : cellM;
-        for (let fx = sx; fx < sx + cellM - 1e-9; fx += step) {
-          for (let fy = sy; fy < sy + cellM - 1e-9; fy += step) {
-            const o = clip(p.outer, fx, fy, fx + step, fy + step);
-            if (o.length < 3 || Math.abs(ringSignedArea(o)) < 1e-4) continue;
-            const hs = p.holes.map((h) => clip(h, fx, fy, fx + step, fy + step)).filter((h) => h.length >= 3 && Math.abs(ringSignedArea(h)) > 1e-4);
-            const contour = o.map(([x, y]) => new THREE.Vector2(x, y)); const hv = hs.map((h) => h.map(([x, y]) => new THREE.Vector2(x, y)));
-            const all = [...o, ...hs.flat()];
-            for (const [a, b, c] of THREE.ShapeUtils.triangulateShape(contour, hv)) { push3(slab, all[a]); push3(slab, all[b]); push3(slab, all[c]); }
+        if (!fine) {
+          const o = clipAxis(rowO, 0, sx, sx + cellM);
+          if (valid(o)) tri(o, rowH.map((h) => clipAxis(h, 0, sx, sx + cellM)).filter(valid));
+          continue;
+        }
+        for (let fy = sy; fy < sy + cellM - 1e-9; fy += fineM) {
+          const fo = clipAxis(rowO, 1, fy, fy + fineM); if (!valid(fo)) continue;
+          const fh = rowH.map((h) => clipAxis(h, 1, fy, fy + fineM)).filter(valid);
+          for (let fx = sx; fx < sx + cellM - 1e-9; fx += fineM) {
+            const o = clipAxis(fo, 0, fx, fx + fineM);
+            if (valid(o)) tri(o, fh.map((h) => clipAxis(h, 0, fx, fx + fineM)).filter(valid));
           }
         }
       }
