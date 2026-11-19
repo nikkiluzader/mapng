@@ -778,6 +778,7 @@
     "processingResolutionDetailStandard": "detalle recomendado",
     "processingResolutionDetailCoarse": "grueso: para áreas muy grandes",
     "processingResolutionGuide": "1 m por píxel sirve para la mayoría de los mapas. Valores menores (0,25–0,5) dan un terreno más fino para esculpir o pintar en el juego, en un área más pequeña. Valores mayores (2–4) abarcan áreas muy grandes, con terreno y carreteras más suaves.",
+    "processingResolutionSteepHint": "Montañas empinadas con túneles o galerías: elige 0,5 m con un tamaño de salida de {px} px para la misma zona. El terreno se recorta más ajustado a ellos (menos bordes dentados en los portales), con unas 4 veces más tiempo y tamaño de exportación.",
     "processingResolutionRange": "Usa un valor entre {min} y {max} m por píxel.",
     "processingResolutionCoarse": "A {mpp} m por píxel las carreteras y los detalles pequeños salen gruesos, y las carreteras apenas se ven en la vista previa 3D.",
     "processingResolutionSuggest": " La misma área a 1 m por píxel: salida de {px} px.",

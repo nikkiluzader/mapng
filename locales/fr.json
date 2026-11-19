@@ -778,6 +778,7 @@
     "processingResolutionDetailStandard": "détail recommandé",
     "processingResolutionDetailCoarse": "grossier : pour de très grandes zones",
     "processingResolutionGuide": "1 m par pixel convient à la plupart des cartes. Plus bas (0,25–0,5) pour un terrain plus fin à sculpter ou peindre en jeu, sur une zone plus petite. Plus haut (2–4) pour couvrir une très grande zone, avec un terrain et des routes plus doux.",
+    "processingResolutionSteepHint": "Montagnes escarpées avec tunnels ou galeries : choisissez 0,5 m avec une taille de sortie de {px} px pour la même zone. Le terrain est découpé au plus près (moins de bords dentelés aux portails), pour environ 4 fois le temps et la taille d'export.",
     "processingResolutionRange": "Utilisez une valeur entre {min} et {max} m par pixel.",
     "processingResolutionCoarse": "À {mpp} m par pixel, les routes et les petits détails sont grossiers, et les routes se voient à peine dans l'aperçu 3D.",
     "processingResolutionSuggest": " La même zone à 1 m par pixel : {px} px en sortie.",

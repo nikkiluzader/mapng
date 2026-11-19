@@ -36,6 +36,13 @@
       · {{ t(detailKey) }}
     </p>
     <ShortHint :more="t('controlPanel.processingResolutionGuide')" />
+    <!-- (a tested recommendation, 2026-11-19: on steep ground with tunnels and galleries 0.5 m cuts the terrain's holes
+         and cuttings round them more closely (Zion and the Axenstrasse: the holes past the structures roughly halved);
+         only where the grid stays at 4096 px or under, past that the cost outweighs it) -->
+    <p v-if="steepHintPx" data-testid="mpp-steep-hint" class="flex items-start gap-1 text-micro text-gray-500 dark:text-gray-400">
+      <Mountain :size="11" class="shrink-0 mt-px text-brand" />
+      <span>{{ t('controlPanel.processingResolutionSteepHint', { px: steepHintPx }) }}</span>
+    </p>
     <p v-if="current > COARSE_MPP" class="flex items-start gap-1 text-micro text-amber-600 dark:text-amber-400 font-medium">
       <AlertTriangle :size="11" class="shrink-0 mt-px" />
       <span>
@@ -50,7 +57,7 @@
 import ShortHint from '../base/ShortHint.vue';
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { AlertTriangle } from 'lucide-vue-next';
+import { AlertTriangle, Mountain } from 'lucide-vue-next';
 
 const { t } = useI18n({ useScope: 'global' });
 
@@ -120,6 +127,14 @@ const suggestedPx = computed(() => {
   if (!(props.resolution > 0) || props.perTile) return 0;
   const needed = props.resolution * current.value;
   return OUTPUT_SIZES.find((s) => s >= needed && s <= needed * 1.05) || 0;
+});
+
+// The 0.5 m suggestion: at 1 m, when the same ground at 0.5 m is a grid of 4096 px or less.
+const STEEP_HINT_MAX_PX = 4096;
+const steepHintPx = computed(() => {
+  if (props.perTile || current.value !== 1 || !(props.resolution > 0)) return 0;
+  const px = props.resolution * 2;
+  return px <= STEEP_HINT_MAX_PX ? px : 0;
 });
 
 const pick = (mpp) => {

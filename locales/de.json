@@ -778,6 +778,7 @@
     "processingResolutionDetailStandard": "empfohlene Detailstufe",
     "processingResolutionDetailCoarse": "grob: für sehr große Gebiete",
     "processingResolutionGuide": "1 m pro Pixel passt für die meisten Karten. Kleinere Werte (0,25–0,5) liefern feineres Gelände zum Modellieren oder Bemalen im Spiel, auf kleinerer Fläche. Größere Werte (2–4) erfassen sehr große Gebiete, mit weicherem Gelände und Straßen.",
+    "processingResolutionSteepHint": "Steile Berge mit Tunneln oder Galerien: 0,5 m mit {px} px Ausgabegröße für dieselbe Fläche wählen. Das Gelände wird enger um sie ausgeschnitten (weniger gezackte Kanten an den Portalen), bei etwa 4-facher Exportzeit und Größe.",
     "processingResolutionRange": "Wert zwischen {min} und {max} m pro Pixel verwenden.",
     "processingResolutionCoarse": "Bei {mpp} m pro Pixel werden Straßen und kleine Details grob, und Straßen sind in der 3D-Vorschau kaum zu sehen.",
     "processingResolutionSuggest": " Dasselbe Gebiet mit 1 m pro Pixel: {px} px Ausgabe mit 1 m.",

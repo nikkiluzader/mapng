@@ -778,6 +778,7 @@
     "processingResolutionDetailStandard": "dettaglio consigliato",
     "processingResolutionDetailCoarse": "grossolano: per aree molto estese",
     "processingResolutionGuide": "1 m per pixel è adatto alla maggior parte delle mappe. Scendi a 0,25–0,5 per ottenere un terreno più dettagliato da scolpire o dipingere nel gioco, su un’area più piccola. Sali a 2–4 per coprire aree molto estese, con terreno e strade meno definiti.",
+    "processingResolutionSteepHint": "Montagne ripide con gallerie o paravalanghe: scegli 0,5 m con una dimensione di uscita di {px} px per la stessa area. Il terreno viene ritagliato più vicino a loro (meno bordi frastagliati ai portali), con circa 4 volte il tempo e le dimensioni dell'esportazione.",
     "processingResolutionRange": "Utilizza un valore compreso tra {min} e {max} m per pixel.",
     "processingResolutionCoarse": "A {mpp} m per pixel, le strade e gli elementi più piccoli risultano grossolani e sono appena visibili nell’anteprima 3D.",
     "processingResolutionSuggest": " La stessa area a 1 m per pixel: output di {px} px con 1 m.",

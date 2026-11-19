@@ -57,7 +57,15 @@ shots/); re-checks on today's code: scratch/fizz033/run; diagrams scratch/fizz03
   the west portal's wingwalls are gone at 0.25 m. Finer than the source adds no height detail; grid grows 4x per
   halving, so only small maps (<= 2-4 km) can use it. To try: Axenstrasse (swissALTI3D 0.5 m, a fairer test of
   real detail), and a "steep map with many tunnels: 0.5 m" hint in the app. Covering holes with structure stays
-  the default fix. Also seen: Zion's arcade 796-828 m is a flat gallery standing in a cliff notch, bore arches
+  the default fix. **Axenstrasse done the same day** (Mapterhorn z17 ~0.41 m there: real detail at 0.5 m): export
+  5.7 / 11.8 / 28.5 s, peak 1.3 / 1.3 / 2.9 GB, zip 22 / 61 / 211 MB; the four bored tunnels' holes outside the
+  outline 14 / 5 / 3 m2, terrain in the tubes 7 / 5 / 3 m2 (clean at 1 m already); in game the terrain teeth
+  along the wingwalls at 1 m are gone at 0.5 m (scratch/fizz033/shots_res/sheet_ax_compare.jpg). **Decision (user):**
+  structure first; recommend 0.5 m where the grid stays at 4096 px or under: hint in ProcessingResolutionInput
+  (data-testid mpp-steep-hint). Found there: the OSM-mapped gallery (4316561, galleryGroundAt) leaves the lidar's
+  smeared roof inside its uphill half from 85 m on (~5 m over the road) and fills its valley side up to 15 m over
+  the lidar out to 30 m (scratch/fizz033/diag/axen_gallery_sections.png): give OSM galleries the arcade rules
+  (ground under the floor, no fill, the retaining wall); its ends read "map edge, no portal" (wrong label, Fizz 3.x). Also seen: Zion's arcade 796-828 m is a flat gallery standing in a cliff notch, bore arches
   showing at its ends (the real tunnel has windows there, no gallery): check the arcade rule on sheer cliffs.
 - **Fixed before this list:** the bridgeTowerHouses error (078ff33, after 0.3.3); short bridges too high
   (the bridge rise cap, 957fa96); sidewalks (the paved model).

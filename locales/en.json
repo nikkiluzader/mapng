@@ -783,6 +783,7 @@
     "processingResolutionDetailStandard": "recommended detail",
     "processingResolutionDetailCoarse": "coarse: for very large areas",
     "processingResolutionGuide": "1 m per pixel suits most maps. Go lower (0.25–0.5) for finer terrain to sculpt or paint in game, over a smaller area. Go higher (2–4) to fit a very large area, with softer terrain and roads.",
+    "processingResolutionSteepHint": "Steep mountains with tunnels or galleries: pick 0.5 m with a {px} px output size for the same area. The terrain is cut more closely round them (fewer jagged edges at portals), at about 4 times the export time and size.",
     "processingResolutionRange": "Use a value between {min} and {max} m per pixel.",
     "processingResolutionCoarse": "At {mpp} m per pixel roads and small features come out coarse, and roads barely show in the 3D preview.",
     "processingResolutionSuggest": " The same area at 1 m per pixel: {px} px output with 1 m.",
