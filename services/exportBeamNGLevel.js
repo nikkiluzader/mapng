@@ -13677,8 +13677,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       seaZ: -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0),
       // the sidewalks away from the curb: raised over their decals
       walks: decalRoads.footpaths,
-      // (the sidewalk rework, under test: one paved area, services/pavedSidewalks.js)
-      pavedModel: typeof process !== 'undefined' && process.env?.MAPNG_PAVED_SIDEWALKS === '1',
+      // (one paved area, services/pavedSidewalks.js: the default; MAPNG_PAVED_SIDEWALKS=0 the old builders, until they go)
+      pavedModel: !(typeof process !== 'undefined' && process.env?.MAPNG_PAVED_SIDEWALKS === '0'),
       sidewalkLook,
       // (paving stones laid as the streets' decals lay them: red brick in the Americas)
       americas: getMarkingStyle(exportTerrainData.roadRules) === 'americas',
