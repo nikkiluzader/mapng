@@ -3765,10 +3765,15 @@ function* sidewalkMeshes(carriageways, options = {}) {
   // services/pavedSidewalks.js; medians, decks, gangways and the waterfront as before)
   let paved = null;
   if (options.pavedModel) {
+    // (the paved pockets by the seawalls, found as today, laid into the paved area)
+    let pavedPockets = [];
+    try { pavedPockets = yield* findWallPocketsSteps(walkRuns, runs, carriageways, options); } catch (err) { console.warn('Sidewalks: could not find the paved pockets by the seawalls:', err?.message); }
     paved = yield* addPavedSidewalksSteps(builder, {
+      pockets: pavedPockets,
       carriageways, corners, walks: options.walks || [], runs, openGround: options.openGround || [], buildings: options.buildings || [], driveways: options.driveways || [],
       curbH: CURB_H, crossSlope: CROSS_SLOPE, curbOnlyM: CURB_ONLY_M, THREE, groundAt: options.groundAt || null,
     });
+    paved.pockets = pavedPockets;
     console.log(`Sidewalks (paved model): ${paved.stats.tiles} tiles, ${Math.round(paved.stats.slab)} slab / ${Math.round(paved.stats.curb)} curb / ${Math.round(paved.stats.skirt)} edge triangles in ${paved.stats.ms} ms`);
     flush();
   } else {
@@ -3789,7 +3794,7 @@ function* sidewalkMeshes(carriageways, options = {}) {
   for (const run of medianRuns.gaps) paveGap(builder, run);
   flush();
   // (a union can fail on bad geometry: strips that overlap beat no sidewalks)
-  let pockets = [];
+  let pockets = paved?.pockets || [];
   if (!paved) try {
     pockets = yield* findWallPocketsSteps(walkRuns, runs, carriageways, options);
   } catch (err) {
