@@ -198,6 +198,7 @@
           :gpxz-key-available="!!gpxzApiKey"
           :processing-meters-per-pixel="metersPerPixel"
           :uploaded-area-mode="uploadedAreaMode"
+          :point-layers="terrainData?.pointLayers || null"
           @update:processingMetersPerPixel="(v) => $emit('update:processingMetersPerPixel', v)"
           @update:verticalUnitOverride="(v) => elevationUnitOverride = v"
           @update:gapFillSource="(v) => gapFillSource = v"

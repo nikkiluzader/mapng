@@ -322,13 +322,26 @@ const getLazPerf = async () => {
 // return to groundSum/groundCnt via the tile's own gridMapper. Multiple
 // overlapping tiles share these accumulators, so overlap regions simply average
 // every contributing tile's points — seamless, with no per-tile edge artifacts.
-const accumulateTilePoints = async (tile, gridMapper, groundSum, groundCnt, onPoint) => {
+// (layers: what the cloud carries, counted in the same pass: points per classification code, points with an
+// intensity and its peak, colour sampled every RGB_SAMPLE_EVERY points. The upload card lists them; later steps can
+// take trees, buildings or markings from them)
+const RGB_SAMPLE_EVERY = 1000;
+const rgbOffset = (fmt) => ({ 2: 20, 3: 28, 5: 28, 7: 30, 8: 30, 10: 30 }[fmt] ?? -1);
+export const newLayerStats = () => ({ classes: new Float64Array(256), points: 0, intensityPoints: 0, intensityMax: 0, rgbSamples: 0, rgbColoured: 0 });
+const countLayers = (L, cls, intensity, rgbAt, i) => {
+  L.classes[cls]++; L.points++;
+  if (intensity > 0) { L.intensityPoints++; if (intensity > L.intensityMax) L.intensityMax = intensity; }
+  if (rgbAt && i % RGB_SAMPLE_EVERY === 0) { L.rgbSamples++; if (rgbAt()) L.rgbColoured++; }
+};
+const accumulateTilePoints = async (tile, gridMapper, groundSum, groundCnt, onPoint, layers = null) => {
   const {
     buffer, isLaz,
     pointFormat, pointDataRecordLength, pointDataOffset, pointCount,
     scaleX, scaleY, scaleZ, offsetX, offsetY, offsetZ,
   } = tile;
   const clsOff = classificationOffset(pointFormat);
+  const clsMask = pointFormat >= 6 ? 0xFF : 0x1F;
+  const rgbOff = rgbOffset(pointFormat);
 
   if (isLaz) {
     // ── LAZ: decompress via laz-perf WASM ──────────────────────────────────
@@ -361,6 +374,7 @@ const accumulateTilePoints = async (tile, gridMapper, groundSum, groundCnt, onPo
       const rawY = heap32[(pointPtr >> 2) + 1];
       const rawZ = heap32[(pointPtr >> 2) + 2];
       const cls = heap8[pointPtr + clsOff] & 0x1F;
+      if (layers) countLayers(layers, heap8[pointPtr + clsOff] & clsMask, heap8[pointPtr + 12] | (heap8[pointPtr + 13] << 8), rgbOff >= 0 ? () => (heap8[pointPtr + rgbOff] | heap8[pointPtr + rgbOff + 1] | heap8[pointPtr + rgbOff + 2] | heap8[pointPtr + rgbOff + 3] | heap8[pointPtr + rgbOff + 4] | heap8[pointPtr + rgbOff + 5]) > 0 : null, i);
       // Only ground (2) and water (9) — everything else is vegetation/noise
       if (cls !== 2 && cls !== 9) { onPoint(); continue; }
 
@@ -390,6 +404,7 @@ const accumulateTilePoints = async (tile, gridMapper, groundSum, groundCnt, onPo
       const rawY = dataView.getInt32(base + 4, true);
       const rawZ = dataView.getInt32(base + 8, true);
       const cls = bytes[base + clsOff] & 0x1F;
+      if (layers) countLayers(layers, bytes[base + clsOff] & clsMask, dataView.getUint16(base + 12, true), rgbOff >= 0 ? () => (dataView.getUint16(base + rgbOff, true) | dataView.getUint16(base + rgbOff + 2, true) | dataView.getUint16(base + rgbOff + 4, true)) > 0 : null, i);
       if (cls !== 2 && cls !== 9) { onPoint(); continue; }
 
       const px = rawX * scaleX + offsetX;
@@ -420,6 +435,7 @@ const rasterize = async (params, id) => {
   const groundSum = new Float64Array(totalCells);
   const groundCnt = new Uint32Array(totalCells);
 
+  const layers = newLayerStats();
   const PROGRESS_EVERY = 250_000;
   const totalPoints = tiles.reduce((sum, t) => sum + Number(t.pointCount || 0), 0) || 1;
   let processed = 0;
@@ -436,7 +452,7 @@ const rasterize = async (params, id) => {
       minX: tile.minX, maxX: tile.maxX, minY: tile.minY, maxY: tile.maxY,
       targetBounds, epsgDefs,
     });
-    await accumulateTilePoints(tile, gridMapper, groundSum, groundCnt, onPoint);
+    await accumulateTilePoints(tile, gridMapper, groundSum, groundCnt, onPoint, layers);
   }
 
   // ── Build final heightmap ─────────────────────────────────────────────────
@@ -471,7 +487,15 @@ const rasterize = async (params, id) => {
     if (exteriorNoDataMask[i]) heightMap[i] = NO_DATA;
   }
 
-  return heightMap;
+  return { heightMap, layers: summarizeLayers(layers) };
+};
+// (the layer counts as the page shows them: shares per classification code over 0.1 %, intensity and colour)
+const summarizeLayers = (L) => {
+  if (!L.points) return null;
+  const classes = [];
+  for (let c = 0; c < 256; c++) if (L.classes[c] / L.points >= 0.001) classes.push({ code: c, points: L.classes[c], share: L.classes[c] / L.points });
+  classes.sort((a, b) => b.points - a.points);
+  return { points: L.points, classes, intensity: L.intensityPoints / L.points >= 0.5, intensityMax: L.intensityMax, colour: L.rgbSamples > 0 && L.rgbColoured / L.rgbSamples >= 0.5 };
 };
 
 // ─── Message handler ──────────────────────────────────────────────────────────
@@ -479,8 +503,8 @@ self.onmessage = async (e) => {
   const { id, type, ...data } = e.data;
   try {
     if (type === 'rasterize') {
-      const heightMap = await rasterize(data, id);
-      self.postMessage({ id, type: 'done', heightMap }, [heightMap.buffer]);
+      const { heightMap, layers } = await rasterize(data, id);
+      self.postMessage({ id, type: 'done', heightMap, layers }, [heightMap.buffer]);
     }
   } catch (err) {
     self.postMessage({ id, type: 'error', error: err.message });

@@ -139,6 +139,8 @@
           <p v-if="nativeMpp && currentMpp === nativeMpp && exportSquare" class="text-amber-700 dark:text-amber-300" data-testid="upload-native-warning">
             {{ t(exportSquare.sizePx >= 8192 ? 'upload.resolutionNativeHeavy' : 'upload.resolutionNativeNote', { px: exportSquare.sizePx, m: nativeMpp, size: Math.round(exportSquare.sizeMeters) }) }}
           </p>
+          <!-- (the layers the cloud carries: from its point format before Generate, counted at Generate) -->
+          <p v-if="pointLayersText" data-testid="upload-point-layers">{{ pointLayersText }}</p>
           <p v-if="exportSquare" data-testid="upload-export-square">{{ t('upload.exportSquare', { size: Math.round(exportSquare.sizeMeters), w: Math.round(exportSquare.fileWidthMeters), h: Math.round(exportSquare.fileHeightMeters), px: exportSquare.sizePx }) }}</p>
         </div>
 
@@ -339,6 +341,8 @@ const props = defineProps({
   // (the processing resolution, metres per pixel, and the upload's area mode: 'native' or 'crop')
   processingMetersPerPixel: { type: [Number, String], default: 1 },
   uploadedAreaMode: { type: String, default: 'native' },
+  // (the point cloud's layers as counted at Generate: terrainData.pointLayers)
+  pointLayers: { type: Object, default: null },
 });
 
 const emit = defineEmits([
@@ -519,6 +523,23 @@ const handleCustomNoDataChange = (raw) => {
 // (the processing resolution: its effect on a point cloud's detail and the square the level keeps)
 const currentMpp = computed(() => { const m = Number(props.processingMetersPerPixel); return Number.isFinite(m) && m > 0 ? m : 1; });
 const pointSpacing = computed(() => (isLazFile.value ? pointCloudSpacing(props.uploadedElevationMeta) : null));
+// (a point cloud's layers: its classification codes with their shares (counted at Generate), intensity and colour.
+// Before Generate, what its point format can hold)
+const CLASS_KEYS = { 0: 'never', 1: 'unclassified', 2: 'ground', 3: 'lowVeg', 4: 'mediumVeg', 5: 'highVeg', 6: 'building', 7: 'noise', 9: 'water', 10: 'rail', 11: 'road', 12: 'overlap', 13: 'wireGuard', 14: 'wire', 15: 'tower', 17: 'bridge', 18: 'highNoise' };
+const className = (code) => (CLASS_KEYS[code] ? t(`upload.layerClass.${CLASS_KEYS[code]}`) : t('upload.layerClass.other', { code }));
+const pointLayersText = computed(() => {
+  if (!isLazFile.value) return '';
+  const L = props.pointLayers;
+  if (L?.classes?.length) {
+    const parts = L.classes.slice(0, 8).map((c) => `${className(c.code)} ${c.share >= 0.1 ? Math.round(c.share * 100) : (c.share * 100).toFixed(1)}%`);
+    const extra = [L.intensity ? t('upload.layerIntensity') : null, L.colour ? t('upload.layerColour') : null].filter(Boolean);
+    return `${t('upload.layersCounted')} ${parts.join(', ')}${extra.length ? ` · ${extra.join(' · ')}` : ''}`;
+  }
+  const fmt = Number(props.uploadedElevationMeta?.pointFormat);
+  if (!Number.isFinite(fmt)) return '';
+  const holds = [t('upload.layerClassification'), t('upload.layerIntensity'), [2, 3, 5, 7, 8, 10].includes(fmt) ? t('upload.layerColour') : null, [8, 10].includes(fmt) ? t('upload.layerNir') : null].filter(Boolean);
+  return t('upload.layersFormat', { fmt, list: holds.join(', ') });
+});
 // (the file's own resolution as a processing resolution: its point spacing to the centimetre, 0.1 m at the finest)
 const nativeMpp = computed(() => (pointSpacing.value ? Math.max(0.1, Math.round(pointSpacing.value.spacing * 100) / 100) : null));
 const exportSquare = computed(() => (props.uploadedAreaMode === 'crop' ? null : nativeExportSquare(props.uploadedElevationMeta, currentMpp.value)));
