@@ -2297,7 +2297,12 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       });
       console.log(`${BEAMNG_EXPORT_UI_LOG} Save picker acquired handle.`, { suggestedName });
     } catch (e) {
-      console.warn(`${BEAMNG_EXPORT_UI_LOG} Save picker unavailable/cancelled, will use anchor fallback.`, e);
+      // (Cancel in the save dialog: no export. It used to run on and download the level anyway)
+      if (e?.name === 'AbortError') {
+        console.log(`${BEAMNG_EXPORT_UI_LOG} Save dialog cancelled: export not started.`);
+        return;
+      }
+      console.warn(`${BEAMNG_EXPORT_UI_LOG} Save picker unavailable, will use anchor fallback.`, e);
     }
   } else {
     console.log(`${BEAMNG_EXPORT_UI_LOG} File System Access API unavailable, using anchor fallback.`);
