@@ -114,3 +114,18 @@ test('gradePaved: ground under the pavement just below the slab, blending back t
   assert.ok(far === undefined, `natural ground 2 m out: ${far}`);
   assert.ok(!edit.has(pix(0, 25)), 'far ground untouched');
 });
+
+test('buildPavedMesh: a curb top band runs along the curb edge, inside it and just over the slab', async () => {
+  const THREE = await import('three');
+  const { makeGrid: mk, buildPavedGrid: build, traceOutlines, buildPavedMesh, WALK: W, GAP: G, CURB_TOP_LIFT_M } = await import('../services/pavedArea.js');
+  const g = mk(-30, -30, 30, 30);
+  const { cells } = build(g, { roads: [{ pts: [[-40, 0], [40, 0]], half: 4 }], walks: [{ pts: [[-40, 9.5], [40, 9.5]], half: 1, sidewalk: true }] });
+  const m = buildPavedMesh(traceOutlines(cells, g, W | G), cells, g, { THREE, heightAt: () => 0.15, curbW: 0.15 });
+  assert.ok(m.curbTop.length > 0);
+  for (let i = 0; i < m.curbTop.length; i += 3) {
+    const y = m.curbTop[i + 1]; const z = m.curbTop[i + 2];
+    if (Math.abs(m.curbTop[i]) > 25) continue;   // (the band along the street's middle)
+    assert.ok(y > 3.5 && y < 4.5, `band at y ${y}`);
+    assert.ok(Math.abs(z - (0.15 + CURB_TOP_LIFT_M)) < 1e-5);
+  }
+});

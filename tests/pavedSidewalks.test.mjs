@@ -53,3 +53,17 @@ test('a driveway drops the curb to a lip across its width, ramping back up besid
   const slabAt = b.tris.slab.flat().filter((p) => Math.abs(p[0]) < 1 && p[1] > 4 && p[1] < 8).map((p) => p[2]);
   assert.ok(slabAt.length && Math.max(...slabAt) < 0.1, `slab in the dip up to ${Math.max(...slabAt)}`);
 });
+
+test('a bare curb (no sidewalk) keeps a curb along the road, open across its dips', () => {
+  const b = collector();
+  addPavedSidewalks(b, {
+    carriageways: [{ nodes: [[-60, 0, 0], [60, 0, 0]], half: 4, highway: 'residential' }],
+    // the curb line along the road's north edge, bare, with a dip (a car park right at the street) from 50 to 70 m
+    runs: [{ points: [[-60, 4], [60, 4]], width: 0.15, side: 1, dips: [[50, 70]] }],
+    curbH: 0.15, curbOnlyM: 0.15, THREE, groundAt: () => 0,
+  });
+  const faces = b.tris.curb.filter((t) => t.every((p) => p[1] < 4.3));
+  assert.ok(faces.length > 0, 'a curb along the bare curb');
+  // none in the open stretch (x from -10 to 10)
+  assert.ok(!faces.some((t) => t.every((p) => p[0] > -8 && p[0] < 8)), 'open along the car park');
+});

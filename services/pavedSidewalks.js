@@ -18,7 +18,32 @@ const EDGE_IN_M = 0.3;   // the road surface read this far inside its edge
 export const DRIVEWAY_HALF_M = 2.5;
 export const DIP_RAMP_M = 1.0;
 export const DIP_LIP_M = 0.02;
-export const CROSS_REACH_M = SIDEWALK_GAP_M + 2;   // a driveway's crossing: this far back from the road along its line
+export const CROSS_REACH_M = SIDEWALK_GAP_M + 2;
+export const BARE_CURB_M = 0.5;   // a bare curb (no sidewalk): a strip this wide along the road edge, its curb and top band
+
+/** The part of a polyline from s0 to s1 metres along it. */
+export function pieceAlong(points, s0, s1) {
+  const out = []; let s = 0;
+  for (let i = 0; i + 1 < points.length; i++) {
+    const a = points[i]; const b = points[i + 1]; const L = fastHypot(b[0] - a[0], b[1] - a[1]);
+    if (L > 0 && s + L >= s0 && s <= s1) {
+      const t0 = Math.max(0, (s0 - s) / L); const t1 = Math.min(1, (s1 - s) / L);
+      if (!out.length) out.push([a[0] + (b[0] - a[0]) * t0, a[1] + (b[1] - a[1]) * t0]);
+      out.push([a[0] + (b[0] - a[0]) * t1, a[1] + (b[1] - a[1]) * t1]);
+    }
+    s += L;
+  }
+  return out;
+}
+
+/** The parts of a polyline outside the spans [[s0, s1]...] (metres along it). */
+function piecesOutside(points, spans) {
+  let total = 0; for (let i = 0; i + 1 < points.length; i++) total += fastHypot(points[i + 1][0] - points[i][0], points[i + 1][1] - points[i][1]);
+  const keep = []; let at = 0;
+  for (const [a, b] of [...spans].sort((x, y) => x[0] - y[0])) { if (a > at) keep.push([at, a]); at = Math.max(at, b); }
+  if (at < total) keep.push([at, total]);
+  return keep.map(([a, b]) => pieceAlong(points, a, b)).filter((l) => l.length > 1);
+}   // a driveway's crossing: this far back from the road along its line
 const smooth01 = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 
 /** The distance from (x, y) to the nearest of lines ([[x, y]...]), through a grid of segments; Infinity far off. */
@@ -125,12 +150,16 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
     if (!crossings.length && ends.length) crossings.push(line);
   }
   const toDriveway = crossings.length ? makeLineDistance(crossings, DRIVEWAY_HALF_M + DIP_RAMP_M) : () => Infinity;
+  // (the curb lowered wherever today's street runs lower it: crosswalks, walkways coming out to the street, car parks
+  // and driveways along a bare curb; with a ramp back up into the sidewalk, as a kerb ramp)
+  const dipLines = runs.flatMap((r) => (r.dips || []).map(([a, b]) => pieceAlong(r.points, a, b)).filter((l) => l.length > 1));
+  const toDip = dipLines.length ? makeLineDistance(dipLines, DIP_RAMP_M) : () => Infinity;
   // the road surface at the nearest edge (a curb face comes down to it)
   const surfaceAt = (x, y) => { const h = road(x, y); if (!h) return groundAt ? groundAt(x, y) : 0; return groundAt ? groundAt(h.ex, h.ey) : h.z; };
   const heightAt = (x, y) => {
     const h = road(x, y); if (!h) return groundAt ? groundAt(x, y) : 0;
     const surface = groundAt ? groundAt(h.ex, h.ey) : h.z;
-    const share = smooth01((toDriveway(x, y) - DRIVEWAY_HALF_M) / DIP_RAMP_M);
+    const share = Math.min(smooth01((toDriveway(x, y) - DRIVEWAY_HALF_M) / DIP_RAMP_M), smooth01(toDip(x, y) / DIP_RAMP_M));
     return surface + curbH * share + DIP_LIP_M * (1 - share) + crossSlope * Math.min(h.d, 6);
   };
   let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
@@ -150,6 +179,12 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
     return [p[0] - (ty / L) * dist, p[1] + (tx / L) * dist];
   });
   const street = runs.filter((r) => r.points?.length > 1 && r.width > curbOnlyM).map((r) => ({ pts: offset(r.points, (r.side ?? 1) * r.width / 2), half: r.width / 2 }));
+  // a bare curb: a narrow strip along the road edge, left out across its dips (a car park right at the street, a
+  // driveway: open there, as today)
+  for (const r of runs) {
+    if (!(r.points?.length > 1) || r.width > curbOnlyM) continue;
+    for (const piece of piecesOutside(r.points, r.dips || [])) street.push({ pts: offset(piece, (r.side ?? 1) * BARE_CURB_M / 2), half: BARE_CURB_M / 2 });
+  }
   const boxOf = (pts) => { let a = Infinity; let b = Infinity; let c = -Infinity; let d = -Infinity; for (const p of pts) { if (p[0] < a) a = p[0]; if (p[0] > c) c = p[0]; if (p[1] < b) b = p[1]; if (p[1] > d) d = p[1]; } return [a, b, c, d]; };
   const withBox = (list, get) => list.map((o) => ({ o, b: boxOf(get(o)) }));
   const R = withBox(roads, (o) => o.pts); const A = withBox(arcs, (o) => o); const W = withBox(ws, (o) => o.pts); const S = withBox(street, (o) => o.pts);
@@ -169,7 +204,7 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
       cores.push(core);
     }
   }
-  const fineAt = crossings.length ? (x, y) => toDriveway(x, y) < DRIVEWAY_HALF_M + DIP_RAMP_M + 1 : null;
+  const fineAt = crossings.length || dipLines.length ? (x, y) => toDriveway(x, y) < DRIVEWAY_HALF_M + DIP_RAMP_M + 1 || toDip(x, y) < DIP_RAMP_M + 1 : null;
   const meshTile = ({ cells, g, rings }, k) => {
     const core = cores[k];
     const m = buildPavedMesh(rings, cells, g, { heightAt, bottomAt: surfaceAt, curbH, THREE, core, fineAt });
@@ -194,6 +229,14 @@ function addToBuilder(builder, m) {
   for (let i = 0; i < s.length; i += 9) {
     const a = [s[i], s[i + 1], s[i + 2]]; const b = [s[i + 3], s[i + 4], s[i + 5]]; const c = [s[i + 6], s[i + 7], s[i + 8]];
     builder.tri('slab', a, b, c, [a[0], a[1]], [b[0], b[1]], [c[0], c[1]], [0, 0, 1]);
+  }
+  // the curb's top band: up, its UVs along the curb
+  const t = m.curbTop || [];
+  for (let i = 0; i < t.length; i += 18) {
+    const a = [t[i], t[i + 1], t[i + 2]]; const b = [t[i + 3], t[i + 4], t[i + 5]]; const bi = [t[i + 6], t[i + 7], t[i + 8]]; const ai = [t[i + 15], t[i + 16], t[i + 17]];
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
+    builder.tri('curb', a, b, bi, [0, 1], [L, 1], [L, 0.8], [0, 0, 1]);
+    builder.tri('curb', a, bi, ai, [0, 1], [L, 0.8], [0, 0.8], [0, 0, 1]);
   }
   for (const [arr, mat] of [[m.curb, 'curb'], [m.skirt, 'curb']]) {
     for (let i = 0; i < arr.length; i += 18) {

@@ -23,6 +23,7 @@ export const PLAIN_GAP_M = 1;
 export const CLOSE_M = 5;
 export const POCKET_M2 = 20;      // an unpaved pocket this small between road and pavement is paved (crossing landings)
 export const SPECK_M2 = 0.5;      // a traced ring this small is dropped
+export const CURB_TOP_LIFT_M = 0.003;  // the curb's top band this far over the slab (no flicker between the two)
 
 // layer bits
 export const ROAD = 1; export const WALK = 2; export const GAP = 4; export const VERGE = 8;
@@ -359,7 +360,8 @@ function simplifyLine(pts, tol) {
 // driveway then has next to no face)
 // fineAt(x, y): true where the slab must follow quick changes (a driveway's dip): there the squares are fineM.
 // Edges are split to at most edgeM so a curb's height can change along a straight run.
-export function buildPavedMesh(rings0, cells, g, { heightAt = () => 0, bottomAt = null, cellM = 4, fineM = 1, fineAt = null, edgeM = 1, curbH = 0.15, skirtM = 0.3, THREE, core = null } = {}) {
+// curbW: the curb's top band, drawn in the curb's material just inside each curb edge, CURB_TOP_LIFT_M over the slab
+export function buildPavedMesh(rings0, cells, g, { heightAt = () => 0, bottomAt = null, cellM = 4, fineM = 1, fineAt = null, edgeM = 1, curbH = 0.15, curbW = 0.15, skirtM = 0.3, THREE, core = null } = {}) {
   if (!THREE) throw new Error('buildPavedMesh needs THREE (ShapeUtils.triangulateShape)');
   const rings = rings0.map((ring) => {
     const out = [];
@@ -380,7 +382,7 @@ export function buildPavedMesh(rings0, cells, g, { heightAt = () => 0, bottomAt 
     }
     return out;
   });
-  const slab = []; const curb = []; const skirt = [];
+  const slab = []; const curb = []; const skirt = []; const curbTop = [];
   // polygons: each outer ring with the holes inside it
   const outers = rings.filter((r) => ringSignedArea(r) > 0); const holes = rings.filter((r) => ringSignedArea(r) < 0);
   const inside = (p, ring) => { let s = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const a = ring[i]; const b = ring[j]; if ((a[1] > p[1]) !== (b[1] > p[1]) && p[0] < a[0] + ((p[1] - a[1]) * (b[0] - a[0])) / (b[1] - a[1])) s = !s; } return s; };
@@ -461,9 +463,14 @@ export function buildPavedMesh(rings0, cells, g, { heightAt = () => 0, bottomAt 
       const db = isCurb && bottomAt ? Math.max(0, zb - bottomAt(b[0], b[1])) : isCurb ? curbH : skirtM;
       if (isCurb && da < 0.005 && db < 0.005) continue;   // (flush: no face)
       into.push(a[0], a[1], za, b[0], b[1], zb, b[0], b[1], zb - db, a[0], a[1], za, b[0], b[1], zb - db, a[0], a[1], za - da);
+      if (isCurb && curbW > 0) {
+        // the top band: inward (the left of the direction of travel) by curbW
+        const ix = -ox * curbW; const iy = -oy * curbW; const lift = CURB_TOP_LIFT_M;
+        curbTop.push(a[0], a[1], za + lift, b[0], b[1], zb + lift, b[0] + ix, b[1] + iy, zb + lift, a[0], a[1], za + lift, b[0] + ix, b[1] + iy, zb + lift, a[0] + ix, a[1] + iy, za + lift);
+      }
     }
   }
-  return { slab: Float32Array.from(slab), curb: Float32Array.from(curb), skirt: Float32Array.from(skirt), polygons: polys.length };
+  return { slab: Float32Array.from(slab), curb: Float32Array.from(curb), skirt: Float32Array.from(skirt), curbTop: Float32Array.from(curbTop), polygons: polys.length };
 }
 
 // grading (step 3d): today's values (beamngSidewalks.js gradeSidewalkGround)
