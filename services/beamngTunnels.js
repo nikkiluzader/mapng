@@ -1058,8 +1058,7 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
     // freeway is sunk deeper; at the cover height the street behind was cut
     // down to a ragged wall of ground over the headwall)
     headTops: [0, 1].map((e) => {
-      if (low) return need + CC_HEAD_OVER_M + RAW_HEAD_GROW_M;
-      if (!cutCover) return HEAD_TOP_M + (raw ? RAW_HEAD_GROW_M : 0);
+      if (!cutCover && !low) return HEAD_TOP_M + (raw ? RAW_HEAD_GROW_M : 0);
       const i0 = e === 0 ? iS : iN; const step = e === 0 ? 1 : -1;
       const behind = [];
       for (let k = 1; k * STEP_M <= CC_STREET_BEHIND_M; k++) {
@@ -1070,6 +1069,11 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
       // (the highest: OSM ends a tunnel a few metres out in front of the
       // street's edge, where the ground still steps up to it)
       const street = behind.length ? Math.max(...behind) : need;
+      // (a low box too: up to the lid's ground behind its face, never taller than its old fixed height, need + 3 m.
+      // At that height Val d'Isère's headwalls stood 2.4 m and more over the town's ground, square blocks round every
+      // portal; the real portals are openings flush in a wall under the street, Mapillary. Under a lid higher than
+      // that (Deck Park's), taller walls raised the backfill over the sidewalks on the street)
+      if (low) return Math.min(need + CC_HEAD_OVER_M + RAW_HEAD_GROW_M, Math.max(need, street) + CC_HEAD_OVER_M);
       return Math.max(need, street) + CC_HEAD_OVER_M;
     }),
     length: L, tubeLength, fill: maxFill, short,

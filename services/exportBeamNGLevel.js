@@ -8329,7 +8329,7 @@ function buildDetailedReportSections(d) {
     lines.push('');
     lines.push(`Tunnel ${t.key}: ${describe(t.osm)}`);
     lines.push(`  - OSM way(s): ${ways(t.osm) || 'n/a'}`);
-    lines.push(`  - ${t.kind === 'cutcover' ? 'Cut-and-cover box' : t.kind === 'gallery' ? `Gallery (hillside ${t.uphill > 0 ? 'right' : 'left'} up to the roof, columns on the valley side)` : 'Bore'} ${formatNumber(t.tubeLength, 1)} m of ${formatNumber(t.length, 1)} m mapped; inside width ${formatNumber(2 * t.W, 1)} m${t.maxExtra > 0 ? ` (up to ${formatNumber(2 * t.W + t.maxExtra, 1)} m where ramps join)` : ''}, crown ${formatNumber(t.crown, 2)} m over the road`);
+    lines.push(`  - ${t.kind === 'cutcover' ? 'Cut-and-cover box' : t.low ? 'Low box (a flat roof at the road\'s own level, the ground over it its lid)' : t.kind === 'gallery' ? `Gallery (hillside ${t.uphill > 0 ? 'right' : 'left'} up to the roof, columns on the valley side)` : 'Bore'} ${formatNumber(t.tubeLength, 1)} m of ${formatNumber(t.length, 1)} m mapped; inside width ${formatNumber(2 * t.W, 1)} m${t.maxExtra > 0 ? ` (up to ${formatNumber(2 * t.W + t.maxExtra, 1)} m where ramps join)` : ''}, crown ${formatNumber(t.crown, 2)} m over the road`);
     for (const br of t.branches || []) lines.push(`  - Ramp ${describe(br.osm)}: in the bore and its cutting for ${formatNumber(br.absorbed, 0)} m${br.trench > 0 ? `, then its own trench ${formatNumber(br.trench, 0)} m` : ''}`);
     // (a gallery's ends are open: the road runs on out of it, no portal; 'edge' there is not the map's edge)
     const kind = t.kind === 'gallery' ? { cut: 'open end', bridge: 'meets a bridge', edge: 'open end' } : { cut: 'cutting + wingwalls', bridge: 'meets a bridge', edge: 'map edge, no portal' };

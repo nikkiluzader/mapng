@@ -74,6 +74,12 @@ shots/); re-checks on today's code: scratch/fizz033/run; diagrams scratch/fizz03
   that height: no road surface is composed inside a gallery's height span now); paved-sidewalk grading skips tunnel
   ground (it graded the Axenstrasse gallery's lanes 4 m down); report says "End A (open end)" not "map edge".
   Left: the D 902 crossing over the D 87A's shallow box lower than its roof (clearance 3 m short, Fizz's report).
+- **2.4 terrain at tunnel ends (Val d'Isère town portals): partly done on dev (2026-11-19).** Mapillary: its two
+  tunnels are rectangular boxes with flush portals; we build them as low boxes (the report called them "Bore": now
+  "Low box"). Headwall backfill falls away 1:1 instead of square blocks (64efb9d); low-box headwalls follow the lid's
+  ground behind the face, at most their old need + 3.3 m (t002 5.2 / 6.1 m instead of 8.1). Left: t001's south portal
+  still juts (its ground is 7 m up); a bright side opening in t001 at 75 % (driver's view); the 15-20 m cover cliff
+  beside steep-side bores; Fizz's fz07 cuts.
 - **Fixed before this list:** the bridgeTowerHouses error (078ff33, after 0.3.3); short bridges too high
   (the bridge rise cap, 957fa96); sidewalks (the paved model).
 - **Owed answers:** 2.2 continuous roads, 3.4 OSM tells galleries apart (tunnel=avalanche_protector), 4.5 double
