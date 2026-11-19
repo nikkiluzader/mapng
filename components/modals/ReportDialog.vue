@@ -44,6 +44,7 @@
                 <li v-if="preview.gpu" data-testid="report-gpu">{{ t('report.incGpu', { gpu: preview.gpu }) }}</li>
                 <li v-if="preview.error">{{ t('report.incError') }}</li>
                 <li v-if="preview.exportReportChars">{{ t('report.incExportReport', { kb: Math.max(1, Math.round(preview.exportReportChars / 1024)) }) }}</li>
+                <li v-if="preview.exportJsonBytes" data-testid="report-export-json">{{ t(preview.mapFeatures ? 'report.incExportJson' : 'report.incExportJsonNoMap', { kb: Math.max(1, Math.round(preview.exportJsonBytes / 1024)), n: preview.mapFeatures }) }}</li>
                 <li v-if="preview.logChars && (includeArea || !preview.area)">{{ t('report.incLog', { kb: Math.max(1, Math.round(preview.logChars / 1024)) }) }}</li>
                 <li v-if="preview.hasOptions">{{ t('report.incOptions') }}</li>
                 <li v-if="preview.dumpBytes">{{ t('report.incDump', { kb: Math.max(1, Math.round(preview.dumpBytes / 1024)) }) }}</li>

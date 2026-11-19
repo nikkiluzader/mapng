@@ -138,3 +138,42 @@ test('at most a set number of reports are stored a day in all', async () => {
   assert.equal((await post(env, { kind: 'manual', description: 'last one in' }, '10.9.9.1')).status, 200);
   assert.equal((await post(env, { kind: 'manual', description: 'one too many' }, '10.9.9.2')).status, 429);
 });
+
+// A level report also carries the level's JSON report (map data included), gzipped by the app, stored as its own file.
+test('a level report keeps its JSON report gzipped, read back only with the token; not gzip is dropped', async () => {
+  const zlib = await import('node:zlib');
+  const env = { OSM_TILES: fakeBucket(), CRASH_ADMIN_TOKEN: 'secret-token' };
+  const json = JSON.stringify({ format: 'mapng-export-report', mapData: { features: [{ id: '1' }] } });
+  const r = await post(env, { kind: 'level', appVersion: '0.3.5', level: 'T', exportReport: '# r', exportReportJsonGz: zlib.gzipSync(json).toString('base64') }, '7.7.7.8');
+  const { id } = await r.json();
+  const key = [...env.OSM_TILES.store.keys()].find((k) => k.endsWith('export_report.json.gz'));
+  assert.ok(key && key.includes(id));
+  const list = await (await call(env, '/api/crash/list', { headers: { Authorization: 'Bearer secret-token' } })).json();
+  assert.equal(list.reports[0].hasExportJson, true);
+  assert.equal(list.reports[0].exportReportJsonGz, undefined);
+  assert.equal((await call(env, `/api/crash/file?key=${encodeURIComponent(key)}`)).status, 401);
+  const got = await call(env, `/api/crash/file?key=${encodeURIComponent(key)}`, { headers: { Authorization: 'Bearer secret-token' } });
+  assert.equal(got.status, 200);
+  // (the fake bucket keeps bytes as a latin1 string: read them from it)
+  assert.equal(zlib.gunzipSync(Buffer.from(env.OSM_TILES.store.get(key).value, 'latin1')).toString(), json);
+  const env2 = { OSM_TILES: fakeBucket(), CRASH_ADMIN_TOKEN: 'secret-token' };
+  await post(env2, { kind: 'level', appVersion: '0.3.5', level: 'T', exportReport: '# r', exportReportJsonGz: Buffer.from('not gzip').toString('base64') }, '7.7.7.9');
+  assert.ok(![...env2.OSM_TILES.store.keys()].some((k) => k.endsWith('.gz')));
+});
+
+// The app packs the JSON report: keys and home folders out, gzipped; the map data left out past the size cap.
+test('the JSON report is packed for sending: scrubbed, gzipped, map data dropped when too large', async () => {
+  const zlib = await import('node:zlib');
+  const { packExportJson } = await import('../desktop/reportScrub.js');
+  const features = Array.from({ length: 3000 }, (_, i) => ({ id: String(i), tags: { name: `street ${Math.random()}` } }));
+  const text = JSON.stringify({ format: 'mapng-export-report', jobLog: ['gpxzApiKey=ak_abcdefghijk'], mapData: { checksum: 'x', features } });
+  const p = packExportJson(text);
+  assert.equal(p.features, 3000); assert.equal(p.mapDataLeftOut, false);
+  const back = zlib.gunzipSync(Buffer.from(p.gz, 'base64')).toString();
+  assert.ok(!back.includes('ak_abcdefghijk'));
+  const small = packExportJson(text, 4000);
+  assert.equal(small.mapDataLeftOut, true); assert.equal(small.features, 0);
+  assert.equal(JSON.parse(zlib.gunzipSync(Buffer.from(small.gz, 'base64')).toString()).mapData.checksum, 'x');
+  assert.equal(packExportJson('{"not":"a report"}'), null);
+  assert.equal(packExportJson(''), null);
+});

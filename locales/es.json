@@ -1479,6 +1479,8 @@
     "incConfig": "Tus ajustes, como código (incluye la ubicación, así que se quita si la desmarcas)",
     "introLevel": "¿Enviar el informe de exportación de {name} para ayudar con un problema? Llega de forma privada al desarrollador de MapNG y no se envía nada hasta que elijas Enviar.",
     "incExportReport": "El informe de exportación de este nivel ({kb} KB): sus ajustes, lo que se construyó, las comprobaciones y el registro de la exportación. Nombra el lugar, sus coordenadas y sus calles.",
+    "incExportJson": "Su informe JSON ({kb} KB comprimido): las mismas comprobaciones como datos, sin claves, y los {n} elementos de OpenStreetMap con los que se construyó el nivel, para que el desarrollador pueda reconstruir exactamente este nivel.",
+    "incExportJsonNoMap": "Su informe JSON ({kb} KB comprimido): las mismas comprobaciones como datos, sin claves. Los datos del mapa eran demasiado grandes para enviarlos y se quedan en el nivel.",
     "title_level": "Enviar el informe de un nivel"
   },
   "config": {

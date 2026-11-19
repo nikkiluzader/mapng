@@ -8,7 +8,7 @@ import { app, crashReporter, net } from 'electron';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { cleanOptions, scrubText } from './reportScrub.js';
+import { cleanOptions, packExportJson, scrubText } from './reportScrub.js';
 
 const MAX_LOG_CHARS = 1500 * 1024;          // the end of a job's log
 const MAX_EXPORT_REPORT_CHARS = 2 * 1024 * 1024;
@@ -16,7 +16,6 @@ const MAX_EXPORT_REPORT_CHARS = 2 * 1024 * 1024;
 // characters, and a code cut short cannot be pasted back into the app)
 const MAX_CONFIG_CHARS = 512 * 1024;
 const MAX_DUMP_BYTES = 8 * 1024 * 1024;
-
 /** Before the app is ready: crash dumps kept locally, never uploaded by Electron. */
 export function startCrashReporter() {
   crashReporter.start({ uploadToServer: false, compress: false, productName: 'MapNG' });
@@ -78,6 +77,8 @@ export function prepareReport(kind, ctx = {}, { build = '', settings = {}, gpu =
     // (a level's own export_report.txt, read from its zip by the main process: kind 'level')
     level: String(ctx.level || '').slice(0, 120),
     exportReport: typeof ctx.exportReport === 'string' ? scrubText(ctx.exportReport).slice(0, MAX_EXPORT_REPORT_CHARS) : '',
+    // (and its JSON report with the map data, gzipped: kind 'level' too)
+    exportReportJsonGz: '',
     minidump: '',
   };
   let dump = null;
@@ -87,6 +88,8 @@ export function prepareReport(kind, ctx = {}, { build = '', settings = {}, gpu =
       try { report.minidump = fs.readFileSync(dump.path).toString('base64'); } catch { dump = null; }
     }
   }
+  const packed = kind === 'level' ? packExportJson(ctx.exportReportJson) : null;
+  if (packed) report.exportReportJsonGz = packed.gz;
   const token = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   prepared.set(token, report);
   if (prepared.size > 10) prepared.delete(prepared.keys().next().value);
@@ -107,6 +110,9 @@ export function prepareReport(kind, ctx = {}, { build = '', settings = {}, gpu =
       dumpBytes: report.minidump ? dump.size : 0,
       level: report.level,
       exportReportChars: report.exportReport.length,
+      exportJsonBytes: packed?.bytes || 0,
+      mapFeatures: packed?.features || 0,
+      mapDataLeftOut: !!packed?.mapDataLeftOut,
     },
   };
 }
@@ -118,7 +124,7 @@ export async function sendReport(token, { includeArea = true, description = '' }
   const body = { ...report, description: String(description || report.description || '').slice(0, 4000) };
   // (the export report holds the location and street names all through: it goes with the location or not at all)
   // (and so does the job's log: its lines name the area's bounds, its country and its lakes)
-  if (!includeArea) { body.area = null; body.config = ''; body.exportReport = ''; body.log = ''; body.options = cleanOptions(body.options, { keepLocation: false }); }
+  if (!includeArea) { body.area = null; body.config = ''; body.exportReport = ''; body.exportReportJsonGz = ''; body.log = ''; body.options = cleanOptions(body.options, { keepLocation: false }); }
   const r = await net.fetch(`${apiOrigin}/api/crash`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

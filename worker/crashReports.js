@@ -9,14 +9,15 @@ import { hideSecretsInText } from '../services/personalKeys.js';
 import { DAILY, overBudget, overRate } from './limits.js';
 
 const PREFIX = 'crash-reports/';
-const MAX_BODY_BYTES = 12 * 1024 * 1024;      // a report with its log and crash dump
+const MAX_BODY_BYTES = 28 * 1024 * 1024;      // a report with its log, crash dump and a level's JSON report
 const MAX_LOG_CHARS = 2 * 1024 * 1024;
 // The session code of the job (settings, area, background areas, points). One with
 // background areas painted over half a 20 km map is far longer than its settings
 // alone: cut at 8,000 characters it could not be pasted back into the app
 // ("invalid code", report MR-TWEP2B). Kept whole up to this.
 const MAX_CONFIG_CHARS = 512 * 1024;
-const MAX_EXPORT_REPORT_CHARS = 2 * 1024 * 1024;   // a level's export_report.txt, sent from the levels list
+const MAX_EXPORT_REPORT_CHARS = 2 * 1024 * 1024;   // a level's export report (Markdown), sent from the levels list
+const MAX_EXPORT_JSON_GZ_B64 = 14 * 1024 * 1024;   // its JSON report with the map data, gzipped, as base64 (10 MB gzipped)
 const LIMIT_PER_HOUR = 10;                    // per address, in this isolate's memory only
 const recent = new Map();                     // address hash -> { hour, count }
 const ID_CHARS = 'ABCDEFGHJKMNPQRSTVWXYZ23456789';
@@ -64,6 +65,7 @@ export function reportSummary(body, id, receivedAt) {
     hasLog: typeof body.log === 'string' && body.log.length > 0,
     hasDump: typeof body.minidump === 'string' && body.minidump.length > 0,
     hasExportReport: typeof body.exportReport === 'string' && body.exportReport.length > 0,
+    hasExportJson: typeof body.exportReportJsonGz === 'string' && body.exportReportJsonGz.length > 0 && body.exportReportJsonGz.length <= MAX_EXPORT_JSON_GZ_B64,
     level: oneLine(body.level, 120),              // the level's name, for a report sent from the levels list
   };
 }
@@ -117,7 +119,7 @@ async function notify(env, summary, viewerUrl) {
     allowance.note,
     `App: ${summary.appVersion} (${summary.build}) on ${summary.os || summary.platform}`,
     summary.level ? `Level: ${summary.level}` : '',
-    `Log: ${summary.hasLog ? 'yes' : 'no'}  Crash dump: ${summary.hasDump ? 'yes' : 'no'}  Export report: ${summary.hasExportReport ? 'yes' : 'no'}`,
+    `Log: ${summary.hasLog ? 'yes' : 'no'}  Crash dump: ${summary.hasDump ? 'yes' : 'no'}  Export report: ${summary.hasExportReport ? 'yes' : 'no'}${summary.hasExportJson ? ' (with its JSON and map data)' : ''}`,
     summary.error ? `Error:\n${quoted(summary.error)}` : '',
     summary.description ? `User wrote:\n${quoted(summary.description)}` : '',
   ].filter(Boolean);
@@ -162,7 +164,7 @@ export async function listReports(env, limit = 50) {
 
 /** A report folder's key: crash-reports/<day>/<time>-<id>/ (nothing else is ever read or written by key). */
 export const REPORT_DIR_RE = new RegExp(`^${PREFIX}\\d{4}-\\d{2}-\\d{2}/\\d{6}-MR-[A-Z0-9]{6}/$`);
-const REPORT_FILE_RE = new RegExp(`^${PREFIX}\\d{4}-\\d{2}-\\d{2}/\\d{6}-MR-[A-Z0-9]{6}/(report\\.json|log\\.txt|export_report\\.txt|crash\\.dmp)$`);
+const REPORT_FILE_RE = new RegExp(`^${PREFIX}\\d{4}-\\d{2}-\\d{2}/\\d{6}-MR-[A-Z0-9]{6}/(report\\.json|log\\.txt|export_report\\.txt|export_report\\.json\\.gz|crash\\.dmp)$`);
 
 /** One file of a report as a Response, or null when the key is not a report file or is missing. */
 export async function reportFile(env, key) {
@@ -213,6 +215,14 @@ export async function handleCrashReports(request, env, ctx, url, json) {
     const writes = [env.OSM_TILES.put(`${dir}report.json`, JSON.stringify(summary, null, 1), { httpMetadata: { contentType: 'application/json' } })];
     if (summary.hasLog) writes.push(env.OSM_TILES.put(`${dir}log.txt`, hideSecretsInText(body.log.slice(-MAX_LOG_CHARS)), { httpMetadata: { contentType: 'text/plain; charset=utf-8' } }));
     if (summary.hasExportReport) writes.push(env.OSM_TILES.put(`${dir}export_report.txt`, hideSecretsInText(body.exportReport.slice(0, MAX_EXPORT_REPORT_CHARS)), { httpMetadata: { contentType: 'text/plain; charset=utf-8' } }));
+    if (summary.hasExportJson) {
+      // (gzipped by the app, which took keys and home folders out before packing it; a gzip file or nothing)
+      try {
+        const bin = Uint8Array.from(atob(body.exportReportJsonGz), (c) => c.charCodeAt(0));
+        if (bin[0] !== 0x1f || bin[1] !== 0x8b) throw new Error('not gzip');
+        writes.push(env.OSM_TILES.put(`${dir}export_report.json.gz`, bin, { httpMetadata: { contentType: 'application/gzip' } }));
+      } catch { summary.hasExportJson = false; }
+    }
     if (summary.hasDump) {
       try {
         const bin = Uint8Array.from(atob(body.minidump), (c) => c.charCodeAt(0));

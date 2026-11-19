@@ -1479,6 +1479,8 @@
     "incConfig": "Vos réglages, sous forme de code (il contient l'emplacement, donc il est retiré si vous le décochez)",
     "introLevel": "Envoyer le rapport d'export de {name} pour aider à résoudre un problème ? Il est transmis en privé au développeur de MapNG, et rien n'est envoyé tant que vous ne choisissez pas Envoyer.",
     "incExportReport": "Le rapport d'export de ce niveau ({kb} Ko) : ses réglages, ce qui a été construit, les vérifications et le journal de l'export. Il nomme le lieu, ses coordonnées et ses rues.",
+    "incExportJson": "Son rapport JSON ({kb} Ko compressé) : les mêmes vérifications sous forme de données, sans clés, et les {n} éléments OpenStreetMap ayant servi au niveau, pour que le développeur puisse reconstruire exactement ce niveau.",
+    "incExportJsonNoMap": "Son rapport JSON ({kb} Ko compressé) : les mêmes vérifications sous forme de données, sans clés. Les données de la carte étaient trop volumineuses et restent dans le niveau.",
     "title_level": "Envoyer le rapport d'un niveau"
   },
   "config": {

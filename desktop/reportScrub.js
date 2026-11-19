@@ -3,6 +3,7 @@
 // location fields when the user unticks the location. No Electron here, so
 // tests can load it.
 import os from 'node:os';
+import zlib from 'node:zlib';
 
 // never in a report: keys, tokens, passwords (GPXZ / Overpass keys live in the options)
 const SECRET_KEY_RE = /key|token|secret|password|auth/i;
@@ -40,4 +41,26 @@ export function scrubText(text, home = os.homedir()) {
   // (and anything shaped like a GPXZ key, whatever stands beside it)
   t = t.replace(/((?:api[_-]?key|key|token|secret|password)["']?\s*[:=]\s*["']?)[^\s"'&,}]+/gi, '$1[hidden]');
   return t.replace(/\bak_[A-Za-z0-9_-]{8,}/g, '[hidden]');
+}
+
+// A level's JSON report (export_report.json: every check as data, and the map data the level was built from),
+// gzipped. Past this the map data is left out and the rest is sent (a 16 km map's data runs to tens of MB).
+export const MAX_EXPORT_JSON_GZ_BYTES = 10 * 1024 * 1024;
+
+/** The JSON report gzipped for sending: { gz (base64), bytes, features, mapDataLeftOut }, or null. */
+export function packExportJson(text, maxGz = MAX_EXPORT_JSON_GZ_BYTES) {
+  if (typeof text !== 'string' || !text) return null;
+  let data;
+  try { data = JSON.parse(text); } catch { return null; }
+  if (data?.format !== 'mapng-export-report') return null;
+  const features = data.mapData?.features?.length || 0;
+  let gz = zlib.gzipSync(scrubText(text), { level: 6 });
+  let mapDataLeftOut = false;
+  if (gz.length > maxGz && data.mapData) {
+    data.mapData = { ...data.mapData, features: undefined, leftOut: 'too large to send; the level holds it' };
+    gz = zlib.gzipSync(scrubText(JSON.stringify(data)), { level: 6 });
+    mapDataLeftOut = true;
+  }
+  if (gz.length > maxGz) return null;
+  return { gz: gz.toString('base64'), bytes: gz.length, features: mapDataLeftOut ? 0 : features, mapDataLeftOut };
 }

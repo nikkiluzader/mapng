@@ -1484,6 +1484,8 @@
     "incConfig": "Your settings, as a code (it includes the location, so it goes when you untick it)",
     "introLevel": "Send {name}'s export report to help with a problem? It goes privately to the MapNG developer, and nothing is sent unless you choose Send.",
     "incExportReport": "This level's export report ({kb} KB): its settings, what was built, the checks and the export's log. It names the place, its coordinates and its streets.",
+    "incExportJson": "Its JSON report ({kb} KB compressed): the same checks as data, without keys, and the {n} OpenStreetMap features the level was built from, so the developer can rebuild exactly this level.",
+    "incExportJsonNoMap": "Its JSON report ({kb} KB compressed): the same checks as data, without keys. The map data was too large to send and stays in the level.",
     "title_level": "Send a level's report"
   },
   "config": {

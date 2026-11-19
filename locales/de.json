@@ -1479,6 +1479,8 @@
     "incConfig": "Deine Einstellungen als Code (enthält den Ort, entfällt also, wenn du ihn abwählst)",
     "introLevel": "Den Exportbericht von {name} senden, um bei einem Problem zu helfen? Er geht privat an den MapNG-Entwickler, und nichts wird gesendet, bevor du Senden wählst.",
     "incExportReport": "Der Exportbericht dieses Levels ({kb} KB): seine Einstellungen, was gebaut wurde, die Prüfungen und das Exportprotokoll. Er nennt den Ort, seine Koordinaten und seine Straßen.",
+    "incExportJson": "Sein JSON-Bericht ({kb} KB komprimiert): dieselben Prüfungen als Daten, ohne Schlüssel, und die {n} OpenStreetMap-Objekte, aus denen das Level gebaut wurde, damit der Entwickler genau dieses Level nachbauen kann.",
+    "incExportJsonNoMap": "Sein JSON-Bericht ({kb} KB komprimiert): dieselben Prüfungen als Daten, ohne Schlüssel. Die Kartendaten waren zum Senden zu groß und bleiben im Level.",
     "title_level": "Bericht eines Levels senden"
   },
   "config": {

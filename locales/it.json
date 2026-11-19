@@ -1479,6 +1479,8 @@
     "incConfig": "Le tue impostazioni, come codice (include la posizione, quindi viene tolto se la deselezioni)",
     "introLevel": "Inviare il rapporto di esportazione di {name} per aiutare con un problema? Arriva in privato allo sviluppatore di MapNG e nulla viene inviato finché non scegli Invia.",
     "incExportReport": "Il rapporto di esportazione di questo livello ({kb} KB): le impostazioni, ciò che è stato costruito, i controlli e il registro dell'esportazione. Indica il luogo, le coordinate e le strade.",
+    "incExportJson": "Il suo rapporto JSON ({kb} KB compresso): gli stessi controlli come dati, senza chiavi, e i {n} elementi OpenStreetMap con cui è stato costruito il livello, così lo sviluppatore può ricostruire esattamente questo livello.",
+    "incExportJsonNoMap": "Il suo rapporto JSON ({kb} KB compresso): gli stessi controlli come dati, senza chiavi. I dati della mappa erano troppo grandi da inviare e restano nel livello.",
     "title_level": "Invia il rapporto di un livello"
   },
   "config": {

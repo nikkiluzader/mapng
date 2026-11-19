@@ -1366,7 +1366,9 @@ const levelExportReport = (zipName, levelName) => {
   try {
     // (export_report.md since 2026-11-19; export_report.txt in older levels)
     const buf = readZipFile(path.join(folder, name), `levels/${level.levelName}/export_report.md`) || readZipFile(path.join(folder, name), `levels/${level.levelName}/export_report.txt`);
-    return buf ? { level: level.title || level.levelName, text: Buffer.from(buf).toString('utf8') } : null;
+    // (and the JSON report with the map data the level was built from, in levels made since 2026-11-19)
+    const json = readZipFile(path.join(folder, name), `levels/${level.levelName}/mapng_source/export_report.json`);
+    return buf ? { level: level.title || level.levelName, text: Buffer.from(buf).toString('utf8'), json: json ? Buffer.from(json).toString('utf8') : null } : null;
   } catch { return null; }
 };
 // The graphics as the app knows them, for a problem report: the active card's ids and driver, the features
@@ -1387,14 +1389,14 @@ async function gpuSummary() {
   return parts.join('; ').slice(0, 600);
 }
 ipcMain.handle('report:prepare', async (_event, kind, ctx = {}) => {
-  const { exportReport: _ignored, level: _alsoIgnored, ...rest } = ctx || {};
+  const { exportReport: _ignored, exportReportJson: _ignoredToo, level: _alsoIgnored, ...rest } = ctx || {};
   // (the log of a job is one of the app's own log files, never any other file the page names)
   if (rest.logPath && !(insideAny(rest.logPath, [JOBS(), SESSIONS()]) && /\.log$/i.test(rest.logPath))) rest.logPath = null;
   const gpu = await gpuSummary();
   if (String(kind) === 'level') {
     const found = levelExportReport(rest.zipName, rest.levelName);
     if (!found) throw new Error('This level has no export report to send (it may have been made by an older MapNG, or the zip was moved).');
-    return prepareReport('level', { ...rest, level: found.level, exportReport: found.text }, { build: String(rest.build || ''), settings: readSettings(), gpu });
+    return prepareReport('level', { ...rest, level: found.level, exportReport: found.text, exportReportJson: found.json }, { build: String(rest.build || ''), settings: readSettings(), gpu });
   }
   return prepareReport(String(kind), rest, { build: String(rest.build || ''), settings: readSettings(), gpu });
 });
