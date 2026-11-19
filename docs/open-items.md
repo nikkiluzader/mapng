@@ -497,6 +497,9 @@ stubs at crossings; B is 15.7 s of Chicago 8192's ~45 s of sidewalk work and hol
     Update (e7d17f3 and after): outlines simplified within one cell, tiles meshed in order as workers return them,
     row pass as linear scans: NYC sidewalk step 15.7 s with the switch on (today 17.8 s), 1.48M triangles (2.12M).
     The 0.25 m corner jogs are gone with the looser outlines (curb within one cell of the road edge).
+    Details done: curb top band, bare curbs (0.5 m strip, open across dips), today's dips (crosswalks, walkway ends,
+    car parks), seawall pockets. NYC with the switch on: 16.3 s (today 17.8 s). Next: the side-by-side on all test
+    areas (plots, paved area and triangle numbers, timing), then the game check at the test intersections.
     Was: 3e wiring behind a switch (heights from the road edges, tiles on workers), (slabs, curb faces) at today's heights; 3d grading
     from the grid; tiles on workers; decks and waterfront unchanged at first; behind a switch until approved.
 - Then: plots and paved-area numbers on the test areas against today, in-game check, and the user's go-ahead
