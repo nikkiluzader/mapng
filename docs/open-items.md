@@ -507,6 +507,15 @@ stubs at crossings; B is 15.7 s of Chicago 8192's ~45 s of sidewalk work and hol
     shots in scratch/swaudit/game/shots): Chicago W Kinzie continuous curb to buildings, driver's view clean;
     NYC block now has walkways where today has none. Hong Kong built but not looked at in game. Waiting for the
     user's decision on switching the paved model on by default.
+    2026-11-18 night: the user said make it the default, run the full sweep, check Hong Kong + a suburb in game, push to
+    main if all is well, then drop the old sidewalk code. Done so far: default on dev (87ceecc); sweep fixes: paved
+    ground check (checkPavedGround), grading never into a deck, slabs follow the ground when terrain is not shaped,
+    no paving over mapped water or the sea (c457dd1); tiles only where something is paved / inside the map (test
+    suite 12.7 -> 1.9 min, 9327971). STILL FAILING in Ready cells (kingst, naldo): terrain spikes up (17->32,
+    25->39), floating 7-13 -> ~30 (kingst t30 168), buried naldo 2->35. Next: diagrams at the worst spikes, fix the
+    grading's edges, re-sweep; then Hong Kong + suburb_naperville (fetched) in game; then drop the old code; main.
+    Unrelated: 3 lint warnings in every cell (beech foliage textures missing in the game itself: a Steam update;
+    re-run the asset generators + audit).
     Was: 3e wiring behind a switch (heights from the road edges, tiles on workers), (slabs, curb faces) at today's heights; 3d grading
     from the grid; tiles on workers; decks and waterfront unchanged at first; behind a switch until approved.
 - Then: plots and paved-area numbers on the test areas against today, in-game check, and the user's go-ahead
