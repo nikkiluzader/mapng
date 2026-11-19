@@ -96,3 +96,21 @@ test('buildPavedMesh: the slab covers the outline\'s area; the edge facing the r
   let worst = 0; for (let i = 0; i < m.slab.length; i += 3) worst = Math.max(worst, Math.abs(m.slab[i + 2] - (0.15 + 0.01 * m.slab[i])));
   assert.ok(worst < 1e-5);
 });
+
+test('gradePaved: ground under the pavement just below the slab, blending back to the natural ground, roads left', async () => {
+  const { makeGrid: mk, buildPavedGrid: build, gradePaved, GRADE_UNDER_M } = await import('../services/pavedArea.js');
+  const g = mk(-30, -30, 30, 30);
+  const { cells } = build(g, { roads: [{ pts: [[-40, 0], [40, 0]], half: 4 }], walks: [{ pts: [[-40, 9.5], [40, 9.5]], half: 1, sidewalk: true }] });
+  // a 64 m terrain at 1 m, flat at 1 m over the slab's 0.2 m top (the ground stands higher beside the street)
+  const W = 64; const heightMap = new Float32Array(W * W).fill(1);
+  const { idx, z } = gradePaved(cells, g, { heightMap, width: W, height: W, worldSize: W, minHeight: 0 }, { heightAt: () => 0.2 });
+  const edit = new Map(); idx.forEach((i, k) => edit.set(i, z[k]));
+  const pix = (x, y) => Math.round((0.5 - y / W) * W - 1) * W + Math.round((x / W + 0.5) * W);
+  assert.ok(Math.abs(edit.get(pix(0, 7)) - (0.2 - GRADE_UNDER_M)) < 1e-9, 'under the strip');
+  assert.ok(!edit.has(pix(0, 0)), 'the road is left to the road grading');
+  // (0.94 m of difference blends over 1.88 m: 1 m out is partway back up, 2 m out is the natural ground)
+  const near = edit.get(pix(0, 11)); const far = edit.get(pix(0, 12));
+  assert.ok(near > 0.06 && near < 1, `blending back up 1 m out: ${near}`);
+  assert.ok(far === undefined, `natural ground 2 m out: ${far}`);
+  assert.ok(!edit.has(pix(0, 25)), 'far ground untouched');
+});

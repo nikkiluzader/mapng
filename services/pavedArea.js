@@ -385,3 +385,54 @@ export function buildPavedMesh(rings, cells, g, { heightAt = () => 0, cellM = 4,
   }
   return { slab: Float32Array.from(slab), curb: Float32Array.from(curb), skirt: Float32Array.from(skirt), polygons: polys.length };
 }
+
+// grading (step 3d): today's values (beamngSidewalks.js gradeSidewalkGround)
+export const GRADE_UNDER_M = 0.14;      // the ground this far under the slab's top (a 1 m grid can't follow it closer)
+export const BLEND_MIN_M = 1;
+export const BLEND_MAX_M = 10;
+export const BLEND_RUN = 2;             // 1 m of height difference blends over 2 m
+const smooth01 = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
+
+/**
+ * Terrain edits under and round the paved area (step 3d). terrain: { heightMap, width, height, worldSize, minHeight }
+ * (world z = raw - minHeight); heightAt(x, y): the slab top. Under the pavement the ground goes GRADE_UNDER_M under the
+ * slab; round it, it blends back to the natural ground over BLEND_RUN per metre of difference (BLEND_MIN_M to
+ * BLEND_MAX_M); road pixels are left to the roads' own grading. Returns { idx: Int32Array, z: Float64Array } (raw).
+ */
+export function gradePaved(cells, g, terrain, { heightAt = () => 0 } = {}) {
+  const { heightMap, width, height, worldSize, minHeight = 0 } = terrain;
+  const N = width * height; const sq = worldSize / width;
+  // (the terrain grid's convention: pixel (c, r) at ((c / W) - 0.5) * size, (0.5 - (r + 1) / H) * size)
+  const wx = (c) => ((c / width) - 0.5) * worldSize; const wy = (r) => (0.5 - (r + 1) / height) * worldSize;
+  const at = (x, y) => { const c = Math.floor((x - g.x0) / g.res); const r = Math.floor((g.y1 - y) / g.res); return c >= 0 && r >= 0 && c < g.w && r < g.h ? cells[r * g.w + c] : 0; };
+  // only the terrain pixels the grid covers
+  const c0 = Math.max(0, Math.floor((g.x0 / worldSize + 0.5) * width)); const c1 = Math.min(width - 1, Math.ceil(((g.x0 + g.w * g.res) / worldSize + 0.5) * width));
+  const r0 = Math.max(0, Math.floor((0.5 - g.y1 / worldSize) * height - 1)); const r1 = Math.min(height - 1, Math.ceil((0.5 - (g.y1 - g.h * g.res) / worldSize) * height));
+  const sw = c1 - c0 + 1; const sh = r1 - r0 + 1;
+  if (sw <= 0 || sh <= 0) return { idx: new Int32Array(0), z: new Float64Array(0) };
+  const paved = new Uint8Array(sw * sh); const road = new Uint8Array(sw * sh); const top = new Float64Array(sw * sh);
+  for (let r = 0; r < sh; r++) {
+    for (let c = 0; c < sw; c++) {
+      const x = wx(c + c0); const y = wy(r + r0); const v = at(x, y); const k = r * sw + c;
+      if (v & ROAD) road[k] = 1;
+      else if (v & (WALK | GAP)) { paved[k] = 1; top[k] = heightAt(x, y) - GRADE_UNDER_M; }
+    }
+  }
+  const { d2, near } = distanceWithNearest(paved, sw, sh);
+  const idx = []; const z = [];
+  const reach = BLEND_MAX_M / sq;
+  for (let r = 0; r < sh; r++) {
+    for (let c = 0; c < sw; c++) {
+      const k = r * sw + c; const gi = (r + r0) * width + (c + c0);
+      if (gi < 0 || gi >= N || road[k]) continue;
+      if (paved[k]) { idx.push(gi); z.push(top[k] + minHeight); continue; }
+      if (near[k] < 0 || d2[k] > reach * reach) continue;
+      const ground = heightMap[gi] - minHeight; const t = top[near[k]];
+      const blend = Math.min(BLEND_MAX_M, Math.max(BLEND_MIN_M, Math.abs(ground - t) * BLEND_RUN));
+      const f = (Math.sqrt(d2[k]) * sq) / blend;
+      if (f >= 1) continue;
+      idx.push(gi); z.push(t + (ground - t) * smooth01(f) + minHeight);
+    }
+  }
+  return { idx: Int32Array.from(idx), z: Float64Array.from(z) };
+}
