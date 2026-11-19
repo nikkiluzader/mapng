@@ -33,28 +33,33 @@ export const ROAD = 1; export const WALK = 2; export const GAP = 4; export const
  */
 export function distanceWithNearest(seed, w, h) {
   const INF = 1e20;
-  const g = new Float64Array(w * h); const near = new Int32Array(w * h).fill(-1);
-  // pass 1: along each row, to the nearest seed in that row
+  // (squared distances in cells are whole numbers far under 2^24: exact in 32 bits, half the memory traffic; the
+  // intersections below stay in 64)
+  const g = new Float32Array(w * h); const near = new Int32Array(w * h);
+  for (let i = 0; i < w * h; i++) { if (seed[i]) { g[i] = 0; near[i] = i; } else { g[i] = INF; near[i] = -1; } }
   const n = Math.max(w, h);
   const f = new Float64Array(n); const fi = new Int32Array(n); const v = new Int32Array(n); const z = new Float64Array(n + 1);
-  const run = (len, getF, getI, put) => {
-    for (let q = 0; q < len; q++) { f[q] = getF(q); fi[q] = getI(q); }
+  // (one 1-D pass over g / near along a line: start, stride, length; plain loops, no callbacks per cell: with them
+  // this was 85 % of the paved grid's time)
+  const pass = (start, stride, len) => {
+    for (let q = 0, i = start; q < len; q++, i += stride) { f[q] = g[i]; fi[q] = near[i]; }
     let k = 0; v[0] = 0; z[0] = -INF; z[1] = INF;
     for (let q = 1; q < len; q++) {
-      let s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
-      while (s <= z[k]) { k--; s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]); }
+      const fq = f[q] + q * q;
+      let p = v[k];
+      let s = (fq - (f[p] + p * p)) / (2 * q - 2 * p);
+      while (s <= z[k]) { k--; p = v[k]; s = (fq - (f[p] + p * p)) / (2 * q - 2 * p); }
       k++; v[k] = q; z[k] = s; z[k + 1] = INF;
     }
     k = 0;
-    for (let q = 0; q < len; q++) { while (z[k + 1] < q) k++; const p = v[k]; put(q, (q - p) * (q - p) + f[p], fi[p]); }
+    for (let q = 0, i = start; q < len; q++, i += stride) {
+      while (z[k + 1] < q) k++;
+      const p = v[k]; const d = (q - p) * (q - p) + f[p];
+      g[i] = d; near[i] = d >= INF ? -1 : fi[p];
+    }
   };
-  for (let y = 0; y < h; y++) {
-    const o = y * w;
-    run(w, (x) => (seed[o + x] ? 0 : INF), (x) => (seed[o + x] ? o + x : -1), (x, d, i) => { g[o + x] = d; near[o + x] = d >= INF ? -1 : i; });
-  }
-  for (let x = 0; x < w; x++) {
-    run(h, (y) => g[y * w + x], (y) => near[y * w + x], (y, d, i) => { g[y * w + x] = d; near[y * w + x] = d >= INF ? -1 : i; });
-  }
+  for (let y = 0; y < h; y++) pass(y * w, 1, w);
+  for (let x = 0; x < w; x++) pass(x, w, h);
   return { d2: g, near };
 }
 
@@ -138,8 +143,16 @@ export function buildPavedGrid(g, { roads = [], cornerArcs = [], walks = [], str
   // (marked straight into their layers, the road taken out once after: a scratch layer cleared per walk was a
   // pass over the whole grid for every walk)
   const sw = new Uint8Array(N); const plain = new Uint8Array(N);
-  for (const wk of walks) if (!wk.crossing && wk.pts.length > 1) markLine(wk.sidewalk ? sw : plain, g, wk.pts, wk.half, 1);
-  for (const s of streetWalks) if (s.pts.length > 1) markLine(plain, g, s.pts, s.half, 1);
+  // (near a plain walk and near the road, each drawn PLAIN_GAP_M wider: the strip between them, marked directly
+  // instead of through two more distance transforms over the tile)
+  const plainNear = new Uint8Array(N); const roadBand = new Uint8Array(N);
+  for (const wk of walks) {
+    if (wk.crossing || wk.pts.length < 2) continue;
+    markLine(wk.sidewalk ? sw : plain, g, wk.pts, wk.half, 1);
+    if (!wk.sidewalk) markLine(plainNear, g, wk.pts, wk.half + PLAIN_GAP_M + 0.3, 1);
+  }
+  for (const s of streetWalks) if (s.pts.length > 1) { markLine(plain, g, s.pts, s.half, 1); markLine(plainNear, g, s.pts, s.half + PLAIN_GAP_M + 0.3, 1); }
+  for (const r of roads) if (r.pts.length > 1) markLine(roadBand, g, r.pts, r.half + PLAIN_GAP_M, 1);
   const road = new Uint8Array(N); const walk = new Uint8Array(N);
   for (let i = 0; i < N; i++) {
     road[i] = cells[i] & ROAD ? 1 : 0;
@@ -148,14 +161,13 @@ export function buildPavedGrid(g, { roads = [], cornerArcs = [], walks = [], str
   }
   const res = g.res;
   const { d2: dRoad2, near: roadNear } = distanceWithNearest(road, g.w, g.h);
-  const { d2: dPlain2 } = distanceWithNearest(plain, g.w, g.h);
   const { d2: dSw2, near: swNear } = distanceWithNearest(sw, g.w, g.h);
-  const plainMax = PLAIN_GAP_M / res; const swMax = SIDEWALK_GAP_M / res;
+  const swMax = SIDEWALK_GAP_M / res;
   for (let i = 0; i < N; i++) {
     if (road[i] || walk[i]) continue;
     const dr = Math.sqrt(dRoad2[i]);
     let take = false;
-    if (dr <= plainMax && dr + Math.sqrt(dPlain2[i]) <= plainMax + 0.3 / res) take = true;
+    if (plainNear[i] && roadBand[i]) take = true;
     else if (swNear[i] >= 0) {
       const D = Math.sqrt(dRoad2[swNear[i]]);
       if (D <= swMax && dr + Math.sqrt(dSw2[i]) <= D + 0.5 / res) take = true;
@@ -178,6 +190,8 @@ export function buildPavedGrid(g, { roads = [], cornerArcs = [], walks = [], str
   // corners: notches narrower than CLOSE_M closed, never onto the road
   const any = new Uint8Array(N);
   for (let i = 0; i < N; i++) any[i] = cells[i] & (ROAD | WALK | GAP) ? 1 : 0;
+  // (at full resolution: on a 1 m copy the partly paved blocks along every edge either spread the paving a metre
+  // past the walks or left specks unpaved inside it)
   const closed = closeMask(any, g.w, g.h, Math.round(CLOSE_M / 2 / res));
   // (only near a sidewalk footway: the closing rounds the sidewalk paving at corners; let loose, it paved the strip
   // beside a plain footway 4.5 m off the curb too)
