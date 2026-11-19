@@ -100,7 +100,7 @@ import { generateRoadLamps } from './streetLamps.js';
 import { buildIngameProbes } from './ingameProbes.js';
 import { smoothLine } from './lineSmoothing.js';
 import { buildPlazaMeshes, courtyardPathHalf, courtyardPaved, getPlazaMaterialDefs, isCourtyard, isPlaza, plazaSurface, PLAZA_MATERIAL, plazaTileM } from './plazas.js';
-import { buildSidewalkMeshesParallel, cornerPatches, inferCrossingSidewalks, buildWallDeckMesh, gutterLines, isCurbedClass, lowerUnderWallDecks, checkSidewalkGround, checkPavedGround, CURB_ONLY_M, ZEBRA_CROSSING_MATERIAL, gradeSidewalkGround, getSidewalkMaterialDefs, SIDEWALK_MATERIALS, sidewalkFootways, streetSides, DEFAULT_SIDEWALK_LOOK, setCurbHeight, CURB_HEIGHTS_M,
+import { buildSidewalkMeshesParallel, cornerPatches, inferCrossingSidewalks, buildWallDeckMesh, gutterLines, isCurbedClass, lowerUnderWallDecks, checkPavedGround, CURB_ONLY_M, ZEBRA_CROSSING_MATERIAL, getSidewalkMaterialDefs, SIDEWALK_MATERIALS, sidewalkFootways, streetSides, DEFAULT_SIDEWALK_LOOK, setCurbHeight, CURB_HEIGHTS_M,
 } from './beamngSidewalks.js';
 import { buildRoadNameZones } from './roadNameZones.js';
 import { placeStreetProps, POLE_LAMP_REACH_M, POLE_TYPES, hash01 as propHash, roadsidePolesRegion } from './streetProps.js';
@@ -13635,7 +13635,13 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const sidewalkSeaPlan = includeRoads && includeSidewalks ? (() => { try { return lowerSeabed({
             heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
             minHeight: Number(exportTerrainData.minHeight) || 0, worldSize: exportTerrainData.width * squareSize,
-          }, exportTerrainData.landCover, -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0), { coarse: !!terrainData?.coarseElevation, coast: coastLinesOf(exportTerrainData, squareSize) }); } catch { return null; } })() : null;
+          }, exportTerrainData.landCover, -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0), {
+            coarse: !!terrainData?.coarseElevation, coast: coastLinesOf(exportTerrainData, squareSize),
+            // (with the water step's own piers and road keep-out: without the piers, the water dug round them was paved
+            // over, a harbour path floating 2 m over its dug dock)
+            piers: pierAreasOf(exportTerrainData, squareSize),
+            keep: (() => { const q = buildCarriagewayIndex(riverRoads().map((r) => ({ nodes: r.points, half: (r.half || 3) + LAKE_KEEP_M }))); return (x, y) => isOnOtherCarriageway(q, x, y, 0, () => false); })(),
+          }); } catch { return null; } })() : null;
   // (the walkway tops on worker threads in the desktop app; here otherwise)
   const sidewalks = includeRoads && includeSidewalks
     ? await buildSidewalkMeshesParallel(groundCarriageways, {
@@ -13693,8 +13699,6 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       seaZ: -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0),
       // the sidewalks away from the curb: raised over their decals
       walks: decalRoads.footpaths,
-      // (one paved area, services/pavedSidewalks.js: the default; MAPNG_PAVED_SIDEWALKS=0 the old builders, until they go)
-      pavedModel: !(typeof process !== 'undefined' && process.env?.MAPNG_PAVED_SIDEWALKS === '0'),
       // (the terrain left as it is: the paved slabs follow it away from the curb; and what is built overhead)
       pavedFollowGround: !shapeExtras,
       // (the rivers' channels, planned before: no paving across them, their beds are dug after the sidewalks)
@@ -13718,23 +13722,21 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const sidewalkGroundIdx = (() => { const flags = new Uint8Array(exportTerrainData.width * exportTerrainData.height); return { add: (i) => { flags[i] = 1; }, has: (i) => flags[i] === 1 }; })();
   // (graded wherever there is paving: the paved model's tiles too; on street-side runs alone, an area whose sidewalks
   // are all mapped footways (Zion's canyon road) had its paving left ungraded, floating metres over the ground)
-  if ((sidewalks.runs.length > 0 || sidewalks.paved?.tiles?.length > 0) && shapeExtras) {
+  if (sidewalks.paved?.tiles?.length > 0 && shapeExtras) {
     // the ground under the slabs (they hang at road height + the curb)
     const terrainGrid = {
       heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
       worldSize: exportTerrainData.width * squareSize, minHeight: Number(exportTerrainData.minHeight) || 0,
     };
     // (the paved model: graded from its own tiles, each its core)
-    const graded = sidewalks.paved
-      ? (() => {
-        const idx = []; const z = [];
-        for (const t of sidewalks.paved.tiles) {
-          const e = gradePaved(t.cells, t.g, terrainGrid, { heightAt: sidewalks.paved.heightAt, core: t.core, overhead: underDeck });
-          for (let k = 0; k < e.idx.length; k++) { idx.push(e.idx[k]); z.push(e.z[k]); }
-        }
-        return { pixels: idx.length, apply(set) { for (let k = 0; k < idx.length; k++) set(idx[k], z[k]); } };
-      })()
-      : gradeSidewalkGround([...sidewalks.runs, ...sidewalks.walkRuns, ...sidewalks.cornerRuns, ...sidewalks.cornerGround], groundCarriageways, terrainGrid, { overhead: underDeck, besideDeck: besideDeckAt(bridgeDecks) });
+    const graded = (() => {
+      const idx = []; const z = [];
+      for (const t of sidewalks.paved.tiles) {
+        const e = gradePaved(t.cells, t.g, terrainGrid, { heightAt: sidewalks.paved.heightAt, core: t.core, overhead: underDeck });
+        for (let k = 0; k < e.idx.length; k++) { idx.push(e.idx[k]); z.push(e.z[k]); }
+      }
+      return { pixels: idx.length, apply(set) { for (let k = 0; k < idx.length; k++) set(idx[k], z[k]); } };
+    })();
     const hmSide = heightMapEditor(exportTerrainData);
     graded.apply((idx, v) => { hmSide.set(idx, v); sidewalkGroundIdx.add(idx); });
     lowerUnderWallDecks(sidewalks.wallDecks, {
@@ -13987,6 +13989,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   let seaFloor = null;
   if (includeWater) {
     try {
+      // (the paving built: the sea floor and the lake beds leave the ground under it, as under the roads; a harbour path
+      // on a tile of its own floated 2 m over the dock dug under it)
+      const pavedGround = sidewalks?.paved?.pavedAt || (() => false);
       lakePlan = planLakes({
         features: exportTerrainData.osmFeatures || [],
         toWorld: (lat, lng) => geoToWorldPoint(lat, lng, exportTerrainData, squareSize, 0),
@@ -14007,7 +14012,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
         worldSize: exportTerrainData.width * squareSize, minHeight: Number(exportTerrainData.minHeight) || 0,
       }, {
-        keep: (x, y) => isOnOtherCarriageway(quayIndex, x, y, 0, () => false),
+        // (and the ground under the paving: built over it, the bed dug under it left the slab floating)
+        keep: (x, y) => isOnOtherCarriageway(quayIndex, x, y, 0, () => false) || pavedGround(x, y),
         // (reservoirs: deepest against their dam)
         dams: (exportTerrainData.osmFeatures || [])
           .filter((f) => (f.tags?.waterway === 'dam' || f.tags?.man_made === 'dam') && f.geometry?.length > 1)
@@ -14024,7 +14030,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       const seabed = lowerSeabed({
         heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
         minHeight: Number(exportTerrainData.minHeight) || 0, worldSize: exportTerrainData.width * squareSize,
-      }, exportTerrainData.landCover, -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0), { coarse: !!terrainData?.coarseElevation, coast: coastLinesOf(exportTerrainData, squareSize), piers: pierAreasOf(exportTerrainData, squareSize), keep: (x, y) => isOnOtherCarriageway(quayIndex, x, y, 0, () => false) });
+      }, exportTerrainData.landCover, -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0), { coarse: !!terrainData?.coarseElevation, coast: coastLinesOf(exportTerrainData, squareSize), piers: pierAreasOf(exportTerrainData, squareSize), keep: (x, y) => isOnOtherCarriageway(quayIndex, x, y, 0, () => false) || pavedGround(x, y) });
       seabed.apply((idx, v) => hmLake.set(idx, v));
       if (seabed.pixels) seaFloor = seabed;
       lakePlan.stats.seabedPixels = seabed.pixels;
@@ -15619,9 +15625,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
       grid: { heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height, worldSize: exportTerrainData.width * squareSize },
     });
-    structureChecks.sidewalks = sidewalks.paved
-      ? checkPavedGround(sidewalks.paved, (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize))
-      : checkSidewalkGround(sidewalks.runs, (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize));
+    structureChecks.sidewalks = checkPavedGround(sidewalks.paved, (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize));
   } catch (err) {
     console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Structure checks skipped: ${err?.message || err}`);
   }

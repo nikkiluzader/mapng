@@ -1,6 +1,6 @@
-// The sidewalk rework wired into the export (step 3e, docs/open-items.md section 5): street-side sidewalks and
-// mapped footways as one paved area (services/pavedArea.js), built tile by tile into the sidewalk part builder.
-// Behind a switch (MAPNG_PAVED_SIDEWALKS=1) until the side-by-side comparison is approved.
+// The sidewalks (docs/open-items.md section 5): street-side sidewalks, corners, mapped footways and the paved pockets
+// and aprons by seawalls as one paved area (services/pavedArea.js), built tile by tile into the sidewalk part builder.
+// The old separate builders (swept strips, corners, merged walkways and their grading) were removed 2026-11-19.
 //
 // Tiles: TILE_M squares with MARGIN_M round each (the rules reach SIDEWALK_GAP_M from a curb and close corners), each
 // tile meshing and grading only its own core, so neighbours meet without overlaps. A whole 8 km map at 0.25 m
@@ -204,10 +204,15 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
     return top;
   };
   let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
-  for (const cw of carriageways) for (const p of cw.nodes || []) { if (p[0] < x0) x0 = p[0]; if (p[0] > x1) x1 = p[0]; if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1]; }
+  // (over the roads, the mapped walks and the seawall pockets: a promenade more than the margin past the outermost road,
+  // on a map's coastal edge, was left unpaved)
+  const grow = (p) => { if (p[0] < x0) x0 = p[0]; if (p[0] > x1) x1 = p[0]; if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1]; };
+  for (const cw of carriageways) for (const p of cw.nodes || []) grow(p);
+  for (const w of walks) if (!w.crossing) for (const p of w.nodes || []) grow(p);
+  for (const pk of pockets) for (const p of pk?.[0] || []) grow(p);
   const stats = { tiles: 0, slab: 0, curb: 0, skirt: 0, ms: 0, bankCleared: 0, bankMs: 0, meshMs: 0, sampleMs: 0 };
   const tiles = [];
-  if (!Number.isFinite(x0)) return { tiles, heightAt, stats };
+  if (!Number.isFinite(x0)) return { tiles, heightAt, stats, pavedAt: () => false };
   const t0 = Date.now();
   // (not a lift's or a stair's way mapped as a carriageway)
   const roads = carriageways.filter((c) => c.nodes?.length > 1 && !['elevator', 'steps', 'footway', 'path'].includes(c.highway)).map((c) => ({ pts: c.nodes, half: c.half || 3 }));
@@ -246,12 +251,12 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
     return any ? { mask: sub, c0, r0, w, h, W, H: Hh, ws } : null;
   };
   const near = (list, bx) => list.filter(({ b }) => b[0] <= bx[2] && b[2] >= bx[0] && b[1] <= bx[3] && b[3] >= bx[1]).map(({ o }) => o);
-  // (the tiles over the roads' box grown by the margin: the paving reaches past the outermost centrelines; over
+  // (the tiles over that box grown by the margin: the paving reaches past the outermost centrelines; over
   // the bare box a straight street along one line had no tile row at all)
   x0 -= MARGIN_M; y0 -= MARGIN_M; x1 += MARGIN_M; y1 += MARGIN_M;
   // (and never past the map: roads running on past its edge gave a test's 8 m map 3,093 empty tiles, a minute of work)
   if (mapBox) { x0 = Math.max(x0, mapBox[0]); y0 = Math.max(y0, mapBox[1]); x1 = Math.min(x1, mapBox[2]); y1 = Math.min(y1, mapBox[3]); }
-  if (x1 <= x0 || y1 <= y0) { stats.ms = Date.now() - t0; return { tiles, heightAt, stats }; }
+  if (x1 <= x0 || y1 <= y0) { stats.ms = Date.now() - t0; return { tiles, heightAt, stats, pavedAt: () => false }; }
   const items = []; const cores = [];
   for (let tx = Math.floor(x0 / TILE_M) * TILE_M; tx <= x1; tx += TILE_M) {
     for (let ty = Math.floor(y0 / TILE_M) * TILE_M; ty <= y1; ty += TILE_M) {
@@ -261,7 +266,6 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
       const box = [Math.max(tx - MARGIN_M, x0), Math.max(ty - MARGIN_M, y0), Math.min(tx + TILE_M + MARGIN_M, x1), Math.min(ty + TILE_M + MARGIN_M, y1)];
       if (box[2] <= box[0] || box[3] <= box[1]) continue;
       const tr = near(R, box);
-      if (!tr.length) continue;
       // (paving only ever comes from a walk, a street-side sidewalk or a seawall pocket: a tile with none is skipped,
       // whatever roads cross it)
       const tw = near(W, box); const ts = near(S, box); const tp = near(PK, box);
@@ -345,7 +349,21 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
   if (built) built.forEach((r, k) => { if (k >= next && !got[k]) onTile(k, r); });
   else items.forEach((it, k) => onTile(k, pavedTile(it)));
   stats.ms = Date.now() - t0;
-  return { tiles, heightAt, stats };
+  return { tiles, heightAt, stats, pavedAt: makePavedAt(tiles) };
+}
+
+/**
+ * Whether (x, y) is paved, from the tiles' grids (each tile's own core): for the steps after the sidewalks that would
+ * change the ground under them (the water step's sea floor and lake beds leave it, as they leave the roads).
+ */
+export function makePavedAt(tiles) {
+  const byCore = new Map();
+  for (const t of tiles) byCore.set(Math.floor(t.core[0] / TILE_M) * 65536 + Math.floor(t.core[1] / TILE_M), t);
+  return (x, y) => {
+    const t = byCore.get(Math.floor(x / TILE_M) * 65536 + Math.floor(y / TILE_M)); if (!t) return false;
+    const { g, cells } = t; const c = Math.floor((x - g.x0) / g.res); const r = Math.floor((g.y1 - y) / g.res);
+    return c >= 0 && r >= 0 && c < g.w && r < g.h && (cells[r * g.w + c] & 6) !== 0;
+  };
 }
 
 // The built slab's height on the ground check's lattice (beamngSidewalks.js checkPavedGround: every CHECK_STEP_M, at

@@ -113,6 +113,12 @@ test('gradePaved: ground under the pavement just below the slab, blending back t
   assert.ok(near > 0.06 && near < 1, `blending back up 1 m out: ${near}`);
   assert.ok(far === undefined, `natural ground 2 m out: ${far}`);
   assert.ok(!edit.has(pix(0, 25)), 'far ground untouched');
+  // (never raised up into a deck over the paving: a 3 m ground under a 3.5 m slab, a deck over x > 0)
+  const low = new Float32Array(W * W).fill(-3);
+  const decked = gradePaved(cells, g, { heightMap: low, width: W, height: W, worldSize: W, minHeight: 0 }, { heightAt: () => 0.5, overhead: (x) => x > 0 });
+  const raised = new Map(); decked.idx.forEach((i, k) => raised.set(i, decked.z[k]));
+  assert.ok(Math.abs(raised.get(pix(-10, 7)) - (0.5 - GRADE_UNDER_M)) < 1e-9, 'graded where open');
+  assert.ok(!raised.has(pix(10, 7)), 'left under the deck');
 });
 
 test('buildPavedMesh: a curb top band runs along the curb edge, inside it and just over the slab', async () => {
