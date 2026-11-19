@@ -407,7 +407,10 @@
     "pointSpacing": "Odstęp punktów około {cm} cm ({density} punktów na m²)",
     "resolutionAverages": "Przy {mpp} m na piksel drobniejsze szczegóły są uśredniane: ten plik zawiera szczegóły do około {cm} cm.",
     "resolutionHere": "Rozdzielczość przetwarzania:",
-    "exportSquare": "Poziom to kwadrat {size} × {size} m ({px} px) ze środka {w} × {h} m pliku: BeamNG potrzebuje kwadratu o boku będącym potęgą dwójki. Jest zaznaczony na pomarańczowo na mapie; Kwadratowe przycięcie pozwala go przesunąć. Zmiana rozdzielczości zmienia jego rozmiar."
+    "exportSquare": "Poziom to kwadrat {size} × {size} m ({px} px) ze środka {w} × {h} m pliku: BeamNG potrzebuje kwadratu o boku będącym potęgą dwójki. Jest zaznaczony na pomarańczowo na mapie; Kwadratowe przycięcie pozwala go przesunąć. Zmiana rozdzielczości zmienia jego rozmiar.",
+    "resolutionNative": "Użyj rozdzielczości pliku: {cm} cm ({m} m na piksel)",
+    "resolutionNativeNote": "Przy {m} m na piksel poziom ma {px} × {px} px ({size} m): znacznie więcej punktów terenu niż zwykle, wolniejsze wczytywanie i większe obciążenie w BeamNG.",
+    "resolutionNativeHeavy": "Przy {m} m na piksel poziom ma {px} × {px} px ({size} m): największy rozmiar terenu w BeamNG. Na większości komputerów długie wczytywanie, dużo pamięci i wolna gra."
   },
   "preview": {
     "hideSettings": "Ukryj ustawienia sceny",

@@ -126,6 +126,19 @@
               @click="$emit('update:processingMetersPerPixel', m)"
             >{{ m }} m</button>
           </div>
+          <!-- (the file's own resolution: its point spacing, in centimetres and as the metres per pixel the processing
+               resolution and the game's terrain squares take) -->
+          <div v-if="nativeMpp" class="flex flex-wrap items-center gap-1">
+            <button
+              type="button"
+              data-testid="upload-mpp-native"
+              :class="['px-1.5 py-0.5 rounded border leading-tight', currentMpp === nativeMpp ? 'bg-brand border-brand text-white' : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-brand']"
+              @click="$emit('update:processingMetersPerPixel', nativeMpp)"
+            >{{ t('upload.resolutionNative', { cm: Math.round(nativeMpp * 100), m: nativeMpp }) }}</button>
+          </div>
+          <p v-if="nativeMpp && currentMpp === nativeMpp && exportSquare" class="text-amber-700 dark:text-amber-300" data-testid="upload-native-warning">
+            {{ t(exportSquare.sizePx >= 8192 ? 'upload.resolutionNativeHeavy' : 'upload.resolutionNativeNote', { px: exportSquare.sizePx, m: nativeMpp, size: Math.round(exportSquare.sizeMeters) }) }}
+          </p>
           <p v-if="exportSquare" data-testid="upload-export-square">{{ t('upload.exportSquare', { size: Math.round(exportSquare.sizeMeters), w: Math.round(exportSquare.fileWidthMeters), h: Math.round(exportSquare.fileHeightMeters), px: exportSquare.sizePx }) }}</p>
         </div>
 
@@ -506,6 +519,8 @@ const handleCustomNoDataChange = (raw) => {
 // (the processing resolution: its effect on a point cloud's detail and the square the level keeps)
 const currentMpp = computed(() => { const m = Number(props.processingMetersPerPixel); return Number.isFinite(m) && m > 0 ? m : 1; });
 const pointSpacing = computed(() => (isLazFile.value ? pointCloudSpacing(props.uploadedElevationMeta) : null));
+// (the file's own resolution as a processing resolution: its point spacing to the centimetre, 0.1 m at the finest)
+const nativeMpp = computed(() => (pointSpacing.value ? Math.max(0.1, Math.round(pointSpacing.value.spacing * 100) / 100) : null));
 const exportSquare = computed(() => (props.uploadedAreaMode === 'crop' ? null : nativeExportSquare(props.uploadedElevationMeta, currentMpp.value)));
 const crsGuessCandidates = computed(() => props.uploadedElevationMeta?.crsGuess?.candidates || []);
 const showAscCoordinateSelector = computed(() => {

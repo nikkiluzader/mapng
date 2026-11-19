@@ -407,7 +407,10 @@
     "pointSpacing": "Distanza tra i punti circa {cm} cm ({density} punti per m²)",
     "resolutionAverages": "A {mpp} m per pixel i dettagli più fini vengono mediati: questo file contiene dettagli fino a circa {cm} cm.",
     "resolutionHere": "Risoluzione di elaborazione:",
-    "exportSquare": "Il livello è il quadrato di {size} × {size} m ({px} px) al centro dei {w} × {h} m del file: BeamNG richiede un quadrato con lato potenza di due. È mostrato in arancione sulla mappa; Ritaglio quadrato permette di spostarlo. Cambiare la risoluzione ne cambia la dimensione."
+    "exportSquare": "Il livello è il quadrato di {size} × {size} m ({px} px) al centro dei {w} × {h} m del file: BeamNG richiede un quadrato con lato potenza di due. È mostrato in arancione sulla mappa; Ritaglio quadrato permette di spostarlo. Cambiare la risoluzione ne cambia la dimensione.",
+    "resolutionNative": "Usa quella del file: {cm} cm ({m} m per pixel)",
+    "resolutionNativeNote": "A {m} m per pixel il livello è {px} × {px} px ({size} m): molti più punti di terreno del solito, più lento da caricare e più pesante in BeamNG.",
+    "resolutionNativeHeavy": "A {m} m per pixel il livello è {px} × {px} px ({size} m): la dimensione di terreno più grande di BeamNG. Aspettati caricamenti lunghi, molta memoria e un gioco lento sulla maggior parte dei PC."
   },
   "preview": {
     "hideSettings": "Nascondi impostazioni scena",

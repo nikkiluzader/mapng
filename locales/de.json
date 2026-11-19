@@ -407,7 +407,10 @@
     "pointSpacing": "Punktabstand etwa {cm} cm ({density} Punkte pro m²)",
     "resolutionAverages": "Bei {mpp} m pro Pixel werden feinere Details gemittelt: Diese Datei enthält Details bis etwa {cm} cm.",
     "resolutionHere": "Verarbeitungsauflösung:",
-    "exportSquare": "Das Level ist das {size} × {size} m große Quadrat ({px} px) aus der Mitte der {w} × {h} m der Datei: BeamNG braucht ein Quadrat mit Zweierpotenz. Es ist auf der Karte orange markiert; mit „Quadratischer Ausschnitt“ lässt es sich verschieben. Eine andere Auflösung ändert seine Größe."
+    "exportSquare": "Das Level ist das {size} × {size} m große Quadrat ({px} px) aus der Mitte der {w} × {h} m der Datei: BeamNG braucht ein Quadrat mit Zweierpotenz. Es ist auf der Karte orange markiert; mit „Quadratischer Ausschnitt“ lässt es sich verschieben. Eine andere Auflösung ändert seine Größe.",
+    "resolutionNative": "Auflösung der Datei verwenden: {cm} cm ({m} m pro Pixel)",
+    "resolutionNativeNote": "Bei {m} m pro Pixel ist das Level {px} × {px} px ({size} m) groß: weit mehr Geländepunkte als üblich, langsamer zu laden und schwerer für BeamNG.",
+    "resolutionNativeHeavy": "Bei {m} m pro Pixel ist das Level {px} × {px} px ({size} m) groß: BeamNGs größte Geländegröße. Auf den meisten PCs langes Laden, viel Speicher und ein langsames Spiel."
   },
   "preview": {
     "hideSettings": "Szeneneinstellungen ausblenden",
