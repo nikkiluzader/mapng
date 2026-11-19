@@ -136,7 +136,7 @@ export function addPavedSidewalks(builder, opts = {}) {
 
 // (a generator: the tiles' grids asked of the driver as one batch, { kind: 'pavedTiles', items }, built on worker
 // threads where there are some; null back: built here)
-export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = [], walks = [], runs = [], openGround = [], buildings = [], driveways = [], pockets = [], uvBands = null, followGround = false, overhead = null, curbH = 0.15, crossSlope = 0.015, curbOnlyM = 0.3, THREE, groundAt = null } = {}) {
+export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = [], walks = [], runs = [], openGround = [], buildings = [], driveways = [], pockets = [], uvBands = null, followGround = false, overhead = null, mapBox = null, curbH = 0.15, crossSlope = 0.015, curbOnlyM = 0.3, THREE, groundAt = null } = {}) {
   const road = makeRoadHeight(carriageways);
   // (a driveway counts only where it crosses the sidewalk to reach the road: the part of its line within
   // CROSS_REACH_M of where it comes to the road's edge. Whole, an alley along a street dropped the curb along it)
@@ -210,14 +210,24 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
   // (the tiles over the roads' box grown by the margin: the paving reaches past the outermost centrelines; over
   // the bare box a straight street along one line had no tile row at all)
   x0 -= MARGIN_M; y0 -= MARGIN_M; x1 += MARGIN_M; y1 += MARGIN_M;
+  // (and never past the map: roads running on past its edge gave a test's 8 m map 3,093 empty tiles, a minute of work)
+  if (mapBox) { x0 = Math.max(x0, mapBox[0]); y0 = Math.max(y0, mapBox[1]); x1 = Math.min(x1, mapBox[2]); y1 = Math.min(y1, mapBox[3]); }
+  if (x1 <= x0 || y1 <= y0) { stats.ms = Date.now() - t0; return { tiles, heightAt, stats }; }
   const items = []; const cores = [];
   for (let tx = Math.floor(x0 / TILE_M) * TILE_M; tx <= x1; tx += TILE_M) {
     for (let ty = Math.floor(y0 / TILE_M) * TILE_M; ty <= y1; ty += TILE_M) {
       const core = [tx, ty, tx + TILE_M, ty + TILE_M];
-      const box = [tx - MARGIN_M, ty - MARGIN_M, tx + TILE_M + MARGIN_M, ty + TILE_M + MARGIN_M];
+      // (clipped to the roads' extent grown by the margin: a small map, or a tile on the map's edge, builds only the
+      // cells that can hold paving; a whole 296 m grid for a 50 m test street made the test exports ten times slower)
+      const box = [Math.max(tx - MARGIN_M, x0), Math.max(ty - MARGIN_M, y0), Math.min(tx + TILE_M + MARGIN_M, x1), Math.min(ty + TILE_M + MARGIN_M, y1)];
+      if (box[2] <= box[0] || box[3] <= box[1]) continue;
       const tr = near(R, box);
       if (!tr.length) continue;
-      items.push({ box, roads: tr, cornerArcs: near(A, box), walks: near(W, box), streetWalks: near(S, box), greenery: near(G, box), buildings: near(B, box), pockets: near(PK, box) });
+      // (paving only ever comes from a walk, a street-side sidewalk or a seawall pocket: a tile with none is skipped,
+      // whatever roads cross it)
+      const tw = near(W, box); const ts = near(S, box); const tp = near(PK, box);
+      if (!tw.length && !ts.length && !tp.length) continue;
+      items.push({ box, roads: tr, cornerArcs: near(A, box), walks: tw, streetWalks: ts, greenery: near(G, box), buildings: near(B, box), pockets: tp });
       cores.push(core);
     }
   }

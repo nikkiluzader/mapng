@@ -13681,6 +13681,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       pavedModel: !(typeof process !== 'undefined' && process.env?.MAPNG_PAVED_SIDEWALKS === '0'),
       // (the terrain left as it is: the paved slabs follow it away from the curb; and what is built overhead)
       pavedFollowGround: !shapeExtras,
+      // (the map's own square: no paving tiles past its edge)
+      mapBox: (() => { const h = (exportTerrainData.width * squareSize) / 2; return [-h, -h, h, h]; })(),
       overhead: (x, y, z0, z1) => underDeck(x, y, z0, z1),
       sidewalkLook,
       // (paving stones laid as the streets' decals lay them: red brick in the Americas)

@@ -3622,9 +3622,11 @@ async function cutsOnWorkers({ jobs }) {
 
 // The paved model's tiles (services/pavedWorker.js: the grid and outlines of each) on worker threads, a few per
 // work item; null (built on this thread) where there are no worker threads or few tiles.
-const PARALLEL_PAVED_FROM = 4;
+// (by the cells to build, not the tiles: starting the workers costs more than a few small tiles take)
+const PARALLEL_PAVED_CELLS = 4e6;
 async function pavedTilesOnWorkers({ items, onTile }) {
-  if (items.length < PARALLEL_PAVED_FROM || (await parallelThreads()) <= 1) return null;
+  const cells = items.reduce((n, it) => n + ((it.box[2] - it.box[0]) * (it.box[3] - it.box[1])) / (0.25 * 0.25), 0);
+  if (cells < PARALLEL_PAVED_CELLS || (await parallelThreads()) <= 1) return null;
   const batches = [];
   for (let i = 0; i < items.length; i += 2) batches.push(items.slice(i, i + 2));
   const results = await parallelMap(batches, {
@@ -3774,6 +3776,7 @@ function* sidewalkMeshes(carriageways, options = {}) {
       uvBands: { curbRepeat: CURB_REPEAT_M, face: [V_BAND_LOW, V_LIGHT_LOW], top: [V_LIGHT_LOW, V_BAND_TOP] },
       // (terrain not shaped: the slab onto the ground away from the curb; under a deck the ground cannot be raised)
       followGround: options.pavedFollowGround === true, overhead: options.overhead || null,
+      mapBox: options.mapBox || null,
       carriageways, corners, walks: options.walks || [], runs, openGround: options.openGround || [], buildings: options.buildings || [], driveways: options.driveways || [],
       curbH: CURB_H, crossSlope: CROSS_SLOPE, curbOnlyM: CURB_ONLY_M, THREE, groundAt: options.groundAt || null,
     });
