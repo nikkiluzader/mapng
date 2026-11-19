@@ -111,7 +111,7 @@ import {
 import {
   lowBoxSquareAt, solveTunnel, chainTunnelParts, absorbBranch, nearestOnTunnel, onCuttingFloor, isBoredTunnelTag, isGalleryTag, tunnelRoadZ, tunnelApronLength, tunnelGroundAt, tunnelHoleAt, lowMouthHoleAt, tunnelReach,
   hitsTunnel, buildTubeGeometry, buildPortalGeometry, buildWindowGeometry, buildTunnelObjects, fitBesideRoads, LIGHT_SPACING_M, LINING_M, extraAt,
-  galleryRoofHalf,
+  galleryRoofHalf, GALLERY_TOP_M,
 } from './beamngTunnels.js';
 import {
   PROP_HYDRANT, PROP_BINS, PROP_SHAPES, US_SIGN_SHAPES, STREET_LIGHT_SHAPES, SIGNAL_MAST, POWER_WIRE_MATERIAL, getPowerWireMaterialDefs,
@@ -5239,7 +5239,7 @@ const pathLength = (xy) => xy.reduce((n, p, i) => (i ? n + fastHypot(p[0] - xy[i
  * height (and gets no cutting).
  */
 function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, halfOf, { done = new Set(), shape = true } = {}) {
-  const out = { bySeg: new Map(), tunnels: [], skipped: [], holes: [], graded: new Set(), tube: new Set(), mouth: new Map() };
+  const out = { bySeg: new Map(), tunnels: [], skipped: [], holes: [], graded: new Set(), tube: new Set(), mouth: new Map(), inside: new Map() };
   // before the bridges are solved (bridges null): a tunnel meeting a bridge
   // road waits for them
   const early = !bridges;
@@ -5539,7 +5539,17 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
             if (Math.abs(want - h) > 1e-3) { hm.set(idx, want + minHeight); changed++; if (want < h - CUT_KEEP_M) out.graded.add(idx); }
             // over the tube itself (inside its portals): the tunnel's alone
             const on = t.portals[0] || t.portals[1] ? nearestOnTunnel(t, x, y, t.headHalf) : null;
-            if (on && on.into >= 0 && !on.beyond) out.tube.add(idx);
+            // (and the height its inside spans, floor to roof top: no other road's surface is composed in there.
+            // A track along the Axenstrasse's gallery, at the survey's picture of its roof, was laid 4.5 m over
+            // the road inside it)
+            const span = (z, top) => { const s = out.inside.get(idx); out.inside.set(idx, s ? [Math.min(s[0], z - 0.3), Math.max(s[1], top + 0.3)] : [z - 0.3, top + 0.3]); };
+            // (galleries and a bore's gallery stretches only: open to the side, a road beside them at the survey's height
+            // is what ends up inside. A road crossing over a shallow box lower than its roof is a clearance conflict
+            // of its own (the D 902 over the D 87A's box): composed as before)
+            if (on && on.into >= 0 && !on.beyond) { out.tube.add(idx); if (t.arcades?.some((ar) => on.s >= ar.s0 && on.s <= ar.s1)) span(on.z, on.z + GALLERY_TOP_M); }
+            // (a gallery has no portals, but under its roof the ground is its own too: the roads' composition
+            // rebuilt that same picture of the roof inside it)
+            else if (t.kind === 'gallery' && shape) { const g = nearestOnTunnel(t, x, y, galleryRoofHalf(t)); if (g && !g.beyond) { out.tube.add(idx); span(g.z, g.z + t.need); } }
             // the open stretch in front of a face, across the road and its walkways, is the tunnel's too,
             // cut or not: where the ground already stood at the road (a low box's mouth, its lid ending a
             // few metres out), a neighbouring corridor's fill was composed across it, 3 to 5 m of ground
@@ -5718,6 +5728,7 @@ function joinTunnelPhases(a, b) {
     graded: new Set([...(a.graded || []), ...(b.graded || [])]),
     mouth: new Map([...(a.mouth || []), ...(b.mouth || [])]),
     tube: new Set([...(a.tube || []), ...(b.tube || [])]),
+    inside: new Map([...(a.inside || []), ...(b.inside || [])]),
   };
 }
 
@@ -6243,7 +6254,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   // Then the bridges (the road nodes on a bridge ride on its deck), then the
   // tunnels a bridge meets (a portal takes the deck's height).
   const done = new Set();
-  const noTunnels = () => ({ bySeg: new Map(), tunnels: [], skipped: [], holes: [], graded: new Set(), tube: new Set(), mouth: new Map() });
+  const noTunnels = () => ({ bySeg: new Map(), tunnels: [], skipped: [], holes: [], graded: new Set(), tube: new Set(), mouth: new Map(), inside: new Map() });
   // (railway tunnels too: their bores come from the same builder)
   const early = includeTunnels ? yield* solveExportTunnels(graphSegments, terrainData, squareSize, null, graphHalfOf, { done, shape: shaping.tunnels }) : noTunnels();
   yield 'bridges';
@@ -8320,8 +8331,9 @@ function buildDetailedReportSections(d) {
     lines.push(`  - OSM way(s): ${ways(t.osm) || 'n/a'}`);
     lines.push(`  - ${t.kind === 'cutcover' ? 'Cut-and-cover box' : t.kind === 'gallery' ? `Gallery (hillside ${t.uphill > 0 ? 'right' : 'left'} up to the roof, columns on the valley side)` : 'Bore'} ${formatNumber(t.tubeLength, 1)} m of ${formatNumber(t.length, 1)} m mapped; inside width ${formatNumber(2 * t.W, 1)} m${t.maxExtra > 0 ? ` (up to ${formatNumber(2 * t.W + t.maxExtra, 1)} m where ramps join)` : ''}, crown ${formatNumber(t.crown, 2)} m over the road`);
     for (const br of t.branches || []) lines.push(`  - Ramp ${describe(br.osm)}: in the bore and its cutting for ${formatNumber(br.absorbed, 0)} m${br.trench > 0 ? `, then its own trench ${formatNumber(br.trench, 0)} m` : ''}`);
-    const kind = { cut: 'cutting + wingwalls', bridge: 'meets a bridge', edge: 'map edge, no portal' };
-    lines.push(`  - Portal A (${kind[t.portalKind[0]]}) at (${formatNumber(a.x, 1)}, ${formatNumber(a.y, 1)}) road ${formatNumber(a.z + minH, 2)} m; portal B (${kind[t.portalKind[1]]}) at (${formatNumber(b.x, 1)}, ${formatNumber(b.y, 1)}) road ${formatNumber(b.z + minH, 2)} m`);
+    // (a gallery's ends are open: the road runs on out of it, no portal; 'edge' there is not the map's edge)
+    const kind = t.kind === 'gallery' ? { cut: 'open end', bridge: 'meets a bridge', edge: 'open end' } : { cut: 'cutting + wingwalls', bridge: 'meets a bridge', edge: 'map edge, no portal' };
+    lines.push(`  - ${t.kind === 'gallery' ? 'End' : 'Portal'} A (${kind[t.portalKind[0]]}) at (${formatNumber(a.x, 1)}, ${formatNumber(a.y, 1)}) road ${formatNumber(a.z + minH, 2)} m; ${t.kind === 'gallery' ? 'end' : 'portal'} B (${kind[t.portalKind[1]]}) at (${formatNumber(b.x, 1)}, ${formatNumber(b.y, 1)}) road ${formatNumber(b.z + minH, 2)} m`);
     lines.push(`  - Ground over the road (before grading): ${formatNumber(minCover, 1)} to ${formatNumber(maxCover, 1)} m`);
     for (const dip of t.dips || []) lines.push(`  - Dip in the cover ${formatNumber(dip.length, 0)} m long at ${formatNumber(dip.s - t.line[t.iS].s, 0)} m in: filled up to ${formatNumber(dip.depth, 1)} m over the tube`);
     for (const [s0, s1, kind] of (t.exposed || []).filter((e) => e[2] === 'air')) lines.push(`  - Standing in the open for ${formatNumber(s1 - s0, 0)} m (too little ground over it to cover: a gallery on a ledge; no cover made up, openings where the open air is beside it)`);
@@ -13431,6 +13443,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       keepSet: tunnelGraded?.size ? tunnelGraded : null,
       tube: decalRoads.tunnels?.tube?.size ? (idx) => decalRoads.tunnels.tube.has(idx) : null,
       tubeSet: decalRoads.tunnels?.tube?.size ? decalRoads.tunnels.tube : null,
+      inside: decalRoads.tunnels?.inside?.size ? decalRoads.tunnels.inside : null,
       skip: sg.shaping?.skip || null,
     });
     const hm = heightMapEditor(exportTerrainData);
@@ -13816,7 +13829,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       return { pixels: idx.length, apply(set) { for (let k = 0; k < idx.length; k++) set(idx[k], z[k]); } };
     })();
     const hmSide = heightMapEditor(exportTerrainData);
-    graded.apply((idx, v) => { hmSide.set(idx, v); sidewalkGroundIdx.add(idx); });
+    // (never inside a tunnel or under a gallery's roof: the ground there is the tunnel's. The paved model has no
+    // tunnel roads in it, so a gallery's lanes read as open ground beside a lower walk: graded 4 m down under the
+    // Axenstrasse's)
+    const tunnelOwn = decalRoads.tunnels?.tube;
+    graded.apply((idx, v) => { if (tunnelOwn?.has(idx)) return; hmSide.set(idx, v); sidewalkGroundIdx.add(idx); });
     lowerUnderWallDecks(sidewalks.wallDecks, {
       heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
       worldSize: exportTerrainData.width * squareSize, minHeight: Number(exportTerrainData.minHeight) || 0,

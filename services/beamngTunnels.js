@@ -91,6 +91,7 @@ const ARCADE_FLOOR_UNDER_M = 0.15;      // the ground in a gallery kept this far
 const ARCADE_FLOOR_PAST_M = 0.8;        // an arcade's floor slab reaches this far past its walls
 const ARCADE_FOOT_LOOK_M = 3;          // the valley wall's foot: the lowest ground this far past the floor's edge ...
 const ARCADE_FOOT_BURY_M = 2;          // ... and this far under it (structures run into the ground, not fitted to it)
+const GAL_END_FLUSH_M = 2;             // a gallery's last metres: the ground at the road (not under the floor slab) and nothing opened, so the terrain meets the slab flush (a 15 cm dip past its end stood the slab's edge up in wedges, the road's lines broken over it)
 const ARCADE_JOIN_M = 12;              // two arcades on one side this close together are one (a 4 m stub of tube between them stood up as a hump)
 const WINDOW_ROCK_M = 12;              // rock between the lining and the open air, at most
 const WINDOW_SPACING_M = 70;           // windows at least this far apart
@@ -450,6 +451,12 @@ function crossSlope(path, groundAt) {
 }
 
 /** A gallery over a path (the road on the ground, smoothed): a tunnel of kind 'gallery'. */
+// The lowest ground under a gallery's valley-side edge at a station: from a metre inside it to ARCADE_FOOT_LOOK_M out.
+function galleryFootAt(q, side, edgeU, groundAt) {
+  let lo = Infinity;
+  for (let o = edgeU - 1; o <= edgeU + ARCADE_FOOT_LOOK_M; o += 0.5) { const [x, y] = lateral(q, side * o); lo = Math.min(lo, groundAt(x, y)); }
+  return Number.isFinite(lo) ? lo : q.z;
+}
 export function solveGallery(path, { groundAt, squareSize = 1 }) {
   const st = stations(path.xy);
   const n = st.length;
@@ -500,8 +507,12 @@ export function solveGallery(path, { groundAt, squareSize = 1 }) {
   // smoothed; its ends on the ground (it runs on over the terrain beyond them)
   const z = smoothPinned(zRaw, STEP_M, SMOOTH_SIGMA_M);
   const line = st.map((p, i) => ({ ...p, z: z[i], g: g[i], kind: 'tube', wl: W, wr: W }));
+  // (the ground under the valley-side edge at each station, the lowest a few metres out: the gallery's valley wall
+  // runs down into it. Filled up to the road instead, the Axenstrasse's stood on an embankment 15 m over the lake
+  // shore out to 30 m)
+  const foot = line.map((q) => galleryFootAt(q, -uphill, W + 0.5 + GAL_WALL_T, groundAt));
   return {
-    ok: true, kind: 'gallery', line, iS: 0, iN: n - 1,
+    ok: true, kind: 'gallery', line, iS: 0, iN: n - 1, foot,
     portals: [false, false], portalKind: ['edge', 'edge'],
     W, wall: GAL_H, arch: 0, crown: GAL_H, need: GAL_H + GAL_ROOF_M, headTop: GAL_H + GAL_ROOF_M,
     uphill, unbenched,
@@ -524,6 +535,9 @@ const GAL_BANK_M = 1.2;                // the walkway's edge to the roof's top, 
 const GAL_BLEND_M = 10;                // the backfill eased into the hillside over this
 /** How far a gallery's roof reaches from its line (the wider, uphill side). */
 export const galleryRoofHalf = (t) => t.W + 0.5 + GAL_BANK_M + GAL_WALL_T;
+/** A gallery's (and an arcade's) roof top over its road. */
+export const GALLERY_TOP_M = GAL_H + GAL_ROOF_M;
+const galEnd = (t, n) => Math.min(n.s - t.line[0].s, t.line[t.line.length - 1].s - n.s) <= GAL_END_FLUSH_M;
 function galleryGroundAt(t, x, y, h) {
   const n = nearestOnTunnel(t, x, y, t.W + GAL_WALL_T + 60);
   if (!n) return h;
@@ -548,7 +562,7 @@ function galleryGroundAt(t, x, y, h) {
     // (level under the wall and a square behind it: the bank rising from the
     // walkway's edge stood through the wall's foot in teeth on the terrain's grid)
     const foot = Math.min(bankEnd - 0.1, inner + (t.squareSize || 1) + 0.05);
-    if (ad <= foot) return n.z;
+    if (ad <= foot) return t.keepWall || galEnd(t, n) ? n.z : n.z - ARCADE_FLOOR_UNDER_M;
     const top = n.z + t.headTop;
     if (ad <= bankEnd) return n.z + t.headTop * ((ad - foot) / (bankEnd - foot));
     const over = Math.max(0, ad - crest);
@@ -557,19 +571,22 @@ function galleryGroundAt(t, x, y, h) {
     return Math.max(top + (h - top) * ease(over / GAL_BLEND_M), face);
   }
   const edge = inner + GAL_WALL_T;
-  if (ad <= edge) return n.z;
+  if (ad <= edge) return t.keepWall || galEnd(t, n) ? n.z : n.z - ARCADE_FLOOR_UNDER_M;
   // valley side: no ground over the road showing between the columns; a
   // verge level with the road, then falling away (never a drop at the
   // lane's edge where the ground below was lower)
+  // (nothing filled: the valley wall stands under the edge, down into the ground; a gallery with its terrain left
+  // as it was, shaping off, keeps the old verge)
   const out = ad - edge;
   const clear = Math.min(h, n.z + Math.max(0, out - GAL_VALLEY_CLEAR_M));
+  if (!t.keepWall) return clear;
   return Math.max(clear, n.z - Math.max(0, out - GAL_VERGE_M) * GAL_VERGE_FALL);
 }
 
 /** A gallery as triangles: roof slab, valley-side columns and beam (the hillside is its back); pieces like a tube's. */
 function buildGalleryGeometry(t) {
   const T = makeTris();
-  gallerySection(T, t, t.line, { up: t.uphill, keepWall: !!t.keepWall });
+  gallerySection(T, t, t.line, { up: t.uphill, keepWall: !!t.keepWall, floor: !t.keepWall, foot: t.keepWall ? null : t.foot });
   return [{ pos: T.pos, uv: T.uv, from: t.line[0].s, to: t.line[t.line.length - 1].s }];
 }
 
@@ -580,7 +597,7 @@ function buildGalleryGeometry(t) {
  * along a bored tunnel stands where the terrain is opened for the tube: the
  * road decal lands on it, as on a tube's floor).
  */
-function gallerySection(T, t, line, { up, keepWall = false, floor = false }) {
+function gallerySection(T, t, line, { up, keepWall = false, floor = false, foot = null }) {
   const inner = t.W + 0.5;
   const at = (p, u, v) => { const [x, y] = lateral(p, u); return [x, y, p.z + v]; };
   // a box-section strip along the line between offsets u0..u1 (right of
@@ -640,6 +657,22 @@ function gallerySection(T, t, line, { up, keepWall = false, floor = false }) {
   // the wall and a beam under the roof between them
   const h = GAL_COLUMN_M / 2;
   const wallFace = up * inner;
+  // the valley wall: under the valley edge (the floor slab's, or the columns' line), from the floor down to
+  // ARCADE_FOOT_BURY_M under the ground there (foot: per station of `line`)
+  if (foot) {
+    const uo = -up * (floor ? roofDown + ARCADE_FLOOR_PAST_M : roofDown); const ui = uo + up * GAL_WALL_T;
+    const top = floor ? -LINING_M : -0.5;
+    const bot = (k) => Math.min(top - 0.3, (foot[k] ?? line[k].z) - ARCADE_FOOT_BURY_M - line[k].z);
+    for (let k = 0; k + 1 < line.length; k++) {
+      const p = line[k]; const q = line[k + 1]; const bp = bot(k); const bq = bot(k + 1);
+      const c = at(p, (uo + ui) / 2, bp / 2);
+      const want = (cc) => [cc[0] - c[0], cc[1] - c[1], cc[2] - c[2]];
+      const quad = (A, B, C, Dd, uv) => { T.tri(A, B, C, [uv[0], uv[1], uv[2]], want); T.tri(A, C, Dd, [uv[0], uv[2], uv[3]], want); };
+      const V0 = p.s / 4; const V1 = q.s / 4;
+      for (const u of [uo, ui]) quad(at(p, u, top), at(q, u, top), at(q, u, bq), at(p, u, bp), [[V0, 0], [V1, 0], [V1, -bq / 4], [V0, -bp / 4]]);
+      quad(at(p, ui, bp), at(q, ui, bq), at(q, uo, bq), at(p, uo, bp), [[V0, 0], [V1, 0], [V1, 0.15], [V0, 0.15]]);
+    }
+  }
   let next = line[0].s;
   for (const p of line) {
     if (p.s < next) continue;
@@ -1197,11 +1230,7 @@ function findWindows(t, groundAt) {
   const edgeU = t.W + 0.5 + GAL_WALL_T + ARCADE_FLOOR_PAST_M;
   for (const a of t.arcades) {
     a.foot = [];
-    for (let k = a.i; k <= a.j; k++) {
-      const q = t.line[k]; let lo = Infinity;
-      for (let o = edgeU - 1; o <= edgeU + ARCADE_FOOT_LOOK_M; o += 0.5) { const [x, y] = lateral(q, a.side * o); lo = Math.min(lo, groundAt(x, y)); }
-      a.foot.push(Number.isFinite(lo) ? lo : q.z);
-    }
+    for (let k = a.i; k <= a.j; k++) a.foot.push(galleryFootAt(t.line[k], a.side, edgeU, groundAt));
   }
   const inArcade = (sAt) => t.arcades.some((a) => sAt >= a.s0 - WINDOW_SPACING_M / 2 && sAt <= a.s1 + WINDOW_SPACING_M / 2);
   const candidates = [];
@@ -1770,7 +1799,14 @@ export function tunnelGroundAt(t, x, y, h) {
  * open a slot in the hillside over it.
  */
 export function tunnelHoleAt(t, x, y, lo, hi = lo) {
-  if (t.kind === 'gallery') return false;   // on the surface: nothing opens
+  // a gallery: the squares under it open (the floor slab covers them and reaches past them), as under an
+  // arcade; with the terrain left as it was (shaping off) nothing opens
+  if (t.kind === 'gallery') {
+    if (t.keepWall) return false;
+    const g = nearestOnTunnel(t, x, y, t.W + 0.5 + t.squareSize);
+    if (!g || g.beyond || across(t, g) > t.W + 0.5 + 0.5 * t.squareSize) return false;
+    return Math.min(g.s - t.line[0].s, t.line[t.line.length - 1].s - g.s) > GAL_END_FLUSH_M + 0.5 * t.squareSize;
+  }
   // a gallery window: through the rock from the lining to the face (never a
   // square standing over the face plate's top)
   for (const w of t.windows || []) {
@@ -2036,19 +2072,7 @@ export function buildTubeGeometry(t) {
     for (const a of arcades) {
       const g0 = Math.max(a.i, i0); const g1 = Math.min(a.j, i1);
       if (g1 <= g0) continue;
-      gallerySection(T, t, t.line.slice(g0, g1 + 1), { up: -a.side, floor: true });
-      // the valley wall under the floor's outer edge, down into the ground (a.foot, per station)
-      const uo = a.side * (galInner + GAL_WALL_T + ARCADE_FLOOR_PAST_M); const ui = uo - a.side * GAL_WALL_T;
-      const bot = (k) => Math.min(-LINING_M - 0.3, (a.foot?.[k - a.i] ?? t.line[k].z) - ARCADE_FOOT_BURY_M - t.line[k].z);
-      for (let k = g0; k < g1; k++) {
-        const p = t.line[k]; const q = t.line[k + 1]; const bp = bot(k); const bq = bot(k + 1);
-        const c = at(p, [(uo + ui) / 2, bp / 2]);
-        const want = (cc) => [cc[0] - c[0], cc[1] - c[1], cc[2] - c[2]];
-        const quad = (A, B, C, D, uv) => { T.tri(A, B, C, [uv[0], uv[1], uv[2]], want); T.tri(A, C, D, [uv[0], uv[2], uv[3]], want); };
-        const V0 = p.s / 4; const V1 = q.s / 4;
-        for (const u of [uo, ui]) quad(at(p, [u, -LINING_M]), at(q, [u, -LINING_M]), at(q, [u, bq]), at(p, [u, bp]), [[V0, 0], [V1, 0], [V1, -bq / 4], [V0, -bp / 4]]);
-        quad(at(p, [ui, bp]), at(q, [ui, bq]), at(q, [uo, bq]), at(p, [uo, bp]), [[V0, 0], [V1, 0], [V1, 0.15], [V0, 0.15]]);
-      }
+      gallerySection(T, t, t.line.slice(g0, g1 + 1), { up: -a.side, floor: true, foot: a.foot?.slice(g0 - a.i, g1 - a.i + 1) });
       for (const [i, sgn] of [[a.i, 1], [a.j, -1]]) {
         if (i < i0 || i > i1 || i === t.iS || i === t.iN) continue;
         const p = t.line[i];

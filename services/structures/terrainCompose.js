@@ -74,6 +74,8 @@ function capsuleSpan(ax, ay, bx, by, R, y) {
  * Compose the terrain edits for a solved, classified graph.
  *   grid: { heightMap, width, height, worldSize, minHeight, keep? } (raw
  *         heights; world z = raw - minHeight, world x, y centred, y north;
+ *         inside: Map idx -> [low, high], the height a built tunnel's inside spans there (no road surface composed
+ *         between them);
  *         keep(idx): ground another builder shaped, left alone outside the
  *         road cores; tube(idx): ground over a built tube, composed only under a
  *         road's own surface); skip(k, i): the piece i..i+1 of edge k is
@@ -83,7 +85,7 @@ function capsuleSpan(ax, ay, bx, by, R, y) {
  *   apply(set): calls set(idx, raw) for every edited pixel
  */
 export function composeTerrain(graph, grid) {
-  const { heightMap, width, height, worldSize, minHeight = 0, keep = null, tube = null, skip = null } = grid;
+  const { heightMap, width, height, worldSize, minHeight = 0, keep = null, tube = null, skip = null, inside = null } = grid;
   // (a band of rows, for a worker: grid.rows = [from, to); grid.collect: the corridors' tiles returned as they
   // are, before the passes over them; grid.prebuilt: those of every band, merged, the corridors not laid again.
   // A pixel sees the roads in the same order whichever band lays it, so the bands' tiles are the whole one's:
@@ -406,6 +408,11 @@ export function composeTerrain(graph, grid) {
           // rounded end or side slope reaching over it (a cutting's end, its
           // road meeting the tube by a short link: dug into the portal)
           if (tube && (d > core || uRaw < 0 || uRaw > 1) && tube(r * width + c)) { left.add(r * width + c); continue; }
+          // ... nor a road's surface at a height inside the tunnel (between its floor and its roof's top): that road
+          // runs over or beside the structure, not through it (a track along a gallery, at the survey's
+          // picture of its roof, was laid inside it). Over the roof or under the floor it is composed as before.
+          // (only this road's surface is skipped: the pixel is not claimed, so a deck's clearance over it still holds)
+          if (inside) { const span = inside.get(r * width + c); if (span && zc > span[0] && zc < span[1]) continue; }
           // ground another builder shaped (a tunnel's cutting): its own
           // except under the road's surface
           if (keep && d > core && keep(r * width + c)) { left.add(r * width + c); continue; }

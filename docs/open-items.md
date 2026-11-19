@@ -67,6 +67,13 @@ shots/); re-checks on today's code: scratch/fizz033/run; diagrams scratch/fizz03
   the lidar out to 30 m (scratch/fizz033/diag/axen_gallery_sections.png): give OSM galleries the arcade rules
   (ground under the floor, no fill, the retaining wall); its ends read "map edge, no portal" (wrong label, Fizz 3.x). Also seen: Zion's arcade 796-828 m is a flat gallery standing in a cliff notch, bore arches
   showing at its ends (the real tunnel has windows there, no gallery): check the arcade rule on sheer cliffs.
+- **3.1-3.3 OSM-mapped avalanche galleries: DONE on dev (2026-11-19), seen in game on the Axenstrasse.** The same build
+  as a bore's gallery stretches: floor slab, the squares under it opened, ground under the slab (flush for the last 2 m
+  at each end), a valley wall down into the ground instead of the 15 m fill on the lake side; the footprint is the
+  tunnel's own (the roads' composition rebuilt the lidar's roof inside it, and a track beside it was laid inside at
+  that height: no road surface is composed inside a gallery's height span now); paved-sidewalk grading skips tunnel
+  ground (it graded the Axenstrasse gallery's lanes 4 m down); report says "End A (open end)" not "map edge".
+  Left: the D 902 crossing over the D 87A's shallow box lower than its roof (clearance 3 m short, Fizz's report).
 - **Fixed before this list:** the bridgeTowerHouses error (078ff33, after 0.3.3); short bridges too high
   (the bridge rise cap, 957fa96); sidewalks (the paved model).
 - **Owed answers:** 2.2 continuous roads, 3.4 OSM tells galleries apart (tunnel=avalanche_protector), 4.5 double

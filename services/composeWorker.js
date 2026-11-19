@@ -21,12 +21,22 @@ export function composeBand(band, shared) {
     heightMap: shared.heightMap, width: shared.width, height: shared.height, worldSize: shared.worldSize, minHeight: shared.minHeight,
     keep: keepMask ? (idx) => keepMask[idx] === 1 : null,
     tube: tubeMask ? (idx) => tubeMask[idx] === 1 : null,
+    inside: shared.insideIdx ? insideMap(shared) : null,
     skip: skipBits ? (k, i) => skipBits[k]?.[i] === 1 : null,
     rows: band, collect: true,
   });
   return { tiles: [...out.tiles], left: Int32Array.from(out.left), corridors: out.stats.corridors, skipped: out.stats.skipped || 0 };
 }
 
+// (the tunnels' inside spans, sparse: a few thousand pixels, sent as arrays and made a Map again per worker)
+const insideCache = new WeakMap();
+const insideMap = (shared) => {
+  if (insideCache.has(shared.insideIdx)) return insideCache.get(shared.insideIdx);
+  const m = new Map();
+  for (let i = 0; i < shared.insideIdx.length; i++) m.set(shared.insideIdx[i], [shared.insideLo[i], shared.insideHi[i]]);
+  insideCache.set(shared.insideIdx, m);
+  return m;
+};
 const maskOf = (set, n) => {
   if (!set?.size) return null;
   const m = new Uint8Array(new SharedArrayBuffer(n));
@@ -59,6 +69,11 @@ export async function composeTerrainParallel(graph, grid) {
   const shared = {
     graph: sub, heightMap, width, height, worldSize: grid.worldSize, minHeight: grid.minHeight || 0,
     keepMask: grid.keep ? maskOf(grid.keepSet, n) : null, tubeMask: grid.tube ? maskOf(grid.tubeSet, n) : null, skipBits,
+    ...(grid.inside?.size ? {
+      insideIdx: Int32Array.from(grid.inside.keys()),
+      insideLo: Float32Array.from([...grid.inside.values()].map((s) => s[0])),
+      insideHi: Float32Array.from([...grid.inside.values()].map((s) => s[1])),
+    } : {}),
   };
   // bands of whole tile rows (a tile is never split between two bands)
   const tileRows = Math.ceil(height / TILE);

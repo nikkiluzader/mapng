@@ -55,7 +55,9 @@ test('a tunnel on a hillside with too little rock over it is a gallery, not a su
   for (const p of t.line) assert.ok(Math.abs(p.z - 50) < 0.5, `road at ${p.z.toFixed(2)}`);
   // nothing opens; under the roof the floor is the road; uphill the rock is
   // cut back over the roof; it is no box sunk under the slope
-  assert.equal(tunnelHoleAt(t, 0, 0, 40, 60), false);
+  // (the squares under it open: its floor slab covers them, as under an arcade)
+  assert.equal(tunnelHoleAt(t, 0, 0, 40, 60), true);
+  assert.equal(tunnelHoleAt(t, -t.W - 4, 0, 40, 60), false);
   assert.ok(Math.abs(tunnelGroundAt(t, -3, 0, hillside(-3)) - 50) < 0.5);
   assert.ok(tunnelGroundAt(t, -12, 0, hillside(-12)) <= 50 + t.headTop + 4 * (12 - t.W - 1.1) + 1e-6);
   const objs = buildTunnelObjects(t, 'g', () => 'id');
@@ -97,7 +99,8 @@ test('a gallery: a ribbed wall uphill, the hillside brought up to its roof behin
   const pos = buildTubeGeometry(t)[0].pos;
   let wall = 0;
   for (let i = 0; i < pos.length; i += 3) {
-    if (pos[i] < -(inner + 0.61) && Math.abs(pos[i + 1]) < 55) assert.ok(pos[i + 2] >= 50 + 5.2 - 0.6, `mesh at x ${pos[i].toFixed(2)} z ${pos[i + 2].toFixed(2)}`);
+    // (past the uphill wall only the roof, and the floor slab's edge under the bank at the road's level)
+    if (pos[i] < -(inner + 0.61) && Math.abs(pos[i + 1]) < 55 && pos[i + 2] > 50.05) assert.ok(pos[i + 2] >= 50 + 5.2 - 0.6, `mesh at x ${pos[i].toFixed(2)} z ${pos[i + 2].toFixed(2)}`);
     if (pos[i] < -(inner - 0.01) && pos[i + 2] < 51) wall++;
   }
   assert.ok(wall > 0, 'the uphill wall');
@@ -487,9 +490,14 @@ test('a gallery where the survey has no road bench (the roof taken out, the slop
   assert.ok(t.unbenched > 50, `${t.unbenched} stations without a bench`);
   // the survey's centre line stands 2.1 m over the real road there; the road is within 0.3 m of the real one
   for (const p of t.line) assert.ok(Math.abs(p.z - roadZ(p.y)) < 0.3, `road ${p.z.toFixed(2)} at y ${p.y}, really ${roadZ(p.y).toFixed(2)}`);
-  // the valley side: a verge level with the road, no drop at the lane's edge
+  // the valley side: nothing filled (lower ground stays as it lies); a wall under the valley edge runs from the
+  // road down into that ground instead (an embankment stood 15 m over the Axenstrasse's lake shore)
   const edge = t.W + 0.5 + 0.6;
-  assert.ok(Math.abs(tunnelGroundAt(t, -(edge + 1.5), 0, g(-(edge + 1.5), 0) - 3) - roadZ(0)) < 0.3, 'verge');
+  const low = g(-(edge + 1.5), 0) - 3;
+  assert.ok(Math.abs(tunnelGroundAt(t, -(edge + 1.5), 0, low) - low) < 1e-6, 'lower ground beside the gallery left as it lies');
+  const verts = buildTubeGeometry(t).flatMap((pc) => { const v = []; for (let k = 0; k < pc.pos.length; k += 3) v.push([pc.pos[k], pc.pos[k + 1], pc.pos[k + 2]]); return v; });
+  const wall = verts.filter(([x, y]) => Math.abs(y) < 3 && x < -t.W && x > -(edge + 1.0));
+  assert.ok(wall.length && Math.min(...wall.map((v) => v[2])) < g(-(edge + 1.5), 0) - 1.5, 'the valley wall reaches under the surveyed ground beside it');
 });
 
 test('a gallery on a coarse survey (no road bench anywhere, a smooth slope): the road stays at the centre line\'s height', () => {
