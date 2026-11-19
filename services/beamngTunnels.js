@@ -54,6 +54,7 @@ const HEAD_TOP_M = 10.5;               // headwall top over the road (bored)
 const HEAD_BOTTOM_M = -1.5;
 const HEAD_SIDE_M = 5;                 // headwall reaches this far past the lining
 const BACKFILL_M = 8;                  // ground behind the headwall raised to its top this far in
+const BACKFILL_FALL = 1;               // ... then falling away this steep (1:1) past the sides and the back
 const FACE_SLOPE = 4;                  // the rock cut back over / beside a headwall: 4 up per 1 back,
 const FACE_REACH_M = 60;               // to the natural ground (a cliff over a portal)
 const WING_GAP_M = 1.5;                // trench floor past the lining before the wingwall
@@ -1733,7 +1734,12 @@ export function tunnelGroundAt(t, x, y, h) {
   const kind = nearerPortalKind(t, n.s);
   if (kind !== 'edge' && n.into <= FACE_REACH_M) {
     const headTop = headTopAt(t, n.s);
-    if (kind === 'cut' && n.into < t.headDepth + BACKFILL_M && ad <= t.headHalf + 1) out = Math.max(out, n.z + headTop);
+    // the ground behind the headwall made up to its top, then falling away 1:1 past the sides and the back (laid as a
+    // flat block, it stopped in steps as high as the wall all round: square mounds on Val d'Isère's shallow tunnels)
+    if (kind === 'cut' && n.into >= 0) {
+      const past = Math.max(0, ad - t.headHalf - 1) + Math.max(0, n.into - t.headDepth - BACKFILL_M);
+      if (past < headTop) out = Math.max(out, n.z + headTop - past * BACKFILL_FALL);
+    }
     out = Math.min(out, n.z + headTop + FACE_SLOPE * (Math.max(0, n.into - t.headDepth) + Math.max(0, ad - t.headHalf)));
   }
   // along an arcade, on its open side: the ground kept under the openings'
