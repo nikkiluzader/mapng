@@ -381,7 +381,7 @@ function simplifyLine(pts, tol) {
 // Edges are split to at most edgeM so a curb's height can change along a straight run.
 // curbW: the curb's top band, drawn in the curb's material just inside each curb edge, CURB_TOP_LIFT_M over the slab
 // groundAt(x, y): where an edge facing the ground must reach (its skirt runs down past the ground there)
-export function buildPavedMesh(rings0, cells, g, { heightAt = () => 0, bottomAt = null, groundAt = null, cellM = 4, fineM = 1, fineAt = null, bendTol = null, edgeM = 1, curbH = 0.15, curbW = 0.15, skirtM = 0.3, THREE, core = null } = {}) {
+export function buildPavedMesh(rings0, cells, g, { heightAt = () => 0, bottomAt = null, groundAt = null, cellM = 4, fineM = 1, fineAt = null, bendTol = null, bendWhere = null, edgeM = 1, curbH = 0.15, curbW = 0.15, skirtM = 0.3, THREE, core = null } = {}) {
   if (!THREE) throw new Error('buildPavedMesh needs THREE (ShapeUtils.triangulateShape)');
   const rings = rings0.map((ring) => {
     const out = [];
@@ -446,7 +446,8 @@ export function buildPavedMesh(rings0, cells, g, { heightAt = () => 0, bottomAt 
     // (bendTol: a square whose slab height bends more than this off the plane through its corners, measured at its
     // middle and its sides' midpoints, is cut finely. For a slab that follows unshaped ground: flat across 4 m squares
     // it cut into the bumps of lidar ground and stood over its hollows. Where the ground is graded to the slab it is
-    // left off: there it doubled the triangles and the time for nothing (NYC 4 km 22 -> 54 s))
+    // left off: there it doubled the triangles and the time for nothing (NYC 4 km 22 -> 54 s). bendWhere(x, y): only the
+    // squares whose middle it passes are tested (the ground under a deck, which is never graded up))
     const bent = (sx, sy) => {
       const z00 = heightAt(sx, sy); const z10 = heightAt(sx + cellM, sy); const z01 = heightAt(sx, sy + cellM); const z11 = heightAt(sx + cellM, sy + cellM);
       const h = cellM / 2;
@@ -461,7 +462,7 @@ export function buildPavedMesh(rings0, cells, g, { heightAt = () => 0, bottomAt 
       const rowH = p.holes.map((h) => clipAxis(h, 1, sy, sy + cellM)).filter(valid);
       for (let sx = Math.floor(x0 / cellM) * cellM; sx < x1; sx += cellM) {
         if (core && (sx + cellM <= core[0] || sx >= core[2])) continue;
-        const fine = (fineAt && fineAt(sx + cellM / 2, sy + cellM / 2)) || (bendTol != null && bent(sx, sy));
+        const fine = (fineAt && fineAt(sx + cellM / 2, sy + cellM / 2)) || (bendTol != null && (!bendWhere || bendWhere(sx + cellM / 2, sy + cellM / 2)) && bent(sx, sy));
         if (!fine) {
           const o = clipAxis(rowO, 0, sx, sx + cellM);
           if (valid(o)) tri(o, rowH.map((h) => clipAxis(h, 0, sx, sx + cellM)).filter(valid));

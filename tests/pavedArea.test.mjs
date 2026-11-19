@@ -153,7 +153,10 @@ test('paved tiles: worker threads and this thread agree', async () => {
     walks: [{ pts: [[-40 + dx, 9.5], [40 + dx, 9.5]], half: 1, sidewalk: true }, { pts: [[-40 + dx, -6], [40 + dx, -6]], half: 1, sidewalk: false }],
     buildings: [[[-5 + dx, 14], [5 + dx, 14], [5 + dx, 25], [-5 + dx, 25]]],
   });
-  const batches = [[item(0), item(60)], [item(120)]];
+  // (one tile with bank blocks: the strip cleared on the worker as on this thread)
+  const banked = item(120); const bw = Math.ceil(240 / 4); const mask = new Uint8Array(bw * bw); for (let i = 0; i < mask.length; i += 3) mask[i] = 1;
+  banked.bank = { mask, block: 4, bw };
+  const batches = [[item(0), item(60)], [banked]];
   const threaded = (await parallelMap(batches, { local: pavedTiles, module: new URL('../services/pavedWorker.js', import.meta.url).href, fn: 'pavedTiles', threads: 2 })).flat();
   const inline = batches.flatMap(pavedTiles);
   assert.equal(threaded.length, 3);

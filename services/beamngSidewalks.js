@@ -3786,7 +3786,7 @@ function* sidewalkMeshes(carriageways, options = {}) {
       curbH: CURB_H, crossSlope: CROSS_SLOPE, curbOnlyM: CURB_ONLY_M, THREE, groundAt: options.groundAt || null,
     });
     paved.pockets = pavedPockets;
-    console.log(`Sidewalks (paved model): ${paved.stats.tiles} tiles, ${Math.round(paved.stats.slab)} slab / ${Math.round(paved.stats.curb)} curb / ${Math.round(paved.stats.skirt)} edge triangles in ${paved.stats.ms} ms (banks ${Math.round(paved.stats.bankMs)} ms on ${paved.stats.bankCleared} tiles, mesh ${Math.round(paved.stats.meshMs)} ms, check samples ${Math.round(paved.stats.sampleMs)} ms)`);
+    console.log(`Sidewalks (paved model): ${paved.stats.tiles} tiles, ${Math.round(paved.stats.slab)} slab / ${Math.round(paved.stats.curb)} curb / ${Math.round(paved.stats.skirt)} edge triangles in ${paved.stats.ms} ms (banks found in ${Math.round(paved.stats.bankMs)} ms on ${paved.stats.bankCleared} tiles, mesh ${Math.round(paved.stats.meshMs)} ms, check samples ${Math.round(paved.stats.sampleMs)} ms)`);
     flush();
   } else {
     for (const run of runs) {

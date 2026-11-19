@@ -39,6 +39,15 @@ export function pavedTile(item) {
       }
     }
   }
+  // (nor down a bank: the blocks the main thread found (services/pavedSidewalks.js), the closed strip in them
+  // cleared before the outlines are traced; walks stay)
+  if (item.bank) {
+    const { mask, block, bw } = item.bank;
+    for (let r = 0; r < g.h; r++) {
+      const row = ((r / block) | 0) * bw;
+      for (let c = 0; c < g.w; c++) { if (!mask[row + ((c / block) | 0)]) continue; const i = r * g.w + c; if (!(cells[i] & WALK)) cells[i] &= ~GAP; }
+    }
+  }
   // (no slab into a building)
   if (item.buildings?.length) {
     const inB = new Uint8Array(cells.length);

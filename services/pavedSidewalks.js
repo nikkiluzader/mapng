@@ -5,7 +5,7 @@
 // Tiles: TILE_M squares with MARGIN_M round each (the rules reach SIDEWALK_GAP_M from a curb and close corners), each
 // tile meshing and grading only its own core, so neighbours meet without overlaps. A whole 8 km map at 0.25 m
 // would be a billion cells; a tile is about 1.3 million.
-import { buildPavedMesh, traceOutlines, SIDEWALK_GAP_M, WALK, GAP } from './pavedArea.js';
+import { buildPavedMesh, makeGrid, SIDEWALK_GAP_M } from './pavedArea.js';
 import { pavedTile } from './pavedWorker.js';
 import { fastHypot } from './fastMath.js';
 import { SLAB_TILE_M } from './sidewalkPanels.js';
@@ -24,7 +24,7 @@ export const BARE_CURB_M = 0.5;
 export const FOLLOW_FROM_M = 0.5;   // terrain not shaped: the slab follows the road this far from its edge,
 export const FOLLOW_M = 2;          // then onto the ground over this much
 export const FOLLOW_OVER_M = 0.05;  // ... this far over it
-export const OVERHEAD_FLOAT_M = 1;
+export const OVERHEAD_FLOAT_M = 0.3;  // under a deck the ground is never graded up: a slab floating more than this follows it (at 1 m a plaza under a viaduct floated 0.84 m)
 export const SURFACE_AGREE_M = 0.5;
 export const GAP_STEEP_M = 1;      // curb and walk this far apart in height: the strip between follows the ground
 export const BEND_TOL_M = 0.05;     // a slab following unshaped ground: squares bending more than this are cut finely
@@ -198,7 +198,9 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
     // (floating well over ground the grading may not raise, something built over it: on the ground instead. Beside
     // a bridge the nearest ground road is the approach on its fill, and a slab under the deck stood 6.9 m up)
     const ground = groundAt(x, y);
-    if (overhead && top - ground > OVERHEAD_FLOAT_M && overhead(x, y, ground, top + 0.5)) return ground + FOLLOW_OVER_M;
+    // (the same reach the grading's guard looks up, pavedArea.js gradePaved: where it leaves the ground, the slab follows it;
+    // half a metre over the slab only, a plaza 0.84 m over the ground under a viaduct was neither graded nor lowered)
+    if (overhead && top - ground > OVERHEAD_FLOAT_M && overhead(x, y, ground, top + 6)) return ground + FOLLOW_OVER_M;
     return top;
   };
   let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
@@ -268,11 +270,16 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
       cores.push(core);
     }
   }
-  // (the tiles a bank can be in: within SIDEWALK_GAP_M of a walk point standing more than GAP_STEEP_M off the curb's
-  // top, the walks sampled every 2 m. The bank test needs such a walk, so elsewhere it is skipped: run on every tile it
-  // cost NYC 3 s for 78 tiles)
-  const bankTiles = new Set();
+  // No paving down a bank: the strip closed between the curb and a walk more than GAP_STEEP_M above or below it, where
+  // the ground stands more than BANK_DROP_M off the road's edge, is the slope of an embankment or a cutting, left as
+  // terrain (paved, the slab floated up to 2 m over pilchowice's 3.5 m road fill). Mapped walks stay; so does the curb
+  // strip. The blocks (1 m) are found here, only round the walk points that stand that far off the curb (sampled
+  // every 2 m), and handed to the tile's worker, which clears them before tracing the outlines: cleared after
+  // tracing, each tile was traced twice (NYC: 2.3 s for 71 tiles)
+  const tb = performance.now();
   if (groundAt) {
+    const r = SIDEWALK_GAP_M + 2;
+    const steep = new Map();   // tile key -> [x, y, ...] of steep walk points within r of it
     for (const w of walks) {
       const n = w.nodes || []; if (w.crossing || n.length < 2) continue;
       for (let i = 0; i + 1 < n.length; i++) {
@@ -280,46 +287,50 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
         const L = fastHypot(b[0] - a[0], b[1] - a[1]); const steps = Math.max(1, Math.ceil(L / 2));
         for (let j = 0; j <= steps; j++) {
           const t = j / steps; const x = a[0] + (b[0] - a[0]) * t; const y = a[1] + (b[1] - a[1]) * t;
-          const h = road(x, y); if (!h || h.d > SIDEWALK_GAP_M + 2) continue;
+          const h = road(x, y); if (!h || h.d > r) continue;
           if (Math.abs(a[2] + (b[2] - a[2]) * t + walkH - (edgeSurface(h) + curbH)) <= GAP_STEEP_M - 0.05) continue;
-          const r = SIDEWALK_GAP_M + 2;
-          for (let tx = Math.floor((x - r) / TILE_M); tx <= Math.floor((x + r) / TILE_M); tx++) for (let ty = Math.floor((y - r) / TILE_M); ty <= Math.floor((y + r) / TILE_M); ty++) bankTiles.add(tx * 65536 + ty);
+          for (let tx = Math.floor((x - r) / TILE_M); tx <= Math.floor((x + r) / TILE_M); tx++) {
+            for (let ty = Math.floor((y - r) / TILE_M); ty <= Math.floor((y + r) / TILE_M); ty++) {
+              const k = tx * 65536 + ty; let l = steep.get(k); if (!l) { l = []; steep.set(k, l); } l.push(x, y);
+            }
+          }
         }
       }
     }
-  }
-  const clearBanks = (cells, g) => {
-    let cleared = false;
-    for (let r0 = 0; r0 < g.h; r0 += BANK_BLOCK) {
-      for (let c0 = 0; c0 < g.w; c0 += BANK_BLOCK) {
-        // (only blocks holding closed strip: walks are kept, and the test costs a lookup a block)
-        let gap = false;
-        for (let r = r0; r < Math.min(g.h, r0 + BANK_BLOCK) && !gap; r++) for (let c = c0; c < Math.min(g.w, c0 + BANK_BLOCK); c++) { const v = cells[r * g.w + c]; if ((v & GAP) && !(v & WALK)) { gap = true; break; } }
-        if (!gap) continue;
-        const x = g.x0 + (c0 + BANK_BLOCK / 2) * g.res; const y = g.y1 - (r0 + BANK_BLOCK / 2) * g.res;
-        const h = road(x, y); if (!h || h.d <= CURB_STRIP_M) continue;
-        // (a bank only between a curb and a walk at very different heights: the ground alone, a metre off the road,
-        // is the noise of a city's 30 m surface model, and cleared paving on 181 of NYC's 254 tiles)
-        const wk = walkHeight(x, y); if (!wk || wk.d >= SIDEWALK_GAP_M) continue;
-        const curbTop = edgeSurface(h) + curbH;
-        if (Math.abs(wk.z + walkH - curbTop) <= GAP_STEEP_M) continue;
-        if (Math.abs(groundAt(x, y) - edgeSurface(h)) <= BANK_DROP_M) continue;
-        for (let r = r0; r < Math.min(g.h, r0 + BANK_BLOCK); r++) for (let c = c0; c < Math.min(g.w, c0 + BANK_BLOCK); c++) { const i = r * g.w + c; if (!(cells[i] & WALK)) cells[i] &= ~GAP; }
-        cleared = true;
+    for (let ti = 0; ti < items.length; ti++) {
+      const pts = steep.get(Math.floor(cores[ti][0] / TILE_M) * 65536 + Math.floor(cores[ti][1] / TILE_M));
+      if (!pts) continue;
+      const g = makeGrid(...items[ti].box);
+      const bw = Math.ceil(g.w / BANK_BLOCK); const bh = Math.ceil(g.h / BANK_BLOCK); const bm = BANK_BLOCK * g.res;
+      const mask = new Uint8Array(bw * bh); const tested = new Uint8Array(bw * bh); let any = false;
+      for (let q = 0; q < pts.length; q += 2) {
+        const c0 = Math.max(0, Math.floor((pts[q] - r - g.x0) / bm)); const c1 = Math.min(bw - 1, Math.floor((pts[q] + r - g.x0) / bm));
+        const r0 = Math.max(0, Math.floor((g.y1 - pts[q + 1] - r) / bm)); const r1 = Math.min(bh - 1, Math.floor((g.y1 - pts[q + 1] + r) / bm));
+        for (let br = r0; br <= r1; br++) {
+          for (let bc = c0; bc <= c1; bc++) {
+            const k = br * bw + bc; if (tested[k]) continue; tested[k] = 1;
+            const x = g.x0 + (bc + 0.5) * bm; const y = g.y1 - (br + 0.5) * bm;
+            const h = road(x, y); if (!h || h.d <= CURB_STRIP_M) continue;
+            // (a bank only between a curb and a walk at very different heights: the ground alone, a metre off the
+            // road, is the noise of a city's 30 m surface model, and cleared paving on 181 of NYC's 254 tiles)
+            const wk = walkHeight(x, y); if (!wk || wk.d >= SIDEWALK_GAP_M) continue;
+            if (Math.abs(wk.z + walkH - (edgeSurface(h) + curbH)) <= GAP_STEEP_M) continue;
+            if (Math.abs(groundAt(x, y) - edgeSurface(h)) <= BANK_DROP_M) continue;
+            mask[k] = 1; any = true;
+          }
+        }
       }
+      if (any) { items[ti].bank = { mask, block: BANK_BLOCK, bw }; stats.bankCleared++; }
     }
-    return cleared;
-  };
+  }
+  stats.bankMs = performance.now() - tb;
+  // (where the slab follows ungraded ground under a deck: there its squares are cut finely where they bend)
+  const underOverhead = overhead && groundAt ? (x, y) => { const z = groundAt(x, y); return overhead(x, y, z, z + 8); } : null;
   const fineAt = crossings.length || dipLines.length ? (x, y) => toDriveway(x, y) < DRIVEWAY_HALF_M + DIP_RAMP_M + 1 || toDip(x, y) < DIP_RAMP_M + 1 : null;
   const meshTile = ({ cells, g, rings }, k) => {
     const core = cores[k];
-    // (no paving down a bank: the strip closed between the curb and a walk, where the ground there stands more than
-    // BANK_DROP_M off the road's edge, is the slope of an embankment or a cutting, left as terrain. Paved, the slab
-    // floated up to 2 m over a road's 3.5 m fill (pilchowice). Mapped walks stay; so does the curb strip)
     let tq = performance.now();
-    if (groundAt && bankTiles.has(Math.floor(core[0] / TILE_M) * 65536 + Math.floor(core[1] / TILE_M)) && clearBanks(cells, g)) { stats.bankCleared++; rings = traceOutlines(cells, g, WALK | GAP); }
-    stats.bankMs += performance.now() - tq; tq = performance.now();
-    const m = buildPavedMesh(rings, cells, g, { heightAt, bottomAt: surfaceAt, groundAt, curbH, THREE, core, fineAt, bendTol: followGround && groundAt ? BEND_TOL_M : null });
+    const m = buildPavedMesh(rings, cells, g, { heightAt, bottomAt: surfaceAt, groundAt, curbH, THREE, core, fineAt, bendTol: groundAt && (followGround || overhead) ? BEND_TOL_M : null, bendWhere: followGround ? null : underOverhead });
     addToBuilder(builder, m, uvBands);
     stats.tiles++; stats.slab += m.slab.length / 9; stats.curb += m.curb.length / 9; stats.skirt += m.skirt.length / 9;
     stats.meshMs += performance.now() - tq; tq = performance.now();
