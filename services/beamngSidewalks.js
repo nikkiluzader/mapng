@@ -3770,6 +3770,8 @@ function* sidewalkMeshes(carriageways, options = {}) {
     try { pavedPockets = yield* findWallPocketsSteps(walkRuns, runs, carriageways, options); } catch (err) { console.warn('Sidewalks: could not find the paved pockets by the seawalls:', err?.message); }
     paved = yield* addPavedSidewalksSteps(builder, {
       pockets: pavedPockets,
+      // (the curb sheet's bands and repeat, as today's curbs use them)
+      uvBands: { curbRepeat: CURB_REPEAT_M, face: [V_BAND_LOW, V_LIGHT_LOW], top: [V_LIGHT_LOW, V_BAND_TOP] },
       carriageways, corners, walks: options.walks || [], runs, openGround: options.openGround || [], buildings: options.buildings || [], driveways: options.driveways || [],
       curbH: CURB_H, crossSlope: CROSS_SLOPE, curbOnlyM: CURB_ONLY_M, THREE, groundAt: options.groundAt || null,
     });

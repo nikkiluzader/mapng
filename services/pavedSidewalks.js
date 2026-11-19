@@ -8,6 +8,7 @@
 import { buildPavedMesh, SIDEWALK_GAP_M } from './pavedArea.js';
 import { pavedTile } from './pavedWorker.js';
 import { fastHypot } from './fastMath.js';
+import { SLAB_TILE_M } from './sidewalkPanels.js';
 
 export const TILE_M = 256;
 export const MARGIN_M = SIDEWALK_GAP_M + 8;
@@ -131,7 +132,7 @@ export function addPavedSidewalks(builder, opts = {}) {
 
 // (a generator: the tiles' grids asked of the driver as one batch, { kind: 'pavedTiles', items }, built on worker
 // threads where there are some; null back: built here)
-export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = [], walks = [], runs = [], openGround = [], buildings = [], driveways = [], pockets = [], curbH = 0.15, crossSlope = 0.015, curbOnlyM = 0.3, THREE, groundAt = null } = {}) {
+export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = [], walks = [], runs = [], openGround = [], buildings = [], driveways = [], pockets = [], uvBands = null, curbH = 0.15, crossSlope = 0.015, curbOnlyM = 0.3, THREE, groundAt = null } = {}) {
   const road = makeRoadHeight(carriageways);
   // (a driveway counts only where it crosses the sidewalk to reach the road: the part of its line within
   // CROSS_REACH_M of where it comes to the road's edge. Whole, an alley along a street dropped the curb along it)
@@ -209,7 +210,7 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
   const meshTile = ({ cells, g, rings }, k) => {
     const core = cores[k];
     const m = buildPavedMesh(rings, cells, g, { heightAt, bottomAt: surfaceAt, curbH, THREE, core, fineAt });
-    addToBuilder(builder, m);
+    addToBuilder(builder, m, uvBands);
     stats.tiles++; stats.slab += m.slab.length / 9; stats.curb += m.curb.length / 9; stats.skirt += m.skirt.length / 9;
     tiles.push({ cells, g, core });
   };
@@ -224,29 +225,34 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
   return { tiles, heightAt, stats };
 }
 
-// slab triangles up, edge faces outward; UVs in world metres along the ground and along each face
-function addToBuilder(builder, m) {
+// slab triangles up, edge faces outward. UVs as today's builder lays them (beamngSidewalks.js): the slab in world
+// metres over SLAB_TILE_M (the part builder scales that to the look's repeat; raw metres repeated the texture ten
+// times too densely), the curb along its length over curbRepeat with the curb sheet's own bands for its face and top
+// (uvBands: { curbRepeat, face: [v0, v1], top: [v0, v1] })
+function addToBuilder(builder, m, uvBands) {
+  const B = uvBands || { curbRepeat: 9, face: [0, 1], top: [0, 1] };
   const s = m.slab;
   for (let i = 0; i < s.length; i += 9) {
     const a = [s[i], s[i + 1], s[i + 2]]; const b = [s[i + 3], s[i + 4], s[i + 5]]; const c = [s[i + 6], s[i + 7], s[i + 8]];
-    builder.tri('slab', a, b, c, [a[0], a[1]], [b[0], b[1]], [c[0], c[1]], [0, 0, 1]);
+    builder.tri('slab', a, b, c, [a[0] / SLAB_TILE_M, a[1] / SLAB_TILE_M], [b[0] / SLAB_TILE_M, b[1] / SLAB_TILE_M], [c[0] / SLAB_TILE_M, c[1] / SLAB_TILE_M], [0, 0, 1]);
   }
-  // the curb's top band: up, its UVs along the curb
+  // (along the curb in world terms: u from the edge's start measured as x + y, so neighbouring pieces carry on)
+  const uAt = (p) => (p[0] + p[1]) / B.curbRepeat;
   const t = m.curbTop || [];
   for (let i = 0; i < t.length; i += 18) {
     const a = [t[i], t[i + 1], t[i + 2]]; const b = [t[i + 3], t[i + 4], t[i + 5]]; const bi = [t[i + 6], t[i + 7], t[i + 8]]; const ai = [t[i + 15], t[i + 16], t[i + 17]];
-    const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
-    builder.tri('curb', a, b, bi, [0, 1], [L, 1], [L, 0.8], [0, 0, 1]);
-    builder.tri('curb', a, bi, ai, [0, 1], [L, 0.8], [0, 0.8], [0, 0, 1]);
+    const ua = uAt(a); const ub = ua + fastHypot(b[0] - a[0], b[1] - a[1]) / B.curbRepeat;
+    builder.tri('curb', a, b, bi, [ua, B.top[0]], [ub, B.top[0]], [ub, B.top[1]], [0, 0, 1]);
+    builder.tri('curb', a, bi, ai, [ua, B.top[0]], [ub, B.top[1]], [ua, B.top[1]], [0, 0, 1]);
   }
-  for (const [arr, mat] of [[m.curb, 'curb'], [m.skirt, 'curb']]) {
+  for (const arr of [m.curb, m.skirt]) {
     for (let i = 0; i < arr.length; i += 18) {
       // (a quad as two triangles: a, b, b-down / a, b-down, a-down; its outward normal from the edge's direction)
       const a = [arr[i], arr[i + 1], arr[i + 2]]; const b = [arr[i + 3], arr[i + 4], arr[i + 5]]; const bd = [arr[i + 6], arr[i + 7], arr[i + 8]]; const ad = [arr[i + 15], arr[i + 16], arr[i + 17]];
       const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1; const want = [(b[1] - a[1]) / L, -(b[0] - a[0]) / L, 0];
-      const h = a[2] - ad[2];
-      builder.tri(mat, a, b, bd, [0, h], [L, h], [L, 0], want);
-      builder.tri(mat, a, bd, ad, [0, h], [L, 0], [0, 0], want);
+      const ua = uAt(a); const ub = ua + L / B.curbRepeat;
+      builder.tri('curb', a, b, bd, [ua, B.face[1]], [ub, B.face[1]], [ub, B.face[0]], want);
+      builder.tri('curb', a, bd, ad, [ua, B.face[1]], [ub, B.face[0]], [ua, B.face[0]], want);
     }
   }
 }
