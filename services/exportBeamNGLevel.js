@@ -8326,6 +8326,7 @@ function buildDetailedReportSections(d) {
     for (const dip of t.dips || []) lines.push(`  - Dip in the cover ${formatNumber(dip.length, 0)} m long at ${formatNumber(dip.s - t.line[t.iS].s, 0)} m in: filled up to ${formatNumber(dip.depth, 1)} m over the tube`);
     for (const [s0, s1, kind] of (t.exposed || []).filter((e) => e[2] === 'air')) lines.push(`  - Standing in the open for ${formatNumber(s1 - s0, 0)} m (too little ground over it to cover: a gallery on a ledge; no cover made up, openings where the open air is beside it)`);
     for (const [s0, s1] of (t.exposed || []).filter((e) => e[2] !== 'air')) lines.push(`  - Exposed tube ${formatNumber(s1 - s0, 0)} m (thin cover where it meets a bridge; terrain opened, not filled)`);
+    if (t.arcades?.length) lines.push(`  - Gallery stretches (a flat roof on columns, open to the valley; the rest bored): ${t.arcades.map((g) => `${formatNumber(g.s0 - t.line[t.iS].s, 0)} to ${formatNumber(g.s1 - t.line[t.iS].s, 0)} m in (${g.side > 0 ? 'right' : 'left'} side open)`).join(', ')}`);
     if (t.windows?.length) lines.push(`  - Gallery windows: ${t.windows.length} (the cliff face close beside the bore), at ${t.windows.map((w) => `${formatNumber(w.s - t.line[t.iS].s, 0)} m (${w.side > 0 ? 'right' : 'left'}, ${formatNumber(w.face - t.W - LINING_M, 1)} m of rock)`).join(', ')}`);
     lines.push(`  - Terrain: ${t.gradedPixels ?? 0} grid points graded (cuttings, headwall backfill, cover), ${t.holes ?? 0} square(s) opened at the portals`);
     lines.push(`  - Lights: ${t.lights ?? 0}, zones: ${t.zones ?? 0}`);
@@ -15083,6 +15084,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     // nothing under a gallery's roof (its road, the walkway, the bank up to the roof)
     ...(decalRoads.tunnels?.tunnels || []).filter((t) => t.kind === 'gallery')
       .map((t) => ({ points: t.line.map((p) => [p.x, p.y]), half: galleryRoofHalf(t) })),
+    // (nor under an arcade's: the gallery stretches of a bored tunnel. Trees stood through the D 902's roof)
+    ...(decalRoads.tunnels?.tunnels || []).flatMap((t) => (t.arcades || [])
+      .map((a) => ({ points: t.line.slice(a.i, a.j + 1).map((p) => [p.x, p.y]), half: galleryRoofHalf(t) }))),
   ]);
   // Rows filling mapped areas (services/areaRows.js), as forest items: a vineyard's vine rows along its longest
   // side; a solar farm's panel rows east-west, their faces to the equator. Kept off roads and decks with the trees

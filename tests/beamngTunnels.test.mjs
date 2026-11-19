@@ -614,16 +614,29 @@ test('a bore with the open air right beside it for a long way is an arcade there
   const a = t.arcades[0];
   assert.equal(a.side, 1, 'on the lake side (right of travel)');
   assert.ok(a.s1 - a.s0 > 150, `the arcade runs ${Math.round(a.s1 - a.s0)} m`);
-  const open = t.windows.filter((w) => w.arcade);
-  // (an opening every 10 m, 8 m wide, a pillar between)
-  assert.ok(open.length >= 15, `${open.length} openings`);
-  for (const w of open) { assert.equal(w.kind, 'gallery'); assert.ok(Math.abs(w.y) <= 100); }
-  for (let k = 1; k < open.length; k++) assert.ok(Math.abs((open[k].s - open[k - 1].s) - 10) < 0.5, 'evenly spaced');
+  // built as a gallery, as real ones are: a flat roof on columns over the road, no arched openings cut in a tube
+  assert.equal(t.windows.filter((w) => w.arcade).length, 0, 'no openings: the arcade is a gallery');
+  const verts = buildTubeGeometry(t).flatMap((pc) => { const v = []; for (let k = 0; k < pc.pos.length; k += 3) v.push([pc.pos[k], pc.pos[k + 1], pc.pos[k + 2]]); return v; });
+  const midZ = t.line.find((p) => Math.abs(p.y) < 1).z;
+  // (the section's top at the middle of the arcade: the roof slab's upper face, 5.9 m, not the tube's 7.6 m crown)
+  const inArc = verts.filter(([x, y]) => Math.abs(y) < 3 && Math.abs(x) < t.W + 4).map(([, , z]) => z - midZ);
+  assert.ok(inArc.length && Math.max(...inArc) > 5.8 && Math.max(...inArc) < 6.0, `the gallery's top over the road: ${Math.max(...inArc).toFixed(2)} m`);
+  const yOut = t.line.find((p) => p.y > 150).y;
+  const zOut = t.line.find((p) => p.y > 150).z;
+  const bore = verts.filter(([x, y, z]) => Math.abs(y - yOut) < 3 && Math.abs(x) < 1 && z > zOut + 1).map(([, , z]) => z - zOut);
+  assert.ok(Math.max(...bore) > 6.9, 'the bore keeps its arch past the arcade');
+  // open to the daylight: no lights and no dark zone along it
+  const objs = buildTunnelObjects(t, 'tn', (() => { let n = 0; return () => `id${n++}`; })());
+  assert.ok(!objs.lights.some((l) => Math.abs(l.position[1]) < 50), 'no lights in the arcade');
+  assert.ok(!objs.zones.some((z) => z.class === 'Zone' && Math.abs(z.position[1]) < 40), 'no dark zone over the arcade');
   // no cover is made up over the tube there: the roof stands in the open
   const mid = t.line.find((p) => Math.abs(p.y) < 1);
-  assert.equal(tunnelGroundAt(t, 0, 0, mid.z + 2), mid.z + 2, 'low ground over the arcade is left');
-  // ground standing in the tube along the arcade opens
-  assert.equal(tunnelHoleAt(t, 0, 0, mid.z + 1), true);
+  assert.equal(tunnelGroundAt(t, 0, 0, mid.z + 2), mid.z - 0.15, 'inside the gallery the ground comes down to the road (no cover made up)');
+  assert.equal(tunnelGroundAt(t, 0, 0, mid.z + 12), mid.z - 0.15, '... and the survey\'s picture of a roof over the road with it');
+  // under the gallery the squares open (the floor slab covers them and reaches past them: no grass through the
+  // floor, no void showing past its edge)
+  assert.equal(tunnelHoleAt(t, 0, 0, mid.z - 0.15), true);
+  assert.equal(tunnelHoleAt(t, t.W + 3, 0, mid.z - 0.15), false);
   // on the open side nothing is brought up into the openings: from the lining
   // out past the face the ground stays as low as it lies (a grid point raised
   // to a face plate there hung a curtain of terrain in every opening; seen in game)

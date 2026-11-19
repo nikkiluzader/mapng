@@ -22,6 +22,40 @@ As of 2026-11-16, evening:
 - The sweep has two areas BeamNG developers exported (dev_szczyrk, dev_pilchowice) besides tychonas; every area
   one of them exports is added.
 
+## Fizz_Mechanic's 0.3.3 list (2026-11-19, in progress)
+
+His 16 km Tignes / Val d'Isère map, 0.3.3, Mesh Roads on. Report and his 24 screenshots: scratch/fizz033 (report_0.3.3.txt,
+shots/); re-checks on today's code: scratch/fizz033/run; diagrams scratch/fizz033/diag; Mapillary scratch/fizz033/mly.
+
+- **Regional look must always make sense (user, 2026-11-19).** The French Alps came out "Utah (high rock and ice)":
+  red-rock textures, sagebrush, Utah lamps. Every automatic asset choice (look, textures, trees, rocks, lamps,
+  ground cover) has to fit the place from its position and its OSM / land cover. Italy (cypress, olive, palm) and
+  East Coast (broadleaf) don't fit the Alps either: needs a mountain look built from what the game has (alpine
+  conifers, grey rock, meadow), or per-asset choices instead of one level's whole kit. To do: list what each
+  official level offers, pick per climate band and height, test on Tignes, Zermatt, the Rockies, the Andes.
+- **2.5 / 3.2 / 3.3 gallery stretches of bored tunnels: IN PROGRESS.** "Tunnel 43 D902" is way 56684729
+  (Les Brévières): Mapillary shows a gallery for its first ~100 m, then a rough-walled bore. We built the arcade as an
+  arched tube with openings through to a face plate up to 9 m out ("too thick", "too deep in the mountain").
+  Now built as a gallery: a flat roof (5.2-5.9 m, matching the lidar's roof shelf), uphill wall, columns; no
+  lights or dark zones in it; a headwall face where it meets the bore; arcades 12 m apart joined; the arcade
+  runs on to the end of a stretch standing in the open; the valley side flush with the floor; the hillside cut
+  4:1 behind the roof; trees kept off. In-game checks on gt_chevril_full (fzgal) under way.
+- **Terrain holes round tunnels: experiments (user, 2026-11-19).** (1) Thicker structures where the holes have
+  no clean answer: fill out the concrete (headwalls, lining, walls into the ground) to hide them, above all where the
+  holes keep the terrain out of the tube (done for gallery stretches: the valley wall). (2) Boulders or rock assets
+  over jagged hole edges, maybe. (3) A finer processing resolution (0.5, 0.25, 0.1 m = the terrain's squareSize):
+  smaller squares cut closer holes; try on gt_chevril_full and measure the jagged edge, the export time, memory
+  and level size, then maybe recommend it for steep maps with many tunnels. Also seen: the cover made up over a
+  bore on a steep valley side runs 1:1 and stops dead at the shaping's reach, a 15-20 m terrain cliff
+  (t001 at 285-294 m, scratch/fizz033/diag/g283_sections_wall.png): Fizz 2.4.
+- **Fixed before this list:** the bridgeTowerHouses error (078ff33, after 0.3.3); short bridges too high
+  (the bridge rise cap, 957fa96); sidewalks (the paved model).
+- **Owed answers:** 2.2 continuous roads, 3.4 OSM tells galleries apart (tunnel=avalanche_protector), 4.5 double
+  chevrons by design.
+- **Next:** the funicular left on the ground (ends 768 m apart: a steep-ends rule for funiculars), wing walls'
+  gap (2.8), buildings on roads (ids 1759xxxxx, 1.8), sidewalks on MTB trails (4.3), road joins and hairpins
+  (1.3, 1.6), terrain over tunnels (2.4), then the Mesh Roads points and World Editor grouping.
+
 ## This week's list (2026-11-15)
 
 All looked at, in game where it needed the game:

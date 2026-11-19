@@ -80,8 +80,21 @@ Diagrams solve problems faster than game trips. Before the first code change on 
   - UI off;
   - a clear line of sight from the camera to the subject (check it), never through terrain, buildings or a deck;
   - the camera never underground or inside geometry;
+  - no views from inside or under the terrain (the line of sight below the ground surface anywhere along it), except
+    when the point is to see the underside of something set into the ground, such as the buried foot of a model;
   - about 35° down;
   - close for things on the ground, farther back for bridges and buildings.
+- **Tunnels: inside and outside.** Outside: the portals and the ground over the tunnel. Inside, from the driver's
+  seat, in both driving directions: at least 5 shots each way (the entrance portal, 25 %, 50 % and 75 % of the way
+  through, and the exit portal). A tunnel with windows or gallery stretches also gets driver's-view shots looking out
+  through them, and shots from outside looking in.
+  Outside shots matter as much: plenty of clean views round the portals, the galleries and the ground over the tunnel,
+  to judge the terrain. Where the terrain holes round a tunnel have no clean answer, hide them with the structure
+  (thicker concrete: a deeper headwall, a fuller lining, a wall down into the ground) rather than leave them
+  jagged, above all where the holes are what keeps the terrain out of the tube.
+- **Follow up what stands out.** Anything in the first shots that looks wrong gets more shots right away, from new
+  angles, under the same camera rules (clear line of sight, clean angles, sensible distance, never from inside the
+  terrain).
 - **Review the whole feature:** far and close, several angles, the driver's view, and every joint (deck ends,
   cable ends, where parts meet). Bridge ends, where the deck meets the road, come first: check both ends of every
   bridge.

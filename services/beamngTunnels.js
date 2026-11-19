@@ -85,7 +85,13 @@ const ARCADE_SLOPE_ROCK_M = 9;          // or this close, where the roof is thin
 const ARCADE_SLOPE_COVER_M = 6;        // smeared from its edge down to the road (bare-earth lidar draws no overhang)
 const ARCADE_MIN_RUN_M = 24;           // ... for at least this far
 const ARCADE_PITCH = 5;                // stations from one opening to the next (4 open, 1 pillar)
-const ARCADE_FILL_CLEAR_M = 4;         // no cover made up this far past an arcade's ends either
+const ARCADE_FILL_CLEAR_M = 0;         // no cover made up this far past an arcade's ends either (0: the hill meets the gallery's end, the bore's arch never standing out over its roof)
+const ARCADE_HOLE_PAD_M = 3;           // squares in the bore this far past an arcade's end open (the ground rising from the gallery's floor to the bore's cover crossed its mouth)
+const ARCADE_FLOOR_UNDER_M = 0.15;      // the ground in a gallery kept this far under its floor slab (no holes there: holes past the slab's edge showed the void under it)
+const ARCADE_FLOOR_PAST_M = 0.8;        // an arcade's floor slab reaches this far past its walls
+const ARCADE_FOOT_LOOK_M = 3;          // the valley wall's foot: the lowest ground this far past the floor's edge ...
+const ARCADE_FOOT_BURY_M = 2;          // ... and this far under it (structures run into the ground, not fitted to it)
+const ARCADE_JOIN_M = 12;              // two arcades on one side this close together are one (a 4 m stub of tube between them stood up as a hump)
 const WINDOW_ROCK_M = 12;              // rock between the lining and the open air, at most
 const WINDOW_SPACING_M = 70;           // windows at least this far apart
 const WINDOW_END_CLEAR_M = 40;         // ... and this far inside the portals
@@ -563,16 +569,27 @@ function galleryGroundAt(t, x, y, h) {
 /** A gallery as triangles: roof slab, valley-side columns and beam (the hillside is its back); pieces like a tube's. */
 function buildGalleryGeometry(t) {
   const T = makeTris();
+  gallerySection(T, t, t.line, { up: t.uphill, keepWall: !!t.keepWall });
+  return [{ pos: T.pos, uv: T.uv, from: t.line[0].s, to: t.line[t.line.length - 1].s }];
+}
+
+/**
+ * A gallery's section along `line` (stations as a tunnel's): the roof slab on
+ * the uphill wall and the valley-side columns and beam, `up` the uphill side
+ * (+1 right of travel). `floor`: a slab under the road as well (an arcade
+ * along a bored tunnel stands where the terrain is opened for the tube: the
+ * road decal lands on it, as on a tube's floor).
+ */
+function gallerySection(T, t, line, { up, keepWall = false, floor = false }) {
   const inner = t.W + 0.5;
-  const up = t.uphill;
   const at = (p, u, v) => { const [x, y] = lateral(p, u); return [x, y, p.z + v]; };
   // a box-section strip along the line between offsets u0..u1 (right of
   // travel) and heights v0..v1: its four long faces, and end caps
   const strip = (u0, u1, v0, v1) => {
     const corners = [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
     const mid = [(u0 + u1) / 2, (v0 + v1) / 2];
-    for (let i = 0; i + 1 < t.line.length; i++) {
-      const p = t.line[i]; const q = t.line[i + 1];
+    for (let i = 0; i + 1 < line.length; i++) {
+      const p = line[i]; const q = line[i + 1];
       const c = at(p, mid[0], mid[1]);
       const want = (cc) => [cc[0] - c[0], cc[1] - c[1], cc[2] - c[2]];
       for (let k = 0; k < 4; k++) {
@@ -583,8 +600,8 @@ function buildGalleryGeometry(t) {
         T.tri(b, d, cq, [[U[0], 1], [U[1], 1], [U[1], 0]], want);
       }
     }
-    for (const [i, sgn] of [[0, -1], [t.line.length - 1, 1]]) {
-      const p = t.line[i];
+    for (const [i, sgn] of [[0, -1], [line.length - 1, 1]]) {
+      const p = line[i];
       const [a, b, c, d] = corners.map(([u, v]) => at(p, u, v));
       const want = () => [sgn * p.tx, sgn * p.ty, 0];
       T.tri(a, b, c, [[0, 0], [1, 0], [1, 1]], want);
@@ -595,7 +612,10 @@ function buildGalleryGeometry(t) {
   // is the gallery's back, galleryGroundAt); with the terrain left as it
   // was (shaping off: t.keepWall) a concrete wall instead
   const roofDown = inner + GAL_WALL_T;
-  const roofUp = t.keepWall ? roofDown : inner + GAL_BANK_M + GAL_WALL_T;
+  const roofUp = keepWall ? roofDown : inner + GAL_BANK_M + GAL_WALL_T;
+  // (past the walls by ARCADE_FLOOR_PAST_M: over the squares the terrain opens under the gallery, their corners on a
+  // diagonal included; on the uphill side it lies behind the wall and under the roof)
+  if (floor) strip(-roofDown - ARCADE_FLOOR_PAST_M, roofDown + ARCADE_FLOOR_PAST_M, -LINING_M, 0);
   strip(up > 0 ? -roofDown : -roofUp, up > 0 ? roofUp : roofDown, GAL_H, GAL_H + GAL_ROOF_M);
   // the uphill wall: concrete from the road's edge to the roof, in front of
   // the bank (avalanche galleries stand on a retaining wall against the
@@ -620,15 +640,14 @@ function buildGalleryGeometry(t) {
   // the wall and a beam under the roof between them
   const h = GAL_COLUMN_M / 2;
   const wallFace = up * inner;
-  let next = 0;
-  for (const p of t.line) {
+  let next = line[0].s;
+  for (const p of line) {
     if (p.s < next) continue;
     next = p.s + GAL_COLUMN_EVERY_M;
     box(p, beamU - h, beamU + h, h, -0.5, GAL_H - 0.8);
     box(p, Math.min(wallFace, wallFace - up * GAL_RIB_M), Math.max(wallFace, wallFace - up * GAL_RIB_M), h, -0.5, GAL_H - GAL_RIB_M);
     box(p, Math.min(wallFace, beamU), Math.max(wallFace, beamU), h, GAL_H - GAL_RIB_M, GAL_H);
   }
-  return [{ pos: T.pos, uv: T.uv, from: t.line[0].s, to: t.line[t.line.length - 1].s }];
 }
 
 // A low box's lid often runs on past the end of the mapped tunnel way (the
@@ -1146,13 +1165,42 @@ function findWindows(t, groundAt) {
           const run = t.line.slice(k, k + G.segments + 1);
           const faces = run.map((q) => galleryFace(q, side));
           if (faces.some((f) => f == null)) continue;
-          picked.push({ ...make(k, side, 'gallery', Math.max(...faces)), arcade: true });
-          // (how far out the ground is kept under the sill along this arcade: to its deepest face)
+          // (no opening cut here any more: an arcade is built as a gallery, a flat roof on columns, as the
+          // galleries OSM maps are (buildTubeGeometry). How far out the ground is kept under the sill
+          // along it: to its deepest face)
           const arc = t.arcades[t.arcades.length - 1];
           arc.rock = Math.max(arc.rock, Math.max(...faces) - outer);
         }
       }
       i = j + 1;
+    }
+  }
+  // (an arcade ending just short of the end of a stretch standing in the open runs on to it: past it, cover
+  // is made up; short of it the bore's arch stood out over the gallery's roof)
+  for (const a of t.arcades) {
+    for (const [ea, eb, kind] of t.exposed || []) {
+      if (kind !== 'air') continue;
+      if (eb > a.s1 && eb - a.s1 <= ARCADE_JOIN_M && ea <= a.s1) { while (a.j < t.iN && t.line[a.j].s < eb) a.j++; a.s1 = t.line[a.j].s; }
+      if (ea < a.s0 && a.s0 - ea <= ARCADE_JOIN_M && eb >= a.s0) { while (a.i > t.iS && t.line[a.i].s > ea) a.i--; a.s0 = t.line[a.i].s; }
+    }
+  }
+  // (arcades on one side with a short gap between joined: one gallery)
+  t.arcades.sort((a, b) => a.side - b.side || a.i - b.i);
+  for (let k = t.arcades.length - 1; k > 0; k--) {
+    const a = t.arcades[k - 1]; const b = t.arcades[k];
+    if (a.side === b.side && b.s0 - a.s1 <= ARCADE_JOIN_M) { a.j = b.j; a.s1 = b.s1; a.rock = Math.max(a.rock, b.rock); t.arcades.splice(k, 1); }
+  }
+  t.arcades.sort((a, b) => a.i - b.i);
+  // (the ground under each station's valley-side edge, the lowest across the slab's edge and a few metres out:
+  // the gallery's valley wall runs from its floor down into it. On a cliff edge the floor slab stood over the
+  // drop with nothing under it, the opened squares showing the void beneath)
+  const edgeU = t.W + 0.5 + GAL_WALL_T + ARCADE_FLOOR_PAST_M;
+  for (const a of t.arcades) {
+    a.foot = [];
+    for (let k = a.i; k <= a.j; k++) {
+      const q = t.line[k]; let lo = Infinity;
+      for (let o = edgeU - 1; o <= edgeU + ARCADE_FOOT_LOOK_M; o += 0.5) { const [x, y] = lateral(q, a.side * o); lo = Math.min(lo, groundAt(x, y)); }
+      a.foot.push(Number.isFinite(lo) ? lo : q.z);
     }
   }
   const inArcade = (sAt) => t.arcades.some((a) => sAt >= a.s0 - WINDOW_SPACING_M / 2 && sAt <= a.s1 + WINDOW_SPACING_M / 2);
@@ -1662,8 +1710,29 @@ export function tunnelGroundAt(t, x, y, h) {
   // along an arcade, on its open side: the ground kept under the openings'
   // sill all along, between them too (a tooth of ground stood up through the
   // gallery beside every pillar)
+  // (built as a gallery: the valley side as a gallery's, a verge level with the floor past the columns, then
+  // falling away; the terrain's edge meets the floor flush instead of standing up in steps under the columns)
   const arc = arcadeAt(t, n.s);
-  if (arc && Math.sign(n.d) === arc.side && ad > t.W && ad <= t.W + LINING_M + Math.max(ARCADE_ROCK_M, arc.rock || 0) + WINDOW_LEDGE_M) out = Math.min(out, n.z + WINDOW_KINDS.gallery.sill - 0.3);
+  // (inside the gallery, across its whole width: down to the road. The survey's picture of the real roof, a slope
+  // over the road's open half, stood up through our roof where the tube's squares did not open)
+  if (arc && ad <= t.W + 0.5 + GAL_WALL_T) return Math.min(out, n.z - ARCADE_FLOOR_UNDER_M);
+  if (arc && Math.sign(n.d) === arc.side && ad <= t.W + LINING_M + Math.max(ARCADE_ROCK_M, arc.rock || 0) + WINDOW_LEDGE_M) {
+    // (past the columns: kept under the road a few metres out, then rising at most 1:1; nothing filled, lower
+    // ground stays as the survey has it)
+    const off = Math.max(0, ad - (t.W + 0.5 + GAL_WALL_T));
+    out = Math.min(out, n.z + Math.max(0, off - GAL_VALLEY_CLEAR_M));
+  }
+  // (and its uphill side as a gallery's: the hillside brought to the roof's back edge, the rock over it cut back
+  // steeply. Left as the survey lay, it stood over the roof in steps and slabs where the tube's squares opened)
+  if (arc && Math.sign(n.d) === -arc.side) {
+    const inner = t.W + 0.5; const bankEnd = inner + GAL_BANK_M; const crest = bankEnd + GAL_WALL_T + 0.5;
+    const top = n.z + GAL_H + GAL_ROOF_M;
+    if (ad <= inner + GAL_WALL_T) return Math.min(out, n.z - ARCADE_FLOOR_UNDER_M);
+    if (ad <= crest) return Math.max(Math.min(out, top), n.z + (GAL_H + GAL_ROOF_M) * Math.min(1, (ad - inner) / GAL_BANK_M));
+    // (past the roof's back edge only the rock steeper than a portal's face is cut back: nothing lowered further
+    // out, where another road may run along the slope)
+    return Math.min(out, top + FACE_SLOPE * (ad - crest));
+  }
   // gallery windows: the ground in front kept under the sill, the rock over
   // the face plate down to its top, and no fill made up in front of it
   for (const w of t.windows || []) {
@@ -1731,8 +1800,16 @@ export function tunnelHoleAt(t, x, y, lo, hi = lo) {
     // (a low box's lid is the surface: only ground truly in the box opens, not the metre over it)
     return lo < n.z + t.crown + LINING_M + (t.low ? 0 : 1);
   }
-  // (an arcade has no cover made up over it either: ground in the tube there opens, as in an exposed stretch)
-  if (!n || n.into < front || (n.into > t.headDepth + BACKFILL_M && !inExposed(t, n.s) && !arcadeAt(t, n.s, ARCADE_FILL_CLEAR_M))) return false;
+  // (an arcade: no holes, its ground is brought under the floor slab instead (tunnelGroundAt); past its ends the
+  // squares open where the ground rising to the bore's cover crosses the mouth)
+  // (under it: every square whose centre is within half a square past the wall's face, whatever the ground: the
+  // floor slab reaches past them all. Without holes the game's grass grew up through the floor and the squares
+  // under the wall stood up in grey teeth in front of it)
+  if (n && arcadeAt(t, n.s)) return n.into >= front && across(t, n) <= t.W + 0.5 + 0.5 * t.squareSize;
+  // (the first metres of the bore past it: open inside its outline whatever the cover over it, the slope up to
+  // the cover runs over the tube there, not across its mouth)
+  if (n && n.into >= front && arcadeAt(t, n.s, ARCADE_HOLE_PAD_M) && across(t, n) <= t.W + LINING_M + 0.5 * t.squareSize) return lo < n.z + t.crown + LINING_M;
+  if (!n || n.into < front || (n.into > t.headDepth + BACKFILL_M && !inExposed(t, n.s) && !arcadeAt(t, n.s, ARCADE_HOLE_PAD_M))) return false;
   if (across(t, n) > t.W + LINING_M + 0.5 * t.squareSize) return false;
   if (hi > n.z + headTopAt(t, n.s) + 0.5) return false;
   return lo < n.z + t.crown + LINING_M + 1;
@@ -1789,7 +1866,8 @@ export function hitsTunnel(tunnels, x, y, z, zTop = z) {
     const n = nearestOnTunnel(t, x, y, t.headHalf + (t.maxExtra || 0) + 1);
     if (!n) continue;
     const ad = across(t, n);
-    const inTube = n.into >= -0.5 && ad <= t.W + LINING_M + 0.5;
+    const arcH = arcadeAt(t, n.s);
+    const inTube = n.into >= -0.5 && ad <= (arcH ? galleryRoofHalf(t) : t.W + LINING_M) + 0.5;
     const inCut = n.into < 0 && t.line[n.i].kind === 'cut' && ad <= wingDAt(t, n.i, Math.sign(n.d) || 1) + t.wingT + 0.5 && t.wings[Math.sign(n.d) || 1].has(n.i);
     const inHead = n.into >= -0.5 && n.into <= t.headDepth + 0.5 && ad <= t.headHalf + 0.5;
     if (!(inTube || inCut || inHead)) continue;
@@ -1881,6 +1959,16 @@ export function buildTubeGeometry(t) {
     }
     return a;
   };
+  // an arcade (findWindows: the stretch along a ledge, open to the valley) is a gallery, not the tube: a flat
+  // roof on the uphill wall and columns on the open side, as real ones are (the D 902 by Les Brévières), and
+  // a headwall face where it meets the bore
+  const arcades = t.arcades || [];
+  const inArcade = (i) => arcades.some((a) => i >= a.i && i < a.j);
+  const galInner = t.W + 0.5;
+  const capLoops = [
+    [(p) => section(p).loops[0], ring(galInner, 0, GAL_H, 0, 16, true)],
+    [(p) => section(p).loops[1], ring(galInner + GAL_WALL_T, -LINING_M, GAL_H + GAL_ROOF_M, 0, 16, true)],
+  ];
   const pieces = [];
   let i0 = t.iS;
   while (i0 < t.iN) {
@@ -1892,6 +1980,7 @@ export function buildTubeGeometry(t) {
     const T = makeTris();
     for (const [which, outward] of [[0, false], [1, true]]) {
       for (let i = i0; i < i1; i++) {
+        if (inArcade(i)) continue;
         const p = t.line[i];
         const q = t.line[i + 1];
         const loop = section(p).loops[which];
@@ -1940,6 +2029,41 @@ export function buildTubeGeometry(t) {
         const a = at(p, inner[k]); const b = at(p, inner[k2]); const c = at(p, outer[k]); const d = at(p, outer[k2]);
         T.tri(a, b, c, [[0, 0], [1, 0], [0, 1]], want);
         T.tri(b, d, c, [[1, 0], [1, 1], [0, 1]], want);
+      }
+    }
+    // arcades in this piece: the gallery along them, and at each end where the bore goes on a face from the
+    // tube's section to the gallery's (seen from both sides: the bore's mouth over the lower gallery roof)
+    for (const a of arcades) {
+      const g0 = Math.max(a.i, i0); const g1 = Math.min(a.j, i1);
+      if (g1 <= g0) continue;
+      gallerySection(T, t, t.line.slice(g0, g1 + 1), { up: -a.side, floor: true });
+      // the valley wall under the floor's outer edge, down into the ground (a.foot, per station)
+      const uo = a.side * (galInner + GAL_WALL_T + ARCADE_FLOOR_PAST_M); const ui = uo - a.side * GAL_WALL_T;
+      const bot = (k) => Math.min(-LINING_M - 0.3, (a.foot?.[k - a.i] ?? t.line[k].z) - ARCADE_FOOT_BURY_M - t.line[k].z);
+      for (let k = g0; k < g1; k++) {
+        const p = t.line[k]; const q = t.line[k + 1]; const bp = bot(k); const bq = bot(k + 1);
+        const c = at(p, [(uo + ui) / 2, bp / 2]);
+        const want = (cc) => [cc[0] - c[0], cc[1] - c[1], cc[2] - c[2]];
+        const quad = (A, B, C, D, uv) => { T.tri(A, B, C, [uv[0], uv[1], uv[2]], want); T.tri(A, C, D, [uv[0], uv[2], uv[3]], want); };
+        const V0 = p.s / 4; const V1 = q.s / 4;
+        for (const u of [uo, ui]) quad(at(p, [u, -LINING_M]), at(q, [u, -LINING_M]), at(q, [u, bq]), at(p, [u, bp]), [[V0, 0], [V1, 0], [V1, -bq / 4], [V0, -bp / 4]]);
+        quad(at(p, [ui, bp]), at(q, [ui, bq]), at(q, [uo, bq]), at(p, [uo, bp]), [[V0, 0], [V1, 0], [V1, 0.15], [V0, 0.15]]);
+      }
+      for (const [i, sgn] of [[a.i, 1], [a.j, -1]]) {
+        if (i < i0 || i > i1 || i === t.iS || i === t.iN) continue;
+        const p = t.line[i];
+        for (const [tubeLoop, gal] of capLoops) {
+          const tl = tubeLoop(p);
+          for (const dir of [sgn, -sgn]) {
+            const want = () => [dir * p.tx, dir * p.ty, 0];
+            for (let k = 0; k < tl.length; k++) {
+              const k2 = (k + 1) % tl.length;
+              const A = at(p, tl[k]); const B = at(p, tl[k2]); const C = at(p, gal[k]); const D = at(p, gal[k2]);
+              T.tri(A, B, C, [[0, 0], [1, 0], [0, 1]], want);
+              T.tri(B, D, C, [[1, 0], [1, 1], [0, 1]], want);
+            }
+          }
+        }
       }
     }
     pieces.push({ pos: T.pos, uv: T.uv, from: t.line[i0].s, to: t.line[i1].s });
@@ -2204,7 +2328,8 @@ export function buildTunnelObjects(t, group, id, { lightSpacing = LIGHT_SPACING_
   // a gallery is open to the daylight on its valley side: no lights, no zones
   if (t.kind === 'gallery') return { lights: [], zones: [], lightCount: 0, zoneCount: 0, portalCount: 0 };
   const lights = [];
-  lightStations(t, lightSpacing).forEach((i, k) => {
+  // (none in an arcade: a gallery open to the daylight)
+  lightStations(t, lightSpacing).filter((i) => !(t.arcades || []).some((a) => i >= a.i && i <= a.j)).forEach((i, k) => {
     const q = t.line[i];
     // over the middle of the section (off the road's centre where widened)
     const [cx, cy] = lateral(q, ((q.wr ?? t.W) - (q.wl ?? t.W)) / 2);
@@ -2227,8 +2352,13 @@ export function buildTunnelObjects(t, group, id, { lightSpacing = LIGHT_SPACING_
   for (let i = t.iS; i <= t.iN; i++) if (t.line[i].s - t.line[cuts[cuts.length - 1]].s >= ZONE_CHUNK_M) cuts.push(i);
   if (cuts.length > 1 && t.line[t.iN].s - t.line[cuts[cuts.length - 1]].s < ZONE_CHUNK_M / 3) cuts.pop();
   if (cuts[cuts.length - 1] !== t.iN) cuts.push(t.iN);
+  // (a cut at each end of an arcade, and no dark zone over one: it is open to the daylight)
+  for (const ar of t.arcades || []) for (const ci of [ar.i, ar.j]) if (ci > t.iS && ci < t.iN && !cuts.includes(ci)) cuts.push(ci);
+  cuts.sort((a, b) => a - b);
+  const inArc = (c0, c1) => (t.arcades || []).some((ar) => c0 >= ar.i && c1 <= ar.j);
   const height = t.crown + LINING_M;
   for (let c = 0; c + 1 < cuts.length; c++) {
+    if (inArc(cuts[c], cuts[c + 1])) continue;
     const a = t.line[cuts[c]];
     const b = t.line[cuts[c + 1]];
     const dx = b.x - a.x; const dy = b.y - a.y; const Lc = fastHypot(dx, dy) || 1;
@@ -2273,5 +2403,5 @@ export function buildTunnelObjects(t, group, id, { lightSpacing = LIGHT_SPACING_
       scale: [r3(2 * w.halfLen + 1), r3(r1 - r0), r3(D.top - w.floor + 1)],
     });
   });
-  return { lights, zones, lightCount: lights.length / 2, zoneCount: cuts.length - 1, portalCount: cuts.length + (t.windows || []).length };
+  return { lights, zones, lightCount: lights.length / 2, zoneCount: zones.filter((z) => z.class === 'Zone').length, portalCount: cuts.length + (t.windows || []).length };
 }
