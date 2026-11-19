@@ -466,8 +466,9 @@ stubs at crossings; B is 15.7 s of Chicago 8192's ~45 s of sidewalk work and hol
   pipeline.py, swstages.py for times per stage).
 - Photo check (Mapillary): Chicago W Kinzie and Hong Kong Kwai Chung paved from the curb; planting exists beside the
   pavement, not between curb and walkway. Rule: close the strip unless mapped greenery covers it.
-- Prototype: scratch/swaudit/proto.py, a 0.25 m paved grid. First pass closes the strips on one street; next:
-  - pave from the curb out to a footway tagged footway=sidewalk (a fixed 3.5 m limit missed 6-8 m downtown walks);
+- Prototype: scratch/swaudit/proto.py, a 0.25 m paved grid. Done: paved from the curb out to a footway tagged
+  footway=sidewalk (256 of 263 Chicago footways, all 143 in Hong Kong carry it), only between road and walk (no
+  filling past a walk), notches under ~5 m closed at corners; plain footways keep the 1 m snap. Next:
   - real road-surface shapes (corner curbs, flares) instead of thick centre lines;
   - greenery from OSM (grass, parks, planters) as evidence for a verge;
   - outlines traced to smooth lines before meshes; heights as today; decks and waterfront unchanged at first.
