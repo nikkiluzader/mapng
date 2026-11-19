@@ -33,13 +33,14 @@ shots/); re-checks on today's code: scratch/fizz033/run; diagrams scratch/fizz03
   East Coast (broadleaf) don't fit the Alps either: needs a mountain look built from what the game has (alpine
   conifers, grey rock, meadow), or per-asset choices instead of one level's whole kit. To do: list what each
   official level offers, pick per climate band and height, test on Tignes, Zermatt, the Rockies, the Andes.
-- **2.5 / 3.2 / 3.3 gallery stretches of bored tunnels: IN PROGRESS.** "Tunnel 43 D902" is way 56684729
+- **2.5 / 3.2 / 3.3 gallery stretches of bored tunnels: DONE on dev 13c9e7b, seen in game.** "Tunnel 43 D902" is way 56684729
   (Les Brévières): Mapillary shows a gallery for its first ~100 m, then a rough-walled bore. We built the arcade as an
   arched tube with openings through to a face plate up to 9 m out ("too thick", "too deep in the mountain").
   Now built as a gallery: a flat roof (5.2-5.9 m, matching the lidar's roof shelf), uphill wall, columns; no
   lights or dark zones in it; a headwall face where it meets the bore; arcades 12 m apart joined; the arcade
-  runs on to the end of a stretch standing in the open; the valley side flush with the floor; the hillside cut
-  4:1 behind the roof; trees kept off. In-game checks on gt_chevril_full (fzgal) under way.
+  runs on to the end of a stretch standing in the open; ground under it below the floor, squares opened; a valley
+  wall down into the ground; the hillside cut 4:1 behind the roof; trees kept off. Shots scratch/fizz033/shots_drv.
+  Left: a portal wall panel on the open side where a gallery starts at a portal; old dark triangles by wingwalls.
 - **Terrain holes round tunnels: experiments (user, 2026-11-19).** (1) Thicker structures where the holes have
   no clean answer: fill out the concrete (headwalls, lining, walls into the ground) to hide them, above all where the
   holes keep the terrain out of the tube (done for gallery stretches: the valley wall). (2) Boulders or rock assets
