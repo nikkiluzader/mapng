@@ -489,6 +489,11 @@ stubs at crossings; B is 15.7 s of Chicago 8192's ~45 s of sidewalk work and hol
     test area. TIMING RISK: a 256 m tile still takes ~0.5 s with meshing and the road-height lookups, about 1,000
     tiles at 8 km = ~500 s on one thread against 67 s for today's whole sidewalk step: tiles on workers (8x) and
     cheaper heightAt (cache the road surface per slab vertex / grading pixel) are needed before a full-size test.
+    Workers done (47e1b3e: Chicago test area 3.4 -> 0.8 s, same level) and row-strip clipping (8e92cd3: the whole ring
+    clipped per 4 m square was quadratic). NYC 4 km with the switch on: sidewalk step 21.2 s (today 17.8 s), 2.70M
+    triangles (today 2.12M; slab 1.21M, curb 0.53M, edge 0.82M). Next: fewer edge/curb faces (jagged walk outlines
+    traced at 0.25 m; skirts on every terrain edge), then profile again; then curb top strip, corner jogs, car parks,
+    seawall pockets; then the side-by-side and the user's go-ahead.
     Was: 3e wiring behind a switch (heights from the road edges, tiles on workers), (slabs, curb faces) at today's heights; 3d grading
     from the grid; tiles on workers; decks and waterfront unchanged at first; behind a switch until approved.
 - Then: plots and paved-area numbers on the test areas against today, in-game check, and the user's go-ahead
