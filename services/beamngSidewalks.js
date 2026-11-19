@@ -23,7 +23,7 @@ import {
   stripUv, makeCropper, makeCutFinder, makeLevelFinder, stripPanels, panelsForItem,
   unionTile, unionTiles as unionTilesLocal, cutStrip, cutStrips as cutStripsLocal, unionsOrNull as unionsOrNullLocal,
 } from './sidewalkPanels.js';
-import { buildCarriagewayIndex, carriagewaysAt, cutNodes, isInZone, isOnOtherCarriageway, segmentsNear } from './roadMarkingCuts.js';
+import { buildCarriagewayIndex, carriagewaysAt, cutNodes, isInZone, isOnOtherCarriageway, nearestCarriagewayAt, segmentsNear } from './roadMarkingCuts.js';
 import { isOneWayRoad } from './roadWidth.js';
 import { PLAZA_MATERIAL, plazaTileM, pavedWalkSurface } from './plazas.js';
 import { smoothLine } from './lineSmoothing.js';
@@ -109,6 +109,7 @@ const DECK_SHORE_M = 0.8;     // ground this far over the deck level is land, no
 const DECK_LAND_NODES = 4;    // ... along this many of a deck's 2 m points together
 const DECK_ROAD_M = 3.5;      // a footway this near a bridge's road is on that bridge
 const DECK_LANE_OVERLAP_M = 0.5;
+const DECK_SIDEWALK_SET_M = 0.05;  // a deck's mapped sidewalk overlapping its lanes: set out this far past their edge
 // A mapped sidewalk along a road bridge is on that bridge this far out from its deck's edge (the parking, verge or
 // cycle lane between: South Main Street over the Reedy, angled parking both sides, the sidewalks 5 to 7 m out),
 // when it runs along it (within SIDEWALK_DECK_COS): at the road's height (the deck is widened to it,
@@ -1948,7 +1949,9 @@ export function buildWalkRuns(paths, carriageways, { groundAt, driveways = [], b
     // beside a street it is as high as the curb; away from one, on the ground
     // (a seawall's foot or a mapped end over the water isn't a dip in the walk)
     const heights = snapped.map((q) => {
-      const road = carriagewaysAt(index, q[0], q[1], WALK_STREET_LEVEL_M)[0];
+      // (the nearest street's height: the first one within reach could be a neighbouring segment's end, off by its
+      // grade over metres)
+      const road = nearestCarriagewayAt(index, q[0], q[1], WALK_STREET_LEVEL_M);
       return road ? road.z + CURB_H - WALK_H : groundAt(q[0], q[1]);
     });
     // (points out over the water take the shore's height, or it drags the end down)
@@ -2443,7 +2446,7 @@ export function buildDeckRuns(paths, bridges, opts = {}) {
     // crossing under the road bridge, along the same line, was lifted on to
     // the upper deck's median)
     const ours = (hit) => { const l = layerByOwner.get(hit.owner); return !Number.isFinite(path.layer) || !Number.isFinite(l) || l === path.layer; };
-    const roadsAt = (q) => (index ? carriagewaysAt(index, q[0], q[1], DECK_ROAD_M).filter(ours) : []);
+    const roadsAt = (q) => (index ? carriagewaysAt(index, q[0], q[1], DECK_ROAD_M).filter(ours).sort((p, r) => p.d2 - r.d2) : []);
     // the nearest road deck of this path's layer at a point: its z, how far out from its edge, its edge point there
     const deckNear = (q, i) => {
       if (!index) return null;
@@ -2463,7 +2466,7 @@ export function buildDeckRuns(paths, bridges, opts = {}) {
         if (d > SIDEWALK_DECK_M || (best && d >= best.gap)) continue;
         const along = Math.abs(((b[0] - a[0]) * dx + (b[1] - a[1]) * dy) / (pl * Math.sqrt(L2)));
         const ux = r > 1e-6 ? (q[0] - px) / r : 0; const uy = r > 1e-6 ? (q[1] - py) / r : 0;
-        best = { owner: s.owner, z: (s.az ?? 0) + ((s.bz ?? 0) - (s.az ?? 0)) * tt, gap: d, along, edge: [px + ux * s.half, py + uy * s.half] };
+        best = { owner: s.owner, z: (s.az ?? 0) + ((s.bz ?? 0) - (s.az ?? 0)) * tt, gap: d, along, edge: [px + ux * s.half, py + uy * s.half], ux, uy, out: r > 1e-6 };
       }
       return best;
     };
@@ -2473,6 +2476,8 @@ export function buildDeckRuns(paths, bridges, opts = {}) {
       || (path.sidewalk && near[i] && near[i].gap < SIDEWALK_DECK_M && near[i].along > SIDEWALK_DECK_COS ? near[i] : null));
     const raw = nodes.map((q, i) => {
       const road = onRoad[i];
+      // (road: the nearest deck segment within reach, roadsAt; the first one found was often its neighbour's end, up
+      // to 8 m along a 3 % deck, and the Bridge of Lions' sidewalks wavered from flush with its road to 0.3 m over it)
       if (road) return road.z + CURB_H - WALK_H;
       return onLand(i) ? ground[i] : least;
     });
@@ -2551,13 +2556,21 @@ export function buildDeckRuns(paths, bridges, opts = {}) {
     // (not over the road's own lanes: a path mapped across a deck's lanes, on
     // its layer, stood on the motorway as a slab; left out where it overlaps
     // them by more than DECK_LANE_OVERLAP_M)
-    const inLanes = nodes.map((q) => !!index && carriagewaysAt(index, q[0], q[1], half - DECK_LANE_OVERLAP_M).filter(ours).length > 0);
+    // (a mapped sidewalk along the deck whose inner part the drawn lanes cover is set out to just past their edge, not
+    // cut: the sidewalks of a two-lane bridge mapped 4.7 m off its centre line lay half on lanes drawn 4.3 m wide, and
+    // the Bridge of Lions lost one side and the end of the other)
+    const at = nodes.map((q, i) => {
+      const nr = near[i];
+      if (!path.sidewalk || !nr || !nr.out || nr.along <= SIDEWALK_DECK_COS || nr.gap >= half + DECK_SIDEWALK_SET_M) return q;
+      return [nr.edge[0] + nr.ux * (half + DECK_SIDEWALK_SET_M), nr.edge[1] + nr.uy * (half + DECK_SIDEWALK_SET_M), q[2]];
+    });
+    const inLanes = at.map((q) => !!index && carriagewaysAt(index, q[0], q[1], half - DECK_LANE_OVERLAP_M).filter(ours).length > 0);
     const pieces = [];
     let cur = [];
     nodes.forEach((q, i) => { if (inLanes[i]) { if (cur.length > 1) pieces.push(cur); cur = []; } else cur.push(i); });
     if (cur.length > 1) pieces.push(cur);
     return pieces.map((idx) => {
-      const centre = idx.map((i) => [nodes[i][0], nodes[i][1], z[i]]);
+      const centre = idx.map((i) => [at[i][0], at[i][1], z[i]]);
       const flat = centre.map((q) => [q[0], q[1], q[2], 0]);
       const points = offsetLine(flat, half).map((q) => [q[0], q[1], q[2]]);
       const width = half * 2; const side = -1;

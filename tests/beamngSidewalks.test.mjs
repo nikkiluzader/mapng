@@ -831,3 +831,25 @@ test('a footbridge\'s ends meet the walks they join; an end on dug ground takes 
   assert.ok(Math.abs(z[0] + 0.1 - 13.5) < 0.05, `west end at the walk's top: ${z[0].toFixed(2)}`);
   assert.ok(Math.abs(z[z.length - 1] - 15) < 0.05, `east end on the surveyed bank: ${z[z.length - 1].toFixed(2)}`);
 });
+
+// A two-lane road bridge drawn 4.3 m each side of its centre, its sidewalks mapped 4.7 m off it: half of each walkway
+// lies on the drawn lanes. They are set out to just past the lanes' edge, the whole length, not cut away (the Bridge
+// of Lions lost its south sidewalk and the end of the north one).
+test('a road bridge\'s mapped sidewalks overlapping its drawn lanes are set out past them, not cut', async () => {
+  const { buildDeckRuns } = await import('../services/beamngSidewalks.js');
+  // (a deck climbing 3 % east: the walkway follows it a curb's height over its road all along)
+  const deckZ = (x) => 8 + 0.03 * (x + 100);
+  const road = street({ owner: 9, bridge: true, half: 4.3, tags: { layer: '1' }, nodes: Array.from({ length: 51 }, (_, i) => [-100 + i * 4, 0, deckZ(-100 + i * 4), 8.6]) });
+  const side = (y) => ({ nodes: Array.from({ length: 41 }, (_, i) => [-80 + i * 4, y, 0]), half: 0.9, sidewalk: true, bridge: true, layer: 1 });
+  const runs = buildDeckRuns([side(4.7), side(-4.7)], [road], { groundAt: () => 0, seaZ: -5 });
+  for (const y of [4.7, -4.7]) {
+    const mine = runs.filter((r) => Math.sign(r.centre[0][1]) === Math.sign(y));
+    assert.equal(mine.length, 1, `one walkway on the ${y > 0 ? 'north' : 'south'} side`);
+    const xs = mine[0].centre.map((q) => q[0]);
+    assert.ok(Math.min(...xs) <= -79 && Math.max(...xs) >= 79, 'the whole length');
+    assert.ok(mine[0].centre.every((q) => Math.abs(q[1]) >= 4.3 + 0.9), 'clear of the lanes');
+    // (its top WALK_H over its line: a curb's height over the deck's road, within the 2 m smoothing's few cm)
+    const off = mine[0].centre.slice(3, -3).map((q) => q[2] + 0.1 - deckZ(q[0]));
+    assert.ok(off.every((v) => Math.abs(v - 0.15) < 0.04), `a curb over the deck: ${Math.min(...off).toFixed(2)}..${Math.max(...off).toFixed(2)}`);
+  }
+});

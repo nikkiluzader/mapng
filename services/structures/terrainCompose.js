@@ -24,6 +24,7 @@ const SLOPE_MIN_M = 2;
 const SLOPE_MAX_M = 40;
 const DECK_UNDER_M = 2.2;      // deck depth under its road surface
 const DECK_CLEAR_M = 0.5;      // terrain at least this far under a deck's underside
+const LOW_DECK_UNDER_M = 0.6;  // a low deck's slab: the ground is dug no further than this (and DECK_CLEAR_M) under its road
 const DECK_REACH_M = 1.5;      // past a deck's half width
 const ABUTMENT_M = 8;
 const CORE_STEP_M = 2;          // road cores this far apart in height are on two levels
@@ -354,7 +355,10 @@ export function composeTerrain(graph, grid) {
           if (deck) {
             // under the deck only, not round its ends
             if (uRaw < 0 || uRaw > 1) continue;
-            const cap = zc - DECK_UNDER_M - DECK_CLEAR_M;
+            // (where the full deck's clearance would dig into the ground, a low deck: the ground stays, down to at most a
+            // thin slab's clearance, and the girders run into the bank. Dug to the full depth, a short bridge laid low by
+            // its reach (crossings.js rise) sat in a 2 m trench with walls along its edges)
+            const cap = Math.max(zc - DECK_UNDER_M - DECK_CLEAR_M, Math.min(raw(c, r) - minHeight, zc - LOW_DECK_UNDER_M - DECK_CLEAR_M));
             if (cap < t.cap[j]) t.cap[j] = cap;
             continue;
           }

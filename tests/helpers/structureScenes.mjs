@@ -89,6 +89,20 @@ export const STRUCTURE_SCENES = [
     ]),
   },
   {
+    name: 'short service bridge over a pond beside a street',
+    // (a low bridge level with the ground, its pond's surface at the ground's height: no deck to build)
+    solverDeck: true,
+    // a flat town at 3 m; a 16 m private service bridge crosses a pond (mapped as water, its surface at the ground's
+    // height in the survey) and joins a street at grade just past it: the bridge stays low, the street on the ground
+    build: () => terrain(() => 3, [
+      way(1, [[-450, 14], [450, 14]], { highway: 'secondary', oneway: 'yes' }),
+      way(2, [[0, -300], [0, -8]], { highway: 'service' }),
+      way(3, [[0, -8], [0, 8]], { highway: 'service', bridge: 'yes', layer: '1', access: 'private' }),
+      way(4, [[0, 8], [0, 14]], { highway: 'service' }),
+      water(5, [[-30, -6], [30, -6], [30, 6], [-30, 6], [-30, -6]], { natural: 'water' }),
+    ]),
+  },
+  {
     name: 'track down through a steep gully',
     // a V gully 25 m deep, its sides about 1:2, along y = 0; an untagged
     // track crosses it (no bridge mapped: it goes down and up)

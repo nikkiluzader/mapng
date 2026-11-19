@@ -436,9 +436,14 @@ export function* solveProfilesSteps(graph) {
     for (let i = run.i0; i <= run.i1; i++) surface = Math.min(surface, G[off[run.edge] + i]);
     // (and its underside over each station's own ground: a river mapped with its banks in it had the
     // deck through the banks, Clear Creek under I-70, the Tame Valley Canal)
+    // (capped at what the bridge reaches from the ground at its edge's ends at its class grade, run.rise: the
+    // clearance it can't reach is not built by lifting the streets at its ends)
+    const e = edges[run.edge]; const last = e.s.length - 1; const g0 = G[off[run.edge]]; const g1 = G[off[run.edge] + last];
     for (let i = run.i0; i <= run.i1; i++) {
       const k = off[run.edge] + i;
-      waterSeeds.push([k, Math.min(Math.max(surface + (run.needs?.[i - run.i0] ?? run.need), G[k] + WATER_OVER_GROUND_M) + DECK_UNDER_M, minorCap(run, i))]);
+      const ends = g0 + (g1 - g0) * (last > 0 ? e.s[i] / (e.s[last] || 1) : 0);
+      const cap = run.rise ? ends + run.rise[i - run.i0] : Infinity;
+      waterSeeds.push([k, Math.min(Math.max(surface + (run.needs?.[i - run.i0] ?? run.need), G[k] + WATER_OVER_GROUND_M) + DECK_UNDER_M, minorCap(run, i), cap)]);
     }
   }
 

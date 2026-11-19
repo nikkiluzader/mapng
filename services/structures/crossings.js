@@ -347,14 +347,19 @@ export function findCrossings(graph, { waterAt = null } = {}) {
           // (the lower side): it rises toward its middle, never beyond
           const wanted = need;
           const needs = [];
+          // (and the most its road may stand over the ground at its ends, climbing at its class grade: the
+          // clearance, the deck's depth and all. With the floor alone a 16 m bus bridge over a creek stood its road
+          // 4 m up and pulled the street it joins at grade up 2 m onto a deck)
+          const rise = [];
           for (let k = i0; k <= i1; k++) {
             const toStart = e.s[k] + reachOf(e.from);
             const toEnd = e.s[e.s.length - 1] - e.s[k] + reachOf(e.to);
             const reach = gradeLimit(e.highway) * Math.min(toStart, toEnd) * REACH_SHARE;
             needs.push(Math.max(Math.min(need, reach), Math.min(need, WATER_CLEAR_FLOOR_M)));
+            rise.push(reach);
           }
           need = Math.max(...needs);
-          water.push({ edge: e.id, i0, i1, s0: e.s[i0], s1: e.s[i1], run, channel, minor, need, needs, wanted });
+          water.push({ edge: e.id, i0, i1, s0: e.s[i0], s1: e.s[i1], run, channel, minor, need, needs, wanted, rise });
           i0 = -1;
         }
       }

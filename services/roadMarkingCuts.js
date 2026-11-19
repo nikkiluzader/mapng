@@ -72,6 +72,13 @@ export function segmentsNear(index, x, y, r) {
   return [...seen].sort((a, b) => a - b);
 }
 
+/** The nearest of carriagewaysAt's hits (its height interpolated along that segment), or null. */
+export function nearestCarriagewayAt(index, x, y, margin, opts) {
+  let best = null;
+  for (const h of carriagewaysAt(index, x, y, margin, opts)) if (!best || h.d2 < best.d2) best = h;
+  return best;
+}
+
 export function carriagewaysAt(index, x, y, margin, { sides = false } = {}) {
   const out = [];
   const cell = index.grid.get(cellKey(Math.floor(x / CELL_M), Math.floor(y / CELL_M)));
@@ -87,7 +94,7 @@ export function carriagewaysAt(index, x, y, margin, { sides = false } = {}) {
     const t = Math.max(0, Math.min(1, raw));
     const ex = s.ax + t * dx - x; const ey = s.ay + t * dy - y;
     const reach = halfOfSegment(s, t) + margin;
-    if (ex * ex + ey * ey < reach * reach) out.push({ owner: s.owner, z: (s.az ?? 0) + ((s.bz ?? 0) - (s.az ?? 0)) * t });
+    if (ex * ex + ey * ey < reach * reach) out.push({ owner: s.owner, z: (s.az ?? 0) + ((s.bz ?? 0) - (s.az ?? 0)) * t, d2: ex * ex + ey * ey });
   }
   return out;
 }

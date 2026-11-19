@@ -75,6 +75,19 @@ test('profile: a bridge over a ship channel never lifts the streets beyond it', 
   });
 });
 
+test('profile: a short bridge over a pond stays low and never lifts the street it joins', async () => {
+  const g = await solved('short service bridge over a pond beside a street');
+  const k = g.edges.findIndex((e) => e.bridge);
+  const top = Math.max(...g.profile.z[k]);
+  // (16 m at a service road's 15 %, from both ends: about 1 m up at most; the clearance floor stood it 4 m up)
+  assert.ok(top - 3 < 1.5, `bridge ${(top - 3).toFixed(2)} m over the ground`);
+  g.edges.forEach((e, j) => {
+    if (e.highway !== 'secondary') return;
+    const z = g.profile.z[j];
+    for (let i = 0; i < z.length; i++) assert.ok(Math.abs(z[i] - e.g[i]) < 0.3, `street lifted ${(z[i] - e.g[i]).toFixed(2)} m at x ${e.x[i].toFixed(0)}`);
+  });
+});
+
 test('profile: an untagged track goes down through a gully, never a tall deck over it', async () => {
   const g = await solved('track down through a steep gully');
   const k = g.edges.findIndex((e) => e.highway === 'track');
