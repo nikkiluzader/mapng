@@ -477,7 +477,8 @@ export function buildPavedMesh(rings0, cells, g, { heightAt = () => 0, bottomAt 
 export const GRADE_UNDER_M = 0.14;      // the ground this far under the slab's top (a 1 m grid can't follow it closer)
 export const BLEND_MIN_M = 1;
 export const BLEND_MAX_M = 10;
-export const BLEND_RUN = 2;             // 1 m of height difference blends over 2 m
+export const BLEND_RUN = 2;
+export const ROAD_MARGIN_M = 0.3;      // terrain this near a road is the road's (today's GROUND_ROAD_MARGIN_M)             // 1 m of height difference blends over 2 m
 const smooth01 = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 
 /**
@@ -502,7 +503,10 @@ export function gradePaved(cells, g, terrain, { heightAt = () => 0, core = null,
   for (let r = 0; r < sh; r++) {
     for (let c = 0; c < sw; c++) {
       const x = wx(c + c0); const y = wy(r + r0); const v = at(x, y); const k = r * sw + c;
-      if (v & ROAD) road[k] = 1;
+      // (road within ROAD_MARGIN_M of the pixel: the road's own; the old grading's margin, without it the paving's
+      // grading tilted the edges of the road surfaces)
+      const m = ROAD_MARGIN_M;
+      if ((v | at(x + m, y) | at(x - m, y) | at(x, y + m) | at(x, y - m)) & ROAD) road[k] = 1;
       else if (v & (WALK | GAP)) { paved[k] = 1; top[k] = heightAt(x, y) - GRADE_UNDER_M; }
     }
   }
