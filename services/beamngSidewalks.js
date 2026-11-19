@@ -4046,6 +4046,8 @@ export function gradeSidewalkGround(runs, carriageways, grid, { overhead = () =>
  */
 export function checkPavedGround(paved, groundAt, { step = 2 } = {}) {
   let samples = 0; let floating = 0; let buried = 0; let worst = null; let worstBuried = null;
+  // (the first spots of each, for the sweep's plots: [x, y, metres])
+  const spots = { floating: [], buried: [] }; const SPOTS = 64;
   const FLOAT_M = CURB_H + SINK + 0.1;
   const BURIED_M = 0.08;
   for (const { cells, g, core } of paved?.tiles || []) {
@@ -4062,12 +4064,14 @@ export function checkPavedGround(paved, groundAt, { step = 2 } = {}) {
         samples++;
         const gap = top - ground;
         // (worst in the report's shape, as checkSidewalkGround gives it)
+        if (gap > FLOAT_M && spots.floating.length < SPOTS) spots.floating.push([Math.round(x), Math.round(y), Math.round(gap * 100) / 100]);
+        if (ground - top > BURIED_M && spots.buried.length < SPOTS) spots.buried.push([Math.round(x), Math.round(y), Math.round((ground - top) * 100) / 100]);
         if (gap > FLOAT_M) { floating++; if (!worst || gap > worst.gap) worst = { gap: Math.round(gap * 100) / 100, at: [Math.round(x), Math.round(y)], road: 'paved walk' }; }
         if (ground - top > BURIED_M) { buried++; const b = ground - top; if (!worstBuried || b > worstBuried.by) worstBuried = { by: Math.round(b * 100) / 100, at: [Math.round(x), Math.round(y)] }; }
       }
     }
   }
-  return { samples, floating, buried, worst, worstBuried };
+  return { samples, floating, buried, worst, worstBuried, spots };
 }
 
 export function checkSidewalkGround(runs, groundAt, { step = 2 } = {}) {

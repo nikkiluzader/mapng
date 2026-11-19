@@ -7821,7 +7821,8 @@ function exportPhaseWeights({ size, osmFeatureCount, roadCount, buildingCount, i
     vegetation: 0.03 + 0.42 * px + 0.0000084 * f,
     assets: 0.03,
     zip: 0.01 + 0.13 * px + 0.00002 * r,
-    compress: 0.3 + 3 * px + 0.0005 * r,
+    // (the archive's writing, ~a file a named road: 5.5 s for 781 files / 2343 roads at 1024 in the browser)
+    compress: 0.5 + 2 * px + 0.0015 * r,
   };
 }
 
@@ -16544,8 +16545,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   let zipCostDone = 0;
   let zipCurrentFile = null;
   let lastZipReportAt = 0;
-  // the big entries compressed natively first (most of the work: the rest
-  // of the bar is JSZip writing the archive)
+  // the big entries compressed natively first (mostly done while the export ran: what is left is a short drain;
+  // writing the archive is most of the step, 5 of 5.5 s at 1024 in the browser)
+  const PRECOMPRESS_SHARE = 0.15;
   let zipShare = 0;
   const precompressed = await precompressZipEntries(zip, JSZip, {
     compressor: zipCompressor,
@@ -16553,11 +16555,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       const now = performance.now();
       if (now - lastZipReportAt < 250) return;
       lastZipReportAt = now;
-      report(`Compressing the level ZIP (${formatBytes(zipTotalBytes)}, ${zipEntries.length} files): ${name.replace(`levels/${levelName}/`, '')}…`, fraction * 0.9);
+      report(`Compressing the level ZIP (${formatBytes(zipTotalBytes)}, ${zipEntries.length} files): ${name.replace(`levels/${levelName}/`, '')}…`, fraction * PRECOMPRESS_SHARE);
     },
   });
   if (precompressed) {
-    zipShare = 0.9;
+    zipShare = PRECOMPRESS_SHARE;
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} ZIP: ${precompressed} big entries compressed natively.`);
   }
   const onZipPercent = (pct, currentFile) => {

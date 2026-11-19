@@ -141,3 +141,25 @@ test('a residential street (houses near) keeps its verge between curb and sidewa
   const sub = build(g, { ...base, houses: [house] }).cells;
   assert.ok(at(sub, 0, 6) & V && !(at(sub, 0, 6) & G), 'with a house behind: lawn');
 });
+
+// The paved tiles on worker threads give the same grid and outlines as on this thread (the optimization rules: one
+// function, both paths; results back in order).
+test('paved tiles: worker threads and this thread agree', async () => {
+  const { parallelMap } = await import('../services/parallel.js');
+  const { pavedTiles } = await import('../services/pavedWorker.js');
+  const item = (dx) => ({
+    box: [-30 + dx, -30, 30 + dx, 30],
+    roads: [{ pts: [[-40 + dx, 0], [40 + dx, 0]], half: 4 }],
+    walks: [{ pts: [[-40 + dx, 9.5], [40 + dx, 9.5]], half: 1, sidewalk: true }, { pts: [[-40 + dx, -6], [40 + dx, -6]], half: 1, sidewalk: false }],
+    buildings: [[[-5 + dx, 14], [5 + dx, 14], [5 + dx, 25], [-5 + dx, 25]]],
+  });
+  const batches = [[item(0), item(60)], [item(120)]];
+  const threaded = (await parallelMap(batches, { local: pavedTiles, module: new URL('../services/pavedWorker.js', import.meta.url).href, fn: 'pavedTiles', threads: 2 })).flat();
+  const inline = batches.flatMap(pavedTiles);
+  assert.equal(threaded.length, 3);
+  for (let i = 0; i < 3; i++) {
+    assert.deepEqual(Array.from(threaded[i].cells), Array.from(inline[i].cells));
+    assert.deepEqual(threaded[i].rings, inline[i].rings);
+    assert.ok(inline[i].rings.length > 0);
+  }
+});
