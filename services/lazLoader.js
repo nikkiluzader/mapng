@@ -1,4 +1,5 @@
 import proj4 from 'proj4';
+import { guessCoordinateSystems } from './crsCatalog.js';
 import {
   detectUnitFromText,
   getBuiltInProj4,
@@ -75,7 +76,9 @@ const epsgFromWKT = (wkt) => {
  * Parse a LAS/LAZ file header and extract metadata + WGS84 bounds.
  * Runs on the main thread — returns everything needed to rasterize on the worker.
  */
-export const parseLazFile = async (file) => {
+// opts: { near: {lat, lng} the area selected on the map, forceEpsg: a code the user picked } (the coordinate system
+// guess for a file that names none: crsCatalog.js)
+export const parseLazFile = async (file, opts = {}) => {
   const buffer = await file.arrayBuffer();
   const view   = new DataView(buffer);
   const bytes  = new Uint8Array(buffer);
@@ -141,6 +144,21 @@ export const parseLazFile = async (file) => {
   // Detect LAZ: file extension is most reliable; laszip VLR as backup
   const isLaz = file.name.toLowerCase().endsWith('.laz') || hasLazVLR;
   const detectedVertical = detectVerticalUnitFromWKT(wktText);
+
+  // ── No coordinate system in the file: a best guess from its coordinates (or the one the user picked) ──
+  // (the Lithuanian national lidar, from LAStools' las2las, carries no GeoKeys or WKT: its numbers alone put it in
+  // Kaunas in LKS-94. The guess is reported as one, with the other candidates, so the upload can show and change it)
+  let crsGuess = null;
+  const declaredEpsg = epsgCode;
+  if (!epsgCode) {
+    const candidates = guessCoordinateSystems({ minX, maxX, minY, maxY }, { near: opts.near || null, defOf: getBuiltInProj4 });
+    const forced = Number(opts.forceEpsg);
+    const chosen = Number.isFinite(forced) && forced > 0 ? (candidates.find((c) => c.epsg === forced) || { epsg: forced, name: `EPSG:${forced}` }) : candidates[0];
+    if (chosen) {
+      epsgCode = chosen.epsg;
+      crsGuess = { epsg: chosen.epsg, name: chosen.name, picked: Number.isFinite(forced) && forced > 0, candidates: candidates.map((c) => ({ epsg: c.epsg, name: c.name, center: c.center })) };
+    }
+  }
 
   // ── Convert bounding box to WGS84 ────────────────────────────────────────
   let bounds = null;
@@ -209,6 +227,7 @@ export const parseLazFile = async (file) => {
     offsetX, offsetY, offsetZ,
     minX, maxX, minY, maxY, minZ, maxZ,
     epsgCode,
+    ...(crsGuess && !declaredEpsg ? { crsGuess } : {}),
     bounds,
     center,
     nativeWidth: coverageSummary.nativeWidth,
@@ -227,16 +246,19 @@ export const parseLazFile = async (file) => {
  * then the per-tile height maps are combined. All tiles must be geo-referenced
  * so their union bounds are meaningful.
  */
-export const parseLazFiles = async (files = []) => {
+export const parseLazFiles = async (files = [], opts = {}) => {
   const list = Array.from(files || []).filter(Boolean);
   if (list.length === 0) {
     throw new Error('No LAZ/LAS files selected.');
   }
   if (list.length === 1) {
-    return parseLazFile(list[0]);
+    return parseLazFile(list[0], opts);
   }
 
-  const parsedList = await Promise.all(list.map((file) => parseLazFile(file)));
+  // (tiles with no coordinate system all take the first tile's guess, or they would not line up)
+  const first = await parseLazFile(list[0], opts);
+  const shared = first.crsGuess ? { ...opts, forceEpsg: first.crsGuess.epsg } : opts;
+  const parsedList = [first, ...(await Promise.all(list.slice(1).map((file) => parseLazFile(file, shared))))];
 
   const ungeoreferenced = parsedList.filter((meta) => !meta?.bounds);
   if (ungeoreferenced.length > 0) {

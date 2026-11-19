@@ -10,7 +10,11 @@
 
       <!-- LAZ/LAS status -->
       <template v-if="isLazFile">
-        <p v-if="uploadedElevationMeta?.center" class="text-caption text-emerald-600 dark:text-emerald-400">
+        <!-- (no coordinate system in the file: placed by a best guess from its numbers, shown as one) -->
+        <p v-if="uploadedElevationMeta?.center && uploadedElevationMeta?.crsGuess" class="text-caption text-amber-600 dark:text-amber-400" data-testid="upload-crs-guessed">
+          {{ ptLabel }} — {{ t(uploadedElevationMeta.crsGuess.picked ? 'upload.crsPicked' : 'upload.crsGuessed', { name: uploadedElevationMeta.crsGuess.name }) }}
+        </p>
+        <p v-else-if="uploadedElevationMeta?.center" class="text-caption text-emerald-600 dark:text-emerald-400">
           {{ ptLabel }} — {{ t('upload.autoDetected') }}
         </p>
         <p v-else-if="uploadedElevationMeta" class="text-caption text-amber-600 dark:text-amber-400">
@@ -113,8 +117,14 @@
             @change="$emit('update:ascCoordinateSystem', $event.target.value)"
             :class="[SELECT_XS, 'flex-1 min-w-0']"
           >
-            <option value="auto">{{ t('upload.auto') }}</option>
-            <option value="2180">{{ t('upload.crsPl1992') }}</option>
+            <template v-if="crsGuessCandidates.length">
+              <option value="auto">{{ t('upload.crsAutoGuess', { name: crsGuessCandidates[0].name }) }}</option>
+              <option v-for="c in crsGuessCandidates.slice(1)" :key="c.epsg" :value="String(c.epsg)">{{ c.name }} (EPSG:{{ c.epsg }})</option>
+            </template>
+            <template v-else>
+              <option value="auto">{{ t('upload.auto') }}</option>
+              <option value="2180">{{ t('upload.crsPl1992') }}</option>
+            </template>
           </select>
         </div>
       </div>
@@ -467,9 +477,12 @@ const handleCustomNoDataChange = (raw) => {
   emit('update:noDataOverride', raw === '' || !Number.isFinite(parsed) ? NODATA_AUTO : String(parsed));
 };
 
+// (a point cloud whose coordinate system was guessed: the candidates, best first; the list stays as first
+// guessed while the user picks among them)
+const crsGuessCandidates = computed(() => props.uploadedElevationMeta?.crsGuess?.candidates || []);
 const showAscCoordinateSelector = computed(() => {
   const sourceFormat = String(props.uploadedElevationMeta?.sourceFormat || '').toLowerCase();
-  return sourceFormat === 'asc' || sourceFormat === 'asc-multi';
+  return sourceFormat === 'asc' || sourceFormat === 'asc-multi' || crsGuessCandidates.value.length > 1;
 });
 
 const handleFileChange = (e) => {

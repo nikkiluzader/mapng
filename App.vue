@@ -707,9 +707,15 @@ const resetUploadDerivedState = () => {
   lastGenerationKey.value = null;
 };
 
+// (a point cloud that names no coordinate system: its best guess ranked by the area on the map, or the system the
+// user picked in the upload's Coordinate system list)
+const uploadParseOpts = () => {
+  const picked = Number(uploadedAscCoordinateSystem.value);
+  return { near: isValidCenter(store.center) ? { lat: store.center.lat, lng: store.center.lng } : null, ...(Number.isFinite(picked) && picked > 0 ? { forceEpsg: picked } : {}) };
+};
 const parseSlotFiles = async (files) => {
   const selected = files.length > 1 ? files : files[0];
-  const meta = await parseElevationFile(selected);
+  const meta = await parseElevationFile(selected, uploadParseOpts());
   return applyAscCoordinateSelection(meta);
 };
 
@@ -796,6 +802,21 @@ const handleUploadedAscCoordinateSystemChange = async (value) => {
   const fileOrFiles = uploadedElevationFile.value;
   if (!fileOrFiles) return;
   const files = Array.isArray(fileOrFiles) ? fileOrFiles : [fileOrFiles];
+  // (a point cloud with a guessed coordinate system: parsed again in the one picked, the map moved to it)
+  const allLaz = files.length > 0 && files.every((file) => /\.(laz|las)$/i.test(String(file?.name || '')));
+  if (allLaz) {
+    try {
+      const meta = await parseElevationFile(fileOrFiles, uploadParseOpts());
+      if (elevationSlots.value.length) elevationSlots.value = [{ ...elevationSlots.value[0], meta }, ...elevationSlots.value.slice(1)];
+      const merged = elevationSlots.value.length ? rebuildMergedUpload() : (uploadedElevationMeta.value = meta);
+      if (isValidCenter(merged?.center)) store.setCenter(merged.center, { force: true });
+      terrainData.value = null;
+      lastGenerationKey.value = null;
+    } catch (error) {
+      console.warn('[BYOD] Failed to re-parse the point cloud after a coordinate system change:', error);
+    }
+    return;
+  }
   const allAsc = files.length > 0
     && files.every((file) => String(file?.name || '').toLowerCase().endsWith('.asc'));
   if (!allAsc) return;

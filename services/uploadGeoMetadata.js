@@ -1,3 +1,4 @@
+import { nationalGridDef } from './crsCatalog.js';
 import proj4 from 'proj4';
 
 export const USER_DEFINED_CRS = 32767;
@@ -20,6 +21,9 @@ export const detectUnitFromText = (text) => {
 };
 
 export const getBuiltInProj4 = (epsgCode) => {
+  // (the national grids crsCatalog.js knows: no fetch from epsg.io, in the page or the LAZ worker)
+  const national = nationalGridDef(epsgCode);
+  if (national) return national;
   if (epsgCode === 28992) {
     // Amersfoort / RD New.
     // Uses the same TOWGS84 parameters commonly embedded in Dutch AHN GeoTIFFs.

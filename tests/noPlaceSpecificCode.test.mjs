@@ -44,6 +44,7 @@ const LATLNG_ALLOWED = new Map([
   ['beamngTrees.js', 'climate regions for the tree mix'],
   ['beamngBuildings.js', 'building style regions'],
   ['geoUtils.js', 'UTM hemisphere and zone maths'],
+  ['crsCatalog.js', 'coordinate systems\' areas of use (EPSG bounding boxes) and UTM zone extents, for guessing an upload\'s system'],
   ['exportBeamNGLevel.js', 'North American town utility poles (region)'],
   ['terrain.js', 'elevation dataset coverage (CONUS / Alaska / Hawaii)'],
   ['streetProps.js', 'utility pole regions (native poles by region)'],

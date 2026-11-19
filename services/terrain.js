@@ -1262,7 +1262,8 @@ const NO_DATA_VALUE = -99999;
  * - Point cloud: .laz, .las
  * - Raster/text: .tif, .tiff, .asc, .gml, .xml, .zip
  */
-export const parseElevationFile = async (fileOrFiles) => {
+// opts: passed to the LAZ/LAS parser ({ near, forceEpsg }: the coordinate system guess for a file that names none)
+export const parseElevationFile = async (fileOrFiles, opts = {}) => {
   const files = Array.isArray(fileOrFiles)
     ? fileOrFiles
     : (fileOrFiles ? [fileOrFiles] : []);
@@ -1289,14 +1290,14 @@ export const parseElevationFile = async (fileOrFiles) => {
       case 'asc': return parseAscFiles(files);
       case 'tif': return parseTifFiles(files);
       case 'gml': return parseGridFiles(files);
-      case 'laz': return parseLazFiles(files);
+      case 'laz': return parseLazFiles(files, opts);
     }
   }
 
   const file = files[0];
   const ext = extOf(file);
   if (ext === 'laz' || ext === 'las') {
-    return parseLazFile(file);
+    return parseLazFile(file, opts);
   }
   return parseRasterOrGridElevationFile(file);
 };
