@@ -7793,33 +7793,35 @@ function summarizeTerrainSamples(terrainData) {
 // its file count (≈ the roads: one folder per named road) and the backdrop's
 // downloads with the area, so the bar follows the time actually spent.
 function exportPhaseWeights({ size, osmFeatureCount, roadCount, buildingCount, includeBackdrop, fineDetail = false, bridgeLidar = false }) {
-  // Roughly seconds, from a timed 2048² export (px 0.25: 2211 roads, 2822
-  // buildings, ~10k features): roads + sidewalks 9 s, base texture 1.7 s,
-  // materials 1.2 s, terrain.ter 1.7 s, thumbnail 2.4 s, buildings 2.5 s,
-  // furniture 2.5 s, vegetation 2.2 s, assembling 2.5 s, compression 7 s. The
-  // progress card then paces each phase by this run's own speed.
+  // Seconds, fitted 2026-11-19 to 281 timed exports of the current code (the sweep's matrix and the 4 km benchmarks:
+  // scratch/speed/fitweights.py), each phase a + b·px + c·roads + d·buildings + e·features. The speed work had made
+  // the old weights wrong by several times (roads and sidewalks far faster, the thumbnail nearly free), and the bar
+  // jumped through some phases and crawled through others. Compression is not in the reports: weighted from a timed
+  // 8 km export in the app (55 s against the roads' 159 s). The progress card paces each phase by this run's speed.
   const px = (size / 4096) ** 2;
+  const r = roadCount; const b = buildingCount; const f = osmFeatureCount;
   return {
-    prepare: 0.5,
-    // fine ground detail and cliffs (8k: 6.5 s), measured bridge heights (~0.3 s a US survey node)
-    detail: fineDetail ? 0.3 + 1.6 * px : 0,
+    prepare: 0.05 + 0.08 * px + 0.00005 * r + 0.00007 * b,
+    detail: fineDetail ? 0.08 + 0.87 * px : 0,
+    // (measured bridge heights: a few seconds of downloads and decodes, not refitted)
     lidar: bridgeLidar ? 3 : 0,
-    roads: 1 + 0.001 * roadCount,
-    sidewalks: 0.0025 * roadCount,
-    props: 0.5 + 0.0002 * roadCount,
-    texture: 0.5 + 4.5 * px,
-    materials: 0.3 + 3.5 * px,
-    ter: 0.3 + 6 * px,
-    heightmap: 0.2 + 1.4 * px,
-    thumbnail: 0.5 + 7 * px,
+    roads: 0.2 + 4.7 * px + 0.0017 * r,
+    sidewalks: 0.3 + 0.0015 * r + 0.00012 * b + 0.000018 * f,
+    props: 0.03 + 0.13 * px + 0.00004 * r,
+    texture: 0.03 + 0.29 * px + 0.00002 * r + 0.00005 * b,
+    materials: 0.05 + 3.7 * px + 0.00002 * r + 0.00004 * b,
+    ter: 0.03 + 0.8 * px + 0.00008 * r + 0.00005 * b,
+    heightmap: 0.04 + 1.37 * px,
+    thumbnail: 0.01 + 0.02 * px,
+    // (the surroundings' downloads and resampling: not in the fitted runs, kept)
     backdrop: includeBackdrop ? 4 + 15 * px : 0,
-    buildings: 0.3 + 0.0008 * buildingCount,
-    water: 0.2,
-    furniture: 0.5 + 0.0002 * osmFeatureCount,
-    vegetation: 0.5 + 0.00015 * osmFeatureCount,
-    assets: 0.4,
-    zip: 0.5 + 8 * px,
-    compress: 2 + 0.002 * roadCount + 8 * px,
+    buildings: 0.2 + 0.00024 * r + 0.00036 * b,
+    water: 0.02 + 0.35 * px,
+    furniture: 0.2 + 0.23 * px + 0.00036 * r + 0.00015 * b + 0.000014 * f,
+    vegetation: 0.03 + 0.42 * px + 0.0000084 * f,
+    assets: 0.03,
+    zip: 0.01 + 0.13 * px + 0.00002 * r,
+    compress: 0.3 + 3 * px + 0.0005 * r,
   };
 }
 
