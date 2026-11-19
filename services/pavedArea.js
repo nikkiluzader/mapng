@@ -254,9 +254,10 @@ export function cornerApex(arc) {
 /**
  * The outlines of the cells with any of bits set (step 3b): closed rings in world metres, traced along the
  * cell-edge midpoints (marching squares: stair-steps become diagonals), then simplified within tol (Douglas-
- * Peucker). Outer rings run counter-clockwise, holes clockwise (signed area > 0 outer).
+ * Peucker; within one cell: the midpoints' zigzag on a diagonal is about 0.15 m, and at half a cell it stayed, ten
+ * times the edges, every one a curb or skirt face). Outer rings run counter-clockwise, holes clockwise.
  */
-export function traceOutlines(cells, g, bits, tol = PAVED_RES_M / 2) {
+export function traceOutlines(cells, g, bits, tol = PAVED_RES_M) {
   const { w, h } = g;
   const on = (c, r) => c >= 0 && r >= 0 && c < w && r < h && (cells[r * w + c] & bits) !== 0;
   // corner samples are cell centres; a square (c, r) .. (c + 1, r + 1) of samples, edges midway between them.

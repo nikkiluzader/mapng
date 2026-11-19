@@ -169,15 +169,21 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
       cores.push(core);
     }
   }
-  const built = (items.length ? yield { kind: 'pavedTiles', items } : null) || items.map(pavedTile);
   const fineAt = crossings.length ? (x, y) => toDriveway(x, y) < DRIVEWAY_HALF_M + DIP_RAMP_M + 1 : null;
-  built.forEach(({ cells, g, rings }, k) => {
+  const meshTile = ({ cells, g, rings }, k) => {
     const core = cores[k];
     const m = buildPavedMesh(rings, cells, g, { heightAt, bottomAt: surfaceAt, curbH, THREE, core, fineAt });
     addToBuilder(builder, m);
     stats.tiles++; stats.slab += m.slab.length / 9; stats.curb += m.curb.length / 9; stats.skirt += m.skirt.length / 9;
     tiles.push({ cells, g, core });
-  });
+  };
+  // (meshed as the tiles come back from the workers, while they build the rest, but strictly in the tiles' order: in
+  // arrival order the mesh would depend on the workers' timing)
+  const got = new Array(items.length); let next = 0;
+  const onTile = (k, r) => { got[k] = r; while (next < items.length && got[next]) { meshTile(got[next], next); got[next] = null; next++; } };
+  const built = items.length ? yield { kind: 'pavedTiles', items, onTile } : null;
+  if (built) built.forEach((r, k) => { if (k >= next && !got[k]) onTile(k, r); });
+  else items.forEach((it, k) => onTile(k, pavedTile(it)));
   stats.ms = Date.now() - t0;
   return { tiles, heightAt, stats };
 }

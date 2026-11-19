@@ -3623,7 +3623,7 @@ async function cutsOnWorkers({ jobs }) {
 // The paved model's tiles (services/pavedWorker.js: the grid and outlines of each) on worker threads, a few per
 // work item; null (built on this thread) where there are no worker threads or few tiles.
 const PARALLEL_PAVED_FROM = 4;
-async function pavedTilesOnWorkers({ items }) {
+async function pavedTilesOnWorkers({ items, onTile }) {
   if (items.length < PARALLEL_PAVED_FROM || (await parallelThreads()) <= 1) return null;
   const batches = [];
   for (let i = 0; i < items.length; i += 2) batches.push(items.slice(i, i + 2));
@@ -3631,6 +3631,8 @@ async function pavedTilesOnWorkers({ items }) {
     local: pavedTilesLocal,
     module: new URL(['./paved', 'Worker.js'].join(''), import.meta.url).href,
     fn: 'pavedTiles',
+    // (each batch handed on as it lands: the generator meshes the tiles in order while the workers carry on)
+    onResult: onTile ? (i, r) => { r.forEach((tile, j) => onTile(i * 2 + j, tile)); } : undefined,
   });
   return results.flat();
 }
