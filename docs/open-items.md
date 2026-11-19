@@ -49,6 +49,16 @@ shots/); re-checks on today's code: scratch/fizz033/run; diagrams scratch/fizz03
   and level size, then maybe recommend it for steep maps with many tunnels. Also seen: the cover made up over a
   bore on a steep valley side runs 1:1 and stops dead at the shaping's reach, a 15-20 m terrain cliff
   (t001 at 285-294 m, scratch/fizz033/diag/g283_sections_wall.png): Fizz 2.4.
+- **Processing resolution vs terrain holes: first test done 2026-11-19 (Zion, 2 km, Mapterhorn ~0.95 m).**
+  Areas zion2 (1 m), zr05 (0.5 m), zr025 (0.25 m), same bounds and OSM. Export 4.0 / 8.6 / 26.1 s, peak memory
+  0.6 / 1.1 / 3.2 GB, level zip 26 / 91 / 337 MB. Hole area outside the structure's outline 101 / 59 / 43 m2
+  (scratch/fizz033/diag/holemetric.py); terrain inside the tube 0 at all three. Hole maps:
+  scratch/fizz033/diag/zion_west_portal_res.png; in game (scratch/fizz033/shots_res) the grey terrain teeth along
+  the west portal's wingwalls are gone at 0.25 m. Finer than the source adds no height detail; grid grows 4x per
+  halving, so only small maps (<= 2-4 km) can use it. To try: Axenstrasse (swissALTI3D 0.5 m, a fairer test of
+  real detail), and a "steep map with many tunnels: 0.5 m" hint in the app. Covering holes with structure stays
+  the default fix. Also seen: Zion's arcade 796-828 m is a flat gallery standing in a cliff notch, bore arches
+  showing at its ends (the real tunnel has windows there, no gallery): check the arcade rule on sheer cliffs.
 - **Fixed before this list:** the bridgeTowerHouses error (078ff33, after 0.3.3); short bridges too high
   (the bridge rise cap, 957fa96); sidewalks (the paved model).
 - **Owed answers:** 2.2 continuous roads, 3.4 OSM tells galleries apart (tunnel=avalanche_protector), 4.5 double
