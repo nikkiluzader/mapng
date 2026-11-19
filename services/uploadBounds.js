@@ -130,3 +130,34 @@ export const getSquareCropResolutionOptions = (meta, processingMpp = 1) => {
     return value <= maxResolution;
   });
 };
+/**
+ * The square an upload in native mode becomes in the level: BeamNG needs a power-of-two square, so the export
+ * centre-crops the generated grid to the largest power of two that fits (computeBeamNGTerrainSize in
+ * exportBeamNGLevel.js, the same rule). { sizePx, sizeMeters, fileWidthMeters, fileHeightMeters, bounds } at the
+ * processing resolution, or null. (A 999 × 1001 m lidar tile at 1 m per pixel keeps its middle 512 m: shown on the
+ * map, so the level's area is no surprise.)
+ */
+export const nativeExportSquare = (meta, metersPerPixel) => {
+  if (!meta?.nativeWidth || !meta?.nativeHeight || !meta?.bounds) return null;
+  const { width, height } = scaleNativeDimsToProcessingMpp(meta.nativeWidth, meta.nativeHeight, metersPerPixel);
+  const minPx = Math.min(width, height);
+  if (!(minPx >= 2)) return null;
+  const sizePx = 2 ** Math.floor(Math.log2(minPx));
+  // (the metres a pixel really covers: the grid may be clamped to MAX_NATIVE_OUTPUT_EDGE)
+  const effMpp = meta.nativeWidth / width;
+  const sizeMeters = sizePx * effMpp;
+  return {
+    sizePx, sizeMeters, effMpp,
+    fileWidthMeters: meta.nativeWidth, fileHeightMeters: meta.nativeHeight,
+    bounds: computeMetricSelectionBounds(getBoundsCenter(meta.bounds), sizeMeters),
+  };
+};
+
+/** A point cloud's average point spacing (m) and density (points per m²) from its header, or null. */
+export const pointCloudSpacing = (meta) => {
+  if (!meta || !Number(meta.pointCount) || meta.epsgCode === 4326) return null;
+  const area = (Number(meta.maxX) - Number(meta.minX)) * (Number(meta.maxY) - Number(meta.minY));
+  if (!(area > 0)) return null;
+  const density = Number(meta.pointCount) / area;
+  return { spacing: 1 / Math.sqrt(density), density };
+};

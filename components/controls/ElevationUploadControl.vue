@@ -110,6 +110,25 @@
           </div>
         </div>
 
+        <!-- (a point cloud: its own detail against the processing resolution, a chance to change that here, and the
+             square the level keeps from it) -->
+        <div v-if="pointSpacing || exportSquare" class="space-y-1 text-micro text-blue-800 dark:text-blue-200" data-testid="upload-resolution">
+          <p v-if="pointSpacing">{{ t('upload.pointSpacing', { cm: Math.round(pointSpacing.spacing * 100), density: pointSpacing.density >= 10 ? Math.round(pointSpacing.density) : pointSpacing.density.toFixed(1) }) }}</p>
+          <p v-if="pointSpacing && currentMpp > pointSpacing.spacing * 1.5" class="text-amber-700 dark:text-amber-300">{{ t('upload.resolutionAverages', { mpp: currentMpp, cm: Math.round(pointSpacing.spacing * 100) }) }}</p>
+          <div class="flex flex-wrap items-center gap-1">
+            <span>{{ t('upload.resolutionHere') }}</span>
+            <button
+              v-for="m in [0.25, 0.5, 1, 2]"
+              :key="m"
+              type="button"
+              :data-testid="`upload-mpp-${m}`"
+              :class="['px-1.5 py-0.5 rounded border leading-tight', currentMpp === m ? 'bg-brand border-brand text-white' : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-brand']"
+              @click="$emit('update:processingMetersPerPixel', m)"
+            >{{ m }} m</button>
+          </div>
+          <p v-if="exportSquare" data-testid="upload-export-square">{{ t('upload.exportSquare', { size: Math.round(exportSquare.sizeMeters), w: Math.round(exportSquare.fileWidthMeters), h: Math.round(exportSquare.fileHeightMeters), px: exportSquare.sizePx }) }}</p>
+        </div>
+
         <div v-if="showAscCoordinateSelector" class="flex items-center gap-2">
           <label class="w-24 shrink-0 text-caption font-medium text-blue-700 dark:text-blue-300">{{ t('upload.coordinateSystem') }}</label>
           <select
@@ -289,6 +308,7 @@ import { NODATA_AUTO, NODATA_NONE } from '../../services/nodataDetect.js';
 import { ascNeedsPlacing, ascGroundSize } from '../../services/ascLoader.js';
 import { applyLayerOrder } from '../../services/elevationLayers.js';
 import { GAP_FILL_STANDARD, GAP_FILL_GPXZ, GAP_FILL_NONE } from '../../services/gapFillSources.js';
+import { nativeExportSquare, pointCloudSpacing } from '../../services/uploadBounds.js';
 
 const { t } = useI18n({ useScope: 'global' });
 
@@ -303,6 +323,9 @@ const props = defineProps({
   gpxzKeyAvailable: { type: Boolean, default: false },
   layerSlots: { type: Array, default: () => [] },
   maxSlots: { type: Number, default: 5 },
+  // (the processing resolution, metres per pixel, and the upload's area mode: 'native' or 'crop')
+  processingMetersPerPixel: { type: [Number, String], default: 1 },
+  uploadedAreaMode: { type: String, default: 'native' },
 });
 
 const emit = defineEmits([
@@ -315,6 +338,7 @@ const emit = defineEmits([
   'update:gapFillSource',
   'slot-selected',
   'slot-removed',
+  'update:processingMetersPerPixel',
 ]);
 const fileInput = ref(null);
 const showNoDataHelp = ref(false);
@@ -479,6 +503,10 @@ const handleCustomNoDataChange = (raw) => {
 
 // (a point cloud whose coordinate system was guessed: the candidates, best first; the list stays as first
 // guessed while the user picks among them)
+// (the processing resolution: its effect on a point cloud's detail and the square the level keeps)
+const currentMpp = computed(() => { const m = Number(props.processingMetersPerPixel); return Number.isFinite(m) && m > 0 ? m : 1; });
+const pointSpacing = computed(() => (isLazFile.value ? pointCloudSpacing(props.uploadedElevationMeta) : null));
+const exportSquare = computed(() => (props.uploadedAreaMode === 'crop' ? null : nativeExportSquare(props.uploadedElevationMeta, currentMpp.value)));
 const crsGuessCandidates = computed(() => props.uploadedElevationMeta?.crsGuess?.candidates || []);
 const showAscCoordinateSelector = computed(() => {
   const sourceFormat = String(props.uploadedElevationMeta?.sourceFormat || '').toLowerCase();

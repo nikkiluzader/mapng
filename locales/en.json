@@ -210,7 +210,8 @@
     "recommendBestFree": "Mapterhorn",
     "recommendFinest": "{source}: the finest of the sources compared.",
     "recommendNoLidar": "{source}: there is no free lidar here.",
-    "recommendLidarLevel": "{source}. The free lidar lies level over {percent}% of this square where the 30 m data slopes, about {metres} m away from it: it may be wrong here."
+    "recommendLidarLevel": "{source}. The free lidar lies level over {percent}% of this square where the 30 m data slopes, about {metres} m away from it: it may be wrong here.",
+    "exportSquare": "The area exported: BeamNG needs a square, a power of two"
   },
   "status": {
     "runConfigCopied": "Run configuration copied to clipboard (GPXZ key masked).",
@@ -407,7 +408,11 @@
       "densityValue": "{value} pts/m²",
       "lat": "Lat",
       "lng": "Lng"
-    }
+    },
+    "pointSpacing": "Point spacing about {cm} cm ({density} points per m²)",
+    "resolutionAverages": "At {mpp} m per pixel, detail finer than that is averaged out: this file holds detail down to about {cm} cm.",
+    "resolutionHere": "Processing resolution:",
+    "exportSquare": "The level is the {size} × {size} m square ({px} px) from the middle of the file's {w} × {h} m: BeamNG needs a square, a power of two. It is shown in orange on the map; Square crop lets you move it. Changing the resolution resizes it."
   },
   "preview": {
     "hideSettings": "Hide scene settings",

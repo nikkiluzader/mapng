@@ -205,7 +205,8 @@
     "recommendBestFree": "Mapterhorn",
     "recommendFinest": "{source}: die feinste der verglichenen Quellen.",
     "recommendNoLidar": "{source}: hier gibt es kein freies Lidar.",
-    "recommendLidarLevel": "{source}. Das freie Lidar liegt auf {percent}% dieses Quadrats eben, wo die 30-m-Daten ein Gefälle zeigen, etwa {metres} m davon entfernt: Es könnte hier falsch sein."
+    "recommendLidarLevel": "{source}. Das freie Lidar liegt auf {percent}% dieses Quadrats eben, wo die 30-m-Daten ein Gefälle zeigen, etwa {metres} m davon entfernt: Es könnte hier falsch sein.",
+    "exportSquare": "Der exportierte Bereich: BeamNG braucht ein Quadrat mit Zweierpotenz"
   },
   "status": {
     "runConfigCopied": "Run-Konfiguration in die Zwischenablage kopiert (GPXZ-Schlüssel maskiert).",
@@ -402,7 +403,11 @@
       "densityValue": "{value} Pkt./m²",
       "lat": "Breite",
       "lng": "Länge"
-    }
+    },
+    "pointSpacing": "Punktabstand etwa {cm} cm ({density} Punkte pro m²)",
+    "resolutionAverages": "Bei {mpp} m pro Pixel werden feinere Details gemittelt: Diese Datei enthält Details bis etwa {cm} cm.",
+    "resolutionHere": "Verarbeitungsauflösung:",
+    "exportSquare": "Das Level ist das {size} × {size} m große Quadrat ({px} px) aus der Mitte der {w} × {h} m der Datei: BeamNG braucht ein Quadrat mit Zweierpotenz. Es ist auf der Karte orange markiert; mit „Quadratischer Ausschnitt“ lässt es sich verschieben. Eine andere Auflösung ändert seine Größe."
   },
   "preview": {
     "hideSettings": "Szeneneinstellungen ausblenden",

@@ -205,7 +205,8 @@
     "recommendBestFree": "Mapterhorn",
     "recommendFinest": "{source}: najdokładniejsze z porównanych źródeł.",
     "recommendNoLidar": "{source}: nie ma tu darmowego lidaru.",
-    "recommendLidarLevel": "{source}. Darmowy lidar jest płaski na {percent}% tego kwadratu tam, gdzie dane 30 m mają spadek, około {metres} m od nich: może być tu błędny."
+    "recommendLidarLevel": "{source}. Darmowy lidar jest płaski na {percent}% tego kwadratu tam, gdzie dane 30 m mają spadek, około {metres} m od nich: może być tu błędny.",
+    "exportSquare": "Eksportowany obszar: BeamNG potrzebuje kwadratu o boku będącym potęgą dwójki"
   },
   "status": {
     "runConfigCopied": "Konfiguracja uruchomienia skopiowana do schowka (klucz GPXZ maskowany).",
@@ -402,7 +403,11 @@
       "densityValue": "{value} pkt/m²",
       "lat": "Szer.",
       "lng": "Dł."
-    }
+    },
+    "pointSpacing": "Odstęp punktów około {cm} cm ({density} punktów na m²)",
+    "resolutionAverages": "Przy {mpp} m na piksel drobniejsze szczegóły są uśredniane: ten plik zawiera szczegóły do około {cm} cm.",
+    "resolutionHere": "Rozdzielczość przetwarzania:",
+    "exportSquare": "Poziom to kwadrat {size} × {size} m ({px} px) ze środka {w} × {h} m pliku: BeamNG potrzebuje kwadratu o boku będącym potęgą dwójki. Jest zaznaczony na pomarańczowo na mapie; Kwadratowe przycięcie pozwala go przesunąć. Zmiana rozdzielczości zmienia jego rozmiar."
   },
   "preview": {
     "hideSettings": "Ukryj ustawienia sceny",

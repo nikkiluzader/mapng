@@ -205,7 +205,8 @@
     "recommendBestFree": "Mapterhorn",
     "recommendFinest": "{source} : la plus fine des sources comparées.",
     "recommendNoLidar": "{source} : pas de lidar gratuit ici.",
-    "recommendLidarLevel": "{source}. Le lidar gratuit est plat sur {percent} % de ce carré là où les données 30 m sont en pente, à environ {metres} m d'elles : il est peut-être faux ici."
+    "recommendLidarLevel": "{source}. Le lidar gratuit est plat sur {percent} % de ce carré là où les données 30 m sont en pente, à environ {metres} m d'elles : il est peut-être faux ici.",
+    "exportSquare": "La zone exportée : BeamNG a besoin d'un carré en puissance de deux"
   },
   "status": {
     "runConfigCopied": "Configuration d'exécution copiée dans le presse-papiers (clé GPXZ masquée).",
@@ -402,7 +403,11 @@
       "densityValue": "{value} pts/m²",
       "lat": "Lat",
       "lng": "Lon"
-    }
+    },
+    "pointSpacing": "Espacement des points d'environ {cm} cm ({density} points par m²)",
+    "resolutionAverages": "À {mpp} m par pixel, les détails plus fins sont moyennés : ce fichier contient des détails jusqu'à environ {cm} cm.",
+    "resolutionHere": "Résolution de traitement :",
+    "exportSquare": "Le niveau est le carré de {size} × {size} m ({px} px) au centre des {w} × {h} m du fichier : BeamNG a besoin d'un carré en puissance de deux. Il est affiché en orange sur la carte ; Recadrage carré permet de le déplacer. Changer la résolution change sa taille."
   },
   "preview": {
     "hideSettings": "Masquer les paramètres de scène",

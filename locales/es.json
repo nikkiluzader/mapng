@@ -205,7 +205,8 @@
     "recommendBestFree": "Mapterhorn",
     "recommendFinest": "{source}: la más fina de las fuentes comparadas.",
     "recommendNoLidar": "{source}: aquí no hay lidar gratuito.",
-    "recommendLidarLevel": "{source}. El lidar gratuito es llano en el {percent}% de este cuadro donde los datos de 30 m tienen pendiente, a unos {metres} m de ellos: puede estar mal aquí."
+    "recommendLidarLevel": "{source}. El lidar gratuito es llano en el {percent}% de este cuadro donde los datos de 30 m tienen pendiente, a unos {metres} m de ellos: puede estar mal aquí.",
+    "exportSquare": "El área exportada: BeamNG necesita un cuadrado potencia de dos"
   },
   "status": {
     "runConfigCopied": "Ajustes copiados al portapapeles (clave GPXZ oculta).",
@@ -402,7 +403,11 @@
       "densityValue": "{value} pts/m²",
       "lat": "Lat",
       "lng": "Lon"
-    }
+    },
+    "pointSpacing": "Separación entre puntos de unos {cm} cm ({density} puntos por m²)",
+    "resolutionAverages": "A {mpp} m por píxel se promedia el detalle más fino: este archivo tiene detalle de hasta unos {cm} cm.",
+    "resolutionHere": "Resolución de procesado:",
+    "exportSquare": "El nivel es el cuadrado de {size} × {size} m ({px} px) del centro de los {w} × {h} m del archivo: BeamNG necesita un cuadrado potencia de dos. Se muestra en naranja en el mapa; Recorte cuadrado permite moverlo. Cambiar la resolución cambia su tamaño."
   },
   "preview": {
     "hideSettings": "Ocultar ajustes de escena",
