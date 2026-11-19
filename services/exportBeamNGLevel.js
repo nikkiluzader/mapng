@@ -135,7 +135,7 @@ import {
 } from './beamngSignals.js';
 import { planRaceways } from './racetracks.js';
 import { backdropImageryFetch } from './backdropImagery.js';
-import { RAIL_DEPTH_M, railHalfWidth, railKindOf, railSegmentsFrom, streetRunningTest, undergroundRailIds } from './railways.js';
+import { RAIL_DEPTH_M, RAIL_GRADE_CEILING, railHalfWidth, railKindOf, railSegmentsFrom, streetRunningTest, undergroundRailIds } from './railways.js';
 import { prepareRailEdges, unjoinedRailCrossings, markUnjoinedCrossing, buildTrackGeometry, crossingDecals, streetTramDecals, railMaterialDefs, RAIL_MATERIALS, TRAMLINE_MATERIAL, railwayStats } from './railTrack.js';
 // footways and other paths: a level crossing of one is a foot crossing
 const PATH_HIGHWAYS = new Set(['footway', 'cycleway', 'path', 'pedestrian', 'steps', 'bridleway']);
@@ -5256,7 +5256,7 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
     const xy = toXY(seg.geometry);
     if (isBoredTunnelTag(tags) && !isBridgeRoad(tags)) {
       parts.push({
-        xy, segIndex, half: halfOf(seg), gallery: isGalleryTag(tags),
+        xy, segIndex, half: halfOf(seg), gallery: isGalleryTag(tags), grade: seg.rail ? RAIL_GRADE_CEILING[seg.rail] ?? null : null,
         osm: { id: seg.sourceFeature?.id ?? null, name: tags['tunnel:name'] || tags.name || tags.ref || null, highway: seg.highway },
       });
     } else {
@@ -5451,7 +5451,8 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
       for (let i = 0; i + 1 < xy.length && !streetsOver; i++) if (planCrossingPoints([xy[i], xy[i + 1]], r.xy).length) streetsOver = true;
     }
     // (shaping off on fine elevation: portals at the survey's own portal faces)
-    const t = solveTunnel({ xy: bore, half, gallery }, { groundAt, approaches, isFreeEnd, squareSize, streetsOver, raw: !shape && !terrainData?.coarseElevation });
+    const railGrade = Math.max(...path.idx.map((i) => parts[i].grade ?? 0));
+    const t = solveTunnel({ xy: bore, half, gallery, ...(railGrade > 0 ? { grade: railGrade } : {}) }, { groundAt, approaches, isFreeEnd, squareSize, streetsOver, raw: !shape && !terrainData?.coarseElevation });
     const osm = path.idx.map((i) => parts[i].osm);
     if (!t.ok) { out.skipped.push({ osm, reason: t.reason, length: t.length }); return null; }
     t.osm = osm;

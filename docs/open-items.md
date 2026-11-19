@@ -80,6 +80,11 @@ shots/); re-checks on today's code: scratch/fizz033/run; diagrams scratch/fizz03
   ground behind the face, at most their old need + 3.3 m (t002 5.2 / 6.1 m instead of 8.1). Left: t001's south portal
   still juts (its ground is 7 m up); a bright side opening in t001 at 75 % (driver's view); the 15-20 m cover cliff
   beside steep-side bores; Fizz's fz07 cuts.
+- **6.1 funicular left on the surface: DONE on dev (2026-11-19).** Rail tunnels use their kind's grade (funicular 100 %,
+  tram 9 %, light rail 8 %; roads and main-line rail keep 6 %); a steep rail tube stays under the ground after the
+  smoothing and is held to its grade by lowering. The Funival now runs in its tunnel at its real grade (test area
+  fz_funival; at 6 % it had been laid 800 m under the mountain where the way met the map edge). Seen in game from
+  inside both ways. Left for the portal pass: tall terrain teeth beside its bottom portal at the bridge.
 - **Fixed before this list:** the bridgeTowerHouses error (078ff33, after 0.3.3); short bridges too high
   (the bridge rise cap, 957fa96); sidewalks (the paved model).
 - **Owed answers:** 2.2 continuous roads, 3.4 OSM tells galleries apart (tunnel=avalanche_protector), 4.5 double

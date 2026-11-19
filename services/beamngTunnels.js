@@ -746,6 +746,9 @@ function overTheStep(path, opts) {
 
 function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = () => false, squareSize = 1, raw = false }, mode, digMax = Infinity) {
   // mode: false a bore, true a cut-and-cover box sunk under the street, 'low' a low box at the road's own level
+  // (a railway's own grade where its kind climbs steeper than a road: a funicular's tunnel climbs its mountain at
+  // 50 % and more; held to a road's 6 % the Funival's ends, 768 m apart in height over 1.6 km, left it on the surface)
+  const MAXG = Number.isFinite(path.grade) ? Math.max(MAX_GRADE, path.grade) : MAX_GRADE;
   const cutCover = mode === true;
   const low = mode === 'low';
   const st = stations(path.xy);
@@ -786,11 +789,11 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
   });
 
   // At a free end (the map's edge cuts the tunnel) the road's height is not
-  // known: under the ground there, no steeper than MAX_GRADE from the other
+  // known: under the ground there, no steeper than MAXG from the other
   // end (the ground at the edge can be a cliff top over the bore).
   const fromOther = (e) => {
     const zo = endZ[1 - e];
-    return clamp(g[e ? n - 1 : 0] - need, zo - MAX_GRADE * L, zo + MAX_GRADE * L);
+    return clamp(g[e ? n - 1 : 0] - need, zo - MAXG * L, zo + MAXG * L);
   };
   if (free[0] && free[1]) { endZ[0] = g[0] - need; endZ[1] = g[n - 1] - need; }
   else if (free[0]) endZ[0] = fromOther(0);
@@ -798,21 +801,21 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
   // No road climbs from one end to the other (mismatched OSM ends, or the
   // elevation data): left on the ground rather than a ramp inside the hill.
   const rise = Math.abs(endZ[1] - endZ[0]);
-  if (!cutCover && rise > MAX_GRADE * 1.5 * L + 5) return { ok: false, reason: `ends ${Math.round(rise)} m apart in height over ${Math.round(L)} m`, length: L };
+  if (!cutCover && rise > MAXG * 1.5 * L + 5) return { ok: false, reason: `ends ${Math.round(rise)} m apart in height over ${Math.round(L)} m`, length: L };
   let z;
   if (cutCover) {
-    // the box under the street all along, no steeper than MAX_GRADE (the
+    // the box under the street all along, no steeper than MAXG (the
     // highest such line: as shallow as it can be)
     const u = g.map((v) => v - need);
     z = u.slice();
-    for (let i = 1; i < n; i++) z[i] = Math.min(z[i], z[i - 1] + MAX_GRADE * (st[i].s - st[i - 1].s));
-    for (let i = n - 2; i >= 0; i--) z[i] = Math.min(z[i], z[i + 1] + MAX_GRADE * (st[i + 1].s - st[i].s));
+    for (let i = 1; i < n; i++) z[i] = Math.min(z[i], z[i - 1] + MAXG * (st[i].s - st[i - 1].s));
+    for (let i = n - 2; i >= 0; i--) z[i] = Math.min(z[i], z[i + 1] + MAXG * (st[i + 1].s - st[i].s));
     z = smoothPinned(z, STEP_M, SMOOTH_SIGMA_M).map((v, i) => Math.min(v, u[i]));
     // the cap cut steps back into the smoothed line where the street's
     // ground jumps (a flat landing inside the portal, then 0.3 m up in 2 m:
     // cars grounded on it): the grade limit again, by lowering only (more
     // cover; a hair under the limit, as the checks judge it)
-    const g2 = MAX_GRADE * 0.97;
+    const g2 = MAXG * 0.97;
     for (let i = 1; i < n; i++) z[i] = Math.min(z[i], z[i - 1] + g2 * (st[i].s - st[i - 1].s));
     for (let i = n - 2; i >= 0; i--) z[i] = Math.min(z[i], z[i + 1] + g2 * (st[i + 1].s - st[i].s));
   } else {
@@ -825,9 +828,19 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
     if (!low) z = z.map((v, i) => Math.max(v - digMax, Math.min(v, g[i] - need)));
     z[0] = endZ[0];
     z[n - 1] = endZ[1];
-    for (let i = 1; i < n; i++) z[i] = Math.max(z[i], z[i - 1] - MAX_GRADE * (st[i].s - st[i - 1].s));
-    for (let i = n - 2; i >= 0; i--) z[i] = Math.max(z[i], z[i + 1] - MAX_GRADE * (st[i + 1].s - st[i].s));
+    for (let i = 1; i < n; i++) z[i] = Math.max(z[i], z[i - 1] - MAXG * (st[i].s - st[i - 1].s));
+    for (let i = n - 2; i >= 0; i--) z[i] = Math.max(z[i], z[i + 1] - MAXG * (st[i + 1].s - st[i].s));
     z = smoothPinned(z, STEP_M, SMOOTH_SIGMA_M);
+    // (a steep railway's tube kept under its cover after the smoothing, ends pinned: a funicular passing under a
+    // gully at 48 % had the dip's bottom smoothed back up through the ground, and was left on the surface)
+    if (MAXG > MAX_GRADE && !low) {
+      for (let i = 1; i < n - 1; i++) z[i] = Math.min(z[i], g[i] - need);
+      // (... and its grade limit again, by lowering only: the cover followed the surface's bumps, a 250 % kink at
+      // the Funival's top end)
+      const gl = MAXG * 0.97;
+      for (let i = 1; i < n; i++) z[i] = Math.min(z[i], z[i - 1] + gl * (st[i].s - st[i - 1].s));
+      for (let i = n - 2; i >= 0; i--) z[i] = Math.min(z[i], z[i + 1] + gl * (st[i + 1].s - st[i].s));
+    }
   }
 
   // Portals: where the ground is first over the bore by the cover, from each
@@ -925,10 +938,10 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
 
   // The line: approach cutting (from the outside in) + the path + the other
   // approach; z on the approaches eases from the portal height back to the
-  // ground (cut or fill), no steeper than MAX_GRADE away from it.
+  // ground (cut or fill), no steeper than MAXG away from it.
   const line = st.map((p, i) => ({ ...p, z: z[i], g: g[i], kind: i < iS || i > iN ? 'cut' : 'tube' }));
   // a cut-and-cover trench runs out until the road is back at the street
-  const trenchMax = cutCover ? need / MAX_GRADE + 60 : TRENCH_MAX_M;
+  const trenchMax = cutCover ? need / MAXG + 60 : TRENCH_MAX_M;
   const extend = (e) => {
     const a = approaches[e];
     if (!a?.xy || a.xy.length < 2 || Number.isFinite(a.deckZ) || a.onBridge || free[e]) return [];
@@ -953,12 +966,12 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
       const top = Number.isFinite(reach) || reach === Infinity ? (reach - gHere >= UNDER_BRIDGE_HIGH_M ? reach : gHere) : gHere;
       return { s: u, cap: top - UNDER_BRIDGE_M };
     }).filter((u) => Number.isFinite(u.cap));
-    // The road eases back to the ground no steeper than MAX_GRADE, measured
+    // The road eases back to the ground no steeper than MAXG, measured
     // against the ground's own run: a mountain road climbing away from its
     // portal at 10 % is on the ground all the way, and a limit under that
     // left the "approach" ever deeper under the hillside, a cutting 250 m
     // long with a wall along it (Tunnel du Glattier). Where the ground ahead
-    // runs steeper than MAX_GRADE the road may follow it (to APPROACH_FOLLOW_MAX).
+    // runs steeper than MAXG the road may follow it (to APPROACH_FOLLOW_MAX).
     const grounds = ap.map((p) => groundAt(p.x, p.y));
     const ahead = Math.max(1, Math.round(APPROACH_TREND_M / STEP_M));
     let zPrev = z0; let sPrev = 0;
@@ -970,15 +983,15 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
       const trend = j > k ? Math.abs(grounds[j] - gr) / (ap[j].s - p.s) : 0;
       // (ground running steeper than the tunnel's grade: the road follows it,
       // and a little steeper still, to come back onto it; on gentler ground
-      // it climbs out of its trench at MAX_GRADE as before)
+      // it climbs out of its trench at MAXG as before)
       // (only a road near the ground: one deep in a trench of its own, the
-      // hillside steep above it, climbs out at MAX_GRADE as before)
-      const near = Math.abs(gr - zPrev) < APPROACH_NEAR_GROUND_M + MAX_GRADE * (p.s - sPrev);
-      const limit = near && trend > MAX_GRADE ? Math.min(APPROACH_FOLLOW_MAX, trend + APPROACH_CATCH_UP) : MAX_GRADE;
+      // hillside steep above it, climbs out at MAXG as before)
+      const near = Math.abs(gr - zPrev) < APPROACH_NEAR_GROUND_M + MAXG * (p.s - sPrev);
+      const limit = near && trend > MAXG ? Math.min(APPROACH_FOLLOW_MAX, trend + APPROACH_CATCH_UP) : MAXG;
       let zz = clamp(gr, zPrev - limit * (p.s - sPrev), zPrev + limit * (p.s - sPrev));
       if (Math.abs(zz - gr) < 1e-6) zz = gr;   // (on the ground exactly, not a rounding error off it)
       zPrev = zz; sPrev = p.s;
-      for (const u of unders) zz = Math.min(zz, Math.max(u.cap + MAX_GRADE * Math.max(0, Math.abs(p.s - u.s) - UNDER_BRIDGE_FLAT_M), z0 - MAX_GRADE * p.s));
+      for (const u of unders) zz = Math.min(zz, Math.max(u.cap + MAXG * Math.max(0, Math.abs(p.s - u.s) - UNDER_BRIDGE_FLAT_M), z0 - MAXG * p.s));
       out.push({ x: p.x, y: p.y, s: p.s, tx: p.tx, ty: p.ty, z: zz, g: gr, kind: 'cut' });
       calm = Math.abs(gr - zz) < TRENCH_DONE_M ? calm + 1 : 0;
       if (calm * STEP_M >= 10) break;

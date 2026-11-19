@@ -44,6 +44,18 @@ reads (level files, materials, roads, prefabs, Lua, assets). Never guess a forma
 - **Deploys:** pushing `dev` builds dev.mapng.com, `main` builds mapng.com (Cloudflare Workers Builds). Check their
   build checks before a release.
 
+## Working through a list
+
+Use foresight. Before each fix, look across the whole list and the history:
+
+- **What else does it touch?** Other items that share the same code or the same place (a portal's headwall touches
+  "portal too big", "walls beside the road" and "terrain at tunnel ends" alike). Build the fix so it helps those
+  too, or at least does not block them.
+- **What went wrong before here?** Check past fixes and regressions in the same area (backlog, open items, history,
+  memory) and guard against repeating them.
+- **What order?** Pick the next step for what it unblocks and what it shares with others, not only for how visible it
+  is; say why in a line.
+
 ## Optimization rules
 
 Every feature, change and fix follows **docs/optimization-rules.md** from the start: go through its checklist for
@@ -105,7 +117,8 @@ Diagrams solve problems faster than game trips. Before the first code change on 
 
 ## Testing
 
-- **Test sources:** Mapterhorn elevation, no backdrop, never USGS (too slow).
+- **Test sources:** Mapterhorn elevation, no backdrop, never USGS (too slow). Services with keys in mapng.env are
+  allowed as needed (GPXZ included: the user has credits to spare).
 - **Run long tests in the background** with a progress log. Check on them about every 10 s, keep per-step timeouts
   short, and stop anything that stalls.
 - **Commit only when every test passes.** Run /verify before code commits.

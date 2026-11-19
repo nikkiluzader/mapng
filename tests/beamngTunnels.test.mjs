@@ -679,3 +679,22 @@ test('a tunnel way with one stretch too thinly covered to fill is built, that st
   assert.equal(hanging.ok, false);
   assert.match(hanging.reason, /of fill over it/);
 });
+
+// A funicular's tunnel climbs its mountain at its own grade (the Funival: 768 m over 1.6 km), not a road's 6 %; its
+// tube stays under the ground through a gully after the smoothing, and no step is steeper than its kind's limit.
+test('a steep railway tunnel (funicular) climbs at its own grade and stays under cover through a gully', () => {
+  const xy = []; for (let y = -600; y <= 600; y += 10) xy.push([0, y]);
+  // the hillside rises 50 % along the line, 30 m of rock over it, with a 20 m deep gully 150 m long in the middle
+  const g = (x, y) => 1000 + 0.5 * (y + 600) + 30 - (Math.abs(y) < 75 ? 20 * Math.cos((y / 75) * Math.PI / 2) : 0);
+  const approaches = [{ xy: [[0, -600], [0, -700]] }, { xy: [[0, 600], [0, 700]] }];
+  const road = solveTunnel({ xy, half: 2.5 }, { groundAt: g, approaches });
+  assert.equal(road.ok, false, 'held to a road\'s grade it cannot climb the mountain');
+  const t = solveTunnel({ xy, half: 2.5, grade: 1 }, { groundAt: g, approaches });
+  assert.equal(t.ok, true, t.reason);
+  // (under the ground all through: whatever cover the gully lacks is made up with fill, within the usual 4 m)
+  assert.ok(t.fill <= 4, `fill over the tube ${t.fill.toFixed(2)} m`);
+  for (let i = t.iS + 1; i < t.iN; i++) {
+    const p = t.line[i]; const q = t.line[i - 1];
+    assert.ok(Math.abs(p.z - q.z) / (p.s - q.s) <= 1.0001, 'no step steeper than its limit');
+  }
+});
