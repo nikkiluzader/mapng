@@ -120,4 +120,22 @@ Diagrams solve problems faster than game trips. Before the first code change on 
 - **OSM edits:** show the changes and a dry run, ask yes/no, then upload.
 - **Keys stay out of the repo** and out of any output. Read them without printing them.
 - **Never run `rm` with variables or globs.** Use literal paths.
+
+## Disk space
+
+The WSL disk lives on the Windows C: drive, which is nearly full, and a full C: crashes WSL. Every session keeps
+its own output small:
+
+- **Check before big runs:** `df -h / /mnt/c` before a sweep, a benchmark set or a big export. Below about 50 GB
+  free on C:, clean up first and tell the user.
+- **Delete test output once it has been read.** Keep what records a result: reports, logs, CSVs, JSON summaries,
+  plots, and the sweep's current baseline. Delete the bulk: exported level zips, per-job temp folders, unpacked
+  levels, worker copies and old sweep runs.
+- **One folder per run, reused or deleted.** Don't leave `run_*`, `tmp/` or `*_base` copies behind; a re-run
+  overwrites, it doesn't add.
+- **Probes that write per-job folders** (memprobe, sweeps, A/B runs) delete each job's bulk when the job is done
+  and keep only its numbers.
+- **Report scratch size** (`du -sh scratch`) in the morning report or when it passes 50 GB.
+- **Deleting files inside WSL doesn't shrink the disk image on C:.** After a big cleanup, ask the user to compact
+  it from Windows (`wsl --shutdown`, then `wsl --manage <distro> --set-sparse true` or Optimize-VHD).
 - **On Windows test builds,** never run Setup.exe; test the unpacked folder.
