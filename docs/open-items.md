@@ -520,3 +520,14 @@ stubs at crossings; B is 15.7 s of Chicago 8192's ~45 s of sidewalk work and hol
     from the grid; tiles on workers; decks and waterfront unchanged at first; behind a switch until approved.
 - Then: plots and paved-area numbers on the test areas against today, in-game check, and the user's go-ahead
   before it replaces A and B.
+
+## 6. Overnight 2026-11-18 -> 19 (user asleep; report in the morning)
+
+The user: keep working through the night, report in the morning. In order:
+1. Sidewalks (paved model) until they look good across all test areas: sweep matrix clean (or every remaining
+   difference shown to be the check's wider sampling, with plots), Hong Kong + suburb_naperville in game.
+   Main only after that (user's earlier go-ahead was "if all is well"); then remove the old sidewalk code.
+2. Double-check the optimization pass (docs/optimization-rules.md, the speed table in section 4).
+3. Review the Generate and Export progress cards: percentages, bars and info text accurate and smooth (jumpy on
+   dev.mapng.com now, likely since the speed work changed step lengths).
+
