@@ -108,20 +108,21 @@ export function makeRoadHeight(carriageways) {
   return (x, y) => {
     const l = cells.get(key(Math.floor(x / SEG_CELL_M), Math.floor(y / SEG_CELL_M)));
     if (!l) return null;
-    let best = Infinity; let bz = 0; let bd = 0; let ex = 0; let ey = 0;
-    for (const s of l) {
-      const ax = segs[s]; const ay = segs[s + 1]; const az = segs[s + 2]; const bx = segs[s + 3]; const by = segs[s + 4]; const bzz = segs[s + 5];
-      const dx = bx - ax; const dy = by - ay; const L2 = dx * dx + dy * dy || 1e-12;
+    // (squared distances in the loop, the root once for the winner: the lookup runs for every slab vertex)
+    let best2 = Infinity; let bs = -1; let bt = 0; let bpx = 0; let bpy = 0;
+    for (let q = 0; q < l.length; q++) {
+      const s = l[q];
+      const ax = segs[s]; const ay = segs[s + 1]; const dx = segs[s + 3] - ax; const dy = segs[s + 4] - ay; const L2 = dx * dx + dy * dy || 1e-12;
       const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / L2));
       const px = ax + dx * t; const py = ay + dy * t;
-      const d = fastHypot(px - x, py - y);
-      if (d < best) {
-        best = d; bz = az + (bzz - az) * t; bd = d - segs[s + 6];
-        const inner = Math.max(0, Math.min(d, segs[s + 6] - EDGE_IN_M));
-        ex = d > 1e-9 ? px + ((x - px) / d) * inner : px; ey = d > 1e-9 ? py + ((y - py) / d) * inner : py;
-      }
+      const d2 = (px - x) * (px - x) + (py - y) * (py - y);
+      if (d2 < best2) { best2 = d2; bs = s; bt = t; bpx = px; bpy = py; }
     }
-    return best === Infinity ? null : { z: bz, d: Math.max(0, bd), ex, ey };
+    if (bs < 0) return null;
+    const d = Math.sqrt(best2); const half = segs[bs + 6];
+    const inner = Math.max(0, Math.min(d, half - EDGE_IN_M));
+    const ex = d > 1e-9 ? bpx + ((x - bpx) / d) * inner : bpx; const ey = d > 1e-9 ? bpy + ((y - bpy) / d) * inner : bpy;
+    return { z: segs[bs + 2] + (segs[bs + 5] - segs[bs + 2]) * bt, d: Math.max(0, d - half), ex, ey };
   };
 }
 
