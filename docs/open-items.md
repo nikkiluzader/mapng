@@ -474,6 +474,9 @@ stubs at crossings; B is 15.7 s of Chicago 8192's ~45 s of sidewalk work and hol
   - done: greenery as evidence for a verge (OSM grass, flowerbed, meadow, park, garden at ground level; rooftop and
     upper-level greenery skipped; street trees don't block paving): Chicago keeps 2,832 m2 of verge, mostly the
     riverside planters along Wacker;
-  - outlines traced to smooth lines before meshes; heights as today; decks and waterfront unchanged at first.
+  - step 3a done: services/pavedArea.js (grid, tests; not wired in). Chicago test area 2147x2147 cells in 1.3 s on
+    one thread; scratch/swaudit/jsgrid.mjs + plotgrid.py draw it. Small notches left at walk ends by crossings.
+  - step 3b next: outlines traced to smooth lines; 3c meshes (slabs, curb faces) at today's heights; 3d grading
+    from the grid; tiles on workers; decks and waterfront unchanged at first; behind a switch until approved.
 - Then: plots and paved-area numbers on the test areas against today, in-game check, and the user's go-ahead
   before it replaces A and B.
