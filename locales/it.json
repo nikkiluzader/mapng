@@ -721,7 +721,9 @@
       "curbHeight_low": "Basso (8 cm)",
       "curbHeight_flush": "A raso (3 cm)",
       "curbHeightHint": "Di quanto i marciapiedi rialzati sporgono sulla strada. Standard è un vero cordolo; Basso e A raso sono più gentili con le auto basse e facili da salire.",
-      "viewDistanceShort": "Fin dove il gioco disegna il livello."
+      "viewDistanceShort": "Fin dove il gioco disegna il livello.",
+      "bundleOsm": "Includi i dati della mappa per le segnalazioni",
+      "bundleOsmHint": "Attivo: i dati OpenStreetMap con cui è stato costruito il livello vengono inclusi (levels/<name>/mapng_source/, al massimo pochi MB, mai letti dal gioco), così una segnalazione sul livello può essere ricostruita esattamente sugli stessi dati. Disattivo: esclusi."
     },
     "weight": {
       "title": "Quanto è pesante questo livello?",
@@ -1579,7 +1581,8 @@
     "curbHeight_flush": "A raso (3 cm)",
     "roadSurface": "Superficie stradale",
     "otherSettings": "Altre impostazioni",
-    "otherSettingsValue": "altre {n}, in «Regolazione fine»"
+    "otherSettingsValue": "altre {n}, in «Regolazione fine»",
+    "bundleOsm": "Includi i dati della mappa per le segnalazioni"
   },
   "usage": {
     "askTitle": "Condividere quali impostazioni usi?",
@@ -1791,7 +1794,8 @@
     "decalSidewalks": "Marciapiedi come decal",
     "curbHeight": "Altezza del cordolo",
     "curbHeight_low": "Basso (8 cm)",
-    "curbHeight_flush": "A raso (3 cm)"
+    "curbHeight_flush": "A raso (3 cm)",
+    "bundleOsm": "Includi i dati della mappa per le segnalazioni"
   },
   "spawnPoints": {
     "title": "Punti di partenza e Quicktravel",
@@ -2088,8 +2092,10 @@
       "showModels": "Mostra i modelli di {kind}",
       "on": "sì",
       "off": "no",
-      "widthsOffShort": "Disattivato: ogni strada prende la larghezza abituale della sua classe."
-    }
+      "widthsOffShort": "Disattivato: ogni strada prende la larghezza abituale della sua classe.",
+      "bundleOsmShort": "I dati della mappa vanno nel livello, per riprodurre le segnalazioni."
+    },
+    "bundleOsm": "nessun dato della mappa per le segnalazioni"
   },
   "backupData": {
     "title": "Questa mappa è stata costruita con dati di riserva.",

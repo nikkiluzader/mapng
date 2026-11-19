@@ -721,7 +721,9 @@
       "curbHeight_low": "Niedrig (8 cm)",
       "curbHeight_flush": "Bündig (3 cm)",
       "curbHeightHint": "Wie weit die erhöhten Gehwege über der Straße stehen. Standard ist ein echter Bordstein; Niedrig und Bündig schonen tiefe Autos und lassen sich leicht befahren.",
-      "viewDistanceShort": "Wie weit das Spiel das Level zeichnet."
+      "viewDistanceShort": "Wie weit das Spiel das Level zeichnet.",
+      "bundleOsm": "Kartendaten für Fehlerberichte beilegen",
+      "bundleOsmHint": "An: Die OpenStreetMap-Daten, aus denen das Level gebaut wurde, kommen mit ins Level (levels/<name>/mapng_source/, höchstens ein paar MB, vom Spiel nie gelesen), damit ein Fehlerbericht auf genau denselben Daten nachgebaut werden kann. Aus: weggelassen."
     },
     "weight": {
       "title": "Wie schwer ist dieses Level?",
@@ -1579,7 +1581,8 @@
     "curbHeight_flush": "Bündig (3 cm)",
     "roadSurface": "Straßenbelag",
     "otherSettings": "Weitere Einstellungen",
-    "otherSettingsValue": "{n} weitere, unter „Feinabstimmung“"
+    "otherSettingsValue": "{n} weitere, unter „Feinabstimmung“",
+    "bundleOsm": "Kartendaten für Fehlerberichte beilegen"
   },
   "usage": {
     "askTitle": "Teilen, welche Einstellungen du nutzt?",
@@ -1791,7 +1794,8 @@
     "decalSidewalks": "Gehwege als Decals",
     "curbHeight": "Bordsteinhöhe",
     "curbHeight_low": "Niedrig (8 cm)",
-    "curbHeight_flush": "Bündig (3 cm)"
+    "curbHeight_flush": "Bündig (3 cm)",
+    "bundleOsm": "Kartendaten für Fehlerberichte beilegen"
   },
   "spawnPoints": {
     "title": "Start- & Quicktravel-Punkte",
@@ -2088,8 +2092,10 @@
       "showModels": "Modelle von {kind} anzeigen",
       "on": "an",
       "off": "aus",
-      "widthsOffShort": "Aus: Jede Straße bekommt die übliche Breite ihrer Klasse."
-    }
+      "widthsOffShort": "Aus: Jede Straße bekommt die übliche Breite ihrer Klasse.",
+      "bundleOsmShort": "Die Kartendaten kommen ins Level, damit Berichte nachvollziehbar sind."
+    },
+    "bundleOsm": "keine Kartendaten für Fehlerberichte"
   },
   "backupData": {
     "title": "Diese Karte wurde aus Ersatzdaten gebaut.",

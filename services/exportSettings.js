@@ -37,6 +37,7 @@ export function exportSettingsFor(options = {}) {
     mapng_beamNGSafeCaps: on(options.safeCaps),
     mapng_beamNGAssumeParking: String(options.assumeParking === true),   // (off unless switched on)
     mapng_beamNGFollowSurvey: String(options.roadsFollowSurvey !== false),   // (on unless switched off)
+    mapng_beamNGBundleOsm: String(options.bundleOsm !== false),   // (on unless switched off)
     mapng_beamNGDecalSidewalks: String(options.sidewalkStyle === 'decal'),
     mapng_beamNGCurbHeight: ['standard', 'low', 'flush'].includes(options.curbHeight) ? options.curbHeight : 'standard',
     mapng_beamNGIncludeBridges: on(options.includeBridges),

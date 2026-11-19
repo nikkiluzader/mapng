@@ -721,7 +721,9 @@
       "curbHeight_low": "Niska (8 cm)",
       "curbHeight_flush": "Na równo (3 cm)",
       "curbHeightHint": "Jak wysoko podniesione chodniki wystają nad jezdnię. Standardowa to prawdziwy krawężnik; Niska i Na równo są łagodniejsze dla niskich aut i łatwe do wjechania.",
-      "viewDistanceShort": "Jak daleko gra rysuje poziom."
+      "viewDistanceShort": "Jak daleko gra rysuje poziom.",
+      "bundleOsm": "Dołącz dane mapy do zgłoszeń błędów",
+      "bundleOsmHint": "Włączone: dane OpenStreetMap, z których zbudowano poziom, trafiają do poziomu (levels/<name>/mapng_source/, najwyżej kilka MB, gra ich nie czyta), aby zgłoszenie dotyczące poziomu można było odtworzyć na dokładnie tych samych danych. Wyłączone: pominięte."
     },
     "weight": {
       "title": "Jak ciężki jest ten poziom?",
@@ -1579,7 +1581,8 @@
     "curbHeight_flush": "Na równo (3 cm)",
     "roadSurface": "Nawierzchnia dróg",
     "otherSettings": "Inne ustawienia",
-    "otherSettingsValue": "jeszcze {n}, w zakładce „Dostrajanie”"
+    "otherSettingsValue": "jeszcze {n}, w zakładce „Dostrajanie”",
+    "bundleOsm": "Dołącz dane mapy do zgłoszeń błędów"
   },
   "usage": {
     "askTitle": "Udostępniać, jakich ustawień używasz?",
@@ -1791,7 +1794,8 @@
     "decalSidewalks": "Chodniki jako decale",
     "curbHeight": "Wysokość krawężnika",
     "curbHeight_low": "Niska (8 cm)",
-    "curbHeight_flush": "Na równo (3 cm)"
+    "curbHeight_flush": "Na równo (3 cm)",
+    "bundleOsm": "Dołącz dane mapy do zgłoszeń błędów"
   },
   "spawnPoints": {
     "title": "Punkty startu i Quicktravel",
@@ -2088,8 +2092,10 @@
       "showModels": "Pokaż modele: {kind}",
       "on": "wł.",
       "off": "wył.",
-      "widthsOffShort": "Wyłączone: każda droga dostaje typową szerokość swojej klasy."
-    }
+      "widthsOffShort": "Wyłączone: każda droga dostaje typową szerokość swojej klasy.",
+      "bundleOsmShort": "Dane mapy trafiają do poziomu, aby można było odtworzyć zgłoszenia."
+    },
+    "bundleOsm": "bez danych mapy do zgłoszeń"
   },
   "backupData": {
     "title": "Ta mapa została zbudowana z danych zapasowych.",

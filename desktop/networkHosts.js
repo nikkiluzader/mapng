@@ -60,7 +60,7 @@ export const NETWORK_HOSTS = [
 // browser, credits, an example in a placeholder, XML namespaces, a made-up base for parsing a path.
 export const LINKS_ONLY = [
   'www.openstreetmap.org', 'operations.osmfoundation.org', 'www.esri.com', 'www.gpxz.io', 'mapterhorn.com', 'registry.opendata.aws',
-  'protomaps.com', 'ko-fi.com', 'zenodo.org', 'tracestrack.com', 'api.tracestrack.com', 'overspan.dev', 'esa-worldcover.org', 'discord.gg',
+  'protomaps.com', 'ko-fi.com', 'zenodo.org', 'tracestrack.com', 'api.tracestrack.com', 'overspan.dev', 'esa-worldcover.org', 'discord.gg', 'opendatacommons.org',
   'www.w3.org', 'www.khronos.org', 'www.opengis.net', 'www.collada.org', 'x.invalid', 'tiles.mapng.invalid',
 ];
 

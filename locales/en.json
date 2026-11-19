@@ -726,7 +726,9 @@
       "curbHeight_low": "Low (8 cm)",
       "curbHeight_flush": "Flush (3 cm)",
       "curbHeightHint": "How far the raised sidewalks stand over the road. Standard is a real curb; Low and Flush are kinder to low cars and easy to drive onto.",
-      "viewDistanceShort": "How far the game draws the level."
+      "viewDistanceShort": "How far the game draws the level.",
+      "bundleOsm": "Include the map data for bug reports",
+      "bundleOsmHint": "On: the OpenStreetMap data the level was built from goes into the level (levels/<name>/mapng_source/, a few MB at most, which the game never reads), so a report about the level can be rebuilt on exactly the same data. Off: left out."
     },
     "weight": {
       "title": "How heavy is this level?",
@@ -1584,7 +1586,8 @@
     "curbHeight_flush": "Flush (3 cm)",
     "roadSurface": "Road surface",
     "otherSettings": "Other settings",
-    "otherSettingsValue": "{n} more, under Fine-tuning"
+    "otherSettingsValue": "{n} more, under Fine-tuning",
+    "bundleOsm": "Include the map data for bug reports"
   },
   "usage": {
     "askTitle": "Share which settings you use?",
@@ -1796,7 +1799,8 @@
     "decalSidewalks": "Sidewalks as decals",
     "curbHeight": "Curb height",
     "curbHeight_low": "Low (8 cm)",
-    "curbHeight_flush": "Flush (3 cm)"
+    "curbHeight_flush": "Flush (3 cm)",
+    "bundleOsm": "Include the map data for bug reports"
   },
   "spawnPoints": {
     "title": "Spawn & quicktravel points",
@@ -2093,8 +2097,10 @@
       "showModels": "Show the models of {kind}",
       "on": "on",
       "off": "off",
-      "widthsOffShort": "Off: each road gets its class's usual width."
-    }
+      "widthsOffShort": "Off: each road gets its class's usual width.",
+      "bundleOsmShort": "The map data goes into the level, so reports can be reproduced."
+    },
+    "bundleOsm": "no map data for bug reports"
   },
   "statusLines": {
     "mhCheck": "Checking Mapterhorn lidar coverage",

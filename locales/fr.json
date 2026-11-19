@@ -721,7 +721,9 @@
       "curbHeight_low": "Basse (8 cm)",
       "curbHeight_flush": "À ras (3 cm)",
       "curbHeightHint": "La hauteur des trottoirs surélevés au-dessus de la chaussée. Standard est une vraie bordure ; Basse et À ras ménagent les voitures basses et se franchissent facilement.",
-      "viewDistanceShort": "Jusqu'où le jeu dessine le niveau."
+      "viewDistanceShort": "Jusqu'où le jeu dessine le niveau.",
+      "bundleOsm": "Inclure les données de la carte pour les rapports de bug",
+      "bundleOsmHint": "Activé : les données OpenStreetMap ayant servi à construire le niveau y sont incluses (levels/<name>/mapng_source/, quelques Mo au plus, jamais lues par le jeu), afin qu’un rapport sur le niveau puisse être reproduit sur exactement les mêmes données. Désactivé : non incluses."
     },
     "weight": {
       "title": "Quel est le poids de ce niveau ?",
@@ -1579,7 +1581,8 @@
     "curbHeight_flush": "À ras (3 cm)",
     "roadSurface": "Revêtement des routes",
     "otherSettings": "Autres réglages",
-    "otherSettingsValue": "{n} de plus, dans « Réglages fins »"
+    "otherSettingsValue": "{n} de plus, dans « Réglages fins »",
+    "bundleOsm": "Inclure les données de la carte pour les rapports de bug"
   },
   "usage": {
     "askTitle": "Partager les réglages que vous utilisez ?",
@@ -1791,7 +1794,8 @@
     "decalSidewalks": "Trottoirs en décalques",
     "curbHeight": "Hauteur des bordures",
     "curbHeight_low": "Basse (8 cm)",
-    "curbHeight_flush": "À ras (3 cm)"
+    "curbHeight_flush": "À ras (3 cm)",
+    "bundleOsm": "Inclure les données de la carte pour les rapports de bug"
   },
   "spawnPoints": {
     "title": "Points de départ et Quicktravel",
@@ -2088,8 +2092,10 @@
       "showModels": "Afficher les modèles de {kind}",
       "on": "oui",
       "off": "non",
-      "widthsOffShort": "Désactivé : chaque route prend la largeur habituelle de sa classe."
-    }
+      "widthsOffShort": "Désactivé : chaque route prend la largeur habituelle de sa classe.",
+      "bundleOsmShort": "Les données de la carte vont dans le niveau, pour reproduire les rapports."
+    },
+    "bundleOsm": "pas de données de carte pour les rapports"
   },
   "backupData": {
     "title": "Cette carte a été construite avec des données de secours.",

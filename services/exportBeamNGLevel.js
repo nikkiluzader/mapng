@@ -7878,6 +7878,50 @@ function captureConsole() {
   };
 }
 
+// The map data a level was built from, in a folder the game never reads (levels/<name>/mapng_source/): osm.json (the
+// export's input features, as the sweep's test areas keep them: scripts/sweep/exportArea.mjs with PREPROCESSED=1, as
+// they come out of Generate's road processing), meta.json (centre, size, metres per pixel, bounds), and the
+// licence notice the OpenStreetMap data needs (ODbL). A few MB compressed on a 16 km map. A tester's report can then
+// be rebuilt on exactly their data. Returns { features, bytes } or null when there is none.
+export const SOURCE_DATA_DIR = 'mapng_source';
+export function addSourceData(zip, base, { features, terrainData, center, levelName, sessionCode }) {
+  if (!Array.isArray(features) || !features.length) return null;
+  const osm = JSON.stringify(features);
+  zip.file(`${base}/${SOURCE_DATA_DIR}/osm.json`, osm);
+  // (a checksum of exactly that file, for the export report: a report sent alone names the data, one sent with its
+  // level proves the bundled file is what the level was built from)
+  const checksum = cyrb53(osm);
+  const meta = {
+    name: levelName,
+    center: { lat: Number(center?.lat), lng: Number(center?.lng) },
+    size: terrainData?.width, mpp: Number(terrainData?.processingMetersPerPixel) || 1,
+    bounds: terrainData?.bounds, fetchBounds: terrainData?.bounds,
+    preprocessed: true,
+    build: typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : null,
+    exportedAt: new Date().toISOString(),
+    ...(sessionCode ? { sessionCode } : {}),
+  };
+  zip.file(`${base}/${SOURCE_DATA_DIR}/meta.json`, JSON.stringify(meta, null, 1));
+  zip.file(`${base}/${SOURCE_DATA_DIR}/LICENSE.txt`, [
+    'The map data this level was built from, kept for bug reports (MapNG: Fine-tuning, "Include the map data").',
+    '',
+    'osm.json contains data from OpenStreetMap, (c) OpenStreetMap contributors, available under the Open Database',
+    'License (ODbL) 1.0: https://opendatacommons.org/licenses/odbl/1-0/ . See https://www.openstreetmap.org/copyright .',
+    'Building heights and outlines may include data from Overture Maps (overturemaps.org), under its own licences.',
+    'The game does not read this folder; deleting it changes nothing in the level.',
+    '',
+  ].join('\n'));
+  return { features: features.length, bytes: osm.length, checksum };
+}
+// (53-bit string hash, cyrb53 by bryc (public domain): fast, synchronous in the browser too, as 14 hex digits)
+function cyrb53(str, seed = 0) {
+  let h1 = 0xdeadbeef ^ seed; let h2 = 0x41c6ce57 ^ seed;
+  for (let i = 0; i < str.length; i++) { const ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(14, '0');
+}
+
 /**
  * Detailed troubleshooting sections for export_report.txt: what the export
  * built (roads, bridges, buildings, furniture, vegetation, water, terrain
@@ -8516,6 +8560,7 @@ function buildBeamNGExportReport({
     ...(sanitizeTreeModelsOff(options?.treeModelsOff).length ? [`- Tree models left out (Fine-tuning): ${sanitizeTreeModelsOff(options.treeModelsOff).join(', ')}`] : []),
     `- Include rocks: ${formatBool(options?.includeRocks)}`,
     `- Street parking assumed where none is mapped: ${formatBool(options?.assumeParking === true)}`,
+    `- Map data bundled for bug reports (levels/<name>/mapng_source/): ${formatBool(options?.bundleOsm !== false)}`,
     `- Roads follow the lidar survey's slope: ${originalTerrainData?.coarseElevation ? 'no (coarse elevation here: class grades)' : options?.roadsFollowSurvey !== false ? 'every road but motorways and trunk roads, 35% at most' : 'tertiary roads and smaller, 35% at most; main roads keep their class grade (switched off)'}`,
     `- View distance: ${viewDistanceChoice(options?.viewDistance) === 'auto' ? 'auto (the map\'s width, 4 km at least, 16 km at most)' : `${viewDistanceChoice(options?.viewDistance)} m`} (LevelInfo visibleDistance)`,
     `- Road surfaces: ${options?.roadSurface === 'hero' ? 'Hero Roads (experimental): built by a script when the level loads, over MapNG\'s decal roads (hidden under them, kept for traffic); editable in the World Editor > Hero Road, rebuilt from MapNG\'s roads at each load' : options?.roadSurface === 'mesh' ? 'Mesh Roads (experimental): a MeshRoad deck saved in the level under each paved road on the ground, MapNG\'s decal roads drawn on it (and kept for traffic)' : 'decal roads'}`,
@@ -12853,6 +12898,8 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
 }
 
 async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
+  // (the map data as it came in, before What to build leaves anything out: bundled for bug reports, addSourceData)
+  const sourceOsmFeatures = terrainData?.osmFeatures;
   const {
     baseTexture = 'hybrid',
     includeBuildings = true,
@@ -15737,7 +15784,20 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       pbrResult,
     },
   });
-  zip.file(`${base}/export_report.txt`, reportContents);
+  // the map data the level was built from, for bug reports (Fine-tuning: "Include the map data", on unless switched off);
+  // the report carries its fingerprint, not the data (a report is pasted into chats: a 16 km map's data is megabytes)
+  let reportText = reportContents;
+  if (options.bundleOsm !== false) {
+    try {
+      const bundled = addSourceData(zip, base, { features: sourceOsmFeatures, terrainData, center, levelName, sessionCode: options.sessionCode });
+      if (bundled) {
+        console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Map data bundled for bug reports: ${bundled.features} features, ${(bundled.bytes / 1048576).toFixed(1)} MB (${base}/${SOURCE_DATA_DIR}/).`);
+        const b = terrainData?.bounds || {};
+        reportText = reportText.replace(/^- Map data bundled for bug reports[^\n]*$/m, (line) => `${line}: ${bundled.features} features, ${(bundled.bytes / 1048576).toFixed(1)} MB, checksum ${bundled.checksum}, bounds N ${b.north} S ${b.south} E ${b.east} W ${b.west} (its source: "OSM Request Metadata" below)`);
+      }
+    } catch (err) { console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Map data not bundled:`, err?.message || err); }
+  }
+  zip.file(`${base}/export_report.txt`, reportText);
   // in-game test probes (scripts/ingame/runIngameTests.mjs)
   let ingameProbes = null;
   try {
@@ -16604,7 +16664,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   return {
     blob: zipBlob, filename: `${levelName}.zip`, structureChecks, ingameProbes,
     // (the level's export_report.txt, for the "done" window: read there without opening the zip again)
-    report: reportContents,
+    report: reportText,
     // (for the export history: each step's time, and the steps reused from the last export)
     steps: processingLog.map((e) => ({ step: e.step, ms: Math.round(e.durationMs) })),
     reused: [...reusedSteps],

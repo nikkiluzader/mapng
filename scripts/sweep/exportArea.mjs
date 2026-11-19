@@ -61,7 +61,8 @@ const raw = !!process.env.RAW;
 // (PREPROCESSED=1: the OSM is the app's own data-step output, corners, widths and twin carriageways already done)
 // (the widths usual outside the Americas, before anything is shaped: as Generate does, terrain.js)
 await withRegionalWidths(osmFeatures, meta.bounds);
-const rounded = process.env.PREPROCESSED ? osmFeatures : roundRoadCorners(osmFeatures).features;
+// (PREPROCESSED, or a level's bundled map data, mapng_source/meta.json preprocessed: the roads already as Generate left them)
+const rounded = process.env.PREPROCESSED || meta.preprocessed ? osmFeatures : roundRoadCorners(osmFeatures).features;
 let osmRoads = process.env.NOWIDTH || process.env.PREPROCESSED ? rounded : fitTwinCarriageways(measureStreetWidths(rounded).features).features;
 // (how far the lidar road snap moved the roads goes into the checks: a snap that wanders shows there)
 let snapStats = null;
