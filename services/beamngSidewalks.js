@@ -3786,7 +3786,7 @@ function* sidewalkMeshes(carriageways, options = {}) {
       curbH: CURB_H, crossSlope: CROSS_SLOPE, curbOnlyM: CURB_ONLY_M, THREE, groundAt: options.groundAt || null,
     });
     paved.pockets = pavedPockets;
-    console.log(`Sidewalks (paved model): ${paved.stats.tiles} tiles, ${Math.round(paved.stats.slab)} slab / ${Math.round(paved.stats.curb)} curb / ${Math.round(paved.stats.skirt)} edge triangles in ${paved.stats.ms} ms`);
+    console.log(`Sidewalks (paved model): ${paved.stats.tiles} tiles, ${Math.round(paved.stats.slab)} slab / ${Math.round(paved.stats.curb)} curb / ${Math.round(paved.stats.skirt)} edge triangles in ${paved.stats.ms} ms (banks ${Math.round(paved.stats.bankMs)} ms on ${paved.stats.bankCleared} tiles, mesh ${Math.round(paved.stats.meshMs)} ms, check samples ${Math.round(paved.stats.sampleMs)} ms)`);
     flush();
   } else {
     for (const run of runs) {
@@ -4044,22 +4044,29 @@ export function gradeSidewalkGround(runs, carriageways, grid, { overhead = () =>
  * slab profile, which the paved model does not build): every step metres over each tile's paved cells, the slab
  * top (paved.heightAt) against the terrain. Floating and buried as checkSidewalkGround counts them.
  */
+const CHECK_EDGE_M = 1;
+const pavedAt = (cells, g, r, c) => r >= 0 && c >= 0 && r < g.h && c < g.w && (cells[r * g.w + c] & 6) !== 0;
 export function checkPavedGround(paved, groundAt, { step = 2 } = {}) {
   let samples = 0; let floating = 0; let buried = 0; let worst = null; let worstBuried = null;
   // (the first spots of each, for the sweep's plots: [x, y, metres])
   const spots = { floating: [], buried: [] }; const SPOTS = 64;
   const FLOAT_M = CURB_H + SINK + 0.1;
   const BURIED_M = 0.08;
-  for (const { cells, g, core } of paved?.tiles || []) {
-    const k = Math.max(1, Math.round(step / g.res));
+  for (const { cells, g, core, slabZ } of paved?.tiles || []) {
+    const k = slabZ ? slabZ.k : Math.max(1, Math.round(step / g.res));
+    const e = Math.max(1, Math.round(CHECK_EDGE_M / g.res));
     for (let r = 0; r < g.h; r += k) {
       const y = g.y1 - (r + 0.5) * g.res;
       if (y < core[1] || y >= core[3]) continue;
       for (let c = 0; c < g.w; c += k) {
         if (!(cells[r * g.w + c] & 6)) continue;   // (WALK | GAP: paved)
+        // (inside the paving only: within EDGE_M of its outline the edge's skirt runs down past the ground, and a quay's
+        // or a bank's drop under the last half metre is covered, not a gap)
+        if (!pavedAt(cells, g, r - e, c) || !pavedAt(cells, g, r + e, c) || !pavedAt(cells, g, r, c - e) || !pavedAt(cells, g, r, c + e)) continue;
         const x = g.x0 + (c + 0.5) * g.res;
         if (x < core[0] || x >= core[2]) continue;
-        const top = paved.heightAt(x, y); const ground = groundAt(x, y);
+        // (the built slab where the mesh was sampled: what the game shows)
+        const top = slabZ ? slabZ.z[(r / k) * slabZ.cols + c / k] : paved.heightAt(x, y); const ground = groundAt(x, y);
         if (!Number.isFinite(top) || !Number.isFinite(ground)) continue;
         samples++;
         const gap = top - ground;

@@ -95,3 +95,41 @@ test('texture scale as today: the slab at a metre over SLAB_TILE_M, curb faces i
     for (const uv of t.uv) assert.ok(uv[1] >= lo - 1e-9 && uv[1] <= hi + 1e-9, `v ${uv[1]} outside ${lo}..${hi}`);
   }
 });
+
+// A street on a fill: the ground level with the road to 1 m past the curb, then down a bank 4 m to the walk at its
+// foot (y = 9.5). The closed strip down the bank is left as terrain; the walk and the curb strip stay paved.
+test('no paving down a bank: the strip between the curb and a walk below it is left unpaved', () => {
+  const ground = (x, y) => (Math.abs(y) <= 5 ? 0 : -Math.min(4, (Math.abs(y) - 5) * 1.5));
+  const build = (groundAt) => {
+    const b = collector();
+    addPavedSidewalks(b, {
+      carriageways: [{ nodes: [[-60, 0, 0], [60, 0, 0]], half: 4, highway: 'residential' }],
+      walks: [{ nodes: [[-60, 9.5, -4], [60, 9.5, -4]], half: 1, sidewalk: true }],
+      curbH: 0.15, THREE, groundAt,
+    });
+    return b.tris.slab.filter((t) => t.every((p) => Math.abs(p[0]) < 40));
+  };
+  const area = (tris, y0, y1) => tris.filter((t) => { const y = (t[0][1] + t[1][1] + t[2][1]) / 3; return y > y0 && y < y1; })
+    .reduce((s, [a, b, c]) => s + Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1])) / 2, 0);
+  const flat = build(() => 0); const bank = build(ground);
+  // flat: paved from the curb to the walk; on the bank, the slope (y 6 to 8.5) is not
+  assert.ok(area(flat, 6, 8.4) > 100, `flat ${area(flat, 6, 8.4)}`);
+  assert.ok(area(bank, 6, 8.4) < 0.1 * area(flat, 6, 8.4), `bank ${area(bank, 6, 8.4)}`);
+  // the walk itself is still paved
+  assert.ok(area(bank, 8.6, 10.4) > 100, `walk ${area(bank, 8.6, 10.4)}`);
+});
+
+// The ground check's lattice samples of the built slab: the plane's height where a triangle covers a point, NaN off it.
+test('sampleSlab: the slab height on the check lattice, NaN where there is none', async () => {
+  const { sampleSlab } = await import('../services/pavedSidewalks.js');
+  const g = { x0: 0, y1: 20, w: 80, h: 80, res: 0.25 };
+  // a sloping square over x 0..10, y 10..20 (z = x / 10), two triangles
+  const slab = [0, 10, 0, 10, 10, 1, 10, 20, 1, 0, 10, 0, 10, 20, 1, 0, 20, 0];
+  const s = sampleSlab(slab, g, 2);
+  assert.equal(s.k, 8); assert.equal(s.cols, 10);
+  const at = (ri, ci) => s.z[ri * s.cols + ci];
+  // lattice point (0, 1): x = 2.125, y = 19.875
+  assert.ok(Math.abs(at(0, 1) - 0.2125) < 1e-5);
+  // x = 12.125: off the slab
+  assert.ok(Number.isNaN(at(0, 6)));
+});
