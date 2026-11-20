@@ -375,7 +375,7 @@ import { Layers, ChevronDown, Star, Navigation } from 'lucide-vue-next';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { getAdjacentBounds, POSITION_LABELS } from '../../services/surroundingTiles';
-import { computeMetricSelectionBounds, computeUploadedCropBounds, nativeExportSquare } from '../../services/uploadBounds';
+import { computeMetricSelectionBounds, computeUploadedCropBounds, nativeSquareAt } from '../../services/uploadBounds';
 import { CHECKBOX } from '../base/controlStyles.js';
 import { useOsmCoverage } from '../../composables/useOsmCoverage.js';
 import { useExportHotspots } from '../../composables/useExportHotspots.js';
@@ -669,10 +669,11 @@ const showUploadedTileZones = computed(() => {
   return format === 'gml-zip' && uploadedCoverageTiles.value.length > 1;
 });
 
-// (native mode: the square the export will keep, drawn inside the upload's footprint)
+// (native mode: the square the export will keep, drawn inside the upload's footprint; it follows the map's centre,
+// held inside the file, so the user picks which part becomes the level)
 const nativeSquareBounds = computed(() => {
   if (!nativeCoverageBounds.value || props.uploadedAreaMode === 'crop') return null;
-  return nativeExportSquare(props.uploadedElevationMeta, props.processingMetersPerPixel)?.bounds || null;
+  return nativeSquareAt(props.uploadedElevationMeta, props.processingMetersPerPixel, currentCenter.value)?.bounds || null;
 });
 
 const uploadedCropBounds = computed(() => {

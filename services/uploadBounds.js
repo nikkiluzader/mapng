@@ -153,6 +153,21 @@ export const nativeExportSquare = (meta, metersPerPixel) => {
   };
 };
 
+/**
+ * The native square placed where the user wants it: centred on `center` (the map's selection centre) and kept inside
+ * the file's outline (a centre past an edge holds it against that edge); with no centre, the file's middle. The same fields as
+ * nativeExportSquare. (The square was always the file's middle: a user with a big point cloud could not choose which
+ * part became the level, Toma's request.)
+ */
+export const nativeSquareAt = (meta, metersPerPixel, center) => {
+  const sq = nativeExportSquare(meta, metersPerPixel);
+  if (!sq) return null;
+  // (a centre past the file's edge holds the square against that edge: dragging toward an edge, it stops there; it
+  // jumped back to the middle at first)
+  const ok = center && Number.isFinite(center.lat) && Number.isFinite(center.lng);
+  return ok ? { ...sq, bounds: computeUploadedCropBounds(center, sq.sizeMeters, meta.bounds) } : sq;
+};
+
 /** A point cloud's average point spacing (m) and density (points per m²) from its header, or null. */
 export const pointCloudSpacing = (meta) => {
   if (!meta || !Number(meta.pointCount) || meta.epsgCode === 4326) return null;

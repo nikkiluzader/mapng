@@ -286,7 +286,7 @@ import { NODATA_AUTO } from './services/nodataDetect.js';
 import { mergeElevationSlots } from './services/tifLoader.js';
 import { DEFAULT_GAP_FILL_SOURCE } from './services/gapFillSources.js';
 import { normalizeFallbackSource } from './services/elevationFallback.js';
-import { computeUploadedCropBounds } from './services/uploadBounds';
+import { computeUploadedCropBounds, nativeSquareAt } from './services/uploadBounds';
 import {
   computeGridTiles,
   computeGridTilesWithOffsets,
@@ -978,14 +978,17 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
       if (!parsedMeta) throw new Error(t('app.error.uploadUnreadable'));
       // The upload card can override the no-data value the loader detected.
       const meta = { ...parsedMeta, noDataOverride: uploadedNoDataOverride.value };
+      // (native mode: the power-of-two square the user placed inside the file, at the map's centre: built as that square
+      // alone, its own size and resolution; the file's middle when the centre is outside the file)
+      const nativeSquare = uploadedAreaMode.value !== 'crop' && meta?.bounds ? nativeSquareAt(meta, Number(processingMpp || 1), center.value) : null;
       const targetBounds = uploadedAreaMode.value === 'crop' && meta?.bounds
         ? computeUploadedCropBounds(center.value, Number(resolution.value) * Number(processingMpp || 1), meta.bounds)
-        : null;
+        : nativeSquare?.bounds || null;
       const effectiveCenter = meta.center ?? center.value;
       data = await loadTerrainFromUploadedElevation(
         meta,
         effectiveCenter,
-        resolution.value,
+        nativeSquare ? nativeSquare.sizePx : resolution.value,
         fetchOSM,
         applyLoadingUpdate,
         signal,
@@ -994,7 +997,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
           gapFillSource,
           gpxzApiKey,
           layerOrder: uploadedLayerOrder.value,
-          processingMetersPerPixel: Number(processingMpp || 1),
+          processingMetersPerPixel: nativeSquare ? nativeSquare.effMpp : Number(processingMpp || 1),
           targetBounds,
           preferNativeCoverage: uploadedAreaMode.value !== 'crop',
           raw,
