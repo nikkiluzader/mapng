@@ -1,6 +1,6 @@
 # MapNG open items
 
-Last reviewed: 2026-11-20 (evening).
+Last reviewed: 2026-11-20 (late night).
 
 The short "now" board: current work, what waits on someone, and checks owed on shipped work. The other tracking
 files: `refs/output/backlog.md` holds everything wanted later, by area; `refs/output/releases.md` what shipped;
@@ -9,12 +9,13 @@ these files; they are never copied.
 
 ## State of the branches
 
-As of 2026-11-20 night:
+As of 2026-11-20 night (late):
 
-- `main` = `dev` at 5f5a1e0: 0.3.5-dev.2's work plus the sea floor / terrain seams / side-slope blend (7db9fe6).
-  Desktop 0.3.5-dev.2 published 2026-11-20 (tag at 5c46066; without 7db9fe6). Published: 0.3.4 as the latest release.
-  Branches: `seawall` (5009640, local: the promenade behind sea walls), `step-walls-2` (390b697: step walls and longer
-  slopes), `hairpin-blend` (one road's overlapping cores blended, unswept), `step-walls` (older, superseded by -2).
+- `main` = `dev` at 9ccd5ad: everything for 0.3.5 (the coast / terrain seams / side-slope blend 7db9fe6, the point
+  cloud fill e673d5f, the hairpin bends 712d2fd, the page 586fac8). Desktop 0.3.5-dev.3 tagged (9ccd5ad) for the
+  user's end-to-end pass; then 0.3.5. Published: 0.3.4 as the latest release.
+  Branches: `seawall` (5009640, local: the promenade, for 0.3.6), `step-walls-2` (390b697), `hairpin-blend` (unswept),
+  `step-walls` (older, superseded by -2).
 - The sweep's known pre-existing flags: sidewalk drift at naldo, kingst, deckpark_g, stelvio; ams_centraal mh/ready;
   dev_szczyrk cross; ams t30/noshape swBuried; Michiel de Ruijtertunnel joint steps (check 4).
 
