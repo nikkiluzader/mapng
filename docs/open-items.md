@@ -54,7 +54,9 @@ push dev and main (standing go-ahead for this list).
    (see the bullet below).
 6. **Buildings:** 4.1 done 2026-11-20 (the "Base nautique" on Lac de Tignes is tagged building=no: no longer built); 4.2 a building over
    a portal juts onto the road.
-7. **Check on today's code:** 3.5 the D 902 road/gallery/tunnel junction (probably the D 87A crossing, fixed);
+7. **Check on today's code** (2026-11-20: the D 87A box under the D 902 checked in game, inside both ways and outside:
+   the box, its headroom and the D 902 over it are sound; its approach cuttings' tops are the same vertical sawtooth
+   as 2.8's, scratch/fizz033/diag/d87_now_sheet.jpg; 3.5 and 2.7 still to look at): 3.5 the D 902 road/gallery/tunnel junction (probably the D 87A crossing, fixed);
    2.7 bridges' heights and shapes; the D 87A box's ends beside the lower road (headroom now fitted, 3.81 m).
 8. **Mesh Roads only** (experimental, off by default, but his chosen mode: worked together with item 4): 1.4 Mesh and Decal Roads at one height, layers showing;
    1.7 small steps; 7.1 triangles visible in the light; 7.2 a texture layer floating over the Decal Road with Mesh
