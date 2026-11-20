@@ -98,6 +98,24 @@ shots/); re-checks on today's code: scratch/fizz033/run; diagrams scratch/fizz03
   portal headwalls stand as tall white blocks over the D 902 (2.1 "portal far too big"): next; a jagged-topped wall
   along the D 87A's cutting north of portal B; castRay goes through terrain holes (probe scans must read the hole
   map: scratch/fizz033/diag/d87a_squares.py).
+- **2.6 his problem tunnel with walls alongside: not reproduced on dev (2026-11-19).** The Paravalanche de la Forêt
+  (way 30195772, D 87A) is built as a 304 m flat-roofed gallery on columns (the OSM gallery rules), no walled ramps
+  in the area (test area fz_foret, 512 m); seen in game from outside and the driver's seat. Ask Fizz to recheck.
+- **2.8 wing walls with a gap to the road: on dev after the sweep (2026-11-19).** The block began at the shoulder's
+  edge (half + 0.7 m) where the terrain fell away at the road's own edge: a 0.7 m slot, 2 m deep, between road and
+  wall, and the parapet on the block's outer edge 3 m out. Now the block starts at the road's drawn edge and the
+  parapet stands there; the block's top runs on beyond it over the steep strip. Tignes (gt_tignes, the service
+  bridge at (-110, 747)): sections scratch/fizz033/diag/wing_before/after.png, in game scratch/fizz033/shots_wing.
+  Then (user, the same spot): the walls at that bridge's end stood across the other roads (Rue de la Poste, its
+  little service bridge and a service road crossing it; a garage ramp joined at the bridge's end). The walls' road
+  check knew only carriageways (no service roads: their pieces split at a bridge carry no owner) and treated the
+  road's own pieces and the next piece through a node alike; it looked only along the line straight out. Now: every
+  drawn road's base pieces (keyed by segment, or by OSM way where split), its own road and the one piece carrying
+  straight on through each node ignored; a station on another road's pavement gets no wall, and the block's corners
+  and middle are checked as well; roads the export does not draw get no walls (the garage ramp).
+  Top views scratch/fizz033/diag/wing_top_after*.png. Left: where a wall is left out beside another road (the
+  service road's crossing) the fill's steep sides show as teeth: terrainCompose walls the fill before the walls are
+  known; give those stations the ordinary slope (needs the wall rule run before the composition).
 - **Fixed before this list:** the bridgeTowerHouses error (078ff33, after 0.3.3); short bridges too high
   (the bridge rise cap, 957fa96); sidewalks (the paved model).
 - **Owed answers:** 2.2 continuous roads, 3.4 OSM tells galleries apart (tunnel=avalanche_protector), 4.5 double

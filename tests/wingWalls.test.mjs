@@ -37,7 +37,7 @@ test('walls run both sides within the wing length where the road stands over the
   const tight = wingWallRuns(graph(), { groundAt: ground, onOtherRoad: (x, y) => y > 5.2 });
   // (a lower street right against the shoulder: a thin wall on the shoulder's edge, with its parapet)
   const thin = tight.find((r) => r.side === 1);
-  assert.ok(thin && thin.stations.every((q) => q.outer < 5.5 && q.outer - q.inner >= 0.3 - 1e-9 && q.inner >= 4 && q.parapet > 0), 'a thin wall beside the lower street');
+  assert.ok(thin && thin.stations.every((q) => q.outer < 5.5 && q.outer - q.inner >= 0.3 - 1e-9 && q.inner >= 4 - 0.05 - 1e-9 && q.parapet > 0), 'a thin wall beside the lower street');
   // (the other carriageway of the same road at the same height, a 3 m trench between: filled to its pavement, no parapet)
   const dual = (x, y) => (Math.abs(y) <= 5.01 || (y > 8 && y < 18) ? 4 : 0);
   const median = wingWallRuns(graph(), { groundAt: dual, onOtherRoad: (x, y) => y > 8.5 && y < 17.5 }).find((r) => r.side === 1);
@@ -56,10 +56,10 @@ test('every face of a wall points out of it', () => {
     for (const [A, B, C] of tris) {
       const n = [(B[1] - A[1]) * (C[2] - A[2]) - (B[2] - A[2]) * (C[1] - A[1]), (B[2] - A[2]) * (C[0] - A[0]) - (B[0] - A[0]) * (C[2] - A[2]), (B[0] - A[0]) * (C[1] - A[1]) - (B[1] - A[1]) * (C[0] - A[0])];
       const m = [(A[0] + B[0] + C[0]) / 3 - c[0], (A[1] + B[1] + C[1]) / 3 - c[1], (A[2] + B[2] + C[2]) / 3 - c[2]];
-      // (the parapet's inner face looks back over the block's top, towards the road: it faces away from the
-      // parapet's own middle, which the dot with the block's middle does not show; checked apart)
-      const onParapetInner = Math.abs(n[2]) < 1e-9 && Math.abs(n[0]) < 1e-9 && Math.min(A[2], B[2], C[2]) > q.z && Math.max(Math.abs(A[1]), Math.abs(B[1]), Math.abs(C[1])) < q.outer - 0.2;
-      if (onParapetInner) { assert.ok(n[1] * q.ny < 0, 'the parapet inner face looks at the road'); continue; }
+      // (the parapet stands at the road's edge; its outer face looks out over the block's top, away from the road:
+      // it faces away from the parapet's own middle, which the dot with the block's middle does not show; checked apart)
+      const onParapetOuter = Math.abs(n[2]) < 1e-9 && Math.abs(n[0]) < 1e-9 && Math.min(A[2], B[2], C[2]) > q.z && Math.max(Math.abs(A[1]), Math.abs(B[1]), Math.abs(C[1])) > q.inner + 0.2 && Math.max(Math.abs(A[1]), Math.abs(B[1]), Math.abs(C[1])) < q.outer - 0.2;
+      if (onParapetOuter) { assert.ok(n[1] * q.ny > 0, 'the parapet outer face looks away from the road'); continue; }
       assert.ok(n[0] * m[0] + n[1] * m[1] + n[2] * m[2] > 0, `side ${run.side}: a face looks into the wall`);
     }
   }
@@ -90,4 +90,27 @@ test('a wing wall\'s faces run into the ground on a clean foot, not fitted stati
   assert.ok(zs.length > 0);
   // every foot under the dip's ground (7.9 + 0.6 = 8.5) by more than a metre: none can show at the dip
   assert.ok(Math.max(...zs) <= 7.9 - 1.3, `feet at ${[...new Set(zs.map((v) => v.toFixed(1)))]}`);
+});
+
+// Three roads meeting at a deck's end (a street's little bridge with a garage ramp joined at its end): no wall in
+// the junction's mouth, where each road's blocks stood across the others' lanes; walls further out along the road.
+test('no wing walls in the mouth of a junction at a deck end', () => {
+  const line = (x0, y0, dx, dy, n) => ({ s: Array.from({ length: n }, (_, i) => i * 2), x: Float64Array.from({ length: n }, (_, i) => x0 + dx * i * 2), y: Float64Array.from({ length: n }, (_, i) => y0 + dy * i * 2) });
+  const deck = { ...line(-20, 0, 1, 0, 11), half: 4, from: 1, to: 3 };          // x -20..0, all deck
+  const road = { ...line(0, 0, 1, 0, 31), half: 4, from: 3, to: 2 };           // x 0..60, the approach
+  const ramp = { ...line(0, 0, 0, 1, 11), half: 3, from: 3, to: 4 };           // north from the deck's end
+  const spur = { ...line(0, 0, 0, -1, 11), half: 3, from: 3, to: 5 };          // south from it
+  const g = {
+    edges: [deck, road, ramp, spur],
+    profile: { z: [deck, road, ramp, spur].map((e) => new Float64Array(e.s.length).fill(4)) },
+    classes: { segments: [{ edge: 0, i0: 0, i1: 10, kind: 'deck' }] },
+  };
+  // (the approach on a fill with vertical sides; the ground beside it at 0; the ramp's and spur's pavement: x within 3)
+  const armPavement = (x, y, k) => k === 1 && Math.abs(x) <= 3 && Math.abs(y) <= 20;
+  const runs = wingWallRuns(g, { groundAt: (x, y) => (x >= 0 && Math.abs(y) <= 5.01 ? 4 : 0), onOtherRoad: armPavement });
+  const onRoad = runs.filter((r) => r.edge === 1).flatMap((r) => r.stations);
+  assert.ok(onRoad.length > 0, 'the approach is walled further out');
+  // (no block on the arms' pavement: none from the junction's own stations, none swinging across the mouth)
+  assert.ok(onRoad.every((q) => q.x >= 4 - 1e-9), `a wall in the junction's mouth at x = ${Math.min(...onRoad.map((q) => q.x))}`);
+  for (const q of onRoad) for (const d of [q.inner, q.outer - 0.3]) assert.ok(!armPavement(q.x + q.nx * d, q.y + q.ny * d, 1), 'a block on an arm');
 });

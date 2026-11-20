@@ -5997,6 +5997,46 @@ function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = [],
   return { decals, ways, footpaths, services: { count: serviceCount, length: serviceLength }, sidewalkStrips: { count: stripCount, length: stripLength } };
 }
 
+// For each structure-graph edge, the segment indices of its own road: itself and the edges it carries straight on
+// into through a node (leaving that node within WALL_STRAIGHT_ON_DEG of opposite directions). The wing walls take an
+// arm joining at an angle as another road, and its pavement as no place for a block.
+const WALL_STRAIGHT_ON_DEG = 35;
+function wingWallSameRoad(graph) {
+  const edges = graph?.edges || [];
+  const atNode = new Map();
+  const leave = (e, start) => {
+    const n = e.s.length; const i0 = start ? 0 : n - 1; const i1 = start ? Math.min(n - 1, 1) : Math.max(0, n - 2);
+    const dx = e.x[i1] - e.x[i0]; const dy = e.y[i1] - e.y[i0]; const L = fastHypot(dx, dy) || 1;
+    return [dx / L, dy / L];
+  };
+  edges.forEach((e, k) => {
+    for (const [id, start] of [[e.from, true], [e.to, false]]) {
+      if (id === undefined) continue;
+      if (!atNode.has(id)) atNode.set(id, []);
+      atNode.get(id).push([k, leave(e, start)]);
+    }
+  });
+  const lim = -Math.cos((WALL_STRAIGHT_ON_DEG * Math.PI) / 180);
+  return edges.map((e, k) => {
+    const own = new Set([e.seg, `way:${e.wayId}`]);
+    for (const id of [e.from, e.to]) {
+      const here = atNode.get(id) || [];
+      // (the one that carries straight on, the most opposite: a street's next piece, not a service road joining at a
+      // sharp angle, which a threshold alone took for the street and walled across in Tignes)
+      for (const m of here.filter(([j]) => j === k).map(([, d]) => d)) {
+        let best = null; let bestDot = lim;
+        for (const [j, d] of here) {
+          if (j === k) continue;
+          const dot = m[0] * d[0] + m[1] * d[1];
+          if (dot <= bestDot) { bestDot = dot; best = j; }
+        }
+        if (best !== null) { own.add(edges[best].seg); own.add(`way:${edges[best].wayId}`); }
+      }
+    }
+    return own;
+  });
+}
+
 // A tunnel's footprint on the ground for the paving: its line through the tube and its approach cuttings, as wide as
 // the tube's walls, as a ring of world points (the shape building footprints come in).
 const TUNNEL_FOOTPRINT_PAD_M = 0.3;
@@ -14873,11 +14913,35 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   if (includeRoads && sg?.classes && sg.profile?.z && Array.isArray(sidewalks.meshes)) {
     // (every carriageway, decks too: at a divided street's bridge end the other carriageway is still on its deck,
     // and the walls of the one beside it stood across its lanes, South Church Street over the Reedy)
-    const cwIndexW = buildCarriagewayIndex((decalRoads.carriageways || groundCarriageways).filter((cw) => !cw.tunnel));
+    // (and every other drawn road: the service roads have no carriageway entry, and a street's walls stood across a
+    // service road crossing it in Tignes; each at its drawn width, keyed by its segment as the carriageways are)
+    const wallCws = (decalRoads.carriageways || groundCarriageways).filter((cw) => !cw.tunnel);
+    const cwOwners = new Set(wallCws.map((cw) => cw.owner));
+    const drawnOnly = [];
+    for (const g of Array.isArray(decalRoads) ? decalRoads : []) {
+      for (const d of g.__items || []) {
+        // (a road's base layer: its name ends _b, or _b1, _b2 where it was split; a piece split at a bridge carries
+        // no owner: keyed by the OSM way and segment its name holds, as the graph's edges are)
+        if (!/_b\d*$/.test(d.name || '') || !(d.nodes?.length >= 2)) continue;
+        const way = (d.name.match(/(\d+_seg_\d+)/) || [])[1];
+        const owner = d.__owner !== undefined ? d.__owner : way ? `way:${way}` : null;
+        if (owner === null || cwOwners.has(owner)) continue;
+        const halfAt = d.nodes.map((nd) => (Number(nd[3]) || 0) / 2);
+        drawnOnly.push({ owner, nodes: d.nodes, half: Math.max(...halfAt), halfAt });
+      }
+    }
+    const cwIndexW = buildCarriagewayIndex(wallCws.concat(drawnOnly));
     const runs = wingWallRuns(sg, {
       groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
-      onOtherRoad: (x, y) => isOnOtherCarriageway(cwIndexW, x, y, 0, () => false),
+      // (not its own road, nor the road it carries straight on into at a node: a station at a node lies on the next
+      // piece's pavement too; an arm joining at an angle is another road)
+      onOtherRoad: (() => {
+        const sameRoad = wingWallSameRoad(sg);
+        return (x, y, k) => isOnOtherCarriageway(cwIndexW, x, y, 0, (owner) => sameRoad[k]?.has(owner));
+      })(),
       shoulderM: Math.max(1, squareSize), slopeM: Math.max(2, 2 * squareSize),
+      // (only along roads that are drawn: the graph holds ways the decals leave out)
+      drawn: (() => { const owners = new Set((decalRoads.carriageways || []).map((cw) => cw.owner)); return (e) => owners.has(e.seg); })(),
     });
     // (a test hook, as __MAPNG_STRUCT_DEBUG: the runs, for a map of the walls)
     if (typeof globalThis.__MAPNG_WALL_DEBUG === 'function') globalThis.__MAPNG_WALL_DEBUG(runs);
