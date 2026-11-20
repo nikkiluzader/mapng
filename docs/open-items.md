@@ -1,6 +1,6 @@
 # MapNG open items
 
-Last reviewed: 2026-11-19.
+Last reviewed: 2026-11-20 (evening).
 
 The short "now" board: current work, what waits on someone, and checks owed on shipped work. The other tracking
 files: `refs/output/backlog.md` holds everything wanted later, by area; `refs/output/releases.md` what shipped;
@@ -9,12 +9,12 @@ these files; they are never copied.
 
 ## State of the branches
 
-As of 2026-11-20 evening:
+As of 2026-11-20 night:
 
-- `main` = `dev` at 5c46066: 0.3.5-dev.1's work plus the turn arrows on the drawn lanes, concrete/stone/brick fences,
-  the paving-sliver fix (0738015). Desktop 0.3.5-dev.2 tagged 2026-11-20 (tag at 5c46066), a patch over dev.1 for the
-  user's end-to-end testing; then 0.3.5. Branches: `step-walls` (parked 2.8 step walls), `seawall` (5009640, local
-  only: the sea-wall promenade, see Before 0.3.5). Published: 0.3.4 as the latest release.
+- `main` = `dev` at 5f5a1e0: 0.3.5-dev.2's work plus the sea floor / terrain seams / side-slope blend (7db9fe6).
+  Desktop 0.3.5-dev.2 published 2026-11-20 (tag at 5c46066; without 7db9fe6). Published: 0.3.4 as the latest release.
+  Branches: `seawall` (5009640, local: the promenade behind sea walls), `step-walls-2` (390b697: step walls and longer
+  slopes), `hairpin-blend` (one road's overlapping cores blended, unswept), `step-walls` (older, superseded by -2).
 - The sweep's known pre-existing flags: sidewalk drift at naldo, kingst, deckpark_g, stelvio; ams_centraal mh/ready;
   dev_szczyrk cross; ams t30/noshape swBuried; Michiel de Ruijtertunnel joint steps (check 4).
 
@@ -106,6 +106,11 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
 - **Sawtooth along steep roads** (user 2026-11-20: "roads close to steep edges ... a lot of sawtooth drops"). Probe
   scratch/saw/saw.py (kinks 1 m apart along each road's edge, ready vs untouched). On dev 7db9fe6: side slopes blended
   by nearness (stelvio kinks > 0.6 m 2.77 -> 1.76 %, survey 0.77; in game scratch/saw/shots/stelvio_dev_*.jpg). Left:
+  - *a bump in the road at a tight hairpin's apex* (user 2026-11-20; stelvio 912, 438: 1.8 m): the decal is eased
+    4.5 m inside a bend tighter than its half width (easeTightNodes, against folding) while the terrain is shaped along
+    the OSM line, and its node heights take the nearest station in plan, which flips half at the apex
+    (scratch/saw/hairpin_cause.png). Fix: one eased line for decal and terrain (junction nodes pinned), heights by
+    distance along the road. In the released code too.
   - *hairpin arms whose road surfaces touch*: a sheer step on the grid between them (stelvio shots 4, 6, 7). Branch
     `step-walls-2` (390b697): step walls traced from the terrain cover only parts of it in game (stelvio_ba_*.jpg).
     Next: wall lines from the composer itself (the lower road's core edge where two cores meet on two levels).
@@ -120,8 +125,8 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
     blended between cell centres; on fine data a cell over the water's level is land and the coastline rule takes only
     water-level ground). kingst untouched: points > 0.5 m off their neighbours 1.65 % -> 0.63 % (source 0.10 %).
     kingst_shore_after.png. On dev 7db9fe6 with the seam pass (services/terrainSeams.js): 1.75 -> 0.38 %.
-  - *Marsh inside a tidal river's outline*: lake beds (carveLakeBeds) take flat marsh at a "second water level" as
-    water and cut whole patches (kingst -800, 560: 0.83 m -> 0.46 m in blocks). Open.
+  - *Marsh under the sea's surface*: not the lake beds but the sea step's spread, which set a fixed shallow depth in
+    patches (kingst -800, 560). Fixed in 7db9fe6 (the spread takes the same blended depth).
   - *Road edges on steep ground*: the edits' biggest share (gt_chevril -300, 580: bands up to 1.5 m along the graded
     band's edges). Open: relax the seam the way the in-game brush does.
   - *Tunnel mouths*: no heightmap change at the portals (gt_chevril); the jags there are the 1 m hole squares: hide with
