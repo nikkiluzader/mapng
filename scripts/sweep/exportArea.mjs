@@ -133,6 +133,8 @@ const { blob, structureChecks, steps: stepTimes } = await exportBeamNGLevel(terr
   includeBuildings: true, includeWater: true, seaLevelOffset: 0,
   includeTrees: true, includeRocks: false, includeNativeBarriers: true,
   ...(process.env.STRUCT ? { structureSolver: process.env.STRUCT } : {}),
+  // (GROUND_MODELS=1: the experimental ground as models, no TerrainBlock)
+  ...(process.env.GROUND_MODELS === '1' ? { groundAsModels: true, ...(process.env.GROUND_ERROR ? { groundMaxError: Number(process.env.GROUND_ERROR) } : {}) } : {}),
   // measured bridge heights (US lidar): LIDAR=1 (off by default: the sweep stays offline and repeatable);
   // survey downloads cached under the sweep output's ept-cache
   lidarDecks: process.env.LIDAR === '1',

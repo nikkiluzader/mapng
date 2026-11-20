@@ -773,7 +773,9 @@
       "curbHeightHint": "Wie weit die erhöhten Gehwege über der Straße stehen. Standard ist ein echter Bordstein; Niedrig und Bündig schonen tiefe Autos und lassen sich leicht befahren.",
       "viewDistanceShort": "Wie weit das Spiel das Level zeichnet.",
       "bundleOsm": "Kartendaten für Fehlerberichte beilegen",
-      "bundleOsmHint": "An: Die OpenStreetMap-Daten, aus denen das Level gebaut wurde, kommen mit ins Level (levels/<name>/mapng_source/, höchstens ein paar MB, vom Spiel nie gelesen), damit ein Fehlerbericht auf genau denselben Daten nachgebaut werden kann. Aus: weggelassen."
+      "bundleOsmHint": "An: Die OpenStreetMap-Daten, aus denen das Level gebaut wurde, kommen mit ins Level (levels/<name>/mapng_source/, höchstens ein paar MB, vom Spiel nie gelesen), damit ein Fehlerbericht auf genau denselben Daten nachgebaut werden kann. Aus: weggelassen.",
+      "groundModels": "Boden als Modelle (experimentell)",
+      "groundModelsHint": "An: Der Boden wird als 3D-Modelle statt als BeamNG-Terrain gebaut, so kann ein Batch-Level jede Form haben (ein langer Streifen aus Kacheln). Das Level lädt langsamer (seine Kollision wird beim Laden gebaut) und hat keinen Grasbewuchs; der Terrain-Editor funktioniert darauf nicht. Aus: das übliche Terrain."
     },
     "weight": {
       "title": "Wie schwer ist dieses Level?",
@@ -2146,9 +2148,11 @@
       "on": "an",
       "off": "aus",
       "widthsOffShort": "Aus: Jede Straße bekommt die übliche Breite ihrer Klasse.",
-      "bundleOsmShort": "Die Kartendaten kommen ins Level, damit Berichte nachvollziehbar sind."
+      "bundleOsmShort": "Die Kartendaten kommen ins Level, damit Berichte nachvollziehbar sind.",
+      "groundModelsShort": "Der Boden als 3D-Modelle, jede Form; lädt langsamer, kein Grasbewuchs."
     },
-    "bundleOsm": "keine Kartendaten für Fehlerberichte"
+    "bundleOsm": "keine Kartendaten für Fehlerberichte",
+    "groundModels": "Boden als Modelle"
   },
   "backupData": {
     "title": "Diese Karte wurde aus Ersatzdaten gebaut.",
@@ -2308,6 +2312,7 @@
     "ter": "Die Geländedatei wird geschrieben (terrain.ter, {w}×{h} Höhen + Materialebenen)",
     "crop": "Das Gelände wird auf {w}×{h} zugeschnitten (BeamNG braucht ein Quadrat mit Zweierpotenz)",
     "heightmap": "Die 16-Bit-Höhenkarte (PNG) wird kodiert ({w}×{h})",
+    "groundModels": "Der Boden wird als Modelle gebaut",
     "thumbnail": "Das Vorschaubild des Levels wird gerendert",
     "look": "Regionales Aussehen und Straßenregeln für diesen Ort werden gewählt",
     "buildings": "Texturierte 3D-Gebäude werden gebaut ({n} OSM-Grundrisse)",

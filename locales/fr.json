@@ -773,7 +773,9 @@
       "curbHeightHint": "La hauteur des trottoirs surélevés au-dessus de la chaussée. Standard est une vraie bordure ; Basse et À ras ménagent les voitures basses et se franchissent facilement.",
       "viewDistanceShort": "Jusqu'où le jeu dessine le niveau.",
       "bundleOsm": "Inclure les données de la carte pour les rapports de bug",
-      "bundleOsmHint": "Activé : les données OpenStreetMap ayant servi à construire le niveau y sont incluses (levels/<name>/mapng_source/, quelques Mo au plus, jamais lues par le jeu), afin qu’un rapport sur le niveau puisse être reproduit sur exactement les mêmes données. Désactivé : non incluses."
+      "bundleOsmHint": "Activé : les données OpenStreetMap ayant servi à construire le niveau y sont incluses (levels/<name>/mapng_source/, quelques Mo au plus, jamais lues par le jeu), afin qu’un rapport sur le niveau puisse être reproduit sur exactement les mêmes données. Désactivé : non incluses.",
+      "groundModels": "Sol en modèles (expérimental)",
+      "groundModelsHint": "Activé : le sol est construit en modèles 3D au lieu du terrain de BeamNG, ainsi un niveau par lots peut avoir n'importe quelle forme (une longue bande de tuiles). Le niveau se charge plus lentement (sa collision est construite au chargement) et n'a pas d'herbe ; l'éditeur de terrain ne fonctionne pas dessus. Désactivé : le terrain habituel."
     },
     "weight": {
       "title": "Quel est le poids de ce niveau ?",
@@ -2146,9 +2148,11 @@
       "on": "oui",
       "off": "non",
       "widthsOffShort": "Désactivé : chaque route prend la largeur habituelle de sa classe.",
-      "bundleOsmShort": "Les données de la carte vont dans le niveau, pour reproduire les rapports."
+      "bundleOsmShort": "Les données de la carte vont dans le niveau, pour reproduire les rapports.",
+      "groundModelsShort": "Le sol en modèles 3D, toute forme ; chargement plus lent, pas d'herbe."
     },
-    "bundleOsm": "pas de données de carte pour les rapports"
+    "bundleOsm": "pas de données de carte pour les rapports",
+    "groundModels": "sol en modèles"
   },
   "backupData": {
     "title": "Cette carte a été construite avec des données de secours.",
@@ -2308,6 +2312,7 @@
     "ter": "Écriture du binaire du terrain (terrain.ter, {w}×{h} hauteurs + couches de matériaux)",
     "crop": "Recadrage du terrain à {w}×{h} (BeamNG demande un carré en puissance de deux)",
     "heightmap": "Encodage de la carte de hauteur PNG 16 bits ({w}×{h})",
+    "groundModels": "Construction du sol en modèles",
     "thumbnail": "Rendu de la vignette du niveau",
     "look": "Choix de l'aspect régional et des règles routières pour ce lieu",
     "buildings": "Construction des bâtiments 3D texturés ({n} emprises OSM)",

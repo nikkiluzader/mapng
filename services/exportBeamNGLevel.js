@@ -7,6 +7,7 @@ import { chooseBaseTextureSize } from './baseTextureSize.js';
 import { encode } from 'fast-png';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { exportTer } from './exportTer.js';
+import { buildGroundTiles } from './groundMesh.js';
 import { buildTerrainMaterials, isVegetationColor } from './osmTerrainMaterials.js';
 import { createOSMGroup, createSurroundingMeshes, SCENE_SIZE } from './export3d.js';
 import { planPools, poolFootprints, poolWaterBlocks, squareOpens, POOL_WATER_BLOCK } from './pools.js';
@@ -961,6 +962,101 @@ async function generateSidewalkTileDAEs(meshes, tileM) {
   }
   const data = await writeDaes(roots);
   return keys.map((key, i) => ({ key, data: data[i] })).filter((t) => t.data);
+}
+
+// ── Ground as models (experimental) ─────────────────────────────────────────
+// The level's ground as tiled models instead of a TerrainBlock (services/groundMesh.js): any shape, as terrain-less
+// community levels are built. One material per terrain material it replaces: its ground model (grip, dust: the
+// TerrainMaterial's groundmodelName) and its detail normal map tiled at its detail size, over the level's base texture
+// laid across the whole map (the base texture alone, 1 m a pixel, looked blurred up close: the TerrainBlock hides that
+// with its detail textures). Collision is a Colmesh of the same triangles.
+export const GROUND_MODEL_DIR = 'map_assets/custom_assets/ground';
+// (the base texture under the name a model material reads as colour: the suffix picks the colour space, and a plain
+// terrain.png on a model came out washed out, read as linear data; the TerrainBlock reads terrain.png as colour)
+export const GROUND_TEXTURE_REL = 'art/terrains/terrain_b.color.png';
+// A level whose ground is models still carries one small flat TerrainBlock, far outside the map: the game draws no
+// DecalRoad while the level has no TerrainBlock at all (found in game 2026-11-20: 717 roads built, none drawn; a
+// TerrainBlock added at runtime, even 30 km away, and they appeared within seconds). Out there nothing on the map
+// reads its height (core_terrain.getTerrainHeight, traffic's tunnel test) and it is past any view distance.
+export const GROUND_ANCHOR_SIZE = 256;
+export const GROUND_ANCHOR_OFFSET_M = 30000;
+const groundMaterialName = (surface) => `mapng_ground_${String(surface).replace(/[^A-Za-z0-9_]/g, '_')}`;
+const GROUND_DETAIL_SIZE_M = 2;   // a terrain material's detail size when it names none
+
+/**
+ * The ground models' materials.json body: one Material per surface (a terrain material's internalName), from that
+ * terrain material (terrainDefs: internalName -> TerrainMaterial). worldSize: the map's width in metres (the UVs span
+ * it once, so a detail of d metres repeats worldSize / d times).
+ */
+export function groundModelMaterialDefs(levelName, surfaces, terrainDefs, worldSize) {
+  const out = {};
+  for (const surface of surfaces) {
+    const def = terrainDefs.get(surface) || {};
+    const name = groundMaterialName(surface);
+    const stage = { baseColorMap: `/levels/${levelName}/${GROUND_TEXTURE_REL}`, roughnessFactor: 1, metallicFactor: 0 };
+    if (def.normalDetailTex) {
+      const reps = worldSize / (Number(def.detailSize) > 0 ? Number(def.detailSize) : GROUND_DETAIL_SIZE_M);
+      stage.detailNormalMap = def.normalDetailTex;
+      stage.detailNormalMapStrength = 1;
+      stage.detailScale = [reps, reps];
+    }
+    out[name] = {
+      name, mapTo: name, class: 'Material', version: 1.5,
+      annotation: 'NATURE', groundType: def.groundmodelName || 'GROUNDMODEL_ASPHALT1',
+      Stages: [stage, {}, {}, {}],
+      translucentBlendOp: 'None',
+    };
+  }
+  return out;
+}
+
+/**
+ * The ground as Collada tiles: { tiles: [{ key, data }], groundModels, summary }. terrain: the finished heights
+ * ({ width, height, heightMap, minHeight }: z is height - minHeight, as the TerrainBlock's); layerMap and the terrain
+ * materials say each square's surface and holes; keepSquare(i, j) false leaves a square out (a batch shape).
+ */
+async function generateGroundModelDAEs(terrain, sq, { layerMap, materialNames, materialDefs, keepSquare = null, maxError = undefined }) {
+  // (a square's surface: its terrain material, so each keeps its own ground model and detail)
+  const groundModelOf = (L) => (materialNames || [])[L] || 'DefaultMaterial';
+  const { tiles, groundModels, summary } = buildGroundTiles(terrain, sq, { layerMap, groundModelOf, keepSquare, ...(maxError > 0 ? { maxError } : {}) });
+  const roots = [];
+  for (const t of tiles) {
+    const base00 = new THREE.Group(); base00.name = 'base00';
+    const start01 = new THREE.Group(); start01.name = 'start01';
+    let n = 0; for (const g of t.groups) n += g.positions.length / 3;
+    const pos = new Float32Array(n * 3); const nrm = new Float32Array(n * 3); const uv = new Float32Array(n * 2);
+    const geo = new THREE.BufferGeometry(); const materials = [];
+    let at = 0;
+    for (const g of t.groups) {
+      const count = g.positions.length / 3;
+      pos.set(g.positions, at * 3); nrm.set(g.normals, at * 3); uv.set(g.uvs, at * 2);
+      geo.addGroup(at, count, materials.length);
+      materials.push(new THREE.MeshStandardMaterial({ name: groundMaterialName(g.groundModel) }));
+      at += count;
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    const mesh = new THREE.Mesh(geo, materials);
+    // (a mesh name ending in a number is read as its detail size: "ground_0_0" was size 0, an invalid detail level,
+    // and the game drew none of the ground; "_a" as the sidewalk tiles' "sidewalks_a")
+    mesh.name = 'ground_a';
+    start01.add(mesh);
+    // the collision mesh: the same triangles (DecalRoads with overObjects lie on a shape's collision mesh: on the
+    // visible mesh alone, as "Visible Mesh Final", no road showed in game). One group per surface, so each keeps its
+    // material's ground model.
+    const colGeo = new THREE.BufferGeometry();
+    colGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    for (const gr of geo.groups) colGeo.addGroup(gr.start, gr.count, gr.materialIndex);
+    colGeo.name = 'Colmesh-1';
+    const collision = new THREE.Mesh(colGeo, materials);
+    collision.name = 'Colmesh-1';
+    start01.add(collision);
+    base00.add(start01); base00.updateMatrixWorld(true);
+    roots.push(base00);
+  }
+  const data = await writeDaes(roots);
+  return { tiles: tiles.map((t, i) => ({ key: t.key, data: data[i], triangles: t.triangles })).filter((t) => t.data), groundModels, summary };
 }
 
 // Overhead wires as thin crossed ribbons (a double-sided material shows both
@@ -7790,10 +7886,15 @@ export function generateTurnArrowDecals(terrainData, squareSize, { carriageways 
  * Write a newline-delimited JSON (NDJSON) string from an array of objects.
  * Each object is one line, file ends with a newline — matching BeamNG's format.
  */
+// (set at the start of every export: with the ground as models every DecalRoad is projected onto objects, the
+// ground being one; without overObjects a DecalRoad lies on the TerrainBlock only, and there is none)
+let groundAsModelsActive = false;
+
 function toNDJSON(objects) {
   return objects
     .map((o) => {
       const { __items, ...rest } = o;
+      if (groundAsModelsActive && rest.class === 'DecalRoad') rest.overObjects = true;
       return JSON.stringify(rest);
     })
     .join('\n') + '\n';
@@ -13277,7 +13378,7 @@ export function mapngLevelStamp({ terrainData, center, options = {}, levelName, 
 export const EXPORT_STEP_GROUPS = [
   { key: 'prepare', members: ['prepare', 'detail', 'lidar'] },
   { key: 'roads', members: ['roads', 'sidewalks', 'props'] },
-  { key: 'terrain', members: ['texture', 'materials', 'ter', 'heightmap', 'thumbnail', 'backdrop'] },
+  { key: 'terrain', members: ['texture', 'materials', 'ter', 'heightmap', 'thumbnail', 'ground', 'backdrop'] },
   { key: 'buildings', members: ['buildings', 'water', 'furniture'] },
   { key: 'nature', members: ['vegetation'] },
   { key: 'package', members: ['assets', 'zip', 'compress'] },
@@ -13312,6 +13413,12 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     roadSurface = 'decal',
     // the raised sidewalks' height over the road: 'standard' (15 cm), 'low' (8 cm), 'flush' (3 cm)
     curbHeight: curbHeightChoice = 'standard',
+    // (experimental) the ground as tiled models instead of a TerrainBlock (generateGroundModelDAEs); keepSquare(i, j)
+    // false leaves a terrain square out (a batch level's shape)
+    groundAsModels = false,
+    groundKeepSquare = null,
+    // (tests: the ground models' error bound in metres; groundMesh.js GROUND_MAX_ERROR_M when unset)
+    groundMaxError = undefined,
     // the local tree mix (treeSpecies.js) when already known; undefined: fetched
     treeSpeciesMix: requestedTreeMix = undefined,
     // the slabs' concrete: a key of SIDEWALK_LOOKS (beamngSidewalks.js)
@@ -13344,6 +13451,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     rightHandDrive,
     onProgress,
   } = options;
+  groundAsModelsActive = !!groundAsModels;
+  console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Ground: ${groundAsModels ? `as models (experimental): the ground in tiled models with collision (the only TerrainBlock a small flat anchor far outside the map)${groundKeepSquare ? ', only the shape\'s squares' : ''}; DecalRoads projected onto objects; no ground cover (it grows on TerrainBlock layers only)` : 'a TerrainBlock (the default)'}.`);
   // (raised sidewalks are built only in the mesh style; the decal style draws strips instead)
   const includeSidewalks = sidewalksWanted && sidewalkStyle !== 'decal';
   const sidewalkStrips = sidewalksWanted && sidewalkStyle === 'decal';
@@ -14794,10 +14903,16 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const terrainBlockZ = roundTo(terrainBase - exportTerrainData.minHeight, 3);
   const terrainBlockMaxHeight = Math.max(1, Math.ceil(terrainTop - terrainBase));
   const terData = { ...exportTerrainData, minHeight: terrainBase, maxHeight: terrainTop };
-  const { blob: terBlob } = await exportTer(terData, {
-    layerMap: terLayerMap,
-    materialNames: pbrResult?.materialNames ?? null,
+  // (the ground as models: terrain.ter is the small flat anchor terrain, GROUND_ANCHOR_SIZE a side, the first terrain
+  // material over all of it)
+  const anchorTer = groundAsModels
+    ? { width: GROUND_ANCHOR_SIZE, height: GROUND_ANCHOR_SIZE, heightMap: new Float32Array(GROUND_ANCHOR_SIZE * GROUND_ANCHOR_SIZE), minHeight: 0, maxHeight: 1 }
+    : null;
+  const { blob: terBlob } = await exportTer(anchorTer || terData, {
+    layerMap: anchorTer ? null : terLayerMap,
+    materialNames: anchorTer ? [(pbrResult?.materialNames ?? ['DefaultMaterial'])[0]] : (pbrResult?.materialNames ?? null),
   });
+  if (anchorTer) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Anchor terrain: terrain.ter is a flat ${GROUND_ANCHOR_SIZE}×${GROUND_ANCHOR_SIZE} placeholder ${GROUND_ANCHOR_OFFSET_M / 1000} km outside the map (the game draws DecalRoads only while a TerrainBlock exists); the ground itself is models.`);
 
   beginStep('heightmap', `Encoding the 16-bit heightmap PNG (${size}×${size})…`);
   await yield_();
@@ -14806,6 +14921,20 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   beginStep('thumbnail', 'Rendering the level preview thumbnail…');
   await yield_();
   let previewBlob = await generatePreviewBlob(exportTerrainData);
+
+  // (experimental) the ground as models: from the finished heights and the painted surfaces, holes included
+  let groundModels = null;
+  if (groundAsModels) {
+    beginStep('ground', 'Building the ground as models…');
+    await yield_();
+    const t0 = performance.now();
+    groundModels = await generateGroundModelDAEs(exportTerrainData, squareSize, {
+      layerMap: terLayerMap, materialNames: pbrResult?.materialNames, materialDefs: pbrResult?.materialDefs, keepSquare: groundKeepSquare, maxError: groundMaxError,
+    });
+    const gs = groundModels.summary;
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Ground models: ${groundModels.tiles.length} tiles of ${gs.tile} squares, ${formatNumber(gs.triangles, 0)} triangles (${formatNumber((100 * gs.triangles) / Math.max(1, gs.fullTriangles), 1)}% of the full grid's ${formatNumber(gs.fullTriangles, 0)}), within ${gs.maxError} m of every grid point; full resolution kept at tile edges, holes and surface changes; ${gs.refinePasses} re-split pass(es) to hold the bound; ${gs.holeTriangles} triangle(s) left open at holes, ${gs.outsideTriangles} outside the grid or the shape; surfaces: ${groundModels.groundModels.join(', ') || 'none'}; ${formatNumber((performance.now() - t0) / 1000, 1)} s.`);
+    for (const t of groundModels.tiles) console.log(`${BEAMNG_EXPORT_SERVICE_LOG}   ground_${t.key}: ${formatNumber(t.triangles, 0)} triangles, ${formatNumber((t.data.size ?? t.data.length ?? 0) / 1e6, 1)} MB.`);
+  }
 
   // The surrounding backdrop is terrain too: built here, with the terrain
   // stage, from the finished heights (terrain.ter is written). It ran after
@@ -15649,7 +15778,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const forestFiles = serializeForestFiles(forestPlacements);
   vegLap('forest files written');
   // (grass and ground cover switched off in What to build: none)
-  const groundCoverObjects = built('groundCover') ? buildGroundCoverObjects(exportTerrainData, squareSize, includeTrees, biome) : [];
+  const groundCoverObjects = built('groundCover') && !groundAsModels ? buildGroundCoverObjects(exportTerrainData, squareSize, includeTrees, biome) : [];
+  if (groundAsModels && built('groundCover')) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Ground cover: skipped (the ground is models; ground cover grows on TerrainBlock layers only).`);
   const managedForestItemData = cloneManagedItemData(Array.from(forestPlacements.keys()), biome);
   vegLap('ground cover and item data done');
 
@@ -15724,7 +15854,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // §minimap). offset = [west, north] corner = [-halfExtent, +halfExtent]; size is
   // the world extent in meters. Path is level-relative (prefixed at load time).
   const minimapHalfExtent = Math.round(halfExtent * 100) / 100;
-  const minimapImageRel = 'art/terrains/terrain.png';
+  const minimapImageRel = groundAsModels ? GROUND_TEXTURE_REL : 'art/terrains/terrain.png';
 
   // Sky date (TimeOfDay-and-Level-Metadata docs): since 0.39 the sun path,
   // moon, stars and the sunset→sunrise night-light window come from
@@ -16462,7 +16592,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   }
 
   // ── art/terrains/terrain.png ───────────────────────────────────────────────
-  zip.file(`${base}/art/terrains/terrain.png`, terrainTextureData);
+  // (the ground as models: the same image under its colour name, the only copy: nothing reads terrain.png then)
+  zip.file(`${base}/${groundAsModels ? GROUND_TEXTURE_REL : 'art/terrains/terrain.png'}`, terrainTextureData);
   texBlob = null;
 
   // ── art/terrains/ PBR textures (when OSM material painting is enabled) ─────
@@ -16499,8 +16630,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   zip.file(`${base}/groundModels/mapng_groundmodels.json`, JSON.stringify(MAPNG_GROUND_MODELS, null, 2));
 
   // ── terrain.terrain.json — update materials list to match .ter contents ────
-  const terrainMaterialNames = pbrResult?.materialNames ?? ['DefaultMaterial'];
-  const heightMapSize = size * size;
+  const terrainMaterialNames = groundAsModels ? [(pbrResult?.materialNames ?? ['DefaultMaterial'])[0]] : (pbrResult?.materialNames ?? ['DefaultMaterial']);
+  const terSize = groundAsModels ? GROUND_ANCHOR_SIZE : size;
+  const heightMapSize = terSize * terSize;
   zip.file(`${base}/terrain.terrain.json`, JSON.stringify({
     binaryFormat: 'version(char), size(unsigned int), heightMap(heightMapSize * heightMapItemSize), layerMap(layerMapSize * layerMapItemSize), layerTextureMap(layerMapSize * layerMapItemSize), materialNames',
     datafile: terrainBinaryVirtualPath,
@@ -16510,7 +16642,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     layerMapItemSize: 1,
     layerMapSize: heightMapSize,
     materials: terrainMaterialNames,
-    size,
+    size: terSize,
     version: 9,
   }, null, 2));
 
@@ -16795,16 +16927,40 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     class: 'TerrainBlock',
     name: 'theTerrain',
     persistentId: generatePersistentId(),
-    position: [-halfExtent, -halfExtent, terrainBlockZ],
-    squareSize,
-    maxHeight: terrainBlockMaxHeight,
-    baseTexSize: size,
+    // (the ground as models: the anchor terrain, flat, far outside the map: GROUND_ANCHOR_SIZE)
+    position: groundModels ? [halfExtent + GROUND_ANCHOR_OFFSET_M, halfExtent + GROUND_ANCHOR_OFFSET_M, -1000] : [-halfExtent, -halfExtent, terrainBlockZ],
+    squareSize: groundModels ? 1 : squareSize,
+    maxHeight: groundModels ? 1 : terrainBlockMaxHeight,
+    baseTexSize: groundModels ? GROUND_ANCHOR_SIZE : size,
     terrainFile: terrainBinaryVirtualPath,
     materialTextureSet: pbrResult?.textureSetName ?? '',
     // Point the terrain block's minimap at the base color texture (north-up
     // top-down). BeamNG convention: leading "levels/…", no leading slash.
     minimapImage: `levels/${levelName}/${minimapImageRel}`,
   }];
+
+  // (experimental) the ground models: one TSStatic a tile at the origin (their points are in level coordinates), the
+  // visible mesh its collision and what decals lie on
+  if (groundModels) {
+    for (const t of groundModels.tiles) {
+      zip.file(`${base}/${GROUND_MODEL_DIR}/ground_${t.key}.dae`, await toZipBinary(t.data));
+      levelObjectItems.push({
+        __parent: 'level_objects',
+        class: 'TSStatic',
+        name: `ground_${t.key}`,
+        persistentId: generatePersistentId(),
+        position: [0, 0, 0],
+        shapeName: `/levels/${levelName}/${GROUND_MODEL_DIR}/ground_${t.key}.dae`,
+        collisionType: 'Collision Mesh',
+        decalType: 'Collision Mesh',
+        prebuildCollisionData: 0,
+        useInstanceRenderData: true,
+      });
+    }
+    const terrainDefs = new Map(Object.values(pbrResult?.materialDefs || {}).filter((d) => d?.internalName).map((d) => [d.internalName, d]));
+    zip.file(`${base}/${GROUND_MODEL_DIR}/main.materials.json`, JSON.stringify(groundModelMaterialDefs(levelName, groundModels.groundModels, terrainDefs, worldSize), null, 2));
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Ground models written: ${groundModels.tiles.length} TSStatic(s) in level_objects; the TerrainBlock is only the flat anchor ${GROUND_ANCHOR_OFFSET_M / 1000} km outside the map.`);
+  }
 
   // the building tiles: lit windows at night as the old single shape had them
   for (const t of buildingTileDaes) {
@@ -17087,6 +17243,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     requiresBarriers: barrierFolderItems.length > 0,
     requiresSigns: signObjects.length > 0,
     requiresDecalRoads: decalRoads.length > 0,
+    groundAsModels: !!groundModels,
   });
 
   // JSZip's percent counts files, so one 1 GB terrain.ter held it at 5 %

@@ -275,6 +275,10 @@
             <TuneRow :title="t('exportPanel.ui.bundleOsm')" :short="t('build.tune.bundleOsmShort')" :more="t('exportPanel.ui.bundleOsmHint')" :more-label="t('build.tune.more')" :less-label="t('build.tune.less')">
               <template #control><BaseSwitch :on="bundleOsm && hasOsmData" :label="t('exportPanel.ui.bundleOsm')" :disabled="!hasOsmData" data-testid="bundle-osm" @toggle="$emit('update:bundleOsm', !bundleOsm)" /></template>
             </TuneRow>
+            <!-- (experimental) the ground as models, no TerrainBlock: any shape (exportBeamNGLevel.js generateGroundModelDAEs) -->
+            <TuneRow :title="t('exportPanel.ui.groundModels')" :short="t('build.tune.groundModelsShort')" :more="t('exportPanel.ui.groundModelsHint')" :more-label="t('build.tune.more')" :less-label="t('build.tune.less')">
+              <template #control><BaseSwitch :on="groundModels" :label="t('exportPanel.ui.groundModels')" data-testid="ground-models" @toggle="$emit('update:groundModels', !groundModels)" /></template>
+            </TuneRow>
           </div>
         </section>
       </div>
@@ -335,6 +339,7 @@ const props = defineProps({
   assumeParking: { type: Boolean, default: true },
   followSurvey: { type: Boolean, default: true },
   bundleOsm: { type: Boolean, default: true },
+  groundModels: { type: Boolean, default: false },
   decalSidewalks: { type: Boolean, default: false },
   roadSurface: { type: String, default: 'decal' },
   curbHeight: { type: String, default: 'standard' },
@@ -343,7 +348,7 @@ const props = defineProps({
   treeModelsOff: { type: Array, default: () => [] },
 });
 const CURB_HEIGHT_KEYS = ['standard', 'low', 'flush'];
-const emit = defineEmits(['update:forestDensity', 'update:lidarDecks', 'update:safeCaps', 'update:assumeParking', 'update:followSurvey', 'update:bundleOsm', 'update:decalSidewalks', 'update:roadSurface', 'update:curbHeight', 'update:treeKindsOff', 'update:treeSwaps', 'update:treeModelsOff']);
+const emit = defineEmits(['update:forestDensity', 'update:lidarDecks', 'update:safeCaps', 'update:assumeParking', 'update:followSurvey', 'update:bundleOsm', 'update:groundModels', 'update:decalSidewalks', 'update:roadSurface', 'update:curbHeight', 'update:treeKindsOff', 'update:treeSwaps', 'update:treeModelsOff']);
 // (Map data > Measure road widths: whether it is on, how many of this map's roads it measured, and the way there)
 const { on: measureWidthsOn, show: showMeasureSetting } = useMeasureRoadWidths();
 const measuredRoads = computed(() => {
@@ -507,6 +512,7 @@ const footer = computed(() => {
     props.assumeParking ? null : t('build.noAssumedParking'),
     props.followSurvey ? null : t('build.followSurvey'),
     props.bundleOsm ? null : t('build.bundleOsm'),
+    props.groundModels ? t('build.groundModels') : null,
     props.decalSidewalks ? t('build.decalSidewalks') : props.curbHeight !== 'standard' ? `${t('exportPanel.ui.curbHeight').toLowerCase()}: ${t(`exportPanel.ui.curbHeight_${props.curbHeight}`).toLowerCase()}` : null,
   ].filter(Boolean).join(' · ');
   return contentTab.value === 'features'

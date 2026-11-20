@@ -27,6 +27,8 @@ export function getRequiredLevelFiles(options = {}) {
     requiresBarriers = false,
     requiresSigns = false,
     requiresDecalRoads = false,
+    // (experimental ground as models: the base texture under its colour name, and the ground's models)
+    groundAsModels = false,
   } = options;
 
   const required = [
@@ -42,7 +44,7 @@ export function getRequiredLevelFiles(options = {}) {
     'art/decals/managedDecalData.json',
     'art/terrains/terrain.ter',
     'art/terrains/terrain.terrainheightmap.png',
-    'art/terrains/terrain.png',
+    groundAsModels ? 'art/terrains/terrain_b.color.png' : 'art/terrains/terrain.png',
     'art/terrains/main.materials.json',
     'main/items.level.json',
     'main/MissionGroup/items.level.json',
@@ -72,6 +74,9 @@ export function getRequiredLevelFiles(options = {}) {
   }
   if (requiresDecalRoads) {
     required.push('main/MissionGroup/Decal_Roads/items.level.json');
+  }
+  if (groundAsModels) {
+    required.push('map_assets/custom_assets/ground/main.materials.json');
   }
 
   return required;

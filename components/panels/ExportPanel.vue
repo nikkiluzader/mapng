@@ -115,6 +115,7 @@
             v-model:assume-parking="beamNGAssumeParking"
             v-model:follow-survey="beamNGFollowSurvey"
             v-model:bundle-osm="beamNGBundleOsm"
+            v-model:ground-models="beamNGGroundModels"
             v-model:decal-sidewalks="beamNGDecalSidewalks"
             v-model:road-surface="beamNGRoadSurface"
             v-model:curb-height="beamNGCurbHeight"
@@ -1029,7 +1030,9 @@ const beamNGSafeCaps = ref(storedOn('mapng_beamNGSafeCaps'));
 const beamNGAssumeParking = ref(localStorage.getItem('mapng_beamNGAssumeParking') === 'true');
 // every road follows the slope the lidar survey measured, main roads too (off: tertiary and smaller only)
 const beamNGFollowSurvey = ref(localStorage.getItem('mapng_beamNGFollowSurvey') !== 'false');   // (on unless switched off)
-const beamNGBundleOsm = ref(localStorage.getItem('mapng_beamNGBundleOsm') !== 'false');   // (on unless switched off: the map data in the level for bug reports)
+const beamNGBundleOsm = ref(localStorage.getItem('mapng_beamNGBundleOsm') !== 'false');
+// (experimental, off unless switched on: the ground as models, no TerrainBlock: exportBeamNGLevel.js groundAsModels)
+const beamNGGroundModels = ref(localStorage.getItem('mapng_beamNGGroundModels') === 'true');   // (on unless switched off: the map data in the level for bug reports)
 // (Fine-tuning: sidewalks as flat decals instead of raised meshes; exportBeamNGLevel.js sidewalkStyle)
 const beamNGDecalSidewalks = ref(localStorage.getItem('mapng_beamNGDecalSidewalks') === 'true');
 // (Fine-tuning: road surfaces as MapNG's decal roads, or experimental Hero Roads; exportBeamNGLevel.js roadSurface)
@@ -1514,6 +1517,7 @@ watch(beamNGSafeCaps, (v) => localStorage.setItem('mapng_beamNGSafeCaps', String
 watch(beamNGAssumeParking, (v) => localStorage.setItem('mapng_beamNGAssumeParking', String(v)));
 watch(beamNGFollowSurvey, (v) => localStorage.setItem('mapng_beamNGFollowSurvey', String(v)));
 watch(beamNGBundleOsm, (v) => localStorage.setItem('mapng_beamNGBundleOsm', String(v)));
+watch(beamNGGroundModels, (v) => localStorage.setItem('mapng_beamNGGroundModels', String(v)));
 watch(beamNGDecalSidewalks, (v) => localStorage.setItem('mapng_beamNGDecalSidewalks', String(v)));
 watch(beamNGRoadSurface, (v) => localStorage.setItem('mapng_beamNGRoadSurface', v === 'hero' ? 'hero' : 'decal'));
 watch(beamNGCurbHeight, (v) => localStorage.setItem('mapng_beamNGCurbHeight', v));
@@ -2423,6 +2427,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       assumeParking: advanced && beamNGAssumeParking.value,
       roadsFollowSurvey: advanced ? beamNGFollowSurvey.value : true,
       bundleOsm: advanced ? beamNGBundleOsm.value : true,
+      groundAsModels: advanced && beamNGGroundModels.value,
       sidewalkStyle: advanced && beamNGDecalSidewalks.value ? 'decal' : 'mesh',
       roadSurface: advanced && ['hero', 'mesh'].includes(beamNGRoadSurface.value) ? beamNGRoadSurface.value : 'decal',
       curbHeight: advanced ? beamNGCurbHeight.value : 'standard',
@@ -2459,6 +2464,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       assumeParking: advanced && beamNGAssumeParking.value,
       roadsFollowSurvey: advanced ? beamNGFollowSurvey.value : true,
       bundleOsm: advanced ? beamNGBundleOsm.value : true,
+      groundAsModels: advanced && beamNGGroundModels.value,
       sidewalkStyle: advanced && beamNGDecalSidewalks.value ? 'decal' : 'mesh',
       roadSurface: advanced && ['hero', 'mesh'].includes(beamNGRoadSurface.value) ? beamNGRoadSurface.value : 'decal',
       curbHeight: advanced ? beamNGCurbHeight.value : 'standard',

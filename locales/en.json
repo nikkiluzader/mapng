@@ -778,7 +778,9 @@
       "curbHeightHint": "How far the raised sidewalks stand over the road. Standard is a real curb; Low and Flush are kinder to low cars and easy to drive onto.",
       "viewDistanceShort": "How far the game draws the level.",
       "bundleOsm": "Include the map data for bug reports",
-      "bundleOsmHint": "On: the OpenStreetMap data the level was built from goes into the level (levels/<name>/mapng_source/, a few MB at most, which the game never reads), so a report about the level can be rebuilt on exactly the same data. Off: left out."
+      "bundleOsmHint": "On: the OpenStreetMap data the level was built from goes into the level (levels/<name>/mapng_source/, a few MB at most, which the game never reads), so a report about the level can be rebuilt on exactly the same data. Off: left out.",
+      "groundModels": "Ground as models (experimental)",
+      "groundModelsHint": "On: the ground is built as 3D models instead of BeamNG's terrain, so a batch level can be any shape (a long strip of tiles). The level loads slower (its collision is built at load) and has no grass cover; the terrain editor does not work on it. Off: the usual terrain."
     },
     "weight": {
       "title": "How heavy is this level?",
@@ -2151,9 +2153,11 @@
       "on": "on",
       "off": "off",
       "widthsOffShort": "Off: each road gets its class's usual width.",
-      "bundleOsmShort": "The map data goes into the level, so reports can be reproduced."
+      "bundleOsmShort": "The map data goes into the level, so reports can be reproduced.",
+      "groundModelsShort": "The ground as 3D models, any shape; slower to load, no grass cover."
     },
-    "bundleOsm": "no map data for bug reports"
+    "bundleOsm": "no map data for bug reports",
+    "groundModels": "ground as models"
   },
   "statusLines": {
     "mhCheck": "Checking Mapterhorn lidar coverage",
@@ -2308,6 +2312,7 @@
     "ter": "Writing the terrain binary (terrain.ter, {w}×{h} heights + material layers)",
     "crop": "Cropping terrain to {w}×{h} (BeamNG needs a square power of two)",
     "heightmap": "Encoding the 16-bit heightmap PNG ({w}×{h})",
+    "groundModels": "Building the ground as models",
     "thumbnail": "Rendering the level preview thumbnail",
     "look": "Choosing the regional look and road rules for this location",
     "buildings": "Building textured 3D buildings ({n} OSM footprints)",

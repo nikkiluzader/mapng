@@ -351,6 +351,22 @@
     <figure><img src="images/send-report.jpg" alt="The Send a level's report dialog in the desktop app: a box for what went wrong, and a list of what is included, the export report and the JSON report with the OpenStreetMap features the level was built from" loading="lazy" style="max-width:520px"><figcaption>Send report in the desktop app: the JSON report and the level's map data go with it.</figcaption></figure>
   </section>
 
+  <section id="groundmodels" data-nav="Ground as models">
+    <div class="kicker">Experimental</div>
+    <h2>The ground as models</h2>
+    <p>BeamNG's terrain must be a square with a power-of-two side. Many community levels skip it and build the ground as 3D models instead, which can take any shape. A new experimental switch in What to build, <b>Ground as models</b>, does the same for a MapNG level: the ground is cut into tiles of 3D models with their own collision, and roads, buildings and trees sit on it as usual.</p>
+    <ul>
+      <li><b>As exact as the terrain.</b> The models keep every point of the height grid where it matters (tile edges, tunnel openings, the edges of roads and other surfaces), and elsewhere stay within 5&nbsp;cm of it.</li>
+      <li><b>Each surface keeps its grip and its look.</b> Asphalt, grass, gravel and the rest each keep their ground type and their detail texture.</li>
+      <li><b>What it costs.</b> The level loads slower, because the game builds the ground's collision when it loads (about 25&nbsp;s for a 1&nbsp;km lidar town). There is no grass cover, and the World Editor's terrain tools don't work on it.</li>
+    </ul>
+    <p>For now it makes the usual square level. Next, it will let a level follow the shape you draw, such as a long strip along a road.</p>
+    <div class="pair">
+      <figure><img src="images/ground-models-junction.jpg" alt="A hillside junction in game from above: the ground, roads with their markings, sidewalks and buildings, all on the ground models" loading="lazy"><figcaption>A hillside town on ground models, roads and sidewalks on top.</figcaption></figure>
+      <figure><img src="images/ground-models-chase.jpg" alt="A car on a road in game seen from behind: asphalt, a curb and sidewalk, and grass with fine surface detail beside it" loading="lazy"><figcaption>Close up: each surface keeps its own detail.</figcaption></figure>
+    </div>
+  </section>
+
   <section id="fixes" data-nav="Fixes">
     <div class="kicker">Fixes</div>
     <h2>Fixes</h2>

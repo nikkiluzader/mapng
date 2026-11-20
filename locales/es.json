@@ -773,7 +773,9 @@
       "curbHeightHint": "Cuánto sobresalen las aceras elevadas sobre la calzada. Estándar es un bordillo real; Bajo y A ras son más amables con los coches bajos y fáciles de subir.",
       "viewDistanceShort": "Hasta dónde dibuja el juego el nivel.",
       "bundleOsm": "Incluir los datos del mapa para informes de errores",
-      "bundleOsmHint": "Activado: los datos de OpenStreetMap con los que se construyó el nivel se incluyen en él (levels/<name>/mapng_source/, unos pocos MB como mucho, que el juego nunca lee), para poder reconstruir un informe sobre el nivel con exactamente los mismos datos. Desactivado: no se incluyen."
+      "bundleOsmHint": "Activado: los datos de OpenStreetMap con los que se construyó el nivel se incluyen en él (levels/<name>/mapng_source/, unos pocos MB como mucho, que el juego nunca lee), para poder reconstruir un informe sobre el nivel con exactamente los mismos datos. Desactivado: no se incluyen.",
+      "groundModels": "Suelo como modelos (experimental)",
+      "groundModelsHint": "Activado: el suelo se construye como modelos 3D en lugar del terreno de BeamNG, así un nivel por lotes puede tener cualquier forma (una franja larga de teselas). El nivel carga más lento (su colisión se construye al cargar) y no tiene hierba; el editor de terreno no funciona en él. Desactivado: el terreno habitual."
     },
     "weight": {
       "title": "¿Cuánto pesa este nivel?",
@@ -2146,9 +2148,11 @@
       "on": "sí",
       "off": "no",
       "widthsOffShort": "Desactivado: cada carretera usa el ancho habitual de su clase.",
-      "bundleOsmShort": "Los datos del mapa van en el nivel, para poder reproducir los informes."
+      "bundleOsmShort": "Los datos del mapa van en el nivel, para poder reproducir los informes.",
+      "groundModelsShort": "El suelo como modelos 3D, cualquier forma; carga más lento, sin hierba."
     },
-    "bundleOsm": "sin datos del mapa para informes"
+    "bundleOsm": "sin datos del mapa para informes",
+    "groundModels": "suelo como modelos"
   },
   "backupData": {
     "title": "Este mapa se construyó con datos de reserva.",
@@ -2308,6 +2312,7 @@
     "ter": "Escribiendo el binario del terreno (terrain.ter, {w}×{h} alturas + capas de material)",
     "crop": "Recortando el terreno a {w}×{h} (BeamNG necesita un cuadrado potencia de dos)",
     "heightmap": "Codificando el mapa de alturas PNG de 16 bits ({w}×{h})",
+    "groundModels": "Construyendo el suelo como modelos",
     "thumbnail": "Renderizando la miniatura del nivel",
     "look": "Eligiendo el aspecto regional y las normas viales de este lugar",
     "buildings": "Construyendo edificios 3D con textura ({n} plantas de OSM)",

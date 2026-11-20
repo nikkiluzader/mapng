@@ -773,7 +773,9 @@
       "curbHeightHint": "Jak wysoko podniesione chodniki wystają nad jezdnię. Standardowa to prawdziwy krawężnik; Niska i Na równo są łagodniejsze dla niskich aut i łatwe do wjechania.",
       "viewDistanceShort": "Jak daleko gra rysuje poziom.",
       "bundleOsm": "Dołącz dane mapy do zgłoszeń błędów",
-      "bundleOsmHint": "Włączone: dane OpenStreetMap, z których zbudowano poziom, trafiają do poziomu (levels/<name>/mapng_source/, najwyżej kilka MB, gra ich nie czyta), aby zgłoszenie dotyczące poziomu można było odtworzyć na dokładnie tych samych danych. Wyłączone: pominięte."
+      "bundleOsmHint": "Włączone: dane OpenStreetMap, z których zbudowano poziom, trafiają do poziomu (levels/<name>/mapng_source/, najwyżej kilka MB, gra ich nie czyta), aby zgłoszenie dotyczące poziomu można było odtworzyć na dokładnie tych samych danych. Wyłączone: pominięte.",
+      "groundModels": "Podłoże jako modele (eksperymentalne)",
+      "groundModelsHint": "Włączone: podłoże jest budowane jako modele 3D zamiast terenu BeamNG, dzięki czemu poziom wsadowy może mieć dowolny kształt (długi pas kafelków). Poziom wczytuje się wolniej (jego kolizja jest budowana przy wczytywaniu) i nie ma trawy; edytor terenu na nim nie działa. Wyłączone: zwykły teren."
     },
     "weight": {
       "title": "Jak ciężki jest ten poziom?",
@@ -2146,9 +2148,11 @@
       "on": "wł.",
       "off": "wył.",
       "widthsOffShort": "Wyłączone: każda droga dostaje typową szerokość swojej klasy.",
-      "bundleOsmShort": "Dane mapy trafiają do poziomu, aby można było odtworzyć zgłoszenia."
+      "bundleOsmShort": "Dane mapy trafiają do poziomu, aby można było odtworzyć zgłoszenia.",
+      "groundModelsShort": "Podłoże jako modele 3D, dowolny kształt; wolniejsze wczytywanie, bez trawy."
     },
-    "bundleOsm": "bez danych mapy do zgłoszeń"
+    "bundleOsm": "bez danych mapy do zgłoszeń",
+    "groundModels": "podłoże jako modele"
   },
   "backupData": {
     "title": "Ta mapa została zbudowana z danych zapasowych.",
@@ -2308,6 +2312,7 @@
     "ter": "Zapisywanie pliku terenu (terrain.ter, {w}×{h} wysokości + warstwy materiałów)",
     "crop": "Przycinanie terenu do {w}×{h} (BeamNG wymaga kwadratu o boku będącym potęgą dwójki)",
     "heightmap": "Kodowanie 16-bitowej mapy wysokości PNG ({w}×{h})",
+    "groundModels": "Budowanie podłoża jako modeli",
     "thumbnail": "Renderowanie miniatury poziomu",
     "look": "Wybieranie regionalnego wyglądu i zasad drogowych dla tego miejsca",
     "buildings": "Budowanie teksturowanych budynków 3D (obrysów OSM: {n})",

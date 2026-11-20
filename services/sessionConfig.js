@@ -26,7 +26,8 @@ export const EXPORT_FIELDS = [
   ['curbHeight', 'mapng_beamNGCurbHeight', ['standard', 'low', 'flush'], 'standard'],   // (raised sidewalks' height: beamngSidewalks.js CURB_HEIGHTS_M)
   ['roadSurface', 'mapng_beamNGRoadSurface', ['decal', 'mesh', 'hero'], 'decal'],   // (experimental: mesh, meshRoads.js; hero, heroRoadsLua.js)
   ['decalSidewalks', 'mapng_beamNGDecalSidewalks', 'bool', false],   // (on: sidewalks as flat decals, exportBeamNGLevel.js sidewalkStyle)
-  ['bundleOsm', 'mapng_beamNGBundleOsm', 'bool', true],   // (on: the map data in the level for bug reports, exportBeamNGLevel.js addSourceData)
+  ['bundleOsm', 'mapng_beamNGBundleOsm', 'bool', true],
+  ['groundModels', 'mapng_beamNGGroundModels', 'bool', false],   // (experimental: the ground as models, no TerrainBlock)   // (on: the map data in the level for bug reports, exportBeamNGLevel.js addSourceData)
   ['followSurvey', 'mapng_beamNGFollowSurvey', 'bool', true],   // (on: every road at the lidar survey's slope; off: tertiary and smaller only, structures/profileSolve.js)
   ['assumeParking', 'mapng_beamNGAssumeParking', 'bool', false],   // (on: a parking lane each side of town streets with no parking tags, services/roadWidth.js)
   ['bridges', 'mapng_beamNGIncludeBridges', 'bool', true],
@@ -55,7 +56,7 @@ const LIST_KINDS = { contentList: sanitizeContentOff, tagList: sanitizeExcludeTa
 /** Whether a field holds a list (stored as JSON; not counted in the settings stats). */
 export const isListField = ([, , kind]) => Object.hasOwn(LIST_KINDS, kind);
 // (not counted in the settings stats: public/data.html lists every counted setting)
-const NOT_COUNTED = new Set(['fallbackSource', 'contentOff', 'excludeTags', 'basicPreset', 'viewDistance', 'assumeParking', 'followSurvey', 'bundleOsm', 'decalSidewalks', 'curbHeight']);
+const NOT_COUNTED = new Set(['fallbackSource', 'contentOff', 'excludeTags', 'basicPreset', 'viewDistance', 'assumeParking', 'followSurvey', 'bundleOsm', 'groundModels', 'decalSidewalks', 'curbHeight']);
 export const isCountedField = (field) => !NOT_COUNTED.has(field[0]) && !isListField(field);
 
 /** Data-part settings kept outside the run configuration: [name, key, kind, default]. */

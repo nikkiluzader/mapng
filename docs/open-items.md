@@ -16,6 +16,9 @@ As of 2026-11-20 night (late):
   preview (09648ed, LATEST_UPDATE 0.3.5: main only at the release, it publishes the page), the movable upload square
   (599dc2b, checked end to end: the level matches the LAZ at the moved square, r 0.999, scratch/sqe2e). Desktop
   0.3.5-dev.4 tagged (66aab61) for the user's end-to-end pass; then 0.3.5. Published: 0.3.4 as the latest release.
+  Since dev.4: the experimental "Ground as models" switch for single exports (services/groundMesh.js; checked in game
+  on tychonas: ground, roads, texture, collision, driving; web end to end: switch -> level with ground tiles and the
+  anchor terrain). Not yet in a test build. Shaped levels on branch `shaped-levels` (backlog "Non-square levels").
   Branches: `seawall` (5009640, local: the promenade, for 0.3.6), `step-walls-2` (390b697), `hairpin-blend` (unswept),
   `step-walls` (older, superseded by -2).
 - The sweep's known pre-existing flags: sidewalk drift at naldo, kingst, deckpark_g, stelvio; ams_centraal mh/ready;
