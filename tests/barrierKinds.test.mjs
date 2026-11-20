@@ -26,3 +26,8 @@ test('the kinds that are named keep their models', () => {
   assert.notEqual(shape({ barrier: 'wall' }), rail);
   assert.notEqual(shape({ barrier: 'fence' }), rail);
 });
+
+test('a concrete retaining wall holds the ground; a concrete wall stands free', () => {
+  assert.ok(resolveNativeBarrierAsset({ barrier: 'retaining_wall', material: 'concrete' })?.retaining, 'concrete retaining wall');
+  assert.ok(!resolveNativeBarrierAsset({ barrier: 'wall', material: 'concrete' })?.retaining, 'a concrete wall stands free');
+});

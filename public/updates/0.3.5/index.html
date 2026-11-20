@@ -274,7 +274,6 @@
       <li>Where a short underpass runs under a street that the ground data has removed, the box fits under the street and the street stays on the ground.</li>
       <li>A long box tunnel under a street now lays its road at a steady depth under the street, so the street over it stays level (Val d'Isère's Tunnel des Téléphériques: a 15&nbsp;% climb onto the roof is gone).</li>
     </ul>
-    <div class="ph"><b>Screenshot to come</b>Wing walls at a bridge end: the wall starting at the road's edge (after the roads and terrain round it are fixed).</div>
     <figure><img src="images/low-box-street.jpg" alt="Before and after: a street junction over a box tunnel. Before, the concrete roof stands out of torn ground; after, the streets meet level over covered ground" loading="lazy"><figcaption>Rue du Cocor over the Tunnel des Téléphériques, before and after.</figcaption></figure>
     <h3>Funiculars and railway tunnels</h3>
     <p>A railway tunnel now climbs at its own kind's grade: a funicular up to 100&nbsp;%, trams 9&nbsp;%, light rail 8&nbsp;%. The Funival in Val d'Isère, whose ends are 768 m apart in height, is built as a tunnel instead of left on the surface.</p>
@@ -324,6 +323,12 @@
     <figure><img src="images/pointcloud-ground.jpg" alt="Two shaded relief maps of the same city blocks from a point cloud at 1 m: before, square blocks and seams where buildings and trees stood; after, the gaps filled smoothly" loading="lazy"><figcaption>Behind the scenes: the ground from a point cloud as shaded relief, before and after. The blocks and seams where buildings, cars and trees stood are filled smoothly now.</figcaption></figure>
   </section>
 
+  <section id="osmfiles" data-nav="Your own map data">
+    <div class="kicker">Map data</div>
+    <h2>Your own map data in more formats</h2>
+    <p>The OpenStreetMap file box under Sources now also takes <code>.osm.pbf</code> extracts (the files Geofabrik, BBBike and osmium make) and GeoJSON, as well as <code>.osm</code> files from openstreetmap.org or JOSM and Overpass JSON. While the file covers your map, MapNG builds from it instead of downloading. A 3.5 MB extract of all of Liechtenstein loads in under a second.</p>
+  </section>
+
   <section id="reports" data-nav="Bug reports">
     <div class="kicker">Help us help you</div>
     <h2>Bug reports with the map inside</h2>
@@ -344,9 +349,28 @@
       <li>Chevron signs on a two-way bend stand back to back on one post instead of on two rows of posts.</li>
       <li>On the website, a small or medium map no longer fails with "out of memory" when the satellite helper stops part way: the picture is fitted on the page instead.</li>
       <li>When a Generate or export stops because the tab crashed, the report you can send afterwards now includes the last lines that job logged, so the problem can be found.</li>
+      <li>A concrete retaining wall mapped in OpenStreetMap holds the ground like any other retaining wall, from the low side up to just over the high side. Before, it stood as a 1 m wall at its foot (seen along sunken freeways in Kansas City).</li>
       <li>An outline tagged <code>building=no</code> is no longer built as a building (a water-sports base's grounds on Lac de Tignes stood as a five-storey block over the beach).</li>
       <li>When Generate cannot get the memory for its picture, it says the computer ran out of memory.</li>
       <li>Model photos are asked for only on the test site; the public site and the desktop app make no such request.</li>
+    </ul>
+  </section>
+
+  <section id="next" data-nav="Next release">
+    <div class="kicker">Coming next</div>
+    <h2>Moved to the next release</h2>
+    <p>These are known and being worked on. They were held back so this release could go out with what is already tested.</p>
+    <ul>
+      <li>Streets standing on a narrow ridge with jagged sides in steep towns (Rue de la Poste in Tignes). The cause is found: a street lifted a few metres where a driveway leads into an underground garage.</li>
+      <li>Walls along a tunnel's approach cutting that stop short of the ground above them, leaving a jagged edge on top.</li>
+      <li>A terrain cliff left beside a covered tunnel on a steep valley side.</li>
+      <li>A building over a tunnel portal reaching out onto the road.</li>
+      <li>Bridge heights and shapes from Fizz_Mechanic's list.</li>
+      <li>Roads on every map: pieces not joined at junctions and bends, hairpins, spikes along road edges, the ground beside roads, and buildings or street lights standing in the road.</li>
+      <li>Mesh Roads (experimental): Mesh and Decal Roads showing through each other, small steps, triangles showing in the light.</li>
+      <li>World Editor: buildings, sidewalks and lake walls as separate objects instead of large groups.</li>
+      <li>The regional look in the Andes and in Colorado's forested mountains.</li>
+      <li>A picture of the new wing walls at a bridge end, once the road and ground round them are fixed.</li>
     </ul>
   </section>
 

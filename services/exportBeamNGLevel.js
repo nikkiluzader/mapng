@@ -9341,6 +9341,8 @@ export function resolveNativeBarrierAsset(tags = {}, biome = null) {
     const wallKind = String(tags.wall ?? '').trim().toLowerCase();
     const height = Number.parseFloat(tags.height);
     if (wallKind === 'dry_stone' || wallKind === 'gabion') return NATIVE_BARRIER_ASSETS.dryStoneWall;
+    // (a concrete retaining wall holds the ground like any other: it was a 1 m free-standing wall at its foot)
+    if (barrierType === 'retaining_wall' && (material === 'concrete' || material === 'reinforced_concrete')) return NATIVE_BARRIER_ASSETS.retainingWall;
     if (material === 'concrete' || material === 'reinforced_concrete' || wallKind === 'noise_barrier' || wallKind === 'jersey_barrier') {
       return NATIVE_BARRIER_ASSETS.concreteWall;
     }
