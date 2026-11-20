@@ -103,6 +103,15 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
 
 ## Before 0.3.5
 
+- **Sawtooth along steep roads** (user 2026-11-20: "roads close to steep edges ... a lot of sawtooth drops"). Probe
+  scratch/saw/saw.py (kinks 1 m apart along each road's edge, ready vs untouched). On dev 7db9fe6: side slopes blended
+  by nearness (stelvio kinks > 0.6 m 2.77 -> 1.76 %, survey 0.77; in game scratch/saw/shots/stelvio_dev_*.jpg). Left:
+  - *hairpin arms whose road surfaces touch*: a sheer step on the grid between them (stelvio shots 4, 6, 7). Branch
+    `step-walls-2` (390b697): step walls traced from the terrain cover only parts of it in game (stelvio_ba_*.jpg).
+    Next: wall lines from the composer itself (the lower road's core edge where two cores meet on two levels).
+  - *steep cut/fill faces on hillsides* rise up to 2 m between neighbours (the blend makes up the hillside's rise too).
+    Tried: slopes 1.5x longer (no gain), an offset blend on the survey (worse: carries per-point noise). Open.
+  - the steps the app's road levelling makes at Generate reach the export as "survey" (no unlevelled copy kept).
 - **Jagged terrain from our own steps** (user 2026-11-20: jagged edges on almost every export, coasts, tunnel mouths,
   cliffs and roads; "the smoothing tool does fix these things really well"). Probe scratch/jag/jag.py (source DEM vs
   untouched vs ready export; jaggedness = |4h - 4 neighbours|), plots there. Findings:
@@ -110,7 +119,7 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
     fine data cut the beach below the mapped coastline into a bank. Fixed in the working tree (depth from a distance
     blended between cell centres; on fine data a cell over the water's level is land and the coastline rule takes only
     water-level ground). kingst untouched: points > 0.5 m off their neighbours 1.65 % -> 0.63 % (source 0.10 %).
-    kingst_shore_after.png. Not swept yet.
+    kingst_shore_after.png. On dev 7db9fe6 with the seam pass (services/terrainSeams.js): 1.75 -> 0.38 %.
   - *Marsh inside a tidal river's outline*: lake beds (carveLakeBeds) take flat marsh at a "second water level" as
     water and cut whole patches (kingst -800, 560: 0.83 m -> 0.46 m in blocks). Open.
   - *Road edges on steep ground*: the edits' biggest share (gt_chevril -300, 580: bands up to 1.5 m along the graded
