@@ -21,7 +21,7 @@ export const PAVED_RES_M = 0.25;
 export const SIDEWALK_GAP_M = 12;
 export const PLAIN_GAP_M = 1;
 export const CLOSE_M = 5;
-export const LAWN_REACH_M = 25;     // houses this near: the street's verge between curb and sidewalk is a lawn
+export const LAWN_REACH_M = 35;     // houses this near: the street's verge between curb and sidewalk is a lawn
 export const LAWN_MIN_GAP_M = 1.5;  // ... unless the walk is this near the curb (mapped against it)
 export const POCKET_M2 = 20;      // an unpaved pocket this small between road and pavement is paved (crossing landings)
 export const SPECK_M2 = 0.5;      // a traced ring this small is dropped
@@ -191,6 +191,10 @@ export function buildPavedGrid(g, { roads = [], cornerArcs = [], walks = [], str
     for (let i = 0; i < N; i++) if (dh[i] <= reach2) lawn[i] = 1;
   }
   const lawnGap = LAWN_MIN_GAP_M / res;
+  // (lawn by the street, not cell by cell: a cell is lawn where it, its nearest road or the sidewalk it lies toward is within reach of houses. Judged
+  // by the cell alone, the strip switched between lawn and paving where the houses' reach ran through it, in ragged
+  // edges, and a residential street's far side, its houses a little further back, was paved solid (Naperville))
+  const lawnAt = (i) => !!lawn && (lawn[i] === 1 || (roadNear[i] >= 0 && lawn[roadNear[i]] === 1) || (swNear[i] >= 0 && lawn[swNear[i]] === 1));
   for (let i = 0; i < N; i++) {
     if (road[i] || walk[i]) continue;
     const dr = Math.sqrt(dRoad2[i]);
@@ -199,7 +203,7 @@ export function buildPavedGrid(g, { roads = [], cornerArcs = [], walks = [], str
     else if (swNear[i] >= 0) {
       const D = Math.sqrt(dRoad2[swNear[i]]);
       if (D <= swMax && dr + Math.sqrt(dSw2[i]) <= D + 0.5 / res) {
-        if (lawn && lawn[i] && D > lawnGap) { cells[i] |= VERGE; continue; }
+        if (lawnAt(i) && D > lawnGap) { cells[i] |= VERGE; continue; }
         take = true;
       }
     }
@@ -227,7 +231,7 @@ export function buildPavedGrid(g, { roads = [], cornerArcs = [], walks = [], str
   // (only near a sidewalk footway: the closing rounds the sidewalk paving at corners; let loose, it paved the strip
   // beside a plain footway 4.5 m off the curb too)
   const closeReach2 = (CLOSE_M / res) * (CLOSE_M / res);
-  for (let i = 0; i < N; i++) if (closed[i] && !(cells[i] & (ROAD | WALK | GAP | VERGE)) && dSw2[i] <= closeReach2 && !(lawn && lawn[i])) cells[i] |= GAP;
+  for (let i = 0; i < N; i++) if (closed[i] && !(cells[i] & (ROAD | WALK | GAP | VERGE)) && dSw2[i] <= closeReach2 && !lawnAt(i)) cells[i] |= GAP;
   // pockets: small unpaved areas wedged between road and pavement (a crossing's landing, a kerb ramp's sides) paved
   {
     const label = new Int32Array(N).fill(-1); const stack = []; const maxCells = POCKET_M2 / (res * res);

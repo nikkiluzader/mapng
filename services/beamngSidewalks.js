@@ -833,16 +833,50 @@ export function buildSidewalkRuns(carriageways, { zones = [], driveways = [], me
       }
     }
   }
+  // (a sidewalk mapped as its own way alongside a stretch of the street, on that side: the street's own slab left out
+  // there, its curb kept. Judged for the whole way only (40 % of it), a street whose mapped sidewalk ran beside it for a
+  // part and curved off round a cul-de-sac kept its own all along: two sidewalks a side, the strip between them paved)
+  const fwIndex = footways.length ? footwayIndex(footways) : null;
+  const mappedAlong = (cw, side) => (x, y) => {
+    const n = cw.nodes; let bi = 0; let bd = Infinity;
+    for (let i = 0; i + 1 < n.length; i++) {
+      const dx = n[i + 1][0] - n[i][0]; const dy = n[i + 1][1] - n[i][1]; const L2 = dx * dx + dy * dy || 1e-9;
+      const t = Math.max(0, Math.min(1, ((x - n[i][0]) * dx + (y - n[i][1]) * dy) / L2));
+      const ex = n[i][0] + dx * t - x; const ey = n[i][1] + dy * t - y; const d = ex * ex + ey * ey;
+      if (d < bd) { bd = d; bi = i; }
+    }
+    const L = fastHypot(n[bi + 1][0] - n[bi][0], n[bi + 1][1] - n[bi][1]) || 1;
+    const tx = (n[bi + 1][0] - n[bi][0]) / L; const ty = (n[bi + 1][1] - n[bi][1]) / L;
+    for (const { q, r } of fwIndex.get(`${Math.floor(x / FOOTWAY_CELL_M)},${Math.floor(y / FOOTWAY_CELL_M)}`) || []) {
+      const dx = r[0] - q[0]; const dy = r[1] - q[1]; const l = fastHypot(dx, dy) || 1;
+      if (Math.abs((dx * tx + dy * ty) / l) < FOOTWAY_ALONG_COS) continue;
+      // (beside the footway, not past its ends)
+      const u = ((x - q[0]) * dx + (y - q[1]) * dy) / (l * l);
+      if (u < 0 || u > 1) continue;
+      const ox = q[0] + dx * u - x; const oy = q[1] + dy * u - y;
+      if (fastHypot(ox, oy) > FOOTWAY_SETBACK_M) continue;
+      if ((tx * oy - ty * ox) * side > 0) return true;
+    }
+    return false;
+  };
   for (const cw of carriageways) {
     const sides = sidesOf.get(cw);
     const ignore = sameStreet.get(cw.owner);
     const blocked = (x, y) => carriagewaysAt(index, x, y, CUT_MARGIN_M, { sides: true }).some((c) => !ignore.has(c.owner));
+    const curb = fwIndex ? sidewalkSides({ ...cw, tags: {} }).left : 0;
     for (const [side, width] of [[1, sides.left], [-1, sides.right]]) {
       // a divided road's median side has the median, not a sidewalk
       if (!width || medianShare(medians.get(cw), side) >= MEDIAN_SIDE_SHARE) continue;
       // (each node's own half width where the way narrows to the next one)
-      for (const piece of cutNodes(offsetLine(cw.nodes, cw.halfAt ? (i) => side * cw.halfAt[i] : side * cw.half), blocked, { minPieceM: 0.5 })) {
+      const line = offsetLine(cw.nodes, cw.halfAt ? (i) => side * cw.halfAt[i] : side * cw.half);
+      const along = fwIndex && width > CURB_ONLY_M ? mappedAlong(cw, side) : null;
+      for (const piece of cutNodes(line, along ? (x, y) => blocked(x, y) || along(x, y) : blocked, { minPieceM: 0.5 })) {
         pieces.push({ points: piece.map((n) => [n[0], n[1], n[2]]), side, width, owner: cw.owner, highway: cw.highway, surface: cw.tags?.surface });
+      }
+      if (along && curb) {
+        for (const piece of cutNodes(line, (x, y) => blocked(x, y) || !along(x, y), { minPieceM: 0.5 })) {
+          pieces.push({ points: piece.map((n) => [n[0], n[1], n[2]]), side, width: curb, owner: cw.owner, highway: cw.highway, surface: cw.tags?.surface });
+        }
       }
     }
   }
@@ -928,6 +962,7 @@ const FRONT_MIN_RUN_M = 8;       // along at least this much of the curb
 const FRONT_WALL_CLEAR_M = 0.05;
 const FRONT_CELL_M = 16;
 const FRONT_WALK_NEAR_M = 3;     // a mapped sidewalk this near behind a curb: no sidewalk laid over it
+const FRONT_WALK_LOOK_M = [1.5, 4.5, 7.5, 10.5];  // ... looked for at these distances behind it (with that reach: to 13.5 m)
 const FRONT_ABSORB_M = 6;        // a bare-curb end shorter than this beside a new sidewalk: taken into it
 const UNMAPPED_WALK_M = 2;       // a sidewalk over unmapped town ground behind a curb
 const UNMAPPED_ROAD_CLEAR_M = 4; // another road this near behind the curb: the strip between is no sidewalk
@@ -985,8 +1020,9 @@ function fillToBuildingFronts(runs, buildings, parking = [], { openGround = [], 
       const a = pts[Math.max(0, i - 1)]; const b = pts[Math.min(pts.length - 1, i + 1)];
       const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
       const ux = (-(b[1] - a[1]) / L) * run.side; const uy = ((b[0] - a[0]) / L) * run.side;
-      // (a mapped sidewalk just behind the curb: it is the sidewalk)
-      if (mappedWalkAt(p[0] + ux * 1.5, p[1] + uy * 1.5)) return null;
+      // (a mapped sidewalk behind the curb, up to FRONT_WALK_BACK_M back: it is the sidewalk. Looked for only just behind
+      // the curb, a residential street with its sidewalks mapped 5 m back behind a lawn got a second one at the curb)
+      if (FRONT_WALK_LOOK_M.some((d) => mappedWalkAt(p[0] + ux * d, p[1] + uy * d))) return null;
       const g = wallAhead(p, ux, uy, FRONT_GAP_M[1]);
       if (g >= FRONT_GAP_M[0] && g <= FRONT_GAP_M[1]) {
         // (a car park between the curb and the wall: no sidewalk across it)

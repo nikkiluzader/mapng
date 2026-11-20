@@ -90,9 +90,10 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
   updates index link at release. Any main push before then carries the draft to mapng.com/updates/0.3.5/ (unlinked,
   noindex, marked as a preview).
 - **Sidewalk fixes** (user, 2026-11-20), after cul-de-sacs:
-  1. Jagged edges across many levels and situations (one cause found while building cul-de-sacs: in
-     suburb_naperville the paved fill between a street's generated sidewalk and a mapped `footway=sidewalk` came out
-     in teeth; scratch/culdesac/cds3_zooms.jpg).
+  1. Jagged edges across many levels and situations. Found and fixed 2026-11-20 (history): the lawn-or-paving choice
+     made cell by cell (ragged edges, one side paved); a second sidewalk at the curb where one is mapped behind a
+     lawn. More examples from the user wanted. Tool: scratch/swaudit/paveddump (dump a tile via the
+     `__MAPNG_PAVED_DUMP` hook, plot its cells by rule).
   2. Sidewalks must never tilt sideways: mostly done 2026-11-20 with 3 (the leaning slabs were mostly unpaved paths
      paved on hillsides). Left: terrain shaping off
      still blends the slab onto the ground (tried level across: worse, tall curbs and floating skirts; history).

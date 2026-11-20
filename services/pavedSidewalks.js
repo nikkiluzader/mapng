@@ -358,6 +358,8 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
   // arrival order the mesh would depend on the workers' timing)
   const got = new Array(items.length); let next = 0;
   const onTile = (k, r) => { got[k] = r; while (next < items.length && got[next]) { meshTile(got[next], next); got[next] = null; next++; } };
+  // (a probe's hook: the tiles as the workers get them, e.g. scratch/swaudit/paveddump/hook.mjs; off unless set)
+  globalThis.__MAPNG_PAVED_DUMP?.(items);
   const built = items.length ? yield { kind: 'pavedTiles', items, onTile } : null;
   if (built) built.forEach((r, k) => { if (k >= next && !got[k]) onTile(k, r); });
   else items.forEach((it, k) => onTile(k, pavedTile(it)));

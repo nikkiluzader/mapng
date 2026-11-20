@@ -148,6 +148,21 @@ test('a residential street (houses near) keeps its verge between curb and sidewa
   assert.ok(at(sub, 0, 6) & V && !(at(sub, 0, 6) & G), 'with a house behind: lawn');
 });
 
+// The lawn is the street's, not the cell's: houses on one side only (the far side's set further back, beyond the reach)
+// still make both verges lawn. Judged cell by cell, the far side was paved solid (Naperville).
+test('a residential street\'s verges are lawn on both sides when houses stand along one', async () => {
+  const { makeGrid: mk, buildPavedGrid: build, GAP: G, VERGE: V, LAWN_REACH_M } = await import('../services/pavedArea.js');
+  const g = mk(-60, -60, 60, 60);
+  const roads = [{ pts: [[-70, 0], [70, 0]], half: 4 }];
+  const walks = [{ pts: [[-70, 8.5], [70, 8.5]], half: 1, sidewalk: true }, { pts: [[-70, -8.5], [70, -8.5]], half: 1, sidewalk: true }];
+  const at = (cells, x, y) => cells[Math.floor((60 - y) / g.res) * g.w + Math.floor((x + 60) / g.res)];
+  // a house north of the street only, its far edge further than the reach from the south verge
+  const house = [[-5, 22], [5, 22], [5, 30], [-5, 30]];
+  assert.ok(LAWN_REACH_M > 22);
+  const cells = build(g, { roads, walks, houses: [house] }).cells;
+  for (const y of [6, -6]) assert.ok(at(cells, 0, y) & V && !(at(cells, 0, y) & G), `verge at y ${y}: ${at(cells, 0, y)}`);
+});
+
 // The paved tiles on worker threads give the same grid and outlines as on this thread (the optimization rules: one
 // function, both paths; results back in order).
 test('paved tiles: worker threads and this thread agree', async () => {
