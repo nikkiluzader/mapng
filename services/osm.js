@@ -436,7 +436,9 @@ export const parseOverpassResponse = (data, bounds) => {
     // (a bridge's pier or abutment mapped as a building, bridge:support=*: the bridge's own builder makes its supports.
     // Built as a building it stood as a house across the deck: Tower Bridge's towers, a road driving into a wall)
     if (tags["bridge:support"] && tags["bridge:support"] !== "no") return "bridge_support";
-    if (!!tags.building || ["castle", "fort", "monastery", "tower", "ruins"].includes(tags.historic)) return "building";
+    // (building=no says the outline is not a building: a water-sports base's grounds on Lac de Tignes, 5,400 m2 by the
+    // beach, came out a building over the beach and the marina (Fizz_Mechanic 4.1))
+    if ((!!tags.building && tags.building !== "no") || ["castle", "fort", "monastery", "tower", "ruins"].includes(tags.historic)) return "building";
     if (tags.natural === "coastline") return "coastline";
     if (
       tags.natural === "water" || tags.waterway ||

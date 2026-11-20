@@ -13307,6 +13307,12 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   beginStep('prepare', `Preparing ${terrainData.width}×${terrainData.height} terrain and ${Array.isArray(terrainData?.osmFeatures) ? terrainData.osmFeatures.length : 0} OSM features…`);
   await yield_();
 
+  // (an outline tagged building=no is not a building: data parsed before the parser knew it (a cached Generate, a
+  // test area) still had one, a water-sports base's 5,400 m2 grounds by Lac de Tignes standing over the beach)
+  if ((terrainData?.osmFeatures || []).some((f) => f?.type === 'building' && f.tags?.building === 'no' && !f.tags?.historic)) {
+    terrainData = { ...terrainData, osmFeatures: terrainData.osmFeatures.filter((f) => !(f?.type === 'building' && f.tags?.building === 'no' && !f.tags?.historic)) };
+  }
+
   // What to build (services/buildContent.js): the OSM features of every
   // feature switched off, and the tags left out one by one, gone from the
   // export's data before anything is built
