@@ -150,3 +150,32 @@ test('turn:lanes places one arrow per lane, ordered left-to-right across travel'
   const deadEnd = { ...approach, id: 'w3', geometry: approach.geometry.map((p) => ({ ...p, lat: p.lat + 0.01 })) };
   assert.equal(generateTurnArrowDecals(makeTerrainData([deadEnd]), SQUARE_SIZE).length, 0);
 });
+
+test('on the drawn carriageway the arrows stand in the lanes its lines divide, behind the stop bar', () => {
+  // a two-way street along x, 12 m driving width, two lanes each way (lanes:forward 2), its forward end at x = 0;
+  // turn:lanes:forward left|through; a stop bar 10 m back from the junction
+  const lat = CENTER_LAT;
+  const dLng = 0.001;
+  const street = {
+    id: 'w1', type: 'road',
+    tags: { highway: 'secondary', lanes: '4', 'lanes:forward': '2', 'lanes:backward': '2', 'turn:lanes:forward': 'left|through' },
+    geometry: [-2, -1, 0].map((k) => ({ lat, lng: CENTER_LNG + k * dLng })),
+  };
+  const cross = {
+    id: 'w2', type: 'road', tags: { highway: 'residential' },
+    geometry: [{ lat: lat - 0.001, lng: CENTER_LNG }, { lat, lng: CENTER_LNG }, { lat: lat + 0.001, lng: CENTER_LNG }],
+  };
+  const nodes = []; for (let x = -190; x <= 0.01; x += 2) nodes.push([x, 0, 0, 6]);
+  const carriageways = [{ wayId: 'w1', nodes, half: 6, drivingHalf: 6, laneShift: 0, highway: 'secondary', tags: street.tags, trimEnd: 4, trimStart: 0 }];
+  const stops = [{ x: -10, y: -3, dir: [1, 0] }];
+  const arrows = generateTurnArrowDecals(makeTerrainData([street, cross]), SQUARE_SIZE, { carriageways, stops });
+  assert.equal(arrows.length, 2);
+  // the lines: edge offset 6 - 0.3 = 5.7, the centre line at 0, the forward lanes on the right (-y): [-5.7, -2.85], [-2.85, 0]
+  const left = arrows.find((a) => a[0] === 0); const through = arrows.find((a) => a[0] === 2);
+  assert.ok(Math.abs(left[4] - -1.425) < 0.05, `left arrow in the lane next to the centre line: y ${left[4]}`);
+  assert.ok(Math.abs(through[4] - -4.275) < 0.05, `through arrow in the kerb lane: y ${through[4]}`);
+  // behind the stop bar: the tip (centre + size / 2) at least 1.5 m before x = -10
+  for (const a of arrows) assert.ok(a[3] + a[1] / 2 <= -10 - 1.49, `tip behind the stop bar: x ${a[3]}, size ${a[1]}`);
+  // the stencil at most a little wider than its lane (the glyph is a third of it)
+  for (const a of arrows) assert.ok(a[1] <= 2.85 * 1.35 + 0.01);
+});

@@ -2,6 +2,8 @@
 // out (no heights: meshing and grading, which read the terrain, stay on the export's thread and are cheap).
 import { makeGrid, buildPavedGrid, traceOutlines, markPolygon, markLine, WALK, GAP, ROAD } from './pavedArea.js';
 
+const GAP_MIN_W_M = 1;         // filled gaps narrower than this are left as ground
+
 /** item: { box, roads, cornerArcs, walks, streetWalks, greenery, buildings } -> { cells, g, rings } */
 export function pavedTile(item) {
   const [x0, y0, x1, y1] = item.box;
@@ -47,6 +49,34 @@ export function pavedTile(item) {
       const row = ((r / block) | 0) * bw;
       for (let c = 0; c < g.w; c++) { if (!mask[row + ((c / block) | 0)]) continue; const i = r * g.w + c; if (!(cells[i] & WALK)) cells[i] &= ~GAP; }
     }
+  }
+  // (no filled gap thinner than GAP_MIN_W_M: slivers a cell or two wide ran from the sidewalk to a building's front, odd
+  // thin strips of paving in the lawn (St. Augustine, Orange Street). An opening: what survives shrinking by half that
+  // width, grown back; mapped walks are never touched)
+  {
+    const r = Math.max(1, Math.round(GAP_MIN_W_M / 2 / g.res));
+    const gapOnly = (i) => (cells[i] & GAP) && !(cells[i] & WALK);
+    const step = (mask, grow) => {
+      const out = new Uint8Array(mask);
+      for (let row = 0; row < g.h; row++) {
+        for (let c = 0; c < g.w; c++) {
+          const i = row * g.w + c;
+          if (grow ? mask[i] : !mask[i]) continue;
+          // (shrink: off if any 4-neighbour is off; grow: on if any 4-neighbour is on)
+          const n = [c > 0 ? mask[i - 1] : 0, c < g.w - 1 ? mask[i + 1] : 0, row > 0 ? mask[i - g.w] : 0, row < g.h - 1 ? mask[i + g.w] : 0];
+          if (grow ? n.some((v) => v) : n.some((v) => !v)) out[i] = grow ? 1 : 0;
+        }
+      }
+      return out;
+    };
+    let m = new Uint8Array(cells.length);
+    for (let i = 0; i < cells.length; i++) m[i] = gapOnly(i) || (cells[i] & WALK) ? 1 : 0;
+    const walk = new Uint8Array(cells.length); for (let i = 0; i < cells.length; i++) walk[i] = cells[i] & WALK ? 1 : 0;
+    let e = m; for (let k = 0; k < r; k++) e = step(e, false);
+    // (grown back from what survived and from the walks themselves, so gap paving joined to a walk keeps its full width)
+    for (let i = 0; i < e.length; i++) if (walk[i]) e[i] = 1;
+    let d = e; for (let k = 0; k < r; k++) d = step(d, true);
+    for (let i = 0; i < cells.length; i++) if (gapOnly(i) && !d[i]) cells[i] &= ~GAP;
   }
   // (no slab into a building)
   if (item.buildings?.length) {

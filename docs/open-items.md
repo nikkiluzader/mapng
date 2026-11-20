@@ -103,6 +103,17 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
 
 ## Before 0.3.5
 
+- **Sea walls: the promenade behind a wall at the water** (user 2026-11-20: "bring the pavement out to the retaining
+  wall and make sure it's flat"). On branch `seawall` (5009640), not on dev; dev.2 went without it (decisions.md).
+  Works at cordova (flat_after.png, in-game shots); sweep regressions left, all at kingst mh (+19 floating):
+  - a walled sunken garden (218, 680): the fill flattens the garden floor, its steps' slab stands up to 1.1 m over it;
+  - between the inner wall and the sea wall (250, 246): slab 3.13 m over ground 2.72 m, nothing grades it up;
+  - two sidewalks at bridge ends by the river wall (306, 60) and (334, -168).
+  Where to look: services/quayFill.js, exportBeamNGLevel.js quayLandStrips/quayWaterGround, pavedSidewalks.js landLevel;
+  plots scratch/bisect (kingst_two_walls.png, kingst_sections.png, ams_fill.png), scratch/quay (flat_plan/flat_after).
+  Already fixed on the branch: inner walls, restore under slabs, band only where the land was raised, far rule gone.
+  Done when: a full sweep against sweep_alp.json shows no sidewalk regressions; then in game at cordova and kingst.
+
 - **Release page draft** (user, 2026-11-19): `public/updates/0.3.5/` (marked as a preview, noindex), on dev for
   testers to read ahead. Covers every commit through 2026-11-20 morning (cul-de-sacs, sidewalk paths and edges
   included). Pictures in: cul-de-sacs, sidewalks (corner, suburb, hillside), gallery outside and driver's view,
@@ -134,6 +145,9 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
   scan angle was poor and points are sparse the ground comes out as "a stalactite field"; their idea: treat gaps as the
   average of the nearest points, not 0. They sent the whole level (nemuno_iedas.zip, 830 MB) and four LAZ tiles
   (56_37_11/12/16/17.laz, 84-105 MB each) in #general. Next: fetch the LAZ, rebuild the area, plot the gaps and spikes.
+  Update 17:00Z: re-exported interpolated to 0.3 m (new nemuno_iedas.zip, 316 MB, #general): "this actually kinda
+  rips", drives fine, still some manual work. So the spikes come mostly from the sparse 10 cm grid; the gap fill still
+  worth doing for fine resolutions.
 
 ## Waiting on someone
 

@@ -3335,6 +3335,25 @@ const hasSidewalkTag = (tags = {}) => ['sidewalk', 'sidewalk:both', 'sidewalk:le
  * reversed the seed geometry, the painted layout mirrors. Symmetric layouts
  * (the overwhelmingly common case) are unaffected.
  */
+/**
+ * The painted lanes of a way, as its lane lines divide it: { oneWay, lanes, nF, nB }. Two-way: the forward lanes
+ * (node order) on the right of the centre line, the backward ones on its left. Shared by the lane lines and the turn
+ * arrows, so an arrow stands in the lane the lines draw.
+ */
+export function markingLaneCounts(highway, tags = {}) {
+  const totalTag = parsePositiveInt(tags.lanes);
+  const fwdTag = parsePositiveInt(tags['lanes:forward']);
+  const backTag = parsePositiveInt(tags['lanes:backward']);
+  if (isOneWayRoad(tags)) {
+    const lanes = Math.max(1, totalTag || (fwdTag + backTag) || getDefaultLaneCount(highway, true));
+    return { oneWay: true, lanes, nF: lanes, nB: 0 };
+  }
+  let lanes = totalTag || (fwdTag && backTag ? fwdTag + backTag : 0) || getDefaultLaneCount(highway, false);
+  let nF = fwdTag; let nB = backTag;
+  if (!nF && !nB) { nF = Math.max(1, Math.floor(lanes / 2)); nB = Math.max(1, lanes - nF); } else { nF = nF || Math.max(1, lanes - nB); nB = nB || Math.max(1, lanes - nF); }
+  return { oneWay: false, lanes: nF + nB, nF, nB };
+}
+
 export function buildLineMarkingLayers(highway, tags = {}, styleHalfWidth = 3.5, options = {}) {
   const style = options.style === 'white' ? 'white' : 'americas';
   const majorRoad = MAJOR_ROAD_MARKINGS.has(highway);
@@ -3343,9 +3362,7 @@ export function buildLineMarkingLayers(highway, tags = {}, styleHalfWidth = 3.5,
   const drawEdgeLines = majorRoad && !(options.urban && hasSidewalkTag(tags));
   const overtaking = String(tags.overtaking ?? '').trim().toLowerCase();
 
-  const totalTag = parsePositiveInt(tags.lanes);
-  const fwdTag = parsePositiveInt(tags['lanes:forward']);
-  const backTag = parsePositiveInt(tags['lanes:backward']);
+  const counts = markingLaneCounts(highway, tags);
 
   const pushSeparator = (k, lanes) => {
     const offset = -edgeOffset + (2 * edgeOffset * k) / lanes;
@@ -3355,8 +3372,8 @@ export function buildLineMarkingLayers(highway, tags = {}, styleHalfWidth = 3.5,
     });
   };
 
-  if (isOneWayRoad(tags)) {
-    const lanes = Math.max(1, totalTag || (fwdTag + backTag) || getDefaultLaneCount(highway, true));
+  if (counts.oneWay) {
+    const { lanes } = counts;
     const sepCount = Math.min(lanes - 1, MAX_PAINTED_LANE_SEPARATORS);
     for (let k = 1; k <= sepCount; k++) pushSeparator(k, lanes);
 
@@ -3375,18 +3392,8 @@ export function buildLineMarkingLayers(highway, tags = {}, styleHalfWidth = 3.5,
     return layers;
   }
 
-  // Two-way: resolve per-direction lane counts.
-  let lanes = totalTag || (fwdTag && backTag ? fwdTag + backTag : 0) || getDefaultLaneCount(highway, false);
-  let nF = fwdTag;
-  let nB = backTag;
-  if (!nF && !nB) {
-    nF = Math.max(1, Math.floor(lanes / 2));
-    nB = Math.max(1, lanes - nF);
-  } else {
-    nF = nF || Math.max(1, lanes - nB);
-    nB = nB || Math.max(1, lanes - nF);
-  }
-  lanes = nF + nB;
+  // Two-way: per-direction lane counts.
+  const { lanes, nF } = counts;
 
   // Center divider sits at the forward/backward boundary. Forward travel
   // follows node order, so its lanes occupy the negative-offset (right) side.
@@ -6909,6 +6916,11 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
         // (the tube's roof over the road, crown and lining: a street over it needs no more room than that)
         ...(tunnels.bySeg.get(segIndex)?.kind !== 'gallery' && Number.isFinite(tunnels.bySeg.get(segIndex)?.crown) ? { tunnelRoof: tunnels.bySeg.get(segIndex).crown + LINING_M } : {}),
         leftExtra: crossSection.leftExtra, rightExtra: crossSection.rightExtra,
+        // (the lane lines' frame and where they stop short of a junction at each end: the turn arrows stand in those
+        // lanes, behind that point)
+        drivingHalf: drivingHalfWidth, laneShift: crossSection.laneShift || 0,
+        trimStart: i === 0 ? Math.max(startTrimProfile.center || 0, startTrimProfile.pos || 0, startTrimProfile.neg || 0) : 0,
+        trimEnd: i === clippedSegments.length - 1 ? Math.max(endTrimProfile.center || 0, endTrimProfile.pos || 0, endTrimProfile.neg || 0) : 0,
       });
 
       const layeredDecals = getLayeredRoadDecals(
@@ -7078,6 +7090,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   Object.defineProperty(groups, 'bridges', { value: bridges, enumerable: false });
   Object.defineProperty(groups, 'tunnels', { value: tunnels, enumerable: false });
   Object.defineProperty(groups, 'crosswalkZones', { value: junctionMarkings.zones || [], enumerable: false });
+  Object.defineProperty(groups, 'stopBars', { value: junctionMarkings.stops || [], enumerable: false });
   Object.defineProperty(groups, 'structureGraph', { value: structureGraph, enumerable: false });
   return groups;
 }
@@ -7247,6 +7260,7 @@ export function generateJunctionMarkingDecals(terrainData, squareSize, { carriag
     return null;
   };
   const zones = [];
+  const stops = [];
 
   // Transverse crosswalk: two full-width lines straddling the crossing point.
   const paintCrosswalk = (road, index, pt) => {
@@ -7397,6 +7411,7 @@ export function generateJunctionMarkingDecals(terrainData, squareSize, { carriag
     const halfW = Math.max(1, (drawnHalf ?? approach.halfWidth) - JUNCTION_MARK_EDGE_INSET_M);
     const fromM = approach.oneWay ? -halfW : STOP_BAR_CENTRE_GAP_M;
     pushLine('jm_stopline', px, py, kerb[0], kerb[1], fromM, halfW, STOP_BAR_THICKNESS_M);
+    stops.push({ x: px, y: py, dir });
     stopCount++;
   }
 
@@ -7405,6 +7420,8 @@ export function generateJunctionMarkingDecals(terrainData, squareSize, { carriag
   }
   // Crosswalk bands, for cutting the road's own lines (see generateDecalRoads).
   Object.defineProperty(decals, 'zones', { value: zones, enumerable: false });
+  // (the stop bars, for the turn arrows behind them)
+  Object.defineProperty(decals, 'stops', { value: stops, enumerable: false });
   return decals;
 }
 
@@ -7465,6 +7482,66 @@ export const ROAD_ARROW_DECAL_DATA = {
 const TURN_ARROW_RECT = { left: 0, right: 1, through: 2 };
 const TURN_ARROW_SIZE = { left: 4.5, right: 3.7, through: 3.4 }; // WCU medians
 const TURN_ARROW_SETBACK_M = 8;
+const TURN_ARROW_GAP_M = 1.5;          // the arrow's tip this far behind the stop bar, or where the lane lines stop
+const TURN_ARROW_STOP_REACH_M = 40;    // a stop bar this near the way's end is its approach's
+
+/**
+ * Where a way's arrows stand on its drawn carriageway (the same frame as its lane lines): the piece of the way that
+ * ends at the junction end, the travel direction's lane span between the centre line and the edge line (the lines'
+ * offsets, buildLineMarkingLayers), and how far back from that end the arrows' tips go (behind the stop bar there, or
+ * where the lane lines stop short of the junction). Returns null when the way has no carriageway near that end.
+ */
+function arrowFrameOnCarriageway(carriageways, road, endXY, stops) {
+  let best = null;
+  for (const c of carriageways) {
+    if (c.wayId !== road.id || !(c.nodes?.length >= 2)) continue;
+    for (const atEnd of [true, false]) {
+      const nd = atEnd ? c.nodes[c.nodes.length - 1] : c.nodes[0];
+      const d = fastHypot(nd[0] - endXY[0], nd[1] - endXY[1]);
+      if (!best || d < best.d) best = { c, atEnd, d };
+    }
+  }
+  if (!best || best.d > 15) return null;
+  const { c, atEnd } = best;
+  // (toward the junction: travel follows the carriageway's node order when it ends there)
+  const pts = atEnd ? c.nodes : [...c.nodes].reverse();
+  const e = Math.max(0.5, (c.drivingHalf || c.half) - EDGE_LINE_INSET_M);
+  const counts = markingLaneCounts(c.highway || road.tags?.highway, c.tags || road.tags || {});
+  // (the lane span, in the carriageway's offsets: positive is left of its node order; forward lanes right of the centre)
+  let lo = -e; let hi = e;
+  if (!counts.oneWay) { const b = -e + (2 * e * counts.nF) / counts.lanes; if (atEnd) hi = b; else lo = b; }
+  // back from the end: the stop bar of this approach, or the lane lines' end
+  const [ex, ey] = pts[pts.length - 1];
+  const [px, py] = pts[pts.length - 2];
+  const tl = fastHypot(ex - px, ey - py) || 1; const tx = (ex - px) / tl; const ty = (ey - py) / tl;
+  let back = atEnd ? (c.trimEnd || 0) : (c.trimStart || 0);
+  let stopBack = null;
+  for (const st of stops || []) {
+    const dx = st.x - ex; const dy = st.y - ey;
+    if (fastHypot(dx, dy) > TURN_ARROW_STOP_REACH_M) continue;
+    if (st.dir[0] * tx + st.dir[1] * ty < 0.7) continue;
+    const along = -(dx * tx + dy * ty); const across = Math.abs(dx * -ty + dy * tx);
+    if (along < 0 || across > (c.half || e) + 2) continue;
+    if (stopBack === null || along < stopBack) stopBack = along;
+  }
+  if (stopBack !== null) back = Math.max(back, stopBack);
+  return { pts, alongNodeOrder: atEnd, lo: lo + (c.laneShift || 0), hi: hi + (c.laneShift || 0), back, stop: stopBack !== null };
+}
+
+// the point `dist` back from the last of pts, and the travel direction there (toward the last point)
+function pointBackFromEnd(pts, dist) {
+  let walked = 0;
+  for (let i = pts.length - 1; i > 0; i--) {
+    const [bx, by] = pts[i]; const [ax, ay] = pts[i - 1];
+    const seg = fastHypot(bx - ax, by - ay); if (seg < 1e-9) continue;
+    if (walked + seg >= dist) {
+      const t = (dist - walked) / seg;
+      return { x: bx + (ax - bx) * t, y: by + (ay - by) * t, dir: [(bx - ax) / seg, (by - ay) / seg] };
+    }
+    walked += seg;
+  }
+  return null;
+}
 
 /**
  * Collapse one turn:lanes lane value to a paintable arrow, or null.
@@ -7523,7 +7600,7 @@ function walkBackFromEnd(geometry, fromEnd, setbackM, terrainData, squareSize) {
  * skipped (turn:lanes ways are almost always short junction-approach
  * segments).
  */
-export function generateTurnArrowDecals(terrainData, squareSize) {
+export function generateTurnArrowDecals(terrainData, squareSize, { carriageways = null, stops = [] } = {}) {
   const features = terrainData.osmFeatures || [];
   // (lane markings switched off: no arrows either)
   if (!features.length || !paintOn.markings) return [];
@@ -7559,6 +7636,7 @@ export function generateTurnArrowDecals(terrainData, squareSize) {
   };
 
   const instances = [];
+  const stat = { ways: 0, onCarriageway: 0, behindStop: 0, behindLines: 0, guessed: 0, noRoom: 0, noJunction: 0 };
 
   for (const road of roads) {
     const tags = road.tags || {};
@@ -7595,7 +7673,42 @@ export function generateTurnArrowDecals(terrainData, squareSize) {
 
       const endPt = towardEnd ? road.geometry[road.geometry.length - 1] : road.geometry[0];
       if (!Number.isFinite(endPt?.lat) || !Number.isFinite(endPt?.lng)) continue;
-      if ((roadsAtNode.get(makeRoadNodeKey(endPt))?.size || 0) < 2) continue;
+      if ((roadsAtNode.get(makeRoadNodeKey(endPt))?.size || 0) < 2) { stat.noJunction++; continue; }
+      stat.ways++;
+
+      // On the drawn carriageway: in the lanes its lines divide, behind its stop bar or where its lines stop. (From
+      // the way's own line and a guessed width, the arrows stood off the painted lanes, a left arrow on the centre
+      // line, and 8 m from the junction's middle: past the stop bar, in the crosswalk's way)
+      const frame = carriageways ? arrowFrameOnCarriageway(carriageways, road, geoToWorldPoint(endPt.lat, endPt.lng, terrainData, squareSize, 0), stops) : null;
+      if (frame) {
+        stat.onCarriageway++;
+        if (frame.stop) stat.behindStop++; else stat.behindLines++;
+        const w = (frame.hi - frame.lo) / nDir;
+        for (let k = 0; k < nDir; k++) {
+          const directive = parseTurnDirective(laneValues[k]);
+          if (!directive) continue;
+          const size = Math.min(TURN_ARROW_SIZE[directive], w * 1.35);
+          const at = pointBackFromEnd(frame.pts, frame.back + TURN_ARROW_GAP_M + size / 2);
+          if (!at) { stat.noRoom++; continue; }
+          // (lanes listed left to right as driven: the left of the travel is the carriageway's left when it is driven
+          // in its node order)
+          const offset = frame.alongNodeOrder ? frame.hi - (k + 0.5) * w : frame.lo + (k + 0.5) * w;
+          const left = [-at.dir[1], at.dir[0]];
+          const side = frame.alongNodeOrder ? 1 : -1;   // (the carriageway's left, in the travel's frame)
+          const x = at.x + left[0] * side * offset; const y = at.y + left[1] * side * offset;
+          if (!insideMargin(x, y)) continue;
+          const z = getTerrainHeightAtWorldXY(x, y, terrainData, squareSize) + 0.1;
+          instances.push([
+            TURN_ARROW_RECT[directive], roundTo(size, 2), 0,
+            roundTo(x, 3), roundTo(y, 3), roundTo(z, 3),
+            0, 0, 1,
+            roundTo(left[0], 6), roundTo(left[1], 6), 0,
+            hashString(`${road.id}:${towardEnd ? 'f' : 'b'}:${k}`),
+          ]);
+        }
+        continue;
+      }
+      stat.guessed++;
 
       const placed = walkBackFromEnd(road.geometry, towardEnd, TURN_ARROW_SETBACK_M, terrainData, squareSize);
       if (!placed || !insideMargin(placed.x, placed.y)) continue;
@@ -7631,6 +7744,11 @@ export function generateTurnArrowDecals(terrainData, squareSize) {
     }
   }
 
+  if (carriageways) {
+    console.log(`[BeamNG Export] Turn arrows: ${instances.length} on ${stat.ways} approach(es) with turn:lanes; ${stat.onCarriageway} on their drawn lanes `
+      + `(${stat.behindStop} behind a stop bar, ${stat.behindLines} behind the lane lines' end), ${stat.guessed} from the way's own line (no carriageway found), `
+      + `${stat.noRoom} arrow(s) with no room before the junction, ${stat.noJunction} tagged end(s) not at a junction.`);
+  }
   return instances;
 }
 
@@ -9376,6 +9494,13 @@ export function resolveNativeBarrierAsset(tags = {}, biome = null) {
     // What OSM says about the fence first; untagged fences take the region's
     // default (wooden in temperate places, chain-link elsewhere).
     const fenceType = String(tags.fence_type ?? '').trim().toLowerCase();
+    // (a fence of concrete, stone or brick is built as that wall: barrier=fence + material=concrete stood as chain
+    // link (a user's report, 2026-11-20))
+    if (material === 'concrete' || material === 'reinforced_concrete' || fenceType === 'concrete') return NATIVE_BARRIER_ASSETS.concreteWall;
+    // (brick as the walls do: the brick model only from 2 m up, lower ones the stone wall)
+    const fenceH = Number.parseFloat(tags.height);
+    if (material === 'brick' || fenceType === 'brick') return Number.isFinite(fenceH) && fenceH >= 2 ? NATIVE_BARRIER_ASSETS.brickWall : NATIVE_BARRIER_ASSETS.stoneWall;
+    if (['stone', 'sandstone', 'limestone', 'granite'].includes(material) || fenceType === 'stone') return NATIVE_BARRIER_ASSETS.stoneWall;
     if (['wood', 'picket', 'board', 'split_rail', 'paling'].includes(fenceType) || material === 'wood') {
       return NATIVE_BARRIER_ASSETS.fence;
     }
@@ -15677,7 +15802,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // ── art/decals + main.decals.json: turn-lane arrows ───────────────────────
   // Painted from OSM turn:lanes via the core road-markings atlas.
   const turnArrowInstances = includeRoads
-    ? generateTurnArrowDecals(exportTerrainData, squareSize)
+    ? generateTurnArrowDecals(exportTerrainData, squareSize, { carriageways: decalRoads.carriageways || null, stops: decalRoads.stopBars || [] })
     : [];
   zip.file(`${base}/art/decals/managedDecalData.json`, JSON.stringify(
     turnArrowInstances.length > 0

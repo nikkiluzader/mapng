@@ -31,3 +31,14 @@ test('a concrete retaining wall holds the ground; a concrete wall stands free', 
   assert.ok(resolveNativeBarrierAsset({ barrier: 'retaining_wall', material: 'concrete' })?.retaining, 'concrete retaining wall');
   assert.ok(!resolveNativeBarrierAsset({ barrier: 'wall', material: 'concrete' })?.retaining, 'a concrete wall stands free');
 });
+
+test('a fence of concrete, stone or brick is built as that wall, not chain link', () => {
+  const chain = shape({ barrier: 'fence', fence_type: 'chain_link' });
+  assert.equal(shape({ barrier: 'fence', material: 'concrete' }), shape({ barrier: 'wall', material: 'concrete' }));
+  assert.equal(shape({ barrier: 'fence', fence_type: 'concrete' }), shape({ barrier: 'wall', material: 'concrete' }));
+  assert.equal(shape({ barrier: 'fence', material: 'stone' }), shape({ barrier: 'wall' }));
+  assert.equal(shape({ barrier: 'fence', material: 'brick', height: '2.5' }), shape({ barrier: 'wall', material: 'brick', height: '2.5' }));
+  assert.equal(shape({ barrier: 'fence', material: 'brick' }), shape({ barrier: 'wall' }), 'a low brick fence: the stone wall, as a low brick wall');
+  for (const t of [{ material: 'concrete' }, { material: 'stone' }, { material: 'brick' }]) assert.notEqual(shape({ barrier: 'fence', ...t }), chain);
+  assert.equal(shape({ barrier: 'fence', material: 'metal' }), chain, 'metal stays chain link');
+});
