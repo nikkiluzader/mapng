@@ -33,7 +33,12 @@ push dev and main (standing go-ahead for this list).
 2. **2.4, the rest:** the 15-20 m terrain cliff beside a covered bore on a steep valley side (t001 at 285-294 m,
    scratch/fizz033/diag/g283_sections_wall.png); Val d'Isère t001's south portal juts (its ground 7 m up); a bright
    side opening in t001 at 75 % (driver's view); his fz07 cuts.
-3. **2.8 leftover:** where a wing wall is left out beside another road (a service road crossing a raised street in
+3. **2.8 leftover** (2026-11-20: tried giving the walled fill near a deck's end the ordinary slope on sides with
+   another road beside it; no change at gt_tignes (-110, 745): the stepped vertical sides there run the whole raised
+   street, not only near the deck, so they come from elsewhere in terrainCompose. In game (scratch/fizz033/diag/
+   tigw_sheet.jpg): Rue de la Poste on a shelf, its downhill edge a vertical sawtooth on the 1 m grid with no wall
+   over it, the sidewalk's edge jagged with it: the general "vertical fill sides with no wall" fault, to fix with
+   item 4's road edges (4.4, 9.2) and the user's sidewalk jagged edges; plot scratch/fizz033/diag/wing_teeth.png): where a wing wall is left out beside another road (a service road crossing a raised street in
    Tignes) the fill's steep sides show as teeth: terrainCompose walls the fill before the walls are known; run the
    wall rule first and give those stations the ordinary slope.
 4. **Roads on every map** (his "most important"). All his screenshots are 0.3.3 with Mesh Roads on (his words);
