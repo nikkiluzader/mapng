@@ -129,6 +129,12 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
   0-100 %, 38.7 MB level in the scratch mods folder, My Levels lists it, no errors. Left for the packaged build:
   Cancel during an export (brokenbraincells_'s report), the AppImage and the Windows portable.
 
+- **thecoachtoma's LAZ upload level is rough** (Discord #general 2026-11-20 13:49-14:44Z; the user: "pretty rough ... let's
+  get back to that later"). 10 cm untouched point cloud of a racetrack (nemuno_iedas, Lithuania), Decal Roads. Where the
+  scan angle was poor and points are sparse the ground comes out as "a stalactite field"; their idea: treat gaps as the
+  average of the nearest points, not 0. They sent the whole level (nemuno_iedas.zip, 830 MB) and four LAZ tiles
+  (56_37_11/12/16/17.laz, 84-105 MB each) in #general. Next: fetch the LAZ, rebuild the area, plot the gaps and spikes.
+
 ## Waiting on someone
 
 - **The next desktop test build (0.3.3-dev.6)** with the next batch of fixes: ask before the -dev tag (planned after

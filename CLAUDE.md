@@ -91,6 +91,7 @@ Diagrams solve problems faster than game trips. Before the first code change on 
 - **Draw the place:** a top view, plus long sections and cross sections from the solved data.
 - **Draw the expected outcome** before exporting, then draw the same place again after the fix.
 - **Send the before/after images.**
+- **Mark the in-game camera** (position and look direction) on top views that go with in-game screenshots.
 - **Use the existing plot tools,** or write a probe when none fits. Plot tools: `scratch/junctions` (dump_pre.mjs,
   plot.py, section.py), swplot for sidewalks, coastplot.py for coasts, `scratch/bridgetour` (top, ends, profiles)
   for bridges, `scratch/devareas` for sections. Python with matplotlib is the `laneextraction` conda env.
@@ -142,6 +143,8 @@ Diagrams solve problems faster than game trips. Before the first code change on 
 
 ## Data and code
 
+- **The export log is as verbose as possible:** every step logs what it looked at, what it changed, what it skipped and
+  why, also when it did nothing.
 - **No area-specific code.** Use general rules, with synthetic test scenes that reproduce the case.
 - **Open data only:** worldwide preferred, continent-wide or whole-major-country sets fine, no per-state or
   per-city sources. Always keep a good generic fallback built from OSM and terrain alone.
