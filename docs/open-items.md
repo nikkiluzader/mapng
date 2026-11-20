@@ -12,10 +12,7 @@ these files; they are never copied.
 As of 2026-11-20 morning:
 
 - `main` = `dev` at bdaac6d (building=no, the alpine look, the crash-report fixes). Branch `step-walls` holds the parked 2.8 step
-  walls. Earlier, at e67df2d, a Fizz-list push (the chevrons) carried everything then on dev to main: cul-de-sacs, the
-  three sidewalk fixes and the 0.3.5 draft page (unlinked, preview tag, noindex), which were meant to wait for the
-  release. Not rolled back (that is a force push: the user's call). Published: 0.3.4 as the latest release; no desktop
-  test build since 0.3.3-dev.5; the user plans a dev build mid-day 2026-11-20 and 0.3.5 that evening.
+  walls. Published: 0.3.4 as the latest release; 0.3.5 planned for 2026-11-20 evening.
 - The sweep's known pre-existing flags: sidewalk drift at naldo, kingst, deckpark_g, stelvio; ams_centraal mh/ready;
   dev_szczyrk cross; ams t30/noshape swBuried; Michiel de Ruijtertunnel joint steps (check 4).
 
