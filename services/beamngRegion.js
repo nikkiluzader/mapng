@@ -9,6 +9,7 @@
  *     Valley; the low West Coast → West Coast USA; the rest of the dry West
  *     and high ground (Utah, Flagstaff, the Sierra) → Utah; everything else →
  *     East Coast USA.
+ *   - Mountains over the conifer line (outside the dry West and the tropics) → the alpine look.
  *   - The Mediterranean → Italy; the tropics → Jungle Rock Island.
  *   - Elsewhere → East Coast USA (temperate).
  *
@@ -17,7 +18,7 @@
  * mapped land cover is mostly scrub, sand, bare rock or desert gets the
  * desert look.
  */
-import { treeClimate } from './beamngTrees.js';
+import { treeClimate, montaneConiferLine } from './beamngTrees.js';
 
 const HIGH_DESERT_M = 1500;      // dry-West ground above this reads as Utah, not Johnson Valley
 const DRY_COVER_SHARE = 0.6;     // share of mapped land cover that makes a map "dry"
@@ -120,6 +121,14 @@ export function resolveRegionalBiome({ lat, lon, meanHeightM = null, features = 
   // what covers the land (WorldCover) first, where it says something; the
   // West Coast keeps its own look (its dry grass is California's)
   const shares = landCoverShares(landCover);
+  // mountains above the conifer line outside the dry West and the deserts: the alpine look (spruce, grey rock,
+  // meadow), whatever covers the ground there (bare rock and snow above the trees read as Utah's red rock, alpine
+  // meadows as its dry grass; Tignes at 2,000 m came out Utah)
+  const line = montaneConiferLine(lat);
+  if (line !== null && Number.isFinite(meanHeightM) && meanHeightM > line && !c.dryWest && !c.hotDesert && !c.tropics) {
+    const dryLow = shares && shares.bare + shares.shrub >= DRY_LAND && shares.snow < 0.05 && shares.trees < 0.02 && shares.grass < 0.1;
+    if (!dryLow) return { biomeId: 'alpine', reason: `mountains (mean height ${Math.round(meanHeightM)} m, over the conifer line at ${Math.round(line)} m)` };
+  }
   if (!(northAmerica(lat, lon) && c.westCoast && !highGround)) {
     const look = lookFromLandCover(shares, { lat, lon, highGround, tropics: c.tropics, mediterranean: mediterranean(lat, lon) });
     if (look) return look;

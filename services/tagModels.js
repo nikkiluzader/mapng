@@ -6,7 +6,7 @@ import { fastHypot } from './fastMath.js';
 
 // The region of the world a biome's look belongs to (the catalogue's regions).
 const REGION_OF_BIOME = {
-  italy: 'europe', european: 'europe', european_template: 'europe',
+  italy: 'europe', european: 'europe', european_template: 'europe', alpine: 'europe',
   utah: 'north-america', east_coast: 'north-america', east_coast_usa: 'north-america', west_coast: 'north-america', west_coast_usa: 'north-america', johnson_valley: 'north-america',
   jungle: 'tropical', jungle_rock_island: 'tropical', small_island: 'tropical',
 };

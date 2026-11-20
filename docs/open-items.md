@@ -57,8 +57,8 @@ push dev and main (standing go-ahead for this list).
    sidewalks along mountain-bike trails; 4.4 spikes along road edges; 9.2 terrain edges beside a road wrong (his
    diagram); 9.3 junctions with walls, slabs and tilted pieces; 1.1 narrow roads, corners tighter than the terrain;
    check 1.2 (a curb strip through a roundabout) and 1.5 (up and down under a gallery) on today's code.
-5. **Regional look (must-fix, user):** the Alps came out "Utah"; every automatic asset choice has to fit the place
-   (see the bullet below).
+5. **Regional look (must-fix, user):** done for the Alps 2026-11-20 (the alpine look, history); the Andes and Colorado
+   left (backlog). The bigger per-asset plan in the bullet below stays.
 6. **Buildings:** 4.1 done 2026-11-20 (the "Base nautique" on Lac de Tignes is tagged building=no: no longer built); 4.2 a building over
    a portal juts onto the road.
 7. **Check on today's code** (2026-11-20: the D 87A box under the D 902 checked in game, inside both ways and outside:

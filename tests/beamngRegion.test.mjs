@@ -58,8 +58,14 @@ test('regional look from WorldCover: desert, high rock, open grassland; the West
   assert.equal(landCoverShares(lc({ 80: 0.9, 30: 0.1 })), null, 'mostly water: says nothing');
   // Sahara-like, low and warm
   assert.equal(resolveRegionalBiome({ lat: 25, lon: 10, meanHeightM: 300, landCover: lc({ 60: 0.85, 20: 0.15 }) }).biomeId, 'johnson_valley');
-  // a glacier summit in the Alps (inside the Mediterranean box)
-  assert.equal(resolveRegionalBiome({ lat: 45.43, lon: 6.9, meanHeightM: 3000, landCover: lc({ 60: 0.75, 70: 0.15, 100: 0.1 }) }).biomeId, 'utah');
+  // a glacier summit in the Alps (inside the Mediterranean box): the alpine look, not Utah's red rock (user, 2026-11-19)
+  assert.equal(resolveRegionalBiome({ lat: 45.43, lon: 6.9, meanHeightM: 3000, landCover: lc({ 60: 0.75, 70: 0.15, 100: 0.1 }) }).biomeId, 'alpine');
+  // Tignes: alpine meadows and some forest at 2,000 m
+  assert.equal(resolveRegionalBiome({ lat: 45.47, lon: 6.91, meanHeightM: 2050, landCover: lc({ 30: 0.6, 60: 0.2, 10: 0.15, 50: 0.05 }) }).biomeId, 'alpine');
+  // a valley town in the Alps under the conifer line keeps the lowland rules
+  assert.notEqual(resolveRegionalBiome({ lat: 47.26, lon: 11.39, meanHeightM: 600 }).biomeId, 'alpine');
+  // the dry West's high ground stays Utah
+  assert.equal(resolveRegionalBiome({ lat: 35.2, lon: -111.65, meanHeightM: 2100 }).biomeId, 'utah');
   // Montana prairie
   const prairie = resolveRegionalBiome({ lat: 47.43, lon: -111.02, meanHeightM: 1100, landCover: lc({ 30: 0.76, 40: 0.23, 10: 0.01 }) });
   assert.equal(prairie.biomeId, 'utah');

@@ -980,6 +980,38 @@ const ASSET_SETS = {
   },
 };
 
+// Mountains above the conifer line (the Alps, the Pyrenees, the Caucasus, the Andes' wet side): a look built from the
+// base game's pieces, as no official level is alpine. Spruce-like Douglas fir as the tree, its young ones as the bush,
+// East Coast's grey rocks and green grass, European lamps (the Alps came out as Utah: red rock, juniper, sagebrush).
+{
+  const eu = ASSET_SETS.european_template.managedItemTemplates;
+  const ec = ASSET_SETS.east_coast;
+  ASSET_SETS.alpine = {
+    streetFurniture: { lamp: part('LOOK_LAMP_EUROPE') },
+    managedItemTemplates: {
+      tree_douglasfir_large_c: eu.tree_douglasfir_large_c,
+      tree_douglasfir_bush_a: {
+        ...eu.tree_douglasfir_large_c,
+        name: 'tree_douglasfir_bush_a',
+        internalName: 'tree_douglasfir_bush_a',
+        shapeFile: 'levels/east_coast_usa/art/shapes/trees/trees_douglasfir/tree_douglasfir_bush_a.dae',
+      },
+      tree_beech_bush_d: eu.tree_beech_bush_d,
+      eca_rock_small: eu.eca_rock_small,
+      eca_rock_medium_1: eu.eca_rock_medium_1,
+      eca_rock_big_narrow: eu.eca_rock_big_narrow,
+    },
+    vegetationSelectors: {
+      default: 'tree_douglasfir_large_c',
+      needle: 'tree_douglasfir_large_c',
+      bush: 'tree_douglasfir_bush_a',
+      hedgeBush: 'tree_beech_bush_d',
+    },
+    rockCandidates: ['eca_rock_medium_1', 'eca_rock_big_narrow', 'eca_rock_small'],
+    groundCover: ec.groundCover,
+  };
+}
+
 const WATER_PROFILES = {
   italy: {
     waterCubemap: 'cubemap_italy_reflection',
@@ -1102,6 +1134,15 @@ export const BEAMNG_BIOMES = [
     terrainLevelFallbacks: ['mapng_template', 'italy', 'east_coast_usa', 'automation_test_track'],
   },
   {
+    id: 'alpine',
+    label: 'Alpine (mountains)',
+    levelName: 'east_coast_usa',
+    environmentProfile: { globalEnvironmentMap: 'cubemap_eca_reflection' },
+    waterProfile: WATER_PROFILES.european_template,
+    assetSetIds: ['alpine', 'east_coast', 'italy'],
+    terrainLevelFallbacks: ['east_coast_usa', 'italy', 'west_coast_usa', 'Utah'],
+  },
+  {
     id: 'utah',
     label: 'Utah',
     levelName: 'Utah',
@@ -1198,6 +1239,10 @@ const BIOME_TRAFFIC_PROFILES = {
     rightHandDrive: false,
   },
   european: {
+    country: 'levels.common.country.germany',
+    rightHandDrive: false,
+  },
+  alpine: {
     country: 'levels.common.country.germany',
     rightHandDrive: false,
   },
