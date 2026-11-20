@@ -85,6 +85,19 @@ shots/); re-checks on today's code: scratch/fizz033/run; diagrams scratch/fizz03
   smoothing and is held to its grade by lowering. The Funival now runs in its tunnel at its real grade (test area
   fz_funival; at 6 % it had been laid 800 m under the mountain where the way met the map edge). Seen in game from
   inside both ways. Left for the portal pass: tall terrain teeth beside its bottom portal at the bridge.
+- **2.1 + D902/D87A clearance + 3.5 (one place, 2026-11-19, on dev after this sweep):** the D 87A's 24 m under the
+  D 902 by the Tignes dam crosses it at 20 degrees; the lidar took the D 902's deck away and shows the D 87A's open
+  trench, the D 902 5 m up on both sides. The low box read its lid from that trench and failed, cut and cover was
+  dropped (it would dig 9.5 m), the road was left on the ground and the D 902 crossed 1.84 m over it; with a box
+  built, the D 902 was lifted onto a 124 m walled deck (the overlap stretches still asked 6.5 m). Now: a low box
+  under a street takes its lid from the street's own ground beside the trench (the highest past the corridor, out of
+  the road smoothing's reach), covered 8 m at least; the street over a low box stands on its lid or cover, crossings
+  and overlaps alike ask the roof, not a deck's clearance; the crossing check asks a street over a tunnel the roof;
+  tunnels' tube and cutting keep the paving out (a curbed slab lay across the lane in the box's mouth). Test area
+  fz_d87a (512 m), diagrams scratch/fizz033/diag/d87a_*.png; in game: driver's view both ways clean. Left: the
+  portal headwalls stand as tall white blocks over the D 902 (2.1 "portal far too big"): next; a jagged-topped wall
+  along the D 87A's cutting north of portal B; castRay goes through terrain holes (probe scans must read the hole
+  map: scratch/fizz033/diag/d87a_squares.py).
 - **Fixed before this list:** the bridgeTowerHouses error (078ff33, after 0.3.3); short bridges too high
   (the bridge rise cap, 957fa96); sidewalks (the paved model).
 - **Owed answers:** 2.2 continuous roads, 3.4 OSM tells galleries apart (tunnel=avalanche_protector), 4.5 double

@@ -744,7 +744,75 @@ function overTheStep(path, opts) {
   return xy === path.xy ? [path, opts] : [{ ...path, xy }, { ...opts, approaches }];
 }
 
-function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = () => false, squareSize = 1, raw = false }, mode, digMax = Infinity) {
+// The lid over a low box where a street crosses it: the street's own ground beside the trench, read along the
+// street's line just past the tunnel's corridor on each side and interpolated across it; -Infinity away from a
+// street. (planar: the street's line from its nearest point to p, walked out both ways)
+const MIN_LOW_UNDER_STREET_M = 8;  // a low box under a crossing street: covered this far at least
+const STREET_LID_CLEAR_M = 2;     // past the tunnel's corridor by this much: the street's own ground
+const STREET_LID_REACH_M = 60;    // looked for this far along the street each way
+const STREET_LID_LOOK_M = 20;     // past the corridor, the highest ground within this far (until it stops rising)
+const STREET_LID_CREST_M = 0.3;   // ground this much under the highest so far: past the crest
+function streetLidOf(path, W, streets, groundAt) {
+  const tube = path.xy;
+  const distToTube = (x, y) => {
+    let best = Infinity;
+    for (let i = 0; i + 1 < tube.length; i++) {
+      const [ax, ay] = tube[i]; const [bx, by] = tube[i + 1];
+      const dx = bx - ax; const dy = by - ay; const L2 = dx * dx + dy * dy;
+      const t = L2 > 0 ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / L2)) : 0;
+      const ex = ax + t * dx - x; const ey = ay + t * dy - y; const d = ex * ex + ey * ey;
+      if (d < best) best = d;
+    }
+    return Math.sqrt(best);
+  };
+  const clear = W + STREET_LID_CLEAR_M;
+  return (p) => {
+    let lid = -Infinity;
+    for (const s of streets) {
+      const xy = s.xy;
+      // nearest point on the street to p, as (segment, t) and its distance
+      let bi = -1; let bt = 0; let bd = Infinity;
+      for (let i = 0; i + 1 < xy.length; i++) {
+        const [ax, ay] = xy[i]; const [bx, by] = xy[i + 1];
+        const dx = bx - ax; const dy = by - ay; const L2 = dx * dx + dy * dy;
+        const t = L2 > 0 ? Math.max(0, Math.min(1, ((p.x - ax) * dx + (p.y - ay) * dy) / L2)) : 0;
+        const ex = ax + t * dx - p.x; const ey = ay + t * dy - p.y; const d = ex * ex + ey * ey;
+        if (d < bd) { bd = d; bi = i; bt = t; }
+      }
+      // (the street over any part of the tube's width: at a slant it covers the tube's side well past the centre line)
+      if (bi < 0 || Math.sqrt(bd) > s.half + W) continue;
+      // walk the street's line out each way to the first point clear of the tunnel's corridor
+      const walk = (dir) => {
+        let i = bi; let t = bt; let gone = 0; let best = null; let first = null;
+        while (gone < STREET_LID_REACH_M) {
+          const [ax, ay] = xy[i]; const [bx, by] = xy[i + 1];
+          const segL = fastHypot(bx - ax, by - ay) || 1e-9;
+          const step = 0.5 / segL;
+          t += dir * step; gone += 0.5;
+          if (t > 1) { if (i + 2 >= xy.length) return null; i++; t = 0; continue; }
+          if (t < 0) { if (i <= 0) return null; i--; t = 1; continue; }
+          const x = ax + t * (bx - ax); const y = ay + t * (by - ay);
+          if (distToTube(x, y) < clear) continue;
+          // (past the corridor, the highest ground along the street until it stops rising: the data pull's road
+          // smoothing pulls a street's ground down toward the trench for some metres beyond it)
+          if (first === null) first = gone;
+          const zg = groundAt(x, y);
+          if (!best || zg > best.z) best = { z: zg, gone };
+          else if (zg < best.z - STREET_LID_CREST_M) return best;
+          if (gone - first > STREET_LID_LOOK_M) return best;
+        }
+        return best;
+      };
+      const a = walk(-1); const b = walk(1);
+      if (!a || !b) continue;
+      const z = a.z + ((b.z - a.z) * a.gone) / (a.gone + b.gone);
+      if (z > lid) lid = z;
+    }
+    return lid;
+  };
+}
+
+function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = () => false, squareSize = 1, raw = false, overStreets = [] }, mode, digMax = Infinity) {
   // mode: false a bore, true a cut-and-cover box sunk under the street, 'low' a low box at the road's own level
   // (a railway's own grade where its kind climbs steeper than a road: a funicular's tunnel climbs its mountain at
   // 50 % and more; held to a road's 6 % the Funival's ends, 768 m apart in height over 1.6 km, left it on the surface)
@@ -771,7 +839,12 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
     const at = (f) => groundAt(...lateral(p, f * side));
     return Math.max(groundAt(p.x, p.y), Math.min(Math.max(at(-1), at(-0.5)), Math.max(at(0.5), at(1))));
   };
-  const g = st.map((p) => (low ? lidAt(p) : groundAt(p.x, p.y)));
+  // (a low box under a street: where the street crosses, its lid is the street's own ground beside the trench.
+  // Ground models take a deck away: the D 87A's 24 m under the D 902 by the Tignes dam shows as the lower road's
+  // open trench, 5 m under the D 902 on both sides; the lid read from the trench was missing and the road was left
+  // on the ground, the D 902 1.8 m over it)
+  const streetLid = low && overStreets.length ? streetLidOf(path, W, overStreets, groundAt) : null;
+  const g = st.map((p) => (low ? Math.max(lidAt(p), streetLid ? streetLid(p) : -Infinity) : groundAt(p.x, p.y)));
   const free = [isFreeEnd(st[0].x, st[0].y), isFreeEnd(st[n - 1].x, st[n - 1].y)];
   // (onBridge: a bridge whose deck is solved after the tunnels, its height
   // still unknown: the portal's height from the ground as at a road end)
@@ -891,7 +964,9 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
     }
   }
   const tubeLength = st[iN].s - st[iS].s;
-  if (st[c1].s - st[c0].s < MIN_TUBE_M) return { ok: false, reason: `bore only ${Math.round(st[c1].s - st[c0].s)} m under ground`, length: L };
+  // (a low box under a street crossing it: the street's width is its length, a real structure however short)
+  const minTube = streetLid ? MIN_LOW_UNDER_STREET_M : MIN_TUBE_M;
+  if (st[c1].s - st[c0].s < minTube) return { ok: false, reason: `bore only ${Math.round(st[c1].s - st[c0].s)} m under ground`, length: L };
   const exposed = [...roofed];
   if (bridged[0] && c0 > 0) exposed.push([st[0].s, st[c0].s]);
   if (bridged[1] && c1 < n - 1) exposed.push([st[c1].s, st[n - 1].s]);

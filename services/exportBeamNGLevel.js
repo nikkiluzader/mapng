@@ -5260,7 +5260,7 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
         osm: { id: seg.sourceFeature?.id ?? null, name: tags['tunnel:name'] || tags.name || tags.ref || null, highway: seg.highway },
       });
     } else {
-      others.push({ xy, segIndex, bridge: bridges?.bySeg.get(segIndex) || null, bridgeRoad: isBridgeRoad(tags) });
+      others.push({ xy, segIndex, half: halfOf(seg), bridge: bridges?.bySeg.get(segIndex) || null, bridgeRoad: isBridgeRoad(tags) });
     }
   });
   if (!parts.length) return out;
@@ -5444,15 +5444,18 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
     // streets crossing over it (not on a bridge): an underpass, dug under
     // them, never a gallery on the surface (a gallery at road level by a
     // harbour slope lifted every street over it onto a deck)
-    let streetsOver = false;
+    // (... kept as lines: a low box under one takes its lid from the street's own ground beside the trench)
+    const overStreets = [];
     for (const r of others) {
-      if (streetsOver) break;
       if (r.bridgeRoad || r.bridge) continue;
-      for (let i = 0; i + 1 < xy.length && !streetsOver; i++) if (planCrossingPoints([xy[i], xy[i + 1]], r.xy).length) streetsOver = true;
+      let crosses = false;
+      for (let i = 0; i + 1 < xy.length && !crosses; i++) if (planCrossingPoints([xy[i], xy[i + 1]], r.xy).length) crosses = true;
+      if (crosses) overStreets.push({ xy: r.xy, half: r.half || 3 });
     }
+    const streetsOver = overStreets.length > 0;
     // (shaping off on fine elevation: portals at the survey's own portal faces)
     const railGrade = Math.max(...path.idx.map((i) => parts[i].grade ?? 0));
-    const t = solveTunnel({ xy: bore, half, gallery, ...(railGrade > 0 ? { grade: railGrade } : {}) }, { groundAt, approaches, isFreeEnd, squareSize, streetsOver, raw: !shape && !terrainData?.coarseElevation });
+    const t = solveTunnel({ xy: bore, half, gallery, ...(railGrade > 0 ? { grade: railGrade } : {}) }, { groundAt, approaches, isFreeEnd, squareSize, streetsOver, overStreets, raw: !shape && !terrainData?.coarseElevation });
     const osm = path.idx.map((i) => parts[i].osm);
     if (!t.ok) { out.skipped.push({ osm, reason: t.reason, length: t.length }); return null; }
     t.osm = osm;
@@ -5994,6 +5997,34 @@ function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = [],
   return { decals, ways, footpaths, services: { count: serviceCount, length: serviceLength }, sidewalkStrips: { count: stripCount, length: stripLength } };
 }
 
+// A tunnel's footprint on the ground for the paving: its line through the tube and its approach cuttings, as wide as
+// the tube's walls, as a ring of world points (the shape building footprints come in).
+const TUNNEL_FOOTPRINT_PAD_M = 0.3;
+function tunnelFootprints(tunnels) {
+  const rings = [];
+  for (const t of tunnels || []) {
+    const L = t.line || [];
+    if (L.length < 2 || !Number.isFinite(t.W)) continue;
+    let i0 = t.iS; let i1 = t.iN;
+    while (i0 > 0 && L[i0 - 1].kind === 'cut') i0--;
+    while (i1 < L.length - 1 && L[i1 + 1].kind === 'cut') i1++;
+    const half = t.W + LINING_M + TUNNEL_FOOTPRINT_PAD_M;
+    const left = []; const right = [];
+    for (let i = i0; i <= i1; i++) {
+      const p = L[i];
+      let tx = p.tx; let ty = p.ty;
+      if (!Number.isFinite(tx) || !Number.isFinite(ty)) {
+        const a = L[Math.max(0, i - 1)]; const b = L[Math.min(L.length - 1, i + 1)];
+        const d = fastHypot(b.x - a.x, b.y - a.y) || 1; tx = (b.x - a.x) / d; ty = (b.y - a.y) / d;
+      }
+      left.push([p.x - ty * half, p.y + tx * half, 0]);
+      right.push([p.x + ty * half, p.y - tx * half, 0]);
+    }
+    if (left.length >= 2) rings.push([...left, ...right.reverse()]);
+  }
+  return rings;
+}
+
 /** The paving materials the decal groups use, by name (for main.materials.json). */
 export function usedPavingMaterials(groups) {
   const byName = new Map(Object.values(PAVING_MATERIALS).map((p) => [p.material.name, p.material]));
@@ -6295,7 +6326,29 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
       // of its own. Where the street's ground is over the tube's roof, no more is asked than what there is.
       if (opts.structureSolver === 'v2' && structureGraph.crossings?.crossings) {
         let eased = 0;
-        for (const c of structureGraph.crossings.crossings) {
+        // (a low box whose lid came from the street over it (the ground model took that street's deck away and
+        // shows the lower road's trench): the street's ground over the box is the lid, graded closed over the
+        // roof; read as the trench, the street was lifted onto a deck 126 m long over the D 87A by the Tignes dam)
+        // (crossings and overlaps alike: where the street runs stacked over the tube along a slant, the solver
+        // asked the open-road clearance there too and lifted it onto a deck all the same)
+        const stacked = [...structureGraph.crossings.crossings, ...(structureGraph.crossings.overlaps || [])];
+        const lidNear = {};
+        for (const c of stacked) {
+          const up = c[c.upper]; const lo = c[c.upper === 'a' ? 'b' : 'a'];
+          const U = structureGraph.edges[up.edge]; const L = structureGraph.edges[lo.edge];
+          const tun = tunnels.bySeg.get(L.seg);
+          if (!tun?.low || !tun.gradedCover || U.bridge || U.tunnel || tunnels.bySeg.get(U.seg)) continue;
+          for (let k = 0; k < U.s.length; k++) {
+            // (over the tube and its walls: the reach the easing below looks in)
+            const near = nearestOnTunnel(tun, U.x[k], U.y[k], tun.W + (tun.maxExtra || 0) + 2, lidNear);
+            if (!near || near.beyond || near.into < 0) continue;
+            // (the lid, or the cover the box's grading lays over its roof where the lid is lower: the ground the
+            // street will stand on)
+            const lid = Math.max(tun.line[near.i]?.g ?? -Infinity, near.z + (tun.need || 0));
+            if (Number.isFinite(lid) && lid > U.g[k]) U.g[k] = lid;
+          }
+        }
+        for (const c of stacked) {
           const up = c[c.upper]; const lo = c[c.upper === 'a' ? 'b' : 'a'];
           const U = structureGraph.edges[up.edge]; const L = structureGraph.edges[lo.edge];
           const tun = tunnels.bySeg.get(L.seg);
@@ -6757,6 +6810,8 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
         owner: segIndex, nodes: centerNodes, half: styleHalfWidth, ...(halfAt ? { halfAt } : {}),
         tags: renderTags, highway, urban: urbanRoad, curbed: isCurbedStreet(feature), wayId: feature.id, oneWay: isOneWay,
         bridge: !!bridgePart, carried: !!carriedPart, tunnel: tunnels.bySeg.has(segIndex),
+        // (the tube's roof over the road, crown and lining: a street over it needs no more room than that)
+        ...(tunnels.bySeg.get(segIndex)?.kind !== 'gallery' && Number.isFinite(tunnels.bySeg.get(segIndex)?.crown) ? { tunnelRoof: tunnels.bySeg.get(segIndex).crown + LINING_M } : {}),
         leftExtra: crossSection.leftExtra, rightExtra: crossSection.rightExtra,
       });
 
@@ -8149,7 +8204,7 @@ function buildDetailedReportSections(d) {
     const gl = (o, what) => `${o.count} stretch(es) on ${what}${o.worst ? `; worst ${formatNumber(o.worst.grade * 100, 1)}% (limit ${formatNumber(o.worst.limit * 100, 0)}%) on ${o.worst.road}${at(o.worst)}` : ''}`;
     lines.push(`- Steeper than the road class allows: ${gl(g.structure, 'bridges/tunnels')}; ${gl(g.ground, 'ground roads')}`);
     const c = sc.crossings;
-    lines.push(`- Grade-separated crossings short of 6.5 m (deck top over the road under it): ${c.short} of ${c.crossings}${c.worst ? `; worst ${formatNumber(c.worst.gap, 2)} m between ${c.worst.roads.join(' and ')}${at(c.worst)}` : ''}`);
+    lines.push(`- Grade-separated crossings short of their clearance (6.5 m, or a tunnel's roof under a street; deck top over the road under it): ${c.short} of ${c.crossings}${c.worst ? `; worst ${formatNumber(c.worst.gap, 2)} m between ${c.worst.roads.join(' and ')}${at(c.worst)}` : ''}`);
     if (sc.groundGaps) {
       const gg = sc.groundGaps;
       lines.push(`- Ground road nodes floating over / buried in the terrain (> 0.5 m): ${gg.off} of ${gg.nodes}${gg.worst ? `; worst ${formatNumber(gg.worst.dz, 2)} m on ${gg.worst.road}${at(gg.worst)}` : ''}`);
@@ -13741,7 +13796,10 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       // building footprints at ground level: no slab into a wall
       buildings: (exportTerrainData.osmFeatures || [])
         .filter((f) => f.type === 'building' && f.geometry?.length > 2 && !isRaisedBuildingPart(f.tags))
-        .map((f) => f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0))),
+        .map((f) => f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0)))
+        // (and each tunnel's tube and approach cutting: the paving does not know the tunnel's lane, its carriageway
+        // being no ground road, and laid a curbed slab across the D 87A in its box's mouth)
+        .concat(tunnelFootprints(tunnelList)),
       // driveways and parking aisles: the curb lowered where they cross
       driveways: (exportTerrainData.osmFeatures || [])
         .filter((f) => f.type === 'road' && f.tags?.highway === 'service' && f.geometry?.length > 1)

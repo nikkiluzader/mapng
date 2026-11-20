@@ -237,9 +237,12 @@ export function checkCrossings(carriageways) {
         // join (not a grade separation)
         if (!isStructure(A) && !isStructure(B) && layerOf(A) === layerOf(B) && gap < 1) continue;
         crossings++;
-        if (gap < CROSSING_SEPARATION_M - CROSSING_TOLERANCE_M) {
+        // (a street over a built tunnel stands on its roof: the room owed is the roof, not a deck's clearance)
+        const lo = za < zb ? A : B; const up = lo === A ? B : A;
+        const need = lo.tunnelRoof && !up.bridge ? Math.min(CROSSING_SEPARATION_M, lo.tunnelRoof) : CROSSING_SEPARATION_M;
+        if (gap < need - CROSSING_TOLERANCE_M) {
           short.push({
-            shortfall: CROSSING_SEPARATION_M - gap, gap,
+            shortfall: need - gap, gap, need,
             x: na[i][0] + (na[i + 1][0] - na[i][0]) * hit.t, y: na[i][1] + (na[i + 1][1] - na[i][1]) * hit.t,
             roads: [roadName(A), roadName(B)],
           });

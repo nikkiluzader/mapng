@@ -698,3 +698,21 @@ test('a steep railway tunnel (funicular) climbs at its own grade and stays under
     assert.ok(Math.abs(p.z - q.z) / (p.s - q.s) <= 1.0001, 'no step steeper than its limit');
   }
 });
+
+// A short underpass under a street, where the ground model took the street's deck away: the lower road's open
+// trench shows through, the street's ground 5.5 m up on both sides (the D 87A under the D 902 by the Tignes dam,
+// crossing at 20 degrees). The low box takes its lid from the street's own ground beside the trench.
+test('a low box under a street whose deck the ground data removed: the lid from the street beside the trench', () => {
+  const groundAt = (x) => (Math.abs(x) <= 4 ? 0 : 5.5);              // the trench along the lower road, x = 0
+  const a = (20 * Math.PI) / 180; const ux = Math.sin(a); const uy = Math.cos(a);
+  const street = { xy: [[-60 * ux, -60 * uy], [60 * ux, 60 * uy]], half: 4 };
+  const path = { xy: [[0, -12], [0, 12]], half: 3 };
+  const approaches = [{ xy: [[0, -12], [0, -40]] }, { xy: [[0, 12], [0, 40]] }];
+  const base = { groundAt, approaches, isFreeEnd: () => false, squareSize: 1, raw: false };
+  const withStreet = solveTunnel(path, { ...base, streetsOver: true, overStreets: [street] });
+  assert.ok(withStreet.ok, withStreet.reason);
+  assert.ok(withStreet.tubeLength >= 8 && withStreet.tubeLength <= 24, `tube ${withStreet.tubeLength}`);
+  // (the old way: no lid read from the trench, so no low box)
+  const without = solveTunnel(path, { ...base, streetsOver: true });
+  assert.ok(!without.ok || without.kind === 'cutcover', `${without.kind}`);
+});
