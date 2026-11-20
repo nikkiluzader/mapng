@@ -1729,7 +1729,7 @@
     "openSite": "Zobacz w OSM",
     "tooBig": "Za duży na jeden eksport z openstreetmap.org (najwyżej 0,25 stopnia kwadratowego i 50 000 punktów). Zmniejsz obszar albo zapisz go z JOSM.",
     "drop": "Upuść tutaj plik .osm lub kliknij, aby wybrać",
-    "formats": ".osm (Eksport z openstreetmap.org, JOSM) lub JSON z Overpass",
+    "formats": ".osm (Eksport z openstreetmap.org, JOSM), .osm.pbf (Geofabrik, BBBike, osmium), JSON z Overpass lub GeoJSON",
     "reading": "Czytanie pliku…",
     "bad": "Nie udało się odczytać tego pliku jako danych OpenStreetMap.",
     "remove": "Przestań używać tego pliku",

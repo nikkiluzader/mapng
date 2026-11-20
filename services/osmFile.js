@@ -9,6 +9,9 @@
 // osm.js parseOverpassResponse takes it unchanged. While one is loaded and
 // overlaps the area being generated, fetchOSMData reads it instead of
 // fetching (osm.js fetchOsmRaw).
+//
+// Also .osm.pbf extracts and GeoJSON (osmFormats.js turns both into the same shape).
+import { geojsonToOverpass, isGeojson } from './osmFormats.js';
 
 // openstreetmap.org's own limits on one export (OSM.MAX_REQUEST_AREA, the API's
 // node cap): a bigger box is refused there with "too many nodes"
@@ -127,7 +130,9 @@ export function parseOsmFile(text) {
   if (head.startsWith('{')) {
     let json;
     try { json = JSON.parse(text); } catch { throw new Error('This JSON file could not be read.'); }
-    if (!Array.isArray(json?.elements)) throw new Error('This JSON file is not OpenStreetMap data (no "elements").');
+    // (GeoJSON: features turned into Overpass elements, their properties as tags; osmFormats.js)
+    if (isGeojson(json)) json = geojsonToOverpass(json);
+    if (!Array.isArray(json?.elements)) throw new Error('This JSON file is not OpenStreetMap data (no "elements", no GeoJSON features).');
     read = readOverpassJson(json);
   } else if (/<osm\b/.test(head) || /<osmChange\b/.test(head)) {
     if (/<osmChange\b/.test(head)) throw new Error('This is a change file (osmChange), not map data.');
@@ -135,7 +140,7 @@ export function parseOsmFile(text) {
   } else if (head.startsWith('<')) {
     throw new Error('This XML file is not OpenStreetMap data (no <osm> element).');
   } else {
-    throw new Error('Not an OpenStreetMap file. Use a .osm file (openstreetmap.org Export or JOSM) or Overpass JSON.');
+    throw new Error('Not an OpenStreetMap file. Use a .osm file (openstreetmap.org Export or JOSM), an .osm.pbf extract, Overpass JSON or GeoJSON.');
   }
 
   const { nodes, ways, relations, wayGeometry } = read;

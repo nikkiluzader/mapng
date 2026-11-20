@@ -89,7 +89,8 @@ test('Overpass JSON, both with geometry and with node lists', () => {
 test('not OSM data: a clear error', () => {
   assert.throws(() => parseOsmFile('hello'), /Not an OpenStreetMap file/);
   assert.throws(() => parseOsmFile('<gpx></gpx>'), /not OpenStreetMap data/);
-  assert.throws(() => parseOsmFile('{"type":"FeatureCollection"}'), /not OpenStreetMap data/);
+  assert.throws(() => parseOsmFile('{"type":"FeatureCollection"}'), /no map data/);   // (GeoJSON is read now: an empty one holds nothing)
+  assert.throws(() => parseOsmFile('{"foo":1}'), /not OpenStreetMap data/);
   assert.throws(() => parseOsmFile('<osm version="0.6"></osm>'), /no map data/);
 });
 

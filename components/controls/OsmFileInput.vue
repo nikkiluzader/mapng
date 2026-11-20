@@ -90,7 +90,7 @@
         <Upload :size="16" />
         <span class="font-medium">{{ reading ? t('osmFile.reading') : t('osmFile.drop') }}</span>
         <span class="text-micro text-gray-400">{{ t('osmFile.formats') }}</span>
-        <input type="file" accept=".osm,.xml,.json,application/xml,application/json" class="sr-only" @change="onPick" />
+        <input type="file" accept=".osm,.xml,.json,.pbf,.geojson,application/xml,application/json,application/geo+json" class="sr-only" @change="onPick" />
       </label>
       <p v-if="error" :title="error" class="flex items-start gap-1.5 leading-snug text-red-600 dark:text-red-400">
         <AlertTriangle :size="12" class="shrink-0 mt-px" />{{ t('osmFile.bad') }}
@@ -104,6 +104,7 @@ import { computed, onBeforeUnmount, ref, shallowRef } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { AlertTriangle, CheckCircle2, CloudDownload, Download, ExternalLink, FileText, Info, Loader2, Upload, X } from 'lucide-vue-next';
 import { desktopApp } from '../../services/platform/desktop.js';
+import { osmTextOfFile } from '../../services/osmFormats.js';
 import {
   getLoadedOsmFile, loadOsmFileText, clearOsmFile, onOsmFileChange,
   osmFileCoverage, osmExportPageUrl, osmExportAreaOk, osmExportFileName, fetchOsmExport,
@@ -147,7 +148,8 @@ async function read(picked) {
   error.value = '';
   reading.value = true;
   try {
-    loadOsmFileText(await picked.text(), picked.name || 'map.osm');
+    // (an .osm.pbf extract decoded to Overpass JSON first; the rest read as text: osmFormats.js)
+    loadOsmFileText(await osmTextOfFile(picked), picked.name || 'map.osm');
   } catch (e) {
     error.value = String(e?.message || e);
   } finally {
