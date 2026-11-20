@@ -12,7 +12,8 @@ these files; they are never copied.
 As of 2026-11-20 morning:
 
 - `main` = `dev` at bb0a431 (+ the crash-report fixes, OSM .pbf/GeoJSON import, concrete retaining walls). Desktop
-  0.3.5-dev.1 prepared (version set; the tag waits for the user's yes). Branch `step-walls` holds the parked 2.8 step
+  0.3.5-dev.1 published 2026-11-20 as a test build (tag at 0a36ab8; both platforms built, signed files, the updater offers
+  it to 0.3.4 with test builds on). The user's end-to-end testing comes next, then 0.3.5. Branch `step-walls` holds the parked 2.8 step
   walls. Published: 0.3.4 as the latest release; 0.3.5 planned for 2026-11-20 evening.
 - The sweep's known pre-existing flags: sidewalk drift at naldo, kingst, deckpark_g, stelvio; ams_centraal mh/ready;
   dev_szczyrk cross; ams t30/noshape swBuried; Michiel de Ruijtertunnel joint steps (check 4).
