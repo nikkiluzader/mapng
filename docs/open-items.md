@@ -11,9 +11,11 @@ these files; they are never copied.
 
 As of 2026-11-20 night (late):
 
-- `main` = `dev` at 9ccd5ad: everything for 0.3.5 (the coast / terrain seams / side-slope blend 7db9fe6, the point
-  cloud fill e673d5f, the hairpin bends 712d2fd, the page 586fac8). Desktop 0.3.5-dev.3 tagged (9ccd5ad) for the
-  user's end-to-end pass; then 0.3.5. Published: 0.3.4 as the latest release.
+- `main` at 9ccd5ad: everything for 0.3.5 (the coast / terrain seams / side-slope blend 7db9fe6, the point
+  cloud fill e673d5f, the hairpin bends 712d2fd, the page 586fac8). `dev` at 66aab61 is ahead: the 0.3.5 page out of
+  preview (09648ed, LATEST_UPDATE 0.3.5: main only at the release, it publishes the page), the movable upload square
+  (599dc2b, checked end to end: the level matches the LAZ at the moved square, r 0.999, scratch/sqe2e). Desktop
+  0.3.5-dev.4 tagged (66aab61) for the user's end-to-end pass; then 0.3.5. Published: 0.3.4 as the latest release.
   Branches: `seawall` (5009640, local: the promenade, for 0.3.6), `step-walls-2` (390b697), `hairpin-blend` (unswept),
   `step-walls` (older, superseded by -2).
 - The sweep's known pre-existing flags: sidewalk drift at naldo, kingst, deckpark_g, stelvio; ams_centraal mh/ready;
