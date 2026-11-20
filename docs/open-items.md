@@ -64,6 +64,11 @@ Also open, outside this list: point cloud layers steps 2-4 (trees, building heig
 refs/output/backlog.md); "Processing resolution" naming (backlog, waiting on the user); brokenbraincells_ asked on
 Discord (2026-11-20 01:42Z) whether the Game texture paints real tileable materials (the user to answer).
 
+- **Desktop Cancel did not cancel** (brokenbraincells_, Discord #general 2026-11-20). Screenshot: the export card at
+  0 % "Preparing", "Waiting for the downloads... Surroundings: Fetching USGS1M data for tile ...", 2:29 elapsed, with
+  the Cancel button. Fixed by the user, not in a release yet: goes in the next desktop build's notes. Open question
+  for the user: the export was waiting on a surroundings download, where downloads are meant to happen at Generate.
+
 - **Regional look must always make sense (user, 2026-11-19).** The French Alps came out "Utah (high rock and ice)":
   red-rock textures, sagebrush, Utah lamps. Every automatic asset choice (look, textures, trees, rocks, lamps,
   ground cover) has to fit the place from its position and its OSM / land cover. Italy (cypress, olive, palm) and
