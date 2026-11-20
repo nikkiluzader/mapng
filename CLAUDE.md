@@ -126,6 +126,7 @@ Diagrams solve problems faster than game trips. Before the first code change on 
 - **Review the whole feature:** far and close, several angles, the driver's view, and every joint (deck ends,
   cable ends, where parts meet). Bridge ends, where the deck meets the road, come first: check both ends of every
   bridge.
+- **Turn the UI back on when done:** after any in-game shots or checks, re-enable the game's UI (`ui_visibility.set(true)`, then `toggle_ui` until it reports visible) before handing the game back.
 - **Keep the mods folder clean:** at most 2-3 test levels installed, removed after each run. Never touch a level
   the test didn't install.
 - **Size test exports at 512, 1024 or 2048,** the smallest that fits the whole structure. If it runs off the map,
