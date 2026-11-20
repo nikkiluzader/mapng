@@ -30,10 +30,6 @@ scratch/fizz033/shots). Test areas in scratch/levelprobe/data: fz_d87a, fz_foret
 gt_chevril_full, gt_tignes, val_disere. Rules: diagrams first, in game both ways, sweep before each commit, then
 push dev and main (standing go-ahead for this list).
 
-1. **A long low box's road follows the lid** (2.3 leftover): the road is a straight line between portals (Val
-   d'Isère's Tunnel des Téléphériques, 318 m), too high near portal A: Rue du Cocor crosses with a 16.9 % kink
-   (bridgetour/ends.py on val_disere). Lay it at a constant depth under the lid, smoothed, within grade, ends
-   pinned, as cut and cover does (solveTunnelAs 'low').
 2. **2.4, the rest:** the 15-20 m terrain cliff beside a covered bore on a steep valley side (t001 at 285-294 m,
    scratch/fizz033/diag/g283_sections_wall.png); Val d'Isère t001's south portal juts (its ground 7 m up); a bright
    side opening in t001 at 75 % (driver's view); his fz07 cuts.

@@ -814,6 +814,56 @@ function streetLidOf(path, W, streets, groundAt) {
   };
 }
 
+// A long low box's road under its lid: lowered to the median over LOW_LID_MEDIAN_M of the lowest ground across the
+// roof (gLow; a street's hump or a kiosk on the lid is not the box) less the box's depth and LOW_LID_UNDER_M, where
+// the straight line would put the roof over it; never raised (a lid thicker than the box over a level road leaves the
+// road level: the ceiling sits lower in it). Only where the lid (g) stands over the line, less what fill makes up:
+// the open approach past the portal faces keeps the line. Held in a cone the grade allows from both pinned ends; the
+// caller pins, grades and smooths it. A box shorter than LOW_FOLLOW_MIN_M keeps the straight line between its ends
+// (they say more than its lid; its crown fits instead).
+const LOW_LID_MEDIAN_M = 20;
+const LOW_FOLLOW_MIN_M = 100;
+const LOW_LID_UNDER_M = 0.5;    // ... its roof this far under that ground: a street over it rides on the ground, not
+                                // on the slab's edge
+function followLid(straight, g, gLow, st, need, maxGrade) {
+  const n = straight.length;
+  const L = st[n - 1].s;
+  if (L < LOW_FOLLOW_MIN_M) return straight;
+  const r = Math.max(1, Math.round(LOW_LID_MEDIAN_M / 2 / STEP_M));
+  const gl = maxGrade * 0.97;
+  const lidded = straight.map((v, i) => i > 0 && i < n - 1 && g[i] - v >= need - LOW_FILL_M);
+  // (the lid's median over the lidded stations only: the open road's ground by a portal face is no lid)
+  const want = new Array(n).fill(NaN);
+  const win = [];
+  for (let i = 0; i < n; i++) {
+    if (!lidded[i]) continue;
+    win.length = 0;
+    for (let k = Math.max(0, i - r); k <= Math.min(n - 1, i + r); k++) if (lidded[k]) win.push(gLow[k]);
+    win.sort((a, b) => a - b);
+    want[i] = Math.min(straight[i], win[win.length >> 1] - need - LOW_LID_UNDER_M);
+  }
+  want[0] = straight[0]; want[n - 1] = straight[n - 1];
+  // (the open stations between: a straight run from the last height known to the next, never over the line: the
+  // approach climbing on its line to the face and the box's road stepping down under the lid there left a 0.2 m step)
+  const out = want.slice();
+  let prev = 0;
+  for (let i = 1; i < n; i++) {
+    if (!Number.isFinite(want[i])) continue;
+    for (let k = prev + 1; k < i; k++) {
+      const f = (st[k].s - st[prev].s) / (st[i].s - st[prev].s || 1);
+      out[k] = Math.min(straight[k], want[prev] + (want[i] - want[prev]) * f);
+    }
+    prev = i;
+  }
+  for (let i = 0; i < n; i++) {
+    const s = st[i].s;
+    let v = Math.min(Math.max(out[i], straight[0] - gl * s), straight[0] + gl * s);
+    v = Math.min(Math.max(v, straight[n - 1] - gl * (L - s)), straight[n - 1] + gl * (L - s));
+    out[i] = v;
+  }
+  return out;
+}
+
 function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = () => false, squareSize = 1, raw = false, overStreets = [] }, mode, digMax = Infinity) {
   // mode: false a bore, true a cut-and-cover box sunk under the street, 'low' a low box at the road's own level
   // (a railway's own grade where its kind climbs steeper than a road: a funicular's tunnel climbs its mountain at
@@ -901,11 +951,27 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
     // under flat ground that is cut and cover's job)
     // (... by digMax at most: see solveTunnel)
     if (!low) z = z.map((v, i) => Math.max(v - digMax, Math.min(v, g[i] - need)));
+    // (a long low box: its road at a constant depth under the lid, as a cut-and-cover road under its street. The
+    // straight line between the portals of Val d'Isère's 335 m Tunnel des Téléphériques stood 0.9 m too high where
+    // the lid rises slower than the line near portal A: Rue du Cocor, on the roof there, climbed 15 % onto it)
+    // (the lid as the lowest ground across the roof's width, edge to edge: a flat roof clears all of it. Read as the
+    // lid beside the lanes, the roof stood 0.2 m out of the lower half where Rue du Cocor runs along it)
+    if (low) {
+      const edge = W + LINING_M;
+      const gLow = st.map((p, i) => Math.min(g[i], ...[-1, -0.5, 0, 0.5, 1].map((f) => groundAt(...lateral(p, f * edge)))));
+      z = followLid(z, g, gLow, st, need, MAXG);
+    }
     z[0] = endZ[0];
     z[n - 1] = endZ[1];
     for (let i = 1; i < n; i++) z[i] = Math.max(z[i], z[i - 1] - MAXG * (st[i].s - st[i - 1].s));
     for (let i = n - 2; i >= 0; i--) z[i] = Math.max(z[i], z[i + 1] - MAXG * (st[i + 1].s - st[i].s));
     z = smoothPinned(z, STEP_M, SMOOTH_SIGMA_M);
+    // (the lid followed: the smoothing's overshoot taken back to the grade, lowering only)
+    if (low) {
+      const gl = MAXG * 0.97;
+      for (let i = 1; i < n; i++) z[i] = Math.min(z[i], z[i - 1] + gl * (st[i].s - st[i - 1].s));
+      for (let i = n - 2; i >= 0; i--) z[i] = Math.min(z[i], z[i + 1] + gl * (st[i + 1].s - st[i].s));
+    }
     // (a steep railway's tube kept under its cover after the smoothing, ends pinned: a funicular passing under a
     // gully at 48 % had the dip's bottom smoothed back up through the ground, and was left on the surface)
     if (MAXG > MAX_GRADE && !low) {

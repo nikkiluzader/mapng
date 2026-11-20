@@ -464,6 +464,31 @@ test('a low lid over a level road is a low box: the road where it is, nothing du
   assert.equal(h(30, 0), 15.5);
 });
 
+// A long low box whose lid rises slower than the line between its portals near one end: the road comes down
+// under it (the roof no higher than the lid, a street on it level), never up where the lid is thicker
+test('a long low box lays its road under the lid, lowered where the straight line would lift the roof over it', () => {
+  // the road climbing 4.8 % between its portals; a lid 5 m over that line, sagging 0.6 m over its first 200 m and
+  // 0.6 m thicker past y = 80
+  const line = (y) => 10 + 0.048 * (y + 200);
+  const sag = (y) => (y > -150 && y < 50 ? 0.6 * Math.sin(((y + 150) / 200) * Math.PI) : 0);
+  const g = (x, y) => (Math.abs(y) <= 150 ? line(y) + 5 - sag(y) + (y > 80 ? 0.6 : 0) : line(y));
+  const t = solveTunnel({ xy: road(-170, 170), half: 4 }, { groundAt: g, approaches: [{ xy: road(-170, -300) }, { xy: road(170, 300) }] });
+  assert.equal(t.ok, true, t.reason);
+  assert.equal(t.low, true);
+  const at = (y) => t.line.reduce((b, p) => (Math.abs(p.y - y) < Math.abs(b.y - y) ? p : b));
+  // under the sag: lowered, the roof no higher than the lid (on the straight line it stood 0.4 m over it)
+  const m = at(-50);
+  assert.ok(m.z < line(-50) - 0.3, `road ${m.z.toFixed(2)} at the sag, the line ${line(-50).toFixed(2)}`);
+  assert.ok(m.z + t.crown + 0.6 <= g(0, -50) + 0.1, `roof ${(m.z + t.crown + 0.6).toFixed(2)} over the lid ${g(0, -50).toFixed(2)}`);
+  // under the thicker lid: on the line, not raised
+  for (const y of [100, 130]) assert.ok(Math.abs(at(y).z - line(y)) < 0.05, `road ${at(y).z.toFixed(2)} at ${y}, the line ${line(y).toFixed(2)}`);
+  // within the grade
+  for (let i = 1; i < t.line.length; i++) {
+    const a = t.line[i - 1]; const b = t.line[i];
+    assert.ok(Math.abs(b.z - a.z) / (b.s - a.s) <= 0.0601, `grade ${((b.z - a.z) / (b.s - a.s)).toFixed(3)} at ${b.y}`);
+  }
+});
+
 test('a low box reaches the real face where the lid\'s end is notched along the centre line', () => {
   const g = lidGround({ notch: 8 });
   const t = solveTunnel({ xy: road(-70, 70), half: 4 }, { groundAt: g, approaches: [{ xy: road(-70, -200) }, { xy: road(70, 200) }] });

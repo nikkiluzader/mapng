@@ -6625,6 +6625,10 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
       }
     });
     for (const [t, samples] of samplesOf) {
+      // (each portal's own height a sample too: past the last road station by a portal, the next one was the other
+      // portal's road, read across the tube: the stations by Val d'Isère's 335 m Tunnel des Téléphériques' portal A
+      // tilted toward portal B's road 15 m higher, a 0.2 m step at the slab)
+      for (const i of [t.iS, t.iN]) if (t.line[i]?.kind === 'tube') samples.push([t.line[i].s, t.line[i].z]);
       samples.sort((a, b) => a[0] - b[0]);
       for (const st of t.line) {
         if (st.kind !== 'cut') continue;
