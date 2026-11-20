@@ -5257,6 +5257,8 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
     if (isBoredTunnelTag(tags) && !isBridgeRoad(tags)) {
       parts.push({
         xy, segIndex, half: halfOf(seg), gallery: isGalleryTag(tags), grade: seg.rail ? RAIL_GRADE_CEILING[seg.rail] ?? null : null,
+        // (OSM's maxheight, metres: a low box's headroom may come down to it)
+        maxheight: parseMaxheightM(tags.maxheight),
         osm: { id: seg.sourceFeature?.id ?? null, name: tags['tunnel:name'] || tags.name || tags.ref || null, highway: seg.highway },
       });
     } else {
@@ -5455,7 +5457,8 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
     const streetsOver = overStreets.length > 0;
     // (shaping off on fine elevation: portals at the survey's own portal faces)
     const railGrade = Math.max(...path.idx.map((i) => parts[i].grade ?? 0));
-    const t = solveTunnel({ xy: bore, half, gallery, ...(railGrade > 0 ? { grade: railGrade } : {}) }, { groundAt, approaches, isFreeEnd, squareSize, streetsOver, overStreets, raw: !shape && !terrainData?.coarseElevation });
+    const maxheights = path.idx.map((i) => parts[i].maxheight).filter(Number.isFinite);
+    const t = solveTunnel({ xy: bore, half, gallery, ...(railGrade > 0 ? { grade: railGrade } : {}), ...(maxheights.length ? { maxheight: Math.min(...maxheights) } : {}) }, { groundAt, approaches, isFreeEnd, squareSize, streetsOver, overStreets, raw: !shape && !terrainData?.coarseElevation });
     const osm = path.idx.map((i) => parts[i].osm);
     if (!t.ok) { out.skipped.push({ osm, reason: t.reason, length: t.length }); return null; }
     t.osm = osm;
@@ -5999,6 +6002,17 @@ function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = [],
 
 const EASE_ROOF_TOL_M = 0.15;   // a street's ground this little under a tunnel's roof still counts as on it
 
+// OSM maxheight as metres: "3.5", "3.5 m", "11'6\"" (feet and inches); null when it says none or is unreadable.
+function parseMaxheightM(v) {
+  if (v === undefined || v === null) return null;
+  const t = String(v).trim().toLowerCase();
+  if (!t || ['none', 'default', 'below_default', 'unsigned', 'no_sign', 'physical'].includes(t)) return null;
+  const ft = t.match(/^(\d+(?:\.\d+)?)\s*'\s*(?:(\d+(?:\.\d+)?)\s*"?)?$/);
+  if (ft) return Number(ft[1]) * 0.3048 + (ft[2] ? Number(ft[2]) * 0.0254 : 0);
+  const m = t.match(/^(\d+(?:\.\d+)?)\s*(m)?$/);
+  return m ? Number(m[1]) : null;
+}
+
 // For each structure-graph edge, the segment indices of its own road: itself and the edges it carries straight on
 // into through a node (leaving that node within WALL_STRAIGHT_ON_DEG of opposite directions). The wing walls take an
 // arm joining at an angle as another road, and its pavement as no place for a block.
@@ -6384,9 +6398,10 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
             // (over the tube and its walls: the reach the easing below looks in)
             const near = nearestOnTunnel(tun, U.x[k], U.y[k], tun.W + (tun.maxExtra || 0) + 2, lidNear);
             if (!near || near.beyond || near.into < 0) continue;
-            // (the lid, or the cover the box's grading lays over its roof where the lid is lower: the ground the
-            // street will stand on)
-            const lid = Math.max(tun.line[near.i]?.g ?? -Infinity, near.z + (tun.need || 0));
+            // (the lid as surveyed. Not the cover over the roof: raised to it at only the few stations over the box, a
+            // street running along a box's line at a slant came out with a 2 m bump, Rue du Cocor in Val d'Isère;
+            // where the roof stands higher the separation below lifts the street with its grades)
+            const lid = tun.line[near.i]?.g ?? -Infinity;
             if (Number.isFinite(lid) && lid > U.g[k]) U.g[k] = lid;
           }
         }
@@ -6405,7 +6420,8 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
           // road's height read there a few centimetres off the crossing's; 4.70 against 4.70 left the D 902's crossing
           // asking 6.5 m on the larger map, and a 108 m deck)
           const want = Math.max(over, roof);
-          if (over >= roof - EASE_ROOF_TOL_M && c.sep > want) { c.sep = want; eased++; }
+          // (a low box under its graded cover always: the street passes over the roof, lifted by the solve if lower)
+          if ((over >= roof - EASE_ROOF_TOL_M || (tun.low && tun.gradedCover)) && c.sep > want) { c.sep = want; eased++; }
         }
         if (eased) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Structure solver: ${eased} street crossing(s) over a built tunnel stay on the ground over its roof.`);
       }

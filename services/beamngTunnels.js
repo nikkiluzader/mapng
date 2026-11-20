@@ -126,6 +126,8 @@ const stationXY = (st, u) => {
 const LOW_WALL_M = 3.4;
 const LOW_ARCH_M = 0.8;
 const LOW_COVER_M = 0;
+const LOW_MIN_CROWN_M = 3.8;           // a low box's headroom, fitted under the street, never lower than this ...
+const MAXHEIGHT_PAD_M = 0.2;           // ... unless OSM's maxheight says lower: that much over it
 const LOW_MOUTH_IN_M = 8;
 const LOW_MOUTH_OUT_M = 8;
 const LOW_CEILING_CLEAR_M = 0.3;        // ground this far under the ceiling or lower stands in the box
@@ -824,10 +826,10 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
   const L = st[n - 1].s;
   if (L < MIN_TUBE_M) return { ok: false, reason: `short (${Math.round(L)} m)`, length: L };
   const W = path.half + WALKWAY_M;
-  const wall = cutCover ? CC_WALL_M : low ? LOW_WALL_M : WALL_M;
+  let wall = cutCover ? CC_WALL_M : low ? LOW_WALL_M : WALL_M;
   const arch = cutCover ? CC_ARCH_M : low ? LOW_ARCH_M : archRise(W);
-  const crown = wall + arch;                   // inner crown over the road
-  const need = crown + LINING_M + (cutCover ? CC_COVER_M : low ? LOW_COVER_M : MIN_COVER_M); // ground over the road
+  let crown = wall + arch;                     // inner crown over the road
+  let need = crown + LINING_M + (cutCover ? CC_COVER_M : low ? LOW_COVER_M : MIN_COVER_M); // ground over the road
   // (a low box: the lid as it stands across the lanes, the lower of its two sides
   // (or the centre line, if higher). The data pull's road smoothing cuts a notch through a lid's
   // end along the centre line, a few metres wide, and the box then stopped
@@ -922,6 +924,20 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
   // runs out to it (out of a cliff face onto the bridge): the stretch with
   // thin cover there is left exposed, never filled.
   // (a low box: a lid up to LOW_FILL_M lower than the box counts, made up with fill over it)
+  // (a low box fits under the street the survey shows: its headroom what the lid leaves along its middle, between
+  // LOW_MIN_CROWN_M (or OSM's maxheight, a little over it, where tagged lower) and the standard. At the standard
+  // height the cover stood up to 1.4 m over the survey, a street over it humped 2 m (Val d'Isère's Tunnel des
+  // Téléphériques) and a box's ends stood over the road beside them (the D 87A by the Tignes dam))
+  if (low) {
+    const lo = Math.floor(n * 0.1); const hi = Math.max(lo + 1, Math.ceil(n * 0.9));
+    const clear = [];
+    for (let i = lo; i < hi; i++) clear.push(g[i] - z[i] - LINING_M - LOW_COVER_M);
+    clear.sort((a, b) => a - b);
+    const mid = clear.length ? clear[Math.floor(clear.length / 2)] : crown;
+    const floor = Number.isFinite(path.maxheight) && path.maxheight > 0 ? Math.min(LOW_MIN_CROWN_M, path.maxheight + MAXHEIGHT_PAD_M) : LOW_MIN_CROWN_M;
+    const fit = clamp(mid, floor, crown);
+    if (fit < crown) { wall = fit - arch; crown = fit; need = crown + LINING_M + LOW_COVER_M; }
+  }
   const covered = (i) => g[i] - z[i] >= need - (low ? LOW_FILL_M : 0) - 1e-6;
   const c0 = z.findIndex((_, i) => covered(i));
   const c1 = n - 1 - [...z].reverse().findIndex((_, k) => covered(n - 1 - k));
@@ -1172,7 +1188,8 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
   };
   // headwall / wingwall / hole sizes follow the terrain grid: the step from
   // the cutting floor to the hillside sits inside a wall's thickness
-  tunnel.headDepth = Math.max(3, 2.5 * squareSize);
+  // (deep enough for the climb from the ground held at the floor behind a face to the headwall's top: two squares' diagonals)
+  tunnel.headDepth = Math.max(3, 2 * Math.SQRT2 * squareSize + 0.2);
   tunnel.stepAt = tunnel.headDepth / 2;
   // (two of a terrain square's diagonals and a little: the cutting's floor reaches half of it behind the face, so no
   // square between a floor point in front of the face and a raised one behind it crosses the face above the floor,
@@ -1814,6 +1831,10 @@ export function tunnelGroundAt(t, x, y, h) {
     // portal (to the step in the headwall); inside a bridge's portal the
     // rock is cut back to the headwall's top
     if (n.into >= 0 && nearerPortalKind(t, n.s) === 'bridge') {
+      // (just behind the face, across the headwall, the ground held at the portal's floor: a square from the slope in
+      // front to the headwall's top behind crossed the face, dark triangles hanging down it, the funicular's portal
+      // over its bridge; the climb lies inside the headwall's depth)
+      if (n.into < Math.SQRT2 * t.squareSize && ad <= t.headHalf) return Math.min(h, n.z);
       return Math.min(h, n.z + headTopAt(t, n.s) + FACE_SLOPE * Math.max(0, ad - t.headHalf));
     }
     // (in front of a cutting's face even where the nearest station is the

@@ -123,7 +123,15 @@ shots/); re-checks on today's code: scratch/fizz033/run; diagrams scratch/fizz03
   square crosses the face above the floor; beside another road a wall takes what room is left (1.5 m at least,
   wingTAt). The D 87A crossing on the full Chevril map: the street's ground 4.70 m over the box against a 4.70 m roof
   failed by a hair (a 108 m deck); eased within 0.15 m. Sections scratch/fizz033/diag/wingcut_before/after.png, in game
-  scratch/fizz033/shots_wing/portal_before_after.jpg. Left on 2.3: the bridge deck ends in his shots.
+  scratch/fizz033/shots_wing/portal_before_after.jpg. Then: a bridge portal's teeth (the funicular's bottom
+  portal over its bridge, dark triangles down the headwall): the ground just behind the face held at the portal's
+  floor, headwalls two square diagonals deep. Low boxes fit under the street (user's choice): headroom what the lid
+  leaves along the middle, 3.8 m at least (or maxheight + 0.2), the standard 4.2 at most (the D 87A: 3.81 m); a
+  street over a low box keeps its surveyed ground and is asked the roof's separation. Deck ends in Val d'Isère
+  (bridgetour/ends.py): clean. Left: a long low box's road is a straight line between its portals (Tunnel des
+  Téléphériques, 318 m), too high under the street near portal A: Rue du Cocor crosses with a 16.9 % kink (before
+  today it went onto a deck there). Next: a long low box's road following the lid at a constant depth, smoothed and
+  within grade, ends pinned, as cut and cover's is.
 - **Fixed before this list:** the bridgeTowerHouses error (078ff33, after 0.3.3); short bridges too high
   (the bridge rise cap, 957fa96); sidewalks (the paved model).
 - **Owed answers:** 2.2 continuous roads, 3.4 OSM tells galleries apart (tunnel=avalanche_protector), 4.5 double
