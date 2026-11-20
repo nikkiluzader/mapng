@@ -160,6 +160,7 @@ import { withProcessHandlersKept } from './keepProcessHandlers.js';
 import { composeTerrainParallel } from './composeWorker.js';
 import { gradePaved } from './pavedArea.js';
 import { fastHypot } from './fastMath.js';
+import { findTerrainSteps } from './terrainSteps.js';
 
 const BEAMNG_EXPORT_SERVICE_LOG = '[BeamNG Export Service]';
 
@@ -9219,6 +9220,7 @@ const NATIVE_BARRIER_ASSETS = {
   // high side's (highway retaining walls stood as 1 m stone garden walls at
   // the foot of their fill)
   retainingWall: { shapeName: BARRIER_SHAPES.concreteWall.shapeFile, segmentLength: 3.1, meshLength: 3.04, zOffset: 0, yawOffset: 0, retaining: { above: 1, below: 2 } },
+  stepWall: { shapeName: BARRIER_SHAPES.concreteWall.shapeFile, segmentLength: 3.1, meshLength: 3.04, zOffset: 0, yawOffset: 0, retaining: { above: 1, below: 2 }, thickScale: 2.6, halfThick: 0.8 },
   brickWall: { shapeName: BARRIER_SHAPES.brickWall.shapeFile, segmentLength: 3.5, meshLength: 3.42, zOffset: 0, yawOffset: 0 },
   // the harbour railing runs along local -Y from its origin at one end
   // (+90° turns -Y onto the run): placed from each piece's start
@@ -9348,6 +9350,9 @@ export function resolveNativeBarrierAsset(tags = {}, biome = null) {
     // (beside a racetrack, unmapped material: a concrete circuit wall, not a garden's stone)
     if (tags['mapng:trackside'] === 'yes' && !material) return NATIVE_BARRIER_ASSETS.concreteWall;
     // (retaining walls are concrete unless mapped as stone or brick)
+    // (a wall the export stands on a step the shaping left: as thick as the grid's staircase wanders either side of
+    // its straightened line, so no tooth shows past it)
+    if (tags['mapng:step'] === 'yes') return NATIVE_BARRIER_ASSETS.stepWall;
     if (barrierType === 'retaining_wall' && !['stone', 'brick', 'sandstone', 'limestone', 'granite'].includes(material)) {
       return NATIVE_BARRIER_ASSETS.retainingWall;
     }
@@ -9724,7 +9729,7 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
           roundTo(at.z + (Number.isFinite(asset.zOffset) ? asset.zOffset : 0), 3),
         ],
         rotationMatrix: rotationMatrixFromYawPitch(centerSample.yaw, pitch, Number.isFinite(asset.yawOffset) ? asset.yawOffset : 0),
-        ...(scaleZ !== 1 || fit ? { scale: alongY ? [1, roundTo(fit ? along : 1, 3), roundTo(scaleZ, 3)] : [roundTo(fit ? along : 1, 3), 1, roundTo(scaleZ, 3)] } : {}),
+        ...(scaleZ !== 1 || fit || asset.thickScale ? { scale: alongY ? [asset.thickScale || 1, roundTo(fit ? along : 1, 3), roundTo(scaleZ, 3)] : [roundTo(fit ? along : 1, 3), asset.thickScale || 1, roundTo(scaleZ, 3)] } : {}),
         shapeName: asset.shapeName,
         useInstanceRenderData: true,
       });
@@ -14878,6 +14883,26 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const gateWays = gateWaysOf(exportTerrainData, groundCarriageways, squareSize);
   // (roads only painted on the terrain count too: a leaf stood in a divided entrance's other lane)
   const onAnyWay = buildClearanceIndex(gateWays.map((w) => ({ points: w.pts, half: w.half })));
+  // steps the shaping left beside roads (a heightfield draws a storey's drop as a staircase on its grid: the sawtooth
+  // along raised streets and cuttings' tops): each walled as a retaining wall, as real roads hold such ground. Not
+  // where a wall is mapped already, under a deck, in a tunnel or on a road's own lanes.
+  const stepWalls = [];
+  if (includeNativeBarriers && exportTerrainData.heightMap !== sourceHeightMap) {
+    const mapped = buildClearanceIndex((exportTerrainData.osmFeatures || [])
+      .filter((f) => ['wall', 'retaining_wall', 'city_wall'].includes(f.tags?.barrier) && f.geometry?.length > 1)
+      .map((f) => ({ points: f.geometry.map((g) => geoToWorldPoint(g.lat, g.lng, exportTerrainData, squareSize)), half: 1.5 })));
+    const gz = (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize);
+    const lines = findTerrainSteps(exportTerrainData, squareSize, groundWithRings.map((cw) => ({ nodes: cw.nodes, half: cw.half })), {
+      source: sourceHeightMap,
+      skip: (x, y) => onDrawnRoad(x, y, -0.5) || mapped(x, y, 0) || underDeck(x, y, gz(x, y) - 4, gz(x, y) + 4, 1),
+    });
+    const b = exportTerrainData.bounds; const ws = exportTerrainData.width * squareSize;
+    lines.forEach((pts, i) => stepWalls.push({
+      type: 'barrier', id: `step_wall_${i + 1}`, tags: { barrier: 'retaining_wall', material: 'concrete', 'mapng:step': 'yes' },
+      geometry: pts.map(([x, y]) => ({ lat: b.north - (0.5 - y / ws) * (b.north - b.south), lng: b.west + (x / ws + 0.5) * (b.east - b.west) })),
+    }));
+    if (stepWalls.length) console.log(`[BeamNG Export] ${stepWalls.length} retaining walls on terrain steps beside roads`);
+  }
   const barrierObjects = includeNativeBarriers
     ? buildNativeBarrierObjects(exportTerrainData, squareSize, biome, {
       skipAt: (x, y, z) => onDrawnRoad(x, y, 0.3) || underDeck(x, y, z - 1, z + 2),
@@ -14888,14 +14913,14 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       trackGates: buildingReport.stats?.trackGates || [],
       gateFree: (x, y) => !onDrawnRoad(x, y, 0.15) && !onAnyWay(x, y, 0.15),
       // guardrails along roads on dams (services/dams.js), on the crest
-      extra: damGuardrails(decalRoads.structureGraph).map(({ pts, z }) => {
+      extra: [...stepWalls, ...damGuardrails(decalRoads.structureGraph).map(({ pts, z }) => {
         const b = exportTerrainData.bounds; const ws = exportTerrainData.width * squareSize;
         return {
           type: 'barrier', id: 'dam_rail', tags: { barrier: 'guard_rail' },
           geometry: pts.map(([x, y]) => ({ lat: b.north - (0.5 - y / ws) * (b.north - b.south), lng: b.west + (x / ws + 0.5) * (b.east - b.west) })),
           __zAt: (x, y) => { let best = Infinity; let zz = z[0]; pts.forEach(([px, py], i) => { const d = (px - x) ** 2 + (py - y) ** 2; if (d < best) { best = d; zz = z[i]; } }); return zz; },
         };
-      }),
+      })],
     })
     : [];
   const barrierFolderItems = buildBarrierFolderItems(barrierObjects);
