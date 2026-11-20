@@ -19,19 +19,21 @@ reads (level files, materials, roads, prefabs, Lua, assets). Never guess a forma
 
 ## Where things live
 
-- **Plans and status:** `docs/open-items.md` holds priorities, branch state, test lists and the speed pass. Update
-  it as work lands.
-- **Backlog, releases, history:** `refs/output/backlog.md` (feature requests grouped by area),
-  `refs/output/releases.md` and `refs/output/history.md`. Add to these files; don't start a new file per release or
-  report.
+- **Tracking, five files** (see "Tracking" below):
+  - `docs/open-items.md`: now. Branch state, the current list, what waits on someone, checks owed.
+  - `refs/output/backlog.md`: everything wanted later, grouped by area.
+  - `refs/output/releases.md`: what shipped, per release (the changelog).
+  - `refs/output/history.md`: finished plans, reviews and work narratives.
+  - `refs/output/decisions.md`: the user's decisions and why.
+  Add to these; don't start a new file per release, report or night.
 - **OSM to game assets:**
   - `data/osm-tag-library.json`: OSM tags mapped to the game's native models; a test keeps it in step with the
     code.
   - `data/game-model-catalogue.json`: the native model catalogue.
   - The organiser and thumbnail tools are in `refs/output/tag-library/` (private).
   - Look at a model in game before using it.
-- **Reference sources:** `refs/output/reference-list.md` lists the OSM wiki tag pages and the photo and check
-  sources. Use it on every task, and add to it.
+- **Reference sources:** `refs/output/reference-list.md` lists the OSM wiki tag pages, the photo and check
+  sources, and the test and diagram tools. Use it on every task, and add to it.
 - **Technique sources:** `refs/BeamNG.Earth-main` (MIT) and `refs/earth2road-main`. Borrowed ideas get tailored to
   MapNG's one-shot, most-detailed build and measured against what we have.
 - **Test tooling:**
@@ -43,6 +45,20 @@ reads (level files, materials, roads, prefabs, Lua, assets). Never guess a forma
   - `scripts/osm` for the OSM fix workflow.
 - **Deploys:** pushing `dev` builds dev.mapng.com, `main` builds mapng.com (Cloudflare Workers Builds). Check their
   build checks before a release.
+
+## Tracking
+
+- **Lifecycle:** backlog -> open items -> releases -> history. Moving an item means removing it from the old file;
+  an item lives in exactly one place.
+- **Open items stays short:** now, waiting on someone, checks owed. Everything later goes to the backlog area it
+  belongs to; finished narrative goes to history.
+- **Each item's shape:** a bold one-line title; source and date; status; where to look (files, plots, areas); what
+  "done" means if known. Don't fill in fields you don't know.
+- **A big part-done topic is one entry** with its open points as sub-bullets and a pointer to its notes and plots.
+- **Record each decision** the user makes in `refs/output/decisions.md`: date, decision, why, where it applies.
+- **Review and tidy** the tracking files at the end of a work session and before a compaction; update "Last
+  reviewed".
+- **Memory holds pointers and preferences,** not project status: status lives in these files.
 
 ## Working through a list
 
