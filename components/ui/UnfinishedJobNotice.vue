@@ -46,6 +46,7 @@ function report() {
   openReportDialog(job.value.kind === 'export' ? 'export' : 'generate', {
     error: `${job.value.kind === 'export' ? 'An export' : 'A Generate'} was still running when ${desktopApp ? 'the app' : 'the page'} closed (build ${job.value.build || 'unknown'}).`,
     config: job.value.code || '',
+    jobLog: job.value.log || '',
   });
   job.value = null;
 }

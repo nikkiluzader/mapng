@@ -53,7 +53,9 @@ const prepared = new Map();   // token -> the report as it would be sent
 /** Build a report and show what is in it: { token, preview } (the dialog's "What's included"). */
 export async function prepareReport(kind, ctx = {}) {
   const nav = globalThis.navigator || {};
-  const log = consoleTail();
+  // (a job that died with its tab: its own last lines, kept in its note, before this page's)
+  const jobLog = typeof ctx.jobLog === 'string' && ctx.jobLog ? `--- the job's last lines before the page closed ---\n${hideSecretsInText(ctx.jobLog)}\n--- this page ---\n` : '';
+  const log = jobLog + consoleTail();
   const report = {
     kind: String(kind || 'manual'),
     appVersion: 'web',

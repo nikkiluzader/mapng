@@ -83,3 +83,19 @@ test('failures with a plain reason: the browser\'s storage giving out, a part of
   assert.ok(isMapPartGone(new Error(`${MAP_PART_GONE}: "satelliteTextureUrl" (Failed to fetch)`)));
   assert.ok(!isMapPartGone(new Error('Failed to fetch')));
 });
+
+test('a job that dies with its tab leaves its last log lines in its note, and a report carries them', async () => {
+  const mem = new Map();
+  globalThis.localStorage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: (k) => mem.delete(k) };
+  const { markJobStart, markJobEnd, noteJobLog, unfinishedJob } = await import('../services/sessionGuard.js');
+  markJobStart('generate', { code: 'mapng:1:abc', build: 'b1' });
+  noteJobLog(Array.from({ length: 100 }, (_, i) => `line ${i}`).join('\n'));
+  const note = unfinishedJob();
+  assert.equal(note.log.split('\n').length, 60);
+  assert.equal(note.log.split('\n').at(-1), 'line 99');
+  const { preview } = await prepareReport('generate', { error: 'A Generate was still running', jobLog: note.log });
+  assert.match(preview.logTail, /line 99\n--- this page ---/);
+  markJobEnd();
+  assert.equal(unfinishedJob(), null);
+  delete globalThis.localStorage;
+});
