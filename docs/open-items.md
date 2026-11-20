@@ -104,6 +104,13 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
   3. Done 2026-11-20 (history): only raised walks are paved; an untagged footway out of town or tagged as a trail is
      a dirt path.
 
+- **End-to-end on dev before the dev build** (2026-11-20 morning, dev 4d481e5): web (production build, `vite preview`,
+  STUB_PICKER=1: headless Chromium's save window reports a cancel, which since 9afaada stops the export as Cancel
+  should): Generate and export 0-100 %, done window, 40 MB written, no errors; the script's "About" and "Data"
+  buttons not found (its selectors, not the app). Desktop (development mode): Generate from MapNG tiles and export
+  0-100 %, 38.7 MB level in the scratch mods folder, My Levels lists it, no errors. Left for the packaged build:
+  Cancel during an export (brokenbraincells_'s report), the AppImage and the Windows portable.
+
 ## Waiting on someone
 
 - **The next desktop test build (0.3.3-dev.6)** with the next batch of fixes: ask before the -dev tag (planned after
