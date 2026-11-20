@@ -255,6 +255,21 @@
     <figure><img src="images/alpine-look.jpg" alt="A mountainside in game near Tignes: fir trees on a green meadow above a road, a valley and mountains behind" loading="lazy"><figcaption>Above Tignes: firs and meadow grass, where the Utah look put juniper and dry grass.</figcaption></figure>
   </section>
 
+  <section id="smoother" data-nav="Smoother ground">
+    <div class="kicker">Terrain</div>
+    <h2>Smoother ground: coasts, slopes and hairpins</h2>
+    <p>Many maps had jagged edges in the terrain, along coasts, beside roads on steep ground and at tight bends. Most of them came from MapNG's own steps, not from the elevation data, and this version takes them out.</p>
+    <ul>
+      <li><b>Coasts.</b> The sea floor was lowered in 10&nbsp;m blocks with steps between them, and on fine elevation the beach below the mapped coastline was cut into a bank. Now the sea floor slopes smoothly down from where the survey's water starts, and beaches and marshes stay as they were measured.</li>
+      <li><b>Where MapNG's changes meet the real ground.</b> The edges where the sea floor, a lake bed or a road's cut or fill meets the surveyed ground are smoothed the way the World Editor's "Really smooth" brush does it. Only the ground MapNG changed is touched, and only back toward the survey. Roads are never smoothed: on 2&nbsp;m lidar or finer the survey's road is already as good as it gets.</li>
+      <li><b>Slopes beside roads.</b> Where two roads' side slopes overlap (between the arms of a hairpin, at a bend) they now meet in one slope instead of a row of drops along the grid.</li>
+      <li><b>Tight hairpins.</b> A bend tighter than the road is wide was drawn on a smoothed line inside the mapped one while the ground was shaped along the mapped line, so the road ran off its own ground at the apex: a bump of up to 2&nbsp;m. Now the road and its ground share one line through the bend.</li>
+    </ul>
+    <figure><img src="images/coast-before-after.jpg" alt="Top: two maps of a beach coloured by height, before with square terraces and a bank, after with a smooth slope into the sea. Bottom: the beach in game sloping smoothly into the water" loading="lazy"><figcaption>A beach in St. Augustine: the sea floor before and after, and the result in game.</figcaption></figure>
+    <figure><img src="images/steep-road-slopes.jpg" alt="Before and after in game: two arms of a mountain road one above the other, with jagged drops between them before and an even slope after" loading="lazy"><figcaption>The Stelvio pass: between the arms of a bend, before and after.</figcaption></figure>
+    <figure><img src="images/hairpin-before-after.jpg" alt="Before and after in game: a hairpin bend from above and from the driver's seat. Before, the road cuts inside the bend with a step across it; after, it follows the bend and climbs evenly" loading="lazy"><figcaption>A Stelvio hairpin from above and from the driver's seat, before and after: the bump at the apex is gone.</figcaption></figure>
+  </section>
+
   <section id="tunnels" data-nav="Tunnels and galleries">
     <div class="kicker">Structures</div>
     <h2>Tunnels, galleries and portals that match the real ones</h2>
@@ -310,6 +325,7 @@
       <li><b>Its layers.</b> The card lists what the file holds: ground, buildings, trees and other classes, laser brightness, colour.</li>
       <li><b>In the 2D preview.</b> Switch the preview to the point cloud's classes or its brightness, seen from above.</li>
       <li><b>Smoother terrain.</b> Gaps under buildings, cars and trees are filled smoothly now, without the rough blocks and seams some files showed.</li>
+      <li><b>No spikes on sparse forest floor.</b> Under trees a fine point cloud has few ground points, and at 10&nbsp;cm most cells were empty. They were filled from the regular elevation, so every point stood as a spike or a pit among its heights. Now the whole area your file covers is filled from your own points, smoothly.</li>
     </ul>
     <div class="pair">
       <figure><img src="images/pointcloud-card.jpg" alt="The custom elevation card with a LAZ file loaded, showing its spacing and coordinate system in short lines" loading="lazy"><figcaption>The upload card, kept short; More about this opens the rest.</figcaption></figure>
@@ -320,6 +336,7 @@
       <figure><img src="images/pointcloud-classes.jpg" alt="The 2D preview showing a point cloud coloured by class: ground, buildings, trees" loading="lazy"><figcaption>2D preview: classes.</figcaption></figure>
       <figure><img src="images/pointcloud-brightness.jpg" alt="The 2D preview showing a point cloud by laser brightness, road markings visible" loading="lazy"><figcaption>2D preview: brightness. Road markings show up.</figcaption></figure>
     </div>
+ <figure><img src="images/pointcloud-forest.jpg" alt="Three panels of a forest track from a 10 cm point cloud: before, most of the ground empty with scattered points; after, one continuous surface, shown as shaded relief and in close-up" loading="lazy"><figcaption>Behind the scenes: a 10&nbsp;cm cloud of a forest track (a tester's own track). Before, nine cells in ten were left to the regular elevation; after, the whole area comes from the file's own points.</figcaption></figure>
     <figure><img src="images/pointcloud-ground.jpg" alt="Two shaded relief maps of the same city blocks from a point cloud at 1 m: before, square blocks and seams where buildings and trees stood; after, the gaps filled smoothly" loading="lazy"><figcaption>Behind the scenes: the ground from a point cloud as shaded relief, before and after. The blocks and seams where buildings, cars and trees stood are filled smoothly now.</figcaption></figure>
   </section>
 
@@ -356,6 +373,7 @@
       <li>Turn-lane arrows stand inside the painted lanes and behind the stop line. Before, a left-turn arrow could sit on the centre line or out past the stop line.</li>
       <li>A fence mapped as concrete, stone or brick is built as that wall instead of a chain-link fence.</li>
       <li>No more thin slivers of paving running from a sidewalk across the lawn to a building's front.</li>
+      <li><span class="pill desk">Desktop</span>Cancel stops an export that is still waiting for its downloads.</li>
     </ul>
   </section>
 
