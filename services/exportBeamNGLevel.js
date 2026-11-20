@@ -5847,6 +5847,35 @@ function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = [],
     return false;
   };
   const isUrban = buildUrbanRoadClassifier(terrainData.osmFeatures || []);
+  // A footway with no surface tag out of town, or tagged as a trail, is a path on the ground: dirt, no slab. Paved
+  // by default, a forest trail mapped highway=footway came out a concrete sidewalk down the hillside (dev_szczyrk).
+  // In town (buildings along it), in a park or a garden, on residential or commercial ground, a street's sidewalk
+  // or crossing, it is paved as before.
+  const PAVED_GROUND = (t) => ['park', 'garden', 'playground', 'schoolyard'].includes(t.leisure) || ['residential', 'commercial', 'retail', 'education', 'civic', 'cemetery'].includes(t.landuse) || ['school', 'university', 'college', 'hospital'].includes(t.amenity) || t.place === 'square';
+  const pavedAreas = (terrainData.osmFeatures || []).filter((f) => f.geometry?.length > 2 && f.type !== 'road' && f.type !== 'building' && PAVED_GROUND(f.tags || {})).map((f) => {
+    const ring = f.geometry; let s0 = Infinity; let w0 = Infinity; let n0 = -Infinity; let e0 = -Infinity;
+    for (const p of ring) { if (p.lat < s0) s0 = p.lat; if (p.lat > n0) n0 = p.lat; if (p.lng < w0) w0 = p.lng; if (p.lng > e0) e0 = p.lng; }
+    return { ring, box: [s0, w0, n0, e0] };
+  });
+  const inPavedArea = (p) => pavedAreas.some(({ ring, box }) => {
+    if (p.lat < box[0] || p.lat > box[2] || p.lng < box[1] || p.lng > box[3]) return false;
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const a = ring[i]; const b = ring[j];
+      if ((a.lat > p.lat) !== (b.lat > p.lat) && p.lng < ((b.lng - a.lng) * (p.lat - a.lat)) / (b.lat - a.lat) + a.lng) inside = !inside;
+    }
+    return inside;
+  });
+  const TRAIL_KEYS = ['sac_scale', 'trail_visibility', 'mtb:scale', 'tracktype'];
+  const groundPath = (feature) => {
+    const t = feature.tags || {};
+    if (t.highway !== 'footway' || t.surface) return false;
+    if (t.footway === 'sidewalk' || t.footway === 'crossing') return false;
+    if (t.informal === 'yes' || TRAIL_KEYS.some((k) => t[k])) return true;
+    const g = feature.geometry;
+    if (isUrban(feature)) return false;
+    return ![g[0], g[g.length >> 1], g[g.length - 1]].some(inPavedArea);
+  };
   let serviceCount = 0; let serviceLength = 0;
   // vertices shared by two or more roads: a service road's square end there
   // is carried on half its width, closing the corner where aisles meet
@@ -5876,7 +5905,7 @@ function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = [],
         ? (Number.isFinite(tagged) && tagged > 0 ? Math.min(20, Math.max(2, tagged)) : lanes >= 2 ? Math.min(12, 3 * lanes) : SERVICE_WIDTH_M[kind] ?? SERVICE_DEFAULT_WIDTH_M)
         : (Number.isFinite(tagged) && tagged > 0 ? Math.min(40, Math.max(2, tagged)) : PEDESTRIAN_WIDTH_M);
     const surface = tags.surface
-      || (footpath ? FOOTPATH_DEFAULT_SURFACE[tags.highway] ?? (americas ? 'concrete' : 'asphalt') : null)
+      || (footpath ? FOOTPATH_DEFAULT_SURFACE[tags.highway] ?? (groundPath(feature) ? 'dirt' : americas ? 'concrete' : 'asphalt') : null)
       || (service ? (kind === 'driveway' ? (!isUrban(feature) ? 'gravel' : americas ? 'concrete' : 'asphalt') : 'asphalt') : null);
     const layers = pedestrianSurfaceLayers(surface, fullWidth, { americas });
     const street = sanitizeBeamNGObjectName(tags.name || `${footpath ? tags.highway : service ? `service_${kind || 'road'}` : 'pedestrian'}_${feature.id}`, `pedestrian_${feature.id || 'x'}`);

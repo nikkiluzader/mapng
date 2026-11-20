@@ -42,7 +42,8 @@ push dev and main (standing go-ahead for this list).
    decal paths. So fix them in the shared road geometry, and check each point with both road kinds, on small exports
    of just the spot (512-2048, never the 16 km map); what shows only with Mesh Roads goes to item 8. Sidewalks were rebuilt since
    his build: recheck every sidewalk point (4.3, curbs, 1.2) fresh. Points: 1.3 road pieces not joined (offset ends, wedges at junctions and
-   bends, 8 shots); 1.6 hairpins (inner wedge, folding over); 1.8 buildings and street lights in the road; 4.3
+   bends, 8 shots); 1.6 hairpins (inner wedge, folding over); 1.8 buildings and street lights in the road (seen too in bt_chicago at (-80, -196): a small building in the
+   middle of a junction, scratch/rel035/chi_5.jpg); 4.3
    sidewalks along mountain-bike trails; 4.4 spikes along road edges; 9.2 terrain edges beside a road wrong (his
    diagram); 9.3 junctions with walls, slabs and tilted pieces; 1.1 narrow roads, corners tighter than the terrain;
    check 1.2 (a curb strip through a roundabout) and 1.5 (up and down under a gallery) on today's code.
@@ -56,8 +57,8 @@ push dev and main (standing go-ahead for this list).
    1.7 small steps; 7.1 triangles visible in the light; 7.2 a texture layer floating over the Decal Road with Mesh
    Roads hidden; 9.1 a thin band of terrain along Mesh and Hero Road edges (request).
 9. **5.1 World Editor:** buildings, sidewalks and lake walls grouped in big blocks; he wants single objects.
-10. **Answers owed to Fizz:** 2.2 one continuous road (the solver works that way; the breaks are where it falls
-    short); 3.4 OSM tells galleries apart (tunnel=avalanche_protector); 4.5 double chevrons by design; ask him to
+10. **Answers owed to Fizz** (draft for the user to post: scratch/fizz033/replies_draft.md, 2026-11-20): 2.2 one continuous road (the solver works that way; the breaks are where it falls
+    short); 3.4 OSM tells galleries apart (tunnel=avalanche_protector); 4.5 double chevrons by design (back to back, one set per direction) but too many on switchbacks (1,772 of his 2,199 signs): thin them; ask him to
     recheck 2.6 (now a flat-roofed gallery, no walls) and the portals on a new build.
 11. **After the list:** a desktop dev build (ask before the -dev tag) and an end-to-end test of everything.
 
@@ -92,11 +93,12 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
   1. Jagged edges across many levels and situations (one cause found while building cul-de-sacs: in
      suburb_naperville the paved fill between a street's generated sidewalk and a mapped `footway=sidewalk` came out
      in teeth; scratch/culdesac/cds3_zooms.jpg).
-  2. Sidewalks must never tilt sideways: where they follow the terrain they sometimes lean left or right. Level
-     across, following the road's grade along.
-  3. Footpaths built as concrete sidewalks that should be dirt or gravel: read OSM (`surface=*`, `highway=path` /
-     `track`, `footway` vs trails, `sac_scale`, `informal`, `tracktype`) and build no sidewalk mesh for an unpaved
-     path or trail; draw it as its ground material instead.
+  2. Sidewalks must never tilt sideways: mostly done 2026-11-20 with 3 (the leaning slabs were mostly unpaved paths
+     paved on hillsides). Left: terrain shaping off
+     still blends the slab onto the ground (tried level across: worse, tall curbs and floating skirts; history).
+     Probe: scratch/swaudit/tilt.py (slope across the nearest road; a walk climbing away from a road reads as across).
+  3. Done 2026-11-20 (history): only raised walks are paved; an untagged footway out of town or tagged as a trail is
+     a dirt path.
 
 ## Waiting on someone
 

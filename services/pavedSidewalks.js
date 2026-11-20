@@ -174,13 +174,16 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
   // (the mapped walks' own heights, which follow what they run on, a bridge's approach among them: on a walk the
   // slab is its height plus walkH, as today's walkways; between the curb and a walk it goes from the curb's top to the
   // walk's. Off the roads alone, the walk to a bridge's footway sat 2-3 m under the deck walk it met)
-  const walkHeight = makeRoadHeight(walks.filter((w) => !w.crossing && (w.nodes || []).length > 1 && w.nodes.every((p) => Number.isFinite(p[2]))).map((w) => ({ nodes: w.nodes, half: w.half || 1 })));
+  const walkHeight = makeRoadHeight(walks.filter((w) => w.sidewalk && !w.crossing && (w.nodes || []).length > 1 && w.nodes.every((p) => Number.isFinite(p[2]))).map((w) => ({ nodes: w.nodes, half: w.half || 1 })));
   const heightAt = (x, y) => {
     const h = road(x, y); if (!h) return groundAt ? groundAt(x, y) : 0;
     const surface = edgeSurface(h);
     const share = Math.min(smooth01((toDriveway(x, y) - DRIVEWAY_HALF_M) / DIP_RAMP_M), smooth01(toDip(x, y) / DIP_RAMP_M));
     let top = surface + curbH * share + DIP_LIP_M * (1 - share) + crossSlope * Math.min(h.d, 6);
     const wk = walkHeight(x, y);
+    // (tried: a mapped walk within 0.5 m of the street's level laid at the street's level. Its ground around it is not
+    // graded to that level, and Barcelona's sidewalks came out buried and floating (30 m: 13 -> 157 buried samples)
+    // for no measurable gain in tilt)
     if (wk && wk.d < SIDEWALK_GAP_M) {
       const walkTop = wk.z + walkH;
       if (wk.d <= 0) top = walkTop;
@@ -192,6 +195,10 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
     }
     if (!groundAt) return top;
     // the terrain left as it is (no shaping): the curb at the road, the slab onto the ground within FOLLOW_M of it
+    // (... following the ground beside it: tried level across instead (the curb's height, lifted where the ground under
+    // the cross-section stood higher), the uphill sides stood up as tall curbs with dark slots by the road and the
+    // downhill ones up to 1.8 m over the ground on their skirts (tychonas, terrain left as it is): here the terrain is
+    // the survey's by the user's choice, and the slab on it reads truer)
     if (followGround) {
       const w = smooth01((h.d - FOLLOW_FROM_M) / FOLLOW_M);
       return w > 0 ? top * (1 - w) + (groundAt(x, y) + FOLLOW_OVER_M) * w : top;
@@ -221,7 +228,9 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
   // sidewalk of its own is in, or the strip from the street to that sidewalk was paved across the bulb)
   const roads = carriageways.filter((c) => c.nodes?.length > 1 && !(c.turningCircle && c.mappedWalk) && !['elevator', 'steps', 'footway', 'path'].includes(c.highway)).map((c) => ({ pts: c.nodes, half: c.half || 3 }));
   const arcs = corners.filter((c) => c.arc?.length > 1).map((c) => c.arc);
-  const ws = walks.filter((w) => w.nodes?.length > 1).map((w) => ({ pts: w.nodes, half: w.half || 1, sidewalk: !!w.sidewalk, crossing: !!w.crossing }));
+  // (only paved walks are paving: a dirt or gravel path, a highway=path, a footway on a bridge or in a tunnel is no slab.
+  // Marked as walks, every mapped path came out a concrete strip on the ground, leaning with a hillside's slope)
+  const ws = walks.filter((w) => w.nodes?.length > 1 && (w.sidewalk || w.crossing)).map((w) => ({ pts: w.nodes, half: w.half || 1, sidewalk: !!w.sidewalk, crossing: !!w.crossing }));
   // (a street-side run's band: its points are on the curb line, the walk out to one side)
   const offset = (pts, dist) => pts.map((p, i) => {
     const a = pts[Math.max(0, i - 1)]; const b = pts[Math.min(pts.length - 1, i + 1)];

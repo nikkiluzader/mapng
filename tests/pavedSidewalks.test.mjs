@@ -133,3 +133,19 @@ test('sampleSlab: the slab height on the check lattice, NaN where there is none'
   // x = 12.125: off the slab
   assert.ok(Number.isNaN(at(0, 6)));
 });
+
+// A mapped path the export does not raise (dirt, gravel, a highway=path, a footway on a bridge) is no paving: it stays a
+// path on the ground. Paved, a hillside gravel path came out a concrete strip leaning with the slope (dev_szczyrk).
+test('only raised walks are paved: an unpaved path far from the street is left on the ground', () => {
+  const slabArea = (walk) => {
+    const b = collector();
+    addPavedSidewalks(b, {
+      carriageways: [{ nodes: [[-60, 0, 0], [60, 0, 0]], half: 4, highway: 'residential' }],
+      walks: [walk], curbH: 0.15, THREE, groundAt: () => 0,
+    });
+    return b.tris.slab.filter((t) => t.every((p) => p[1] > 20)).reduce((s, [a, p, c]) => s + Math.abs((p[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (p[1] - a[1])) / 2, 0);
+  };
+  const path = { nodes: [[-30, 30, 0], [30, 30, 0]], half: 1 };
+  assert.ok(slabArea({ ...path, sidewalk: true }) > 80, 'a paved footway is paved');
+  assert.equal(slabArea({ ...path, sidewalk: false }), 0, 'a dirt path is not');
+});
