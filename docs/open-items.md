@@ -40,7 +40,9 @@ push dev and main (standing go-ahead for this list).
 3. **2.8 leftover:** where a wing wall is left out beside another road (a service road crossing a raised street in
    Tignes) the fill's steep sides show as teeth: terrainCompose walls the fill before the walls are known; run the
    wall rule first and give those stations the ordinary slope.
-4. **Roads on every map** (his "most important"): 1.3 road pieces not joined (offset ends, wedges at junctions and
+4. **Roads on every map** (his "most important"). He exported with Mesh Roads on, which looks like his preference
+   (user, 2026-11-19), so every point here was seen on Mesh Roads: first reproduce each on both Mesh and Decal
+   Roads to sort out which are Mesh-only (fold those in with item 8) and which every map has. Points: 1.3 road pieces not joined (offset ends, wedges at junctions and
    bends, 8 shots); 1.6 hairpins (inner wedge, folding over); 1.8 buildings and street lights in the road; 4.3
    sidewalks along mountain-bike trails; 4.4 spikes along road edges; 9.2 terrain edges beside a road wrong (his
    diagram); 9.3 junctions with walls, slabs and tilted pieces; 1.1 narrow roads, corners tighter than the terrain;
@@ -51,7 +53,7 @@ push dev and main (standing go-ahead for this list).
    a portal juts onto the road.
 7. **Check on today's code:** 3.5 the D 902 road/gallery/tunnel junction (probably the D 87A crossing, fixed);
    2.7 bridges' heights and shapes; the D 87A box's ends beside the lower road (headroom now fitted, 3.81 m).
-8. **Mesh Roads only** (experimental, off by default): 1.4 Mesh and Decal Roads at one height, layers showing;
+8. **Mesh Roads only** (experimental, off by default, but his chosen mode: worked together with item 4): 1.4 Mesh and Decal Roads at one height, layers showing;
    1.7 small steps; 7.1 triangles visible in the light; 7.2 a texture layer floating over the Decal Road with Mesh
    Roads hidden; 9.1 a thin band of terrain along Mesh and Hero Road edges (request).
 9. **5.1 World Editor:** buildings, sidewalks and lake walls grouped in big blocks; he wants single objects.
