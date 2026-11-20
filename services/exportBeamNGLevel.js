@@ -5997,6 +5997,8 @@ function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = [],
   return { decals, ways, footpaths, services: { count: serviceCount, length: serviceLength }, sidewalkStrips: { count: stripCount, length: stripLength } };
 }
 
+const EASE_ROOF_TOL_M = 0.15;   // a street's ground this little under a tunnel's roof still counts as on it
+
 // For each structure-graph edge, the segment indices of its own road: itself and the edges it carries straight on
 // into through a node (leaving that node within WALL_STRAIGHT_ON_DEG of opposite directions). The wing walls take an
 // arm joining at an angle as another road, and its pavement as no place for a block.
@@ -6399,7 +6401,11 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
           const over = U.g[i] - (near.z + (L.rail ? RAIL_DEPTH_M : 0));
           // (the tube's own roof under the street: its crown and lining, the street on top)
           const roof = Number.isFinite(tun.crown) ? tun.crown + ROOF_SLAB_M : ROOFED_MIN_M;
-          if (over >= roof && c.sep > over) { c.sep = over; eased++; }
+          // (within a hand's width of the roof: the street's ground was raised over the box at its own stations, the
+          // road's height read there a few centimetres off the crossing's; 4.70 against 4.70 left the D 902's crossing
+          // asking 6.5 m on the larger map, and a 108 m deck)
+          const want = Math.max(over, roof);
+          if (over >= roof - EASE_ROOF_TOL_M && c.sep > want) { c.sep = want; eased++; }
         }
         if (eased) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Structure solver: ${eased} street crossing(s) over a built tunnel stay on the ground over its roof.`);
       }

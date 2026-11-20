@@ -116,6 +116,14 @@ shots/); re-checks on today's code: scratch/fizz033/run; diagrams scratch/fizz03
   Top views scratch/fizz033/diag/wing_top_after*.png. Left: where a wall is left out beside another road (the
   service road's crossing) the fill's steep sides show as teeth: terrainCompose walls the fill before the walls are
   known; give those stations the ordinary slope (needs the wall rule run before the composition).
+- **2.3 at the D 902's portal A by Lac du Chevril (2026-11-19, on dev):** the headwall's opening was the bore's arch over a
+  gallery stretch's flat roof (the sky through it): a portal whose first metres in are a gallery takes the gallery's
+  rectangle. The dark triangles up wingwalls set at a slant to the terrain grid (also the funicular's portal teeth):
+  wingwalls are 2 square diagonals + 0.2 m thick (3 m at 1 m), the floor reaching half of it behind the face, so no
+  square crosses the face above the floor; beside another road a wall takes what room is left (1.5 m at least,
+  wingTAt). The D 87A crossing on the full Chevril map: the street's ground 4.70 m over the box against a 4.70 m roof
+  failed by a hair (a 108 m deck); eased within 0.15 m. Sections scratch/fizz033/diag/wingcut_before/after.png, in game
+  scratch/fizz033/shots_wing/portal_before_after.jpg. Left on 2.3: the bridge deck ends in his shots.
 - **Fixed before this list:** the bridgeTowerHouses error (078ff33, after 0.3.3); short bridges too high
   (the bridge rise cap, 957fa96); sidewalks (the paved model).
 - **Owed answers:** 2.2 continuous roads, 3.4 OSM tells galleries apart (tunnel=avalanche_protector), 4.5 double

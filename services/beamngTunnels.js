@@ -1174,7 +1174,12 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
   // the cutting floor to the hillside sits inside a wall's thickness
   tunnel.headDepth = Math.max(3, 2.5 * squareSize);
   tunnel.stepAt = tunnel.headDepth / 2;
-  tunnel.wingT = Math.max(1.5, 1.5 * squareSize);
+  // (two of a terrain square's diagonals and a little: the cutting's floor reaches half of it behind the face, so no
+  // square between a floor point in front of the face and a raised one behind it crosses the face above the floor,
+  // and the climb from the floor to the hillside lies inside the wall's body. At 1.5 m the squares crossing a
+  // wall set at a slant to the grid stood up its face as dark triangles to two thirds of its height: Fizz_Mechanic's
+  // portals by Lac du Chevril, the funicular's bottom portal)
+  tunnel.wingT = Math.max(3, 2 * Math.SQRT2 * squareSize + 0.2);
   tunnel.wingD = W + LINING_M + WING_GAP_M;
   tunnel.headHalf = Math.max(W + LINING_M + HEAD_SIDE_M, tunnel.wingD + tunnel.wingT + 1);
   // the terrain as surveyed: bigger holes round the tube, so a headwall
@@ -1550,10 +1555,17 @@ function onForeignRoad(t, x, y, margin) {
   return false;
 }
 
+// a wingwall's thickness at line index i, side: its full thickness, or what room another road beside it leaves (the
+// wall's face never comes in past the tube's width), WING_T_MIN_M at least
+const WING_T_MIN_M = 1.5;
+const wingTAt = (t, i, side) => {
+  const c = t.clear?.[side]?.[i] ?? Infinity;
+  return Number.isFinite(c) ? clamp(c - BESIDE_GAP_M - t.W, Math.min(WING_T_MIN_M, t.wingT), t.wingT) : t.wingT;
+};
 // a wingwall's inner face offset at line index i, side (pulled in off another road)
 const wingDAt = (t, i, side) => {
   const c = t.clear?.[side]?.[i] ?? Infinity;
-  return Number.isFinite(c) ? clamp(c - t.wingT - BESIDE_GAP_M, t.W, t.wingD) : t.wingD;
+  return Number.isFinite(c) ? clamp(c - wingTAt(t, i, side) - BESIDE_GAP_M, t.W, t.wingD) : t.wingD;
 };
 // a headwall's reach past the line at portal index i, side
 const headHalfAt = (t, i, side) => {
@@ -1575,7 +1587,7 @@ function wingTops(t, groundAt) {
       // from one station inside the headwall outwards
       for (let i = i0 - step; i >= 0 && i < t.line.length; i += step) {
         const p = t.line[i];
-        const [x, y] = lateral(p, side * (wingDAt(t, i, side) + extraAt(t, p, side) + t.wingT + 1));
+        const [x, y] = lateral(p, side * (wingDAt(t, i, side) + extraAt(t, p, side) + wingTAt(t, i, side) + 1));
         cap = Math.min(cap, groundAt(x, y) - p.z);
         if (cap < WING_MIN_M) break;
         // (a wall belongs to a cutting. Past the portal's own flank, a road
@@ -1759,7 +1771,7 @@ export function tunnelGroundAt(t, x, y, h) {
     // (where a wingwall stands, out to a square behind its back: the ground
     // rising from the lane's edge stood through the wall's face in teeth)
     const side = Math.sign(m?.d) || 1;
-    const reach = m && t.wings?.[side]?.has(m.i) ? wingDAt(t, m.i, side) + t.wingT + t.squareSize : t.W + LINING_M + t.squareSize;
+    const reach = m && t.wings?.[side]?.has(m.i) ? wingDAt(t, m.i, side) + wingTAt(t, m.i, side) + t.squareSize : t.W + LINING_M + t.squareSize;
     // Ground under the road's line there (the box's grade runs from the
     // tagged way's ends, and meets the face a few decimetres over the road
     // in front of it: the apron stood 0.4 m proud of the road, a step a car
@@ -1808,9 +1820,9 @@ export function tunnelGroundAt(t, x, y, h) {
     // portal's own)
     if (n.into < 0 ? p.kind !== 'cut' && nearerPortalKind(t, n.s) !== 'cut' : nearerPortalKind(t, n.s) !== 'cut') return h;
     const top = t.wings[Math.sign(n.d) || 1].get(n.i) ?? 0;
-    const wd = wingDAt(t, n.i, Math.sign(n.d) || 1);
-    if (ad <= wd + t.wingT / 2) return n.z;
-    const r = Math.max(0, ad - wd - t.wingT);
+    const wd = wingDAt(t, n.i, Math.sign(n.d) || 1); const wt = wingTAt(t, n.i, Math.sign(n.d) || 1);
+    if (ad <= wd + wt / 2) return n.z;
+    const r = Math.max(0, ad - wd - wt);
     // (over the wall the ground is cut back at 1 to 1 for a few metres, then
     // steeply: a rock face steeper than 1 to 1 never met that slope, and a
     // slice was cut out of it as far as the grading reached)
@@ -1988,7 +2000,7 @@ export function lowBoxSquareAt(t, x, y, lo) {
 export function onCuttingFloor(t, n, pad = 0) {
   if (!n || n.beyond || n.into >= 0 || t.line[n.i].kind !== 'cut') return false;
   const side = Math.sign(n.d) || 1;
-  const half = t.wings?.[side]?.has(n.i) ? wingDAt(t, n.i, side) + t.wingT : t.W + LINING_M;
+  const half = t.wings?.[side]?.has(n.i) ? wingDAt(t, n.i, side) + wingTAt(t, n.i, side) : t.W + LINING_M;
   return across(t, n) <= half + pad;
 }
 
@@ -2002,7 +2014,7 @@ export function hitsTunnel(tunnels, x, y, z, zTop = z) {
     const ad = across(t, n);
     const arcH = arcadeAt(t, n.s);
     const inTube = n.into >= -0.5 && ad <= (arcH ? galleryRoofHalf(t) : t.W + LINING_M) + 0.5;
-    const inCut = n.into < 0 && t.line[n.i].kind === 'cut' && ad <= wingDAt(t, n.i, Math.sign(n.d) || 1) + t.wingT + 0.5 && t.wings[Math.sign(n.d) || 1].has(n.i);
+    const inCut = n.into < 0 && t.line[n.i].kind === 'cut' && ad <= wingDAt(t, n.i, Math.sign(n.d) || 1) + wingTAt(t, n.i, Math.sign(n.d) || 1) + 0.5 && t.wings[Math.sign(n.d) || 1].has(n.i);
     const inHead = n.into >= -0.5 && n.into <= t.headDepth + 0.5 && ad <= t.headHalf + 0.5;
     if (!(inTube || inCut || inHead)) continue;
     if (zTop >= n.z - 1 && z <= n.z + (inHead ? headTopAt(t, n.s) : t.crown + LINING_M) + 0.5) return true;
@@ -2208,7 +2220,12 @@ export function buildPortalGeometry(t, end) {
   // widths left / right of "into" (a ramp joining widens one side)
   const wl = end === 'S' ? p.wl ?? t.W : p.wr ?? t.W;
   const wr = end === 'S' ? p.wr ?? t.W : p.wl ?? t.W;
-  const outer = ring((wl + wr) / 2 + LINING_M, -LINING_M, t.wall, t.arch + LINING_M, 16, !!t.flat);
+  // (a bore whose first metres in are a gallery stretch: the gallery's rectangle, as high as its flat roof. The arch
+  // cut for the bore stood over the gallery's roof with the sky through it, at the D 902's portal by Lac du Chevril)
+  const galleryMouth = !t.flat && t.kind !== 'gallery' && !!arcadeAt(t, p.s + (end === 'S' ? 1 : -1));
+  const outer = galleryMouth
+    ? ring((wl + wr) / 2 + LINING_M, -LINING_M, GAL_H, 0, 16, true)
+    : ring((wl + wr) / 2 + LINING_M, -LINING_M, t.wall, t.arch + LINING_M, 16, !!t.flat);
   const c = (wl - wr) / 2;
   // (left of "into" is the line's left at its start, its right at its end)
   const sideL = end === 'S' ? -1 : 1;
@@ -2252,8 +2269,8 @@ export function buildPortalGeometry(t, end) {
     if (run.length < 2) continue;
     const top = (k) => t.wings[side].get(k) ?? t.wings[side].get(i - step) ?? headTop;
     const corner = (k, d, v) => { const q = t.line[k]; const [x, y] = lateral(q, side * (d + extraAt(t, q, side))); return [x, y, q.z + v]; };
-    const sec = (k) => { const d = wingDAt(t, k, side); return [corner(k, d, WING_BOTTOM_M), corner(k, d, top(k)), corner(k, d + t.wingT, top(k)), corner(k, d + t.wingT, WING_BOTTOM_M)]; };
-    const centre = (k) => { const q = t.line[k]; const [x, y] = lateral(q, side * (wingDAt(t, k, side) + extraAt(t, q, side) + t.wingT / 2)); return [x, y, q.z + top(k) / 2]; };
+    const sec = (k) => { const d = wingDAt(t, k, side); const wt = wingTAt(t, k, side); return [corner(k, d, WING_BOTTOM_M), corner(k, d, top(k)), corner(k, d + wt, top(k)), corner(k, d + wt, WING_BOTTOM_M)]; };
+    const centre = (k) => { const q = t.line[k]; const [x, y] = lateral(q, side * (wingDAt(t, k, side) + extraAt(t, q, side) + wingTAt(t, k, side) / 2)); return [x, y, q.z + top(k) / 2]; };
     // (the texture laid along the wall and up it by each corner's own
     // height: mapped as a rectangle per panel, a wall whose top slopes had
     // its concrete's stains sheared into a saw-tooth from panel to panel)
