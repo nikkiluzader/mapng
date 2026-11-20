@@ -84,7 +84,8 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
 - **Release page draft** (user, 2026-11-19): `public/updates/0.3.5/` (marked as a preview, noindex), on dev for
   testers to read ahead. Written from every commit since v0.3.4 (11f3405 the last one in it). Add each later fix to
   it; 8 placeholders (`class="ph"`) for pictures still to take, among them a city corner on today's sidewalks (the old
-  shot had the squeezed slab texture) and a suburb with a cul-de-sac. Add `refs/output/releases.md` notes and the
+  shot had the squeezed slab texture), a suburb with a cul-de-sac, and wing walls (the old shot's road and terrain
+  round the walls looked bad: user, retake once those are fixed). Add `refs/output/releases.md` notes and the
   updates index link at release. Any main push before then carries the draft to mapng.com/updates/0.3.5/ (unlinked,
   noindex, marked as a preview).
 - **Cul-de-sacs** (user, 2026-11-19: "the suburb screenshot looks ugly without one"). OSM `highway=turning_circle`
