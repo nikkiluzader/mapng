@@ -8,7 +8,7 @@
  */
 import { tagObjectNodeTags } from './tagModels.js';
 
-export const OVERPASS_QUERY_VERSION = 12;   // 2: traffic_calming nodes; 3: food, drink and lodging nodes; 4: railways; 5: disused, preserved and abandoned lines; 6: bus stops, post boxes, picnic tables, flagpoles, recycling, information boards; 7: power towers mapped on their own; 8: shelters, toilets, statues, masts, towers, oil wells, bike stands, street cabinets, dumpsters; 9: wind turbines and railway platforms; 10: every mapped traffic sign (traffic_sign=*); 11: concrete blocks, utility poles and obelisks; 12: water towers, billboards, picnic sites, storage tanks
+export const OVERPASS_QUERY_VERSION = 13;   // 13: turning circles and loops (cul-de-sacs); 2: traffic_calming nodes; 3: food, drink and lodging nodes; 4: railways; 5: disused, preserved and abandoned lines; 6: bus stops, post boxes, picnic tables, flagpoles, recycling, information boards; 7: power towers mapped on their own; 8: shelters, toilets, statues, masts, towers, oil wells, bike stands, street cabinets, dumpsters; 9: wind turbines and railway platforms; 10: every mapped traffic sign (traffic_sign=*); 11: concrete blocks, utility poles and obelisks; 12: water towers, billboards, picnic sites, storage tanks
 
 // Public Overpass mirrors (volunteer-run; any of them may be down).
 export const OVERPASS_ENDPOINTS = [
@@ -94,7 +94,7 @@ export const OSM_FILTER = {
     ['natural', 'tree'], ['natural', 'tree_row'], ['natural', 'shrub'],
     ['amenity', 'fuel'], ['amenity', 'charging_station'], ['man_made', 'fuel_pump'],
     ['highway', 'traffic_signals'], ['highway', 'stop'], ['highway', 'give_way'],
-    ['highway', 'street_lamp'], ['barrier', 'bollard'], ['barrier', 'block'], ['man_made', 'utility_pole'], ['man_made', 'obelisk'], ['amenity', 'bench'],
+    ['highway', 'street_lamp'], ['highway', 'turning_circle'], ['highway', 'turning_loop'], ['barrier', 'bollard'], ['barrier', 'block'], ['man_made', 'utility_pole'], ['man_made', 'obelisk'], ['amenity', 'bench'],
     ['emergency', 'fire_hydrant'], ['amenity', 'waste_basket'], ['power', 'pole'], ['power', 'tower'],
     ['traffic_calming', 'bump'], ['traffic_calming', 'hump'], ['traffic_calming', 'table'], ['traffic_calming', 'cushion'],
     ['amenity', 'fountain'], ['amenity', 'drinking_water'],

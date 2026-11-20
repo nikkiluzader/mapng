@@ -216,7 +216,10 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
   if (!Number.isFinite(x0)) return { tiles, heightAt, stats, pavedAt: () => false };
   const t0 = Date.now();
   // (not a lift's or a stair's way mapped as a carriageway)
-  const roads = carriageways.filter((c) => c.nodes?.length > 1 && !['elevator', 'steps', 'footway', 'path'].includes(c.highway)).map((c) => ({ pts: c.nodes, half: c.half || 3 }));
+  // (a cul-de-sac whose sidewalk is mapped round it is left out of the road raster: its curb comes from its run, and
+  // in the raster it changed what the fill round the mapped sidewalk paved, in teeth along the street; one with a
+  // sidewalk of its own is in, or the strip from the street to that sidewalk was paved across the bulb)
+  const roads = carriageways.filter((c) => c.nodes?.length > 1 && !(c.turningCircle && c.mappedWalk) && !['elevator', 'steps', 'footway', 'path'].includes(c.highway)).map((c) => ({ pts: c.nodes, half: c.half || 3 }));
   const arcs = corners.filter((c) => c.arc?.length > 1).map((c) => c.arc);
   const ws = walks.filter((w) => w.nodes?.length > 1).map((w) => ({ pts: w.nodes, half: w.half || 1, sidewalk: !!w.sidewalk, crossing: !!w.crossing }));
   // (a street-side run's band: its points are on the curb line, the walk out to one side)

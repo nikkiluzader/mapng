@@ -99,6 +99,7 @@ import { buildRoadSignProps } from './roadSigns.js';
 import { generateRoadLamps } from './streetLamps.js';
 import { buildIngameProbes } from './ingameProbes.js';
 import { smoothLine } from './lineSmoothing.js';
+import { planTurningCircles, turningCircleCarriageway, turningCircleDecalNodes, gradeTurningCircle } from './turningCircles.js';
 import { buildPlazaMeshes, courtyardPathHalf, courtyardPaved, getPlazaMaterialDefs, isCourtyard, isPlaza, plazaSurface, PLAZA_MATERIAL, plazaTileM } from './plazas.js';
 import { buildSidewalkMeshesParallel, cornerPatches, inferCrossingSidewalks, buildWallDeckMesh, gutterLines, isCurbedClass, lowerUnderWallDecks, checkPavedGround, CURB_ONLY_M, ZEBRA_CROSSING_MATERIAL, getSidewalkMaterialDefs, SIDEWALK_MATERIALS, sidewalkFootways, streetSides, DEFAULT_SIDEWALK_LOOK, setCurbHeight, CURB_HEIGHTS_M,
 } from './beamngSidewalks.js';
@@ -6945,6 +6946,41 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   }
 
   yield;
+  // Cul-de-sacs (services/turningCircles.js): a mapped turning circle or loop at a street's dead end, a round bulb of
+  // the street's own surface. Its ring is a carriageway of its own, kept apart from the streets (no markings, no
+  // traffic, no signs or lamps along it; the sidewalks, the ground and the keep-offs take it).
+  const turningCircles = [];
+  {
+    const points = (terrainData.osmFeatures || []).filter((f) => f.type === 'turning_circle' && f.geometry?.length).map((f) => {
+      const [x, y] = geoToWorldPoint(f.geometry[0].lat, f.geometry[0].lng, terrainData, squareSize, 0);
+      return { id: f.id, x, y, tags: f.tags || {} };
+    });
+    const mappedWalks = points.length ? (terrainData.osmFeatures || [])
+      .filter((f) => f.type === 'road' && f.tags?.highway === 'footway' && f.tags?.footway === 'sidewalk' && f.geometry?.length > 1)
+      .map((f) => f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0))) : [];
+    for (const tc of planTurningCircles(points, carriageways)) {
+      const ring = turningCircleCarriageway(tc, { mappedWalks });
+      // the street's own surface decal, its look copied round the ring
+      const base = surfaceDecals.find((s) => s.owner === tc.street.owner && /_b$/.test(s.decal.name || '')) || surfaceDecals.find((s) => s.owner === tc.street.owner);
+      if (!base) continue;
+      const { mapngLanes, overObjects, ...look } = base.decal;
+      const decal = {
+        ...look,
+        name: sanitizeBeamNGObjectName(`${base.decal.name.replace(/_b\d*$/, '')}_tc${turningCircles.length + 1}_b`),
+        persistentId: generatePersistentId(),
+        position: [...turningCircleDecalNodes(tc)[0].slice(0, 3)],
+        nodes: turningCircleDecalNodes(tc).map((nd) => nd.map((v) => Math.round(v * 1000) / 1000)),
+        // (no traffic round it: not in the AI's road graph, as a driveway)
+        drivability: 0,
+        autoLanes: false,
+      };
+      Object.defineProperty(decal, '__owner', { value: ring.owner, enumerable: false });
+      base.group.__items.push(decal);
+      ring.tc = tc;
+      turningCircles.push(ring);
+    }
+    if (turningCircles.length) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Cul-de-sacs: ${turningCircles.length} of ${points.length} mapped turning circle(s) built at a street's dead end (${turningCircles.filter((r) => r.tc.loop).length} loop(s) round an island).`);
+  }
   const pedestrianStreets = buildPedestrianStreetDecals(terrainData, squareSize, carriageways, { raisedFootways: !!opts.raisedFootways, sidewalkStrips: !!opts.sidewalkStrips });
   yield 'junctions';
   // A service road, a path or a pedestrian street along a dam's crest rides on it, as a road for traffic does
@@ -7005,6 +7041,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
       .flatMap((owners) => [...owners].filter((o) => o !== cw.owner));
   }
   Object.defineProperty(groups, 'carriageways', { value: carriageways, enumerable: false });
+  Object.defineProperty(groups, 'turningCircles', { value: turningCircles, enumerable: false });
   Object.defineProperty(groups, 'pedestrianStreets', { value: pedestrianStreets.ways, enumerable: false });
   Object.defineProperty(groups, 'footpaths', { value: pedestrianStreets.footpaths, enumerable: false });
   Object.defineProperty(groups, 'serviceRoads', { value: pedestrianStreets.services, enumerable: false });
@@ -13601,6 +13638,10 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // in a tube, a headwall or a cutting's walls (the hill over it is free).
   const tunnelList = decalRoads.tunnels?.tunnels || [];
   const groundCarriageways = (decalRoads.carriageways || []).filter((cw) => !cw.bridge && !cw.tunnel);
+  // (the cul-de-sacs' rings: in the sidewalks, the ground keep-offs and the paint under roads; not where things are
+  // built along a street: lamps, props, signs, the spawn)
+  const turningRings = decalRoads.turningCircles || [];
+  const groundWithRings = turningRings.length ? [...groundCarriageways, ...turningRings] : groundCarriageways;
   // (a railway's track bed: no road sign stands on it. A road curving beside a line put its chevrons on the track,
   // and a sign at a junction by a level crossing stood between the rails)
   const nearRail = railways?.lines?.length ? buildClearanceIndex(railways.lines) : null;
@@ -13623,7 +13664,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   let lampGlowCount = 0;   // (street lamps' night glows, lampGlow.js)
   // the ground roads the rivers keep off and the lake beds' quays (a deck's
   // stretch is no ground carriageway: splitOnDecks)
-  const riverRoads = () => groundCarriageways.map((c) => ({ points: c.nodes, half: c.half }));
+  const riverRoads = () => groundWithRings.map((c) => ({ points: c.nodes, half: c.half }));
   let deckCover = null;
   const W0 = exportTerrainData.width; const H0 = exportTerrainData.height;
   if (bridgeDecks.length > 0) {
@@ -13704,7 +13745,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         });
       };
       // (ground roads and their sidewalks keep their ground)
-      const keepRoads = buildCarriagewayIndex(groundCarriageways.map((cw) => ({ ...cw, half: (cw.half || 3) + LAKE_KEEP_M })));
+      const keepRoads = buildCarriagewayIndex(groundWithRings.map((cw) => ({ ...cw, half: (cw.half || 3) + LAKE_KEEP_M })));
       const lev = levelUnderDecks(bridgeDecks, {
         heightMap: exportTerrainData.heightMap, width: W0, height: H0, worldSize: W0 * squareSize, minHeight: Number(exportTerrainData.minHeight) || 0,
       }, (x, y) => isOnOtherCarriageway(keepRoads, x, y, 0, () => false), PARAPET_W_M, wet);
@@ -13724,9 +13765,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       const toWorld = (lat, lng) => geoToWorldPoint(lat, lng, exportTerrainData, squareSize, 0);
       const { rivers } = riverPlan;
       // (ground roads and a margin keep their ground: quays, a bridge's approach)
-      const bedKeep = buildCarriagewayIndex(groundCarriageways.map((cw) => ({ ...cw, half: (cw.half || 3) + LAKE_KEEP_M })));
+      const bedKeep = buildCarriagewayIndex(groundWithRings.map((cw) => ({ ...cw, half: (cw.half || 3) + LAKE_KEEP_M })));
       // (under a deck: the approach road and its sidewalks, no quay margin past them)
-      const bedKeepTight = buildCarriagewayIndex(groundCarriageways.map((cw) => ({ ...cw, half: (cw.half || 3) + 2.5 })));
+      const bedKeepTight = buildCarriagewayIndex(groundWithRings.map((cw) => ({ ...cw, half: (cw.half || 3) + 2.5 })));
       const { lakes } = planLakes({ features: exportTerrainData.osmFeatures || [], toWorld, heightAt });
       const beds = carveWaterUnderDecks({ rivers, lakes }, {
         heightMap: exportTerrainData.heightMap, width: W, height: H, worldSize, minHeight: Number(exportTerrainData.minHeight) || 0,
@@ -13838,6 +13879,21 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     beginStep('sidewalks', `Building sidewalks, curbs and ramps along ${groundCarriageways.length} carriageways${bridgeDecks.length ? ` (${bridgeDecks.length} bridge decks built)` : ''}…`);
     await yield_();
   }
+  // the ground under each cul-de-sac to its plane, before the sidewalks grade round it (turningCircles.js)
+  if (turningRings.length && shaping.roads) {
+    const hmTc = heightMapEditor(exportTerrainData);
+    const streetsIdx = buildCarriagewayIndex(groundCarriageways);
+    let tcPx = 0;
+    for (const ring of turningRings) {
+      tcPx += gradeTurningCircle(ring.tc, {
+        hm: hmTc, W: exportTerrainData.width, H: exportTerrainData.height, sq: squareSize,
+        minHeight: Number(exportTerrainData.minHeight) || 0,
+        // (another street's ground beside it is that street's)
+        keep: (x, y) => isOnOtherCarriageway(streetsIdx, x, y, 0.5, (o) => o === ring.tc.street.owner),
+      });
+    }
+    if (tcPx) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Cul-de-sacs: ${tcPx} grid point(s) graded under ${turningRings.length} bulb(s).`);
+  }
   // (the lakes as the water step plans them, their beds dug after the sidewalks: no paving over them. The mapped-water
   // filter alone let a lake through (Zion), and paving over its dug bed floated metres up)
   const sidewalkLakeRings = includeRoads && includeSidewalks && includeWater ? (() => {
@@ -13857,7 +13913,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
           }, exportTerrainData.landCover, -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0), { coarse: !!terrainData?.coarseElevation, coast: coastLinesOf(exportTerrainData, squareSize) }); } catch { return null; } })() : null;
   // (the walkway tops on worker threads in the desktop app; here otherwise)
   const sidewalks = includeRoads && includeSidewalks
-    ? await buildSidewalkMeshesParallel(groundCarriageways, {
+    ? await buildSidewalkMeshesParallel(groundWithRings, {
       zones: decalRoads.crosswalkZones || [],
       // building footprints at ground level: no slab into a wall
       buildings: (exportTerrainData.osmFeatures || [])
@@ -14395,7 +14451,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     const n = exportTerrainData.width;
     const UNPAVED = new Set(['unpaved', 'gravel', 'fine_gravel', 'dirt', 'earth', 'ground', 'grass', 'sand', 'mud', 'compacted', 'pebblestone', 'woodchips']);
     let painted = 0;
-    for (const cw of groundCarriageways) {
+    for (const cw of groundWithRings) {
       if (UNPAVED.has(String(cw.tags?.surface || '').toLowerCase()) || cw.highway === 'track' || cw.highway === 'path') continue;
       const nodes = cw.nodes || []; const reach = (cw.half || 3) + ROAD_LAYER_MARGIN_M;
       for (let i = 0; i + 1 < nodes.length; i++) {
@@ -14783,7 +14839,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const furniturePart = async (key) => { const [text, at] = FURNITURE_PARTS[key] || []; if (text && currentStep?.phase === 'furniture') { report(text, at); await yield_(); } };
   await furniturePart('barriers');
   await yield_();
-  const onDrawnRoad = buildClearanceIndex(groundCarriageways.map((cw) => ({ points: cw.nodes, half: cw.half })));
+  const onDrawnRoad = buildClearanceIndex(groundWithRings.map((cw) => ({ points: cw.nodes, half: cw.half })));
   const gateWays = gateWaysOf(exportTerrainData, groundCarriageways, squareSize);
   // (roads only painted on the terrain count too: a leaf stood in a divided entrance's other lane)
   const onAnyWay = buildClearanceIndex(gateWays.map((w) => ({ points: w.pts, half: w.half })));
@@ -15242,7 +15298,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // scrub are often drawn right over the roads through them) and out from
   // under bridge decks.
   const clearOf = buildClearanceIndex([
-    ...groundCarriageways.map((cw) => ({ points: cw.nodes, half: cw.half })),
+    ...groundWithRings.map((cw) => ({ points: cw.nodes, half: cw.half })),
     ...(decalRoads.pedestrianStreets || []).map((way) => ({ points: way.nodes, half: way.half })),
     ...[...sidewalks.runs, ...(sidewalks.walkRuns || [])].map((run) => ({ points: run.points, half: run.width })),
     // nor on a railway's track bed and its ditches (railTrack.js)

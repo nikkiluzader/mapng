@@ -88,14 +88,6 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
   round the walls looked bad: user, retake once those are fixed). Add `refs/output/releases.md` notes and the
   updates index link at release. Any main push before then carries the draft to mapng.com/updates/0.3.5/ (unlinked,
   noindex, marked as a preview).
-- **Cul-de-sacs** (user, 2026-11-19: "the suburb screenshot looks ugly without one"). OSM `highway=turning_circle`
-  (2.6 M nodes; `turning_circle=*` shape, `diameter`) and `highway=turning_loop` (170 k, a ring round an island) are
-  in data/osm-tag-library.json as planned, not fetched: add them to `OSM_FILTER` (services/overpassQuery.js) with a
-  query-version bump, build a round bulb of road surface joined to the street end (curbs and sidewalks round it from
-  the paved model), a ring with a kerbed island for loops. Look first for a game asset or how official levels draw
-  one; many real cul-de-sacs are not tagged, so maybe also a residential dead end among houses. Test on
-  suburb_naperville; done when the suburb shot has its bulbs, in game and in the 2D preview.
-
 - **Sidewalk fixes** (user, 2026-11-20), after cul-de-sacs:
   1. Jagged edges across many levels and situations (one cause found while building cul-de-sacs: in
      suburb_naperville the paved fill between a street's generated sidewalk and a mapped `footway=sidewalk` came out

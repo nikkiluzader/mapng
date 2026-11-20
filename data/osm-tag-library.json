@@ -4583,9 +4583,10 @@
    "count": 2570000,
    "group": "roads",
    "item": "turningCircles",
-   "status": "planned",
-   "fetched": false,
-   "builds": "A round asphalt bulb at the end of the cul-de-sac",
+   "code": "services/turningCircles.js",
+   "status": "built",
+   "fetched": true,
+   "builds": "A round bulb of the street's own surface at its dead end, the curb and any sidewalk round it, the ground graded under it (services/turningCircles.js)",
    "assets": [],
    "generated": "A disc of road surface joined to the street; no model needed",
    "properties": {
@@ -4595,7 +4596,7 @@
     },
     "diameter": {
      "effect": "Size of the bulb",
-     "used": false
+     "used": true
     }
    }
   },
@@ -4607,9 +4608,10 @@
    "count": 170000,
    "group": "roads",
    "item": "turningCircles",
-   "status": "planned",
-   "fetched": false,
-   "builds": "A ring of road surface round a small island",
+   "code": "services/turningCircles.js",
+   "status": "built",
+   "fetched": true,
+   "builds": "A ring of the street's surface round an island at its dead end (services/turningCircles.js)",
    "assets": [],
    "generated": "A ring of road surface with a kerbed island"
   },

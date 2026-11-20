@@ -158,7 +158,7 @@
 <main class="wrap">
   <div class="cards">
     <div class="card"><b><span class="tick">✓</span>Faster exports</b><span>Nearly twice as fast, a third less memory.</span></div>
-    <div class="card"><b><span class="tick">✓</span>New sidewalks</b><span>One paved area: curbs, corners, driveways, lawns.</span></div>
+    <div class="card"><b><span class="tick">✓</span>New sidewalks</b><span>One paved area, and cul-de-sacs at last.</span></div>
     <div class="card"><b><span class="tick">✓</span>Tunnels and galleries</b><span>Built the way the real ones are.</span></div>
     <div class="card"><b><span class="tick">✓</span>Point clouds</b><span>Placed by a guess, their layers shown.</span></div>
     <div class="card"><b><span class="tick">✓</span>Better bug reports</b><span>The level carries its own map data.</span></div>
@@ -226,7 +226,7 @@
     <div class="pair">
       <figure><img src="images/sidewalk-chicago.jpg" alt="A downtown street in game: a continuous concrete sidewalk with a curb runs from the road edge to the building fronts" loading="lazy"><figcaption>Downtown: one continuous sidewalk from the curb to the buildings.</figcaption></figure>
       <figure><div class="ph"><b>Screenshot to come</b>A city corner: sidewalks meeting round a rounded curb (retake on today's build: the old shot has the squeezed slab texture since fixed).</div></figure>
-      <figure><div class="ph"><b>Screenshot to come</b>A suburban street with lawn verges and a cul-de-sac (after cul-de-sacs are built).</div></figure>
+      <figure><img src="images/culdesac-suburb.jpg" alt="A suburban cul-de-sac in game: a round asphalt bulb at the end of the street, lawn round it and the sidewalk looping round the lawn in front of the houses" loading="lazy"><figcaption>On streets with houses, the verge is lawn, not concrete.</figcaption></figure>
       <figure><img src="images/sidewalk-hillside.jpg" alt="A steep hillside street in game with a sidewalk following the bend and the slope" loading="lazy"><figcaption>On a hillside, the slab follows the road's grade.</figcaption></figure>
     </div>
     <ul>
@@ -238,6 +238,14 @@
     </ul>
   </section>
 
+  <section id="culdesacs" data-nav="Cul-de-sacs">
+    <div class="kicker">Streets</div>
+    <h2>Cul-de-sacs</h2>
+    <p>A street that ends in a turning circle in OpenStreetMap (<code>highway=turning_circle</code>, or a <code>turning_loop</code> round an island) now ends in a round bulb of its own asphalt, as wide as the circle mapped there or sized from the street. The curb follows it round, the ground under it is levelled to the street's grade, and trees and props stay off it.</p>
+    <p>Where the sidewalk round the bulb is mapped, that one is laid. Where it isn't, a street with sidewalks gets one round the bulb.</p>
+    <figure><img src="images/culdesac-close.jpg" alt="A cul-de-sac in game seen from above: the street opens into a round asphalt bulb with a curb and a sidewalk running round it" loading="lazy"><figcaption>A bulb with its own sidewalk, where none is mapped.</figcaption></figure>
+  </section>
+
   <section id="tunnels" data-nav="Tunnels and galleries">
     <div class="kicker">Structures</div>
     <h2>Tunnels, galleries and portals that match the real ones</h2>
@@ -245,7 +253,10 @@
     <h3>Galleries</h3>
     <p>A road tunnel that opens along a cliff, and an avalanche gallery mapped in OpenStreetMap (<code>tunnel=avalanche_protector</code>), are now built the way they stand: a flat roof on the uphill wall and columns on the valley side, at the height the lidar shows, with a floor slab and a valley wall going down into the ground. A portal whose first metres are a gallery takes the gallery's rectangle as its opening, not a round arch.</p>
     <figure><img src="images/gallery-portal.jpg" alt="Before and after pictures of a tunnel portal: before, an arched opening over a gallery's flat roof; after, a rectangular opening matching the gallery" loading="lazy"><figcaption>A portal into a gallery stretch, before and after.</figcaption></figure>
-    <div class="ph"><b>Screenshot to come</b>A gallery from outside and from the driver's seat (the D 902 by Les Brévières, or the Axenstrasse).</div>
+    <div class="pair">
+      <figure><img src="images/gallery-outside.jpg" alt="An avalanche gallery in game seen from the valley side: a flat concrete roof on a row of columns along a steep wooded hillside" loading="lazy"><figcaption>The Paravalanche de la Forêt from the valley side.</figcaption></figure>
+      <figure><img src="images/gallery-driver.jpg" alt="The driver's view inside the gallery: the road under the flat roof, the uphill wall on the left and the columns open to the valley on the right" loading="lazy"><figcaption>From the driver's seat, the valley through the columns.</figcaption></figure>
+    </div>
     <h3>Portals and the ground round them</h3>
     <ul>
       <li>The ground behind a headwall is made up to its top and then falls away, instead of a square block standing as high as the wall.</li>
@@ -258,7 +269,7 @@
     <figure><img src="images/low-box-street.jpg" alt="Before and after: a street junction over a box tunnel. Before, the concrete roof stands out of torn ground; after, the streets meet level over covered ground" loading="lazy"><figcaption>Rue du Cocor over the Tunnel des Téléphériques, before and after.</figcaption></figure>
     <h3>Funiculars and railway tunnels</h3>
     <p>A railway tunnel now climbs at its own kind's grade: a funicular up to 100&nbsp;%, trams 9&nbsp;%, light rail 8&nbsp;%. The Funival in Val d'Isère, whose ends are 768 m apart in height, is built as a tunnel instead of left on the surface.</p>
-    <div class="ph"><b>Screenshot to come</b>The Funival's tunnel portal and its line up the mountain.</div>
+    <figure><img src="images/funicular-portal.jpg" alt="A funicular's track on a concrete viaduct running straight into a tunnel portal in a steep green hillside" loading="lazy"><figcaption>The Funival in Val d'Isère going into the mountain.</figcaption></figure>
     <h3>A finer grid for steep maps</h3>
     <p>Terrain holes round tunnels and galleries follow the game's terrain squares. On a steep map of 2 km or less with tunnels, MapNG now suggests a 0.5 m processing resolution: tested on Zion, the jagged ground left round the structures went from 101 to 59 m².</p>
     <div class="ph"><b>Screenshot to come</b>The 0.5 m suggestion under the processing resolution.</div>
@@ -274,7 +285,10 @@
       <li>A bridge over water stays within what its road can reach from its ends at its class's grade (from a tester's St. Augustine level, checked against the map and photos).</li>
       <li>Quay walls only stand where the survey shows a steep face.</li>
     </ul>
-    <div class="ph"><b>Screenshot to come</b>A footbridge with railings over a river, and the St. Augustine bridges.</div>
+    <div class="pair">
+      <figure><img src="images/footbridge-liberty.jpg" alt="A long curved suspension footbridge in game spanning a river gorge in a park, with railings on both sides and no posts" loading="lazy"><figcaption>A curved suspension footbridge over a river: end to end, on no posts (Falls Park, Greenville).</figcaption></figure>
+      <figure><img src="images/footbridge-river.jpg" alt="A straight footbridge with railings on both sides spanning a river between paved park paths" loading="lazy"><figcaption>Railings both sides, its ends on the paths it joins.</figcaption></figure>
+    </div>
   </section>
 
   <section id="pointclouds" data-nav="Point clouds">

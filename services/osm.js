@@ -331,6 +331,12 @@ export const parseOverpassResponse = (data, bounds) => {
             id: el.id.toString(), type: "traffic_calming",
             geometry: [{ lat: el.lat, lng: el.lon }], tags: el.tags,
           });
+        } else if (el.tags.highway === "turning_circle" || el.tags.highway === "turning_loop") {
+          // a cul-de-sac's round end (services/turningCircles.js)
+          rawFeatures.push({
+            id: el.id.toString(), type: "turning_circle",
+            geometry: [{ lat: el.lat, lng: el.lon }], tags: el.tags,
+          });
         } else if (el.tags.natural === "tree" || el.tags.natural === "tree_row") {
           const tags = el.tags.natural === "tree_row"
             ? { ...el.tags, tree_row: "yes", source_feature: "tree_row" }

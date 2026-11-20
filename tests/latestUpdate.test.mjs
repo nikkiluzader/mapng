@@ -6,7 +6,9 @@ import fs from 'node:fs';
 import { LATEST_UPDATE } from '../worker/updates.js';
 
 test('the latest-update link names the newest update page', () => {
-  const versions = fs.readdirSync(new URL('../public/updates/', import.meta.url)).filter((d) => /^\d+\.\d+\.\d+$/.test(d));
+  // (a page drafted ahead of its release says so, noindex: the link stays on the last release until it goes out)
+  const draft = (d) => /<meta name="robots" content="noindex">/.test(fs.readFileSync(new URL(`../public/updates/${d}/index.html`, import.meta.url), 'utf8'));
+  const versions = fs.readdirSync(new URL('../public/updates/', import.meta.url)).filter((d) => /^\d+\.\d+\.\d+$/.test(d) && !draft(d));
   const newest = versions.sort((a, b) => { const x = a.split('.').map(Number); const y = b.split('.').map(Number); return x[0] - y[0] || x[1] - y[1] || x[2] - y[2]; }).pop();
   assert.equal(LATEST_UPDATE, newest);
   assert.ok(fs.existsSync(new URL(`../public/updates/${LATEST_UPDATE}/index.html`, import.meta.url)));
