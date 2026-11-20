@@ -96,6 +96,16 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
   one; many real cul-de-sacs are not tagged, so maybe also a residential dead end among houses. Test on
   suburb_naperville; done when the suburb shot has its bulbs, in game and in the 2D preview.
 
+- **Sidewalk fixes** (user, 2026-11-20), after cul-de-sacs:
+  1. Jagged edges across many levels and situations (one cause found while building cul-de-sacs: in
+     suburb_naperville the paved fill between a street's generated sidewalk and a mapped `footway=sidewalk` came out
+     in teeth; scratch/culdesac/cds3_zooms.jpg).
+  2. Sidewalks must never tilt sideways: where they follow the terrain they sometimes lean left or right. Level
+     across, following the road's grade along.
+  3. Footpaths built as concrete sidewalks that should be dirt or gravel: read OSM (`surface=*`, `highway=path` /
+     `track`, `footway` vs trails, `sac_scale`, `informal`, `tracktype`) and build no sidewalk mesh for an unpaved
+     path or trail; draw it as its ground material instead.
+
 ## Waiting on someone
 
 - **The next desktop test build (0.3.3-dev.6)** with the next batch of fixes: ask before the -dev tag (planned after
