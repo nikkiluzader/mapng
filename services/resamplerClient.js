@@ -10,6 +10,7 @@ import { getBuiltInProj4 } from './uploadGeoMetadata.js';
 
 let worker = null;
 let messageId = 0;
+const KEEP_IMAGE_COPY_BYTES = 128 * 1024 * 1024;
 const pendingMessages = new Map();
 
 /**
@@ -37,7 +38,9 @@ const getWorker = () => {
         worker.onerror = (e) => {
             // (its file may be gone: the site was updated under this page)
             codeFailed();
-            console.error('[ResamplerClient] Uncaught error:', e);
+            // (an ErrorEvent's message, file and line are not its own properties: logged as the event alone the
+            // report showed only {"isTrusted":true})
+            console.error('[ResamplerClient] Uncaught error:', e?.message || '(no message: the worker file may not have loaded)', e?.filename ? `${e.filename}:${e.lineno}:${e.colno}` : '');
             // Reject all pending, force recreation on next call
             for (const [, p] of pendingMessages) p.reject(new Error('Worker error'));
             pendingMessages.clear();
@@ -490,7 +493,13 @@ export const resampleHeightAndImageOffThread = async (
                 fallbackForWorker = { ...fallbackData, pixels };
             }
 
-            const imagePixels = imageSourceData.pixels;
+            // (a picture up to KEEP_IMAGE_COPY_BYTES goes as a copy, so this side keeps one: when the worker
+            // stops, the main-thread fallback still has a picture to fit. Moved, it was gone, and a 1024 or 2048
+            // map with a 30-60 MB picture ended in "out of memory" on every try: reports MR-MK6PSM, MR-N6XJE9,
+            // MR-595EF6, MR-32WDKH. A bigger one is still moved: two copies may not fit.)
+            const imagePixels = imageSourceData.pixels.byteLength <= KEEP_IMAGE_COPY_BYTES
+                ? imageSourceData.pixels.slice()
+                : imageSourceData.pixels;
             transferables.push(imagePixels.buffer);
 
             const result = await postToWorker({
@@ -591,6 +600,8 @@ export const resampleImageOffThread = async (
     const imageHeight = imageSize?.height || height;
     if (getWorker() && imageSourceData) {
         try {
+            // (a copy when small, as in resampleHeightAndImageOffThread: the fallback below reads the picture)
+            const pixels = imageSourceData.pixels.byteLength <= KEEP_IMAGE_COPY_BYTES ? imageSourceData.pixels.slice() : imageSourceData.pixels;
             const result = await postToWorker({
                 type: 'resampleImage',
                 center,
@@ -599,8 +610,8 @@ export const resampleImageOffThread = async (
                 imageWidth,
                 imageHeight,
                 targetBounds,
-                imageSource: imageSourceData,
-            }, [imageSourceData.pixels.buffer]);
+                imageSource: { ...imageSourceData, pixels },
+            }, [pixels.buffer]);
 
             if (result && result.rgbaBuffer) {
                 return await canvasFromRgbaBuffer(result.imageWidth || width, result.imageHeight || height, result.rgbaBuffer);
