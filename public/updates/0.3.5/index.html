@@ -172,27 +172,51 @@
   <section id="speed" data-nav="Faster exports">
     <div class="kicker">Speed</div>
     <h2>Faster exports that need less memory</h2>
-    <p>Most of the work in this version went into making every step of Generate and export quicker, without changing what comes out. Each change was checked against the level it replaced, and the levels match.</p>
+    <p>Most of the work in this version went into making every step of Generate and export quicker and lighter, without changing what comes out. Every Generate and export step was timed, the slow ones were rewritten, and each change was checked against the level it replaced: the levels match, to the byte in most cases and within a millimetre in the rest. From now on every change to MapNG goes through the same checklist (indexes instead of scans, work spread over threads in a fixed order, less memory thrown away, downloads overlapped within each server's limits) before it is done.</p>
     <div class="stats">
       <div class="stat"><div class="v">1053 → 553 s</div><div class="k">a dense 8 km downtown, the whole export</div></div>
       <div class="stat"><div class="v">28 → 19 GB</div><div class="k">the same export's peak memory</div></div>
       <div class="stat"><div class="v">121 → 106 s</div><div class="k">a city's Generate</div></div>
       <div class="stat"><div class="v">125 → 54 s</div><div class="k">a city's bridge heights from the US lidar survey</div></div>
     </div>
+
+    <h3>Spread over more threads</h3>
     <ul>
-      <li>The ground under roads and the sidewalks are worked out on several threads at once.</li>
-      <li>Bridges, bridge towers, sidewalks beside decks and barrier gates no longer scan parts that cannot count, so big cities with hundreds of decks are far quicker.</li>
-      <li>The export's three downloads (the surroundings, bridge heights and the water round the map) run at the same time, each still at its server's own pace.</li>
-      <li>Generate asks which trees grow in the area as soon as it knows the map's bounds, beside the map data.</li>
-      <li>Each building tile goes into the level's zip as soon as it is built, so the whole set is never held in memory at once.</li>
-      <li><span class="pill desk">Desktop</span>Exports use at most 8 worker threads. More of them only used more memory (32 threads: 24 GB, 8 threads: 17 GB, the same time).</li>
-      <li><span class="pill desk">Desktop</span>The data step no longer runs a second time at export. Its result used to be lost on the way back to the app, about 30 seconds of work for a city.</li>
+      <li><b>The ground under roads</b> is shaped on several threads at once, each taking a band of rows. The bands are put back together in exactly the order a single thread would have used, so the terrain comes out the same.</li>
+      <li><b>Sidewalks</b> are built in 256 m tiles on worker threads: in a dense test city the paving step went from 3.4 to 0.8 s, and the curb cuts and seawall unions from 24.8 to 18.7 s.</li>
+      <li><b>Downloads at export</b>: the surroundings, the bridge heights and the water round the map now download at the same time, and up to 8 bridge-height survey tiles download while earlier ones are read. Each server is still asked at its own pace.</li>
+      <li><b>Generate</b> asks which trees grow in the area as soon as it knows the map's bounds, beside the map data, instead of after it.</li>
     </ul>
+
+    <h3>Less searching</h3>
+    <ul>
+      <li><b>Bridges, bridge towers, sidewalks beside decks and barrier gates</b> skip every part that cannot be the nearest, instead of checking them all. A city with 700 decks used to compare every deck with every other at every point: a dense downtown's export went from 1053 to 646 s on this alone.</li>
+      <li><b>The structure solver</b> (which works out every road's height at once) stops each round as soon as nothing moves, and in the last sweeps works only on the roads still moving. Twin decks are paired only where they come close, each road's crossings are gathered once, and its numbers live in plain typed arrays.</li>
+      <li><b>Lake and sea beds</b> are dug row by row instead of testing the whole shoreline at every pixel: a 4 km lakefront's lake step went from 6.6 to 3.1 s.</li>
+      <li><b>Sidewalk meshes</b> clip each outline to a strip once rather than to every square: New York at 4 km, 33.8 to 13.6 s for that step.</li>
+      <li><b>Water under decks, crossing points and buildings over tunnel portals</b> are looked up in grids or by box instead of one by one.</li>
+    </ul>
+
+    <h3>Less memory</h3>
+    <ul>
+      <li>Each building tile goes into the level's zip, compressed, as soon as it is built, so the whole set is never held at once: the dense 8 km downtown peaked at 19 GB instead of 28.</li>
+      <li>Distances are worked out with a much cheaper calculation that was the export's biggest source of throw-away memory: about five times faster, the same result to a trillionth of a metre.</li>
+      <li>Lake beds are kept in a tiled store: Chicago at 8 km used to hit a limit and skip every lake bed after 20 seconds ("Map maximum size exceeded"). It now finishes, Lake Michigan included, in 423 s.</li>
+      <li><span class="pill desk">Desktop</span>Exports use at most 8 worker threads. More of them only used more memory (32 threads: 24 GB, 8 threads: 17 GB, in the same time). <code>MAPNG_THREADS</code> still sets your own number.</li>
+    </ul>
+
+    <h3>No work done twice</h3>
+    <ul>
+      <li><span class="pill desk">Desktop</span>The data step no longer runs a second time at export. Its result used to be lost on the way back to the app every time, about 30 seconds of lidar and surroundings read again for a city.</li>
+      <li><span class="pill desk">Desktop</span>An export no longer stops when a download it no longer needs fails; it carries on as the browser does.</li>
+      <li>The step cache keeps building tiles compressed, so an export after a small change reuses them without the memory cost.</li>
+    </ul>
+
     <h3>How heavy is this level?</h3>
     <p><span class="pill desk">Desktop</span>Before you export, the app now says how much memory the export will need at its peak, against what your computer has: fits, tight or too much. The figures come from measuring the desktop app on mountains, towns and downtowns from 2 to 16 km.</p>
     <div class="ph"><b>Screenshot to come</b>The "How heavy is this level?" line in the desktop app, before an export.</div>
     <h3>A progress bar that keeps time</h3>
-    <p>After all the speed work, the progress bar's idea of how long each step takes was wrong by several times: it jumped through some steps and crawled through others. It has been refitted to 281 timed exports, and now spreads the rest of the bar over the time left at your run's own pace.</p>
+    <p>After all the speed work, the progress bar's idea of how long each step takes was wrong by several times: it jumped through some steps and crawled through others. It has been refitted to 281 timed exports, and now spreads the rest of the bar over the time left at your run's own pace. Every part of laying roads, building the 3D buildings and placing barriers and street furniture also has its own line under the bar, with bridges and building groups counted, in all seven languages.</p>
   </section>
 
   <section id="sidewalks" data-nav="New sidewalks">
