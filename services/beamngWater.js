@@ -1086,7 +1086,10 @@ export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [], shal
     if (lake.river) depth = Math.min(depth, RIVER_AREA_MAX_M);
     depth = Math.max(LAKE_BED_M, depth);
     if (shallow) depth = Math.min(depth, SHALLOW_BED_M);
-    report.push({ name: lake.tags?.name || null, depth, source: tagged ? 'osm' : damD != null ? 'dam' : slope != null ? 'slope' : 'none', reach, slope, damDepth: damD });
+    let wetCells = 0; let flawCells = 0; for (let i = 0; i < gw * gh; i++) { if (wet[i]) wetCells++; if (flaw[i]) flawCells++; }
+    report.push({ name: lake.tags?.name || null, depth, source: tagged ? 'osm' : damD != null ? 'dam' : slope != null ? 'slope' : 'none', reach, slope, damDepth: damD,
+      // (for the log: the water's level (world z), the second levels found, and the grid the decisions were made on)
+      level, loose, river: !!lake.river, cell, sheets: sheetLevels.map((z) => z - minHeight), wetCells, flawCells, cells: gw * gh });
     // The distance to the shore has a crease wherever two shores are equally
     // far (down the middle of every bay), and the bed took it: flat facets
     // meeting in ridges. Away from the shore the distance is smoothed over
@@ -1373,9 +1376,21 @@ export function fillRemnants(heightMap, width, height, lowered, { rounds = 2, ke
 // ground goes down under it, SEABED_DEPTH_M deep, deepening over
 // SEABED_RAMP_CELLS land cover cells (10 m each) from the shore. Lowered only.
 const SEA_SURFACE_BAND_M = 0.3;
+// D (cells, n x n) at a fractional cell position, bilinear between the cells' centres; `own` stands in for cells past
+// the edge or still at their unreached value
+function cellDistanceAt(D, n, fc, fr, own) {
+  const c0 = Math.max(0, Math.min(n - 1, Math.floor(fc))); const r0 = Math.max(0, Math.min(n - 1, Math.floor(fr)));
+  const c1 = Math.min(n - 1, c0 + 1); const r1 = Math.min(n - 1, r0 + 1);
+  const tc = Math.max(0, Math.min(1, fc - c0)); const tr = Math.max(0, Math.min(1, fr - r0));
+  const v = (i) => (D[i] >= 1e8 ? own : D[i]);
+  const a = v(r0 * n + c0) * (1 - tc) + v(r0 * n + c1) * tc;
+  const b = v(r1 * n + c0) * (1 - tc) + v(r1 * n + c1) * tc;
+  return a * (1 - tr) + b * tr;
+}
 const SEABED_DEPTH_M = 2;
 const SEABED_RAMP_CELLS = 3;
 const SEA_FLAT_M = 0.03;       // a fine survey's water is flat: a point within this of the water's own level is the same water
+const SEA_SPREAD_UNDER_M = 0.1;  // ... and goes at least this far under the sea's surface
 const SEA_SPREAD_M = 15;       // the lowering is carried this far past the land cover's water cells
 const SEA_SHOAL_MAX_M = 6;     // in water joined to the sea, ground up to this far over it is still the sea's floor
 const COAST_REACH_M = 150;          // a cell is judged by a mapped coastline this near
@@ -1456,10 +1471,19 @@ export function lowerSeabed(grid, landCover, seaZ, { coarse = false, keep = null
       for (let i = 0; i < n * n; i++) if (side[i] < 0) landByCoast[i] = 1;
     } else nearSegs.clear();
   }
-  // distance (in cells) from the nearest non-water cell, two chamfer passes
+  // each cell's own ground, at its centre
+  const cellZ = new Float32Array(n * n);
+  for (let r = 0; r < n; r++) {
+    const hr = Math.min(height - 1, Math.floor(((r + 0.5) / n) * height)) * width;
+    for (let c = 0; c < n; c++) cellZ[r * n + c] = heightMap[hr + Math.min(width - 1, Math.floor(((c + 0.5) / n) * width))] - minHeight;
+  }
+  const top = seaZ + SEA_SURFACE_BAND_M;
+  // distance (in cells) from the nearest non-water cell, two chamfer passes. (On a fine survey a cell whose own ground
+  // stands over the water's level is land, whatever the land cover says: a beach below the mapped coastline is sand,
+  // and the sea floor's slope starts where the survey's water does)
   const D = new Float32Array(n * n);
   const BIG = 1e9;
-  for (let i = 0; i < n * n; i++) D[i] = wet(lc[i]) || byCoast[i] ? BIG : 0;
+  for (let i = 0; i < n * n; i++) D[i] = (wet(lc[i]) || byCoast[i]) && (coarse || cellZ[i] <= top) ? BIG : 0;
   for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
     const i = r * n + c; if (!D[i]) continue;
     if (c > 0) D[i] = Math.min(D[i], D[i - 1] + 1);
@@ -1470,7 +1494,6 @@ export function lowerSeabed(grid, landCover, seaZ, { coarse = false, keep = null
     if (c < n - 1) D[i] = Math.min(D[i], D[i + 1] + 1);
     if (r < n - 1) D[i] = Math.min(D[i], D[i + n] + 1);
   }
-  const top = seaZ + SEA_SURFACE_BAND_M;
   // The sea itself, by the land cover: water joined to water that lies at the sea's level (or to the open
   // sea beyond the tiles), through water whose ground is no more than SEA_SHOAL_MAX_M over it. Coarse
   // elevation carries the land's height out over the water: off Visakhapatnam's beach the global 30 m data
@@ -1478,11 +1501,6 @@ export function lowerSeabed(grid, landCover, seaZ, { coarse = false, keep = null
   // (glitter_shitter: "the water doesn't reach the shore", and raising the sea drowned the low town). All of
   // that is under the sea. A lake up in the hills is not joined to it; a river is, as far up as its bed in
   // the data stays within the band: its tidal mouth.
-  const cellZ = new Float32Array(n * n);
-  for (let r = 0; r < n; r++) {
-    const hr = Math.min(height - 1, Math.floor(((r + 0.5) / n) * height)) * width;
-    for (let c = 0; c < n; c++) cellZ[r * n + c] = heightMap[hr + Math.min(width - 1, Math.floor(((c + 0.5) / n) * width))] - minHeight;
-  }
   const sea = new Uint8Array(n * n);
   const queue = new Int32Array(n * n); let qh = 0; let qt = 0;
   for (let i = 0; i < n * n; i++) if (D[i] && (lc[i] === 0 || cellZ[i] <= top)) { sea[i] = 1; queue[qt++] = i; }
@@ -1526,7 +1544,9 @@ export function lowerSeabed(grid, landCover, seaZ, { coarse = false, keep = null
         // (not the last couple of metres before the line: a promenade or a quay's kerb is mapped a little to
         // either side of it, and its ground went from under it: Naples's seafront walks floated)
         if (sd > 0 && best < COAST_MARGIN_M) { landHere = 1; }
-        else if (sd > 0) { landHere = 0; if (z <= seaZ + COAST_SEA_MAX_M) { seaHere = 2; if (!d) d = 1; } }
+        // (on a fine survey only ground at the water's level: the beach and the marsh below the mapped high-water line
+        // were measured, and cut to the sea floor they stood as a bank at the line (St. Augustine's beach))
+        else if (sd > 0) { landHere = 0; if (coarse ? z <= seaZ + COAST_SEA_MAX_M : z <= top) { seaHere = 2; if (!d) d = 1; } }
         else if (sd < 0) { landHere = 1; }
       }
       if (!d) continue;
@@ -1537,7 +1557,9 @@ export function lowerSeabed(grid, landCover, seaZ, { coarse = false, keep = null
         // little under a seafront street, and its ground went 2 m down from under it)
         if (keep && worldSize > 0 && keep(((c / width) - 0.5) * worldSize, (0.5 - (r + 1) / height) * worldSize)) continue;
       }
-      const target = seaZ - SEABED_DEPTH_M * Math.min(1, d / SEABED_RAMP_CELLS);
+      // (the distance blended between the cells' centres: one value per 10 m cell cut the sea floor into square
+      // terraces 0.67 m apart, the blocks showing along every shore)
+      const target = seaZ - SEABED_DEPTH_M * Math.min(1, cellDistanceAt(D, n, ((c + 0.5) / width) * n - 0.5, ((r + 0.5) / height) * n - 0.5, d) / SEABED_RAMP_CELLS);
       if (target < z) edits.set(idx, target + minHeight);
     }
   }
@@ -1552,7 +1574,6 @@ export function lowerSeabed(grid, landCover, seaZ, { coarse = false, keep = null
     const sq = worldSize > 0 ? worldSize / width : 1;
     // (steps along the grid's axes: a diagonal run takes 1.4 steps a square)
     const maxSteps = Math.max(1, Math.round((SEA_SPREAD_M * 1.5) / sq));
-    const shallow = seaZ - SEABED_DEPTH_M / SEABED_RAMP_CELLS + minHeight;
     // (each point carries the level of the water it was reached from: a neighbour is the same water only at that
     // level. Compared with its neighbour alone, the lowering crept step by step over low ground that falls away
     // gently from a canal, and Amsterdam's streets stood over the lowered ground. Ground kept for a road or its
@@ -1568,7 +1589,13 @@ export function lowerSeabed(grid, landCover, seaZ, { coarse = false, keep = null
           const zk = heightMap[k];
           if (zk - minHeight > top || Math.abs(zk - z0) > SEA_FLAT_M) continue;
           if (keep && worldSize > 0) { const rk = Math.floor(k / width); const ck = k - rk * width; if (keep(((ck / width) - 0.5) * worldSize, (0.5 - (rk + 1) / height) * worldSize)) continue; }
-          if (shallow < zk) { edits.set(k, shallow); level.set(k, z0); next.push(k); }
+          // (the same blended depth as the sea floor round it, not one fixed shallow depth: a marsh flat under the sea's
+          // surface came out as 20 m patches cut 0.37 m down beside patches the spread had not reached (kingst))
+          const rk2 = Math.floor(k / width); const ck2 = k - rk2 * width;
+          const lc2 = Math.min(n - 1, Math.floor((rk2 / height) * n)) * n + Math.min(n - 1, Math.floor((ck2 / width) * n));
+          const dk = cellDistanceAt(D, n, ((ck2 + 0.5) / width) * n - 0.5, ((rk2 + 0.5) / height) * n - 0.5, Math.max(1, D[lc2] < 1e8 ? D[lc2] : 1));
+          const tk = Math.min(seaZ - SEA_SPREAD_UNDER_M, seaZ - SEABED_DEPTH_M * Math.min(1, dk / SEABED_RAMP_CELLS)) + minHeight;
+          if (tk < zk) { edits.set(k, tk); level.set(k, z0); next.push(k); }
         }
       }
       frontier = next;

@@ -159,6 +159,7 @@ import { contentExportOptions, contentOn, filterOsmByTags, filterWaterKinds, fil
 import { withProcessHandlersKept } from './keepProcessHandlers.js';
 import { composeTerrainParallel } from './composeWorker.js';
 import { gradePaved } from './pavedArea.js';
+import { relaxSeams } from './terrainSeams.js';
 import { fastHypot } from './fastMath.js';
 
 const BEAMNG_EXPORT_SERVICE_LOG = '[BeamNG Export Service]';
@@ -11691,6 +11692,8 @@ const CLEARANCE_CELL_M = 16;
  * Clearance test against strips [{ points: [[x, y, ...]...], half }]:
  * returns clearOf(x, y, margin), true within half + margin of any strip.
  */
+const SEAM_ROAD_MARGIN_M = 0.5;   // terrain seams: a road and this much round it are never smoothed
+
 function buildClearanceIndex(strips) {
   const segments = [];
   const grid = new Map();
@@ -14463,6 +14466,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       lakePlan.stats.bedPixels = beds.pixels;
       lakePlan.stats.lakeDepths = (beds.lakes || []).slice().sort((p, q) => q.depth - p.depth);
       if (beds.lakes?.length) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Lake beds: ${beds.lakes.map((lk) => `${lk.name || 'lake'} ${lk.depth.toFixed(1)} m (${lk.source})`).slice(0, 8).join(', ')}.`);
+      for (const lk of beds.lakes || []) {
+        console.log(`${BEAMNG_EXPORT_SERVICE_LOG}   ${lk.name || 'lake'}: water level ${Number(lk.level).toFixed(2)} m${lk.river ? ', river area' : ''}${lk.loose ? ', surface not flat (cut by height over the level)' : ''}; `
+          + `${lk.wetCells} of ${lk.cells} cell(s) water on a ${Number(lk.cell).toFixed(1)} m grid, ${lk.flawCells} of them dry ground taken for water`
+          + `${lk.sheets?.length ? `; second water level(s) at ${lk.sheets.map((z) => z.toFixed(2)).join(', ')} m` : ''}; bed ${lk.depth.toFixed(1)} m deep.`);
+      }
       // the sea floor under the sea plane where the survey recorded the
       // water's surface (any terrain choice: a measuring artifact, not shaping)
       const seabed = lowerSeabed({
@@ -14563,6 +14571,32 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     if (dragGrade.strips) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Drag strips: ${dragGrade.strips} graded smooth (${dragGrade.pixels} px; bumps ${(dragGrade.before * 100).toFixed(1)} -> ${(dragGrade.after * 100).toFixed(1)} cm rms).`);
   } catch (err) {
     console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Drag strip grading skipped: ${err?.message || err}`);
+  }
+
+  // The seams of the export's own terrain edits relaxed (services/terrainSeams.js): the jagged edges where the sea
+  // floor, a lake bed, a road's cut or fill or a field meets the surveyed ground, smoothed as the World Editor's "Really
+  // smooth" brush does, on the seams only. Held, never moved: roads and their margin (on 2 m lidar or finer the survey's
+  // road is near perfect: the user's rule, 2026-11-20; kept on every survey), the ground graded under the paving, a
+  // tunnel's own ground and mouths, ground under a deck.
+  if (exportTerrainData.heightMap !== sourceHeightMap) try {
+    const W = exportTerrainData.width; const H = exportTerrainData.height; const sq = squareSize;
+    const onRoadHeld = groundWithRings.length ? buildClearanceIndex(groundWithRings.map((cw) => ({ points: cw.nodes, half: cw.half }))) : null;
+    const tube = decalRoads.tunnels?.tube; const holes = decalRoads.tunnels?.holes ? new Set(decalRoads.tunnels.holes) : null;
+    const held = (idx) => {
+      if (sidewalkGroundIdx.has(idx) || tube?.has(idx) || holes?.has(idx)) return true;
+      const r = (idx / W) | 0; const c = idx - r * W;
+      const x = (c - W / 2) * sq; const y = (H - 1 - r - H / 2) * sq;
+      return !!(onRoadHeld && onRoadHeld(x, y, SEAM_ROAD_MARGIN_M)) || underDeck(x, y, -1e4, 1e4, 0.5);
+    };
+    // (written straight into the export's heightmap: it differs from the source, so it is the export's own copy)
+    // (the sea floor smoothed at any depth: lowered water, not a structure's ground. Held as deep, the sides of a beach's
+    // groynes stayed stepped where the floor beside them goes 2 m down: kingst)
+    const sm = relaxSeams({ heightMap: exportTerrainData.heightMap, source: sourceHeightMap, width: W, height: H, held, deepOk: (i) => !!seaFloor?.has(i) });
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Terrain seams: ${sm.seam} point(s) where the export's edits meet the surveyed ground, ${sm.band} in the band, `
+      + `${sm.held} held (roads, paving, tunnels, under decks), ${sm.deep} in edits deeper than 1.5 m left as built; ${sm.moved} smoothed, up to ${sm.maxChange.toFixed(2)} m (mean ${(sm.meanChange * 100).toFixed(1)} cm), `
+      + `${sm.big} by over 1 m${sm.maxAt >= 0 ? `; the most at (${(((sm.maxAt % W) - W / 2) * sq).toFixed(0)}, ${((H - 1 - ((sm.maxAt / W) | 0) - H / 2) * sq).toFixed(0)})` : ''}.`);
+  } catch (err) {
+    console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Terrain seams skipped: ${err?.message || err}`);
   }
 
   beginStep('ter', `Writing the terrain binary (terrain.ter, ${size}×${size} heights + material layers)…`);

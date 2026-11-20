@@ -103,6 +103,26 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
 
 ## Before 0.3.5
 
+- **Jagged terrain from our own steps** (user 2026-11-20: jagged edges on almost every export, coasts, tunnel mouths,
+  cliffs and roads; "the smoothing tool does fix these things really well"). Probe scratch/jag/jag.py (source DEM vs
+  untouched vs ready export; jaggedness = |4h - 4 neighbours|), plots there. Findings:
+  - *Coast*: the sea floor step (beamngWater.js lowerSeabed) cut 10 m land-cover squares and 0.67 m terraces, and on
+    fine data cut the beach below the mapped coastline into a bank. Fixed in the working tree (depth from a distance
+    blended between cell centres; on fine data a cell over the water's level is land and the coastline rule takes only
+    water-level ground). kingst untouched: points > 0.5 m off their neighbours 1.65 % -> 0.63 % (source 0.10 %).
+    kingst_shore_after.png. Not swept yet.
+  - *Marsh inside a tidal river's outline*: lake beds (carveLakeBeds) take flat marsh at a "second water level" as
+    water and cut whole patches (kingst -800, 560: 0.83 m -> 0.46 m in blocks). Open.
+  - *Road edges on steep ground*: the edits' biggest share (gt_chevril -300, 580: bands up to 1.5 m along the graded
+    band's edges). Open: relax the seam the way the in-game brush does.
+  - *Tunnel mouths*: no heightmap change at the portals (gt_chevril); the jags there are the 1 m hole squares: hide with
+    the structure (CLAUDE.md), not smoothing.
+  - *The game's brushes* (measured in game, scratch/jag/brushtest.png): "Really smooth (new)" = each point pulled toward
+    its near neighbours' average (Gaussian ~1 m), ~0.75 at the centre fading to 0 at the brush edge; "Average Height
+    (old)" flattens toward one mean (tilts slopes); "Smooth Slope" evens toward one slope (cut 1.25 m off a cliff edge).
+    The engine does these in C++; Lua only sets size/pressure/softness/slope mask (terrainEditor.lua). The Lua
+    terraform tool (editor/terraform/terraform.lua, bCDDL: reimplement, don't copy) relaxes the band beside a held road.
+
 - **Sea walls: the promenade behind a wall at the water** (user 2026-11-20: "bring the pavement out to the retaining
   wall and make sure it's flat"). On branch `seawall` (5009640), not on dev; dev.2 went without it (decisions.md).
   Works at cordova (flat_after.png, in-game shots); sweep regressions left, all at kingst mh (+19 floating):
@@ -148,6 +168,11 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
   Update 17:00Z: re-exported interpolated to 0.3 m (new nemuno_iedas.zip, 316 MB, #general): "this actually kinda
   rips", drives fine, still some manual work. So the spikes come mostly from the sparse 10 cm grid; the gap fill still
   worth doing for fine resolutions.
+  Toma's recipe (Discord 2026-11-20 13:26-13:30): 1) discard irrelevant classes, 2) prune statistical outliers, 3) a
+  Kriging fill (CloudCompare). Ours (lazWorker.js, lazGrid.js): 1) done (ground 2 + water 9 only); 2) weak: only cells
+  > 25 m ABOVE their 8 neighbours' median are dropped, nothing low (the likely stalactites); 3) a pyramid fill relaxed
+  into a membrane (measured cells kept). Next: a two-sided statistical outlier filter (median/MAD per neighbourhood,
+  weighted by point count) before the fill; Kriging only for uploads, later, if the membrane falls short.
 
 ## Waiting on someone
 

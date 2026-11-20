@@ -281,7 +281,9 @@ test('the sea floor: where the land cover says water and the ground sits at the 
   const res = lowerSeabed({ heightMap: hm, width: W, height: W, minHeight: 0 }, { grid, n }, 0);
   res.apply((i, v) => { hm[i] = v; });
   assert.ok(res.pixels > 0);
-  assert.ok(hm[50 * W + 95] <= -1.9, `open sea under the water: ${hm[50 * W + 95]}`);
+  assert.ok(hm[50 * W + 67] <= -1.9, `open sea under the water: ${hm[50 * W + 67]}`);
+  // (the sandbar stands over the water: the floor rises toward it, as it does toward the shore)
+  assert.ok(hm[50 * W + 77] > hm[50 * W + 67], `the floor rises toward the sandbar: ${hm[50 * W + 77]}`);
   assert.ok(hm[50 * W + 52] < 0 && hm[50 * W + 52] > -1.9, `the shore deepens gently: ${hm[50 * W + 52]}`);
   assert.equal(hm[50 * W + 82], 3, 'ground well over the sea is left');
   assert.ok(Math.abs(hm[50 * W + 20] - 0.1) < 1e-6, 'land is left');
@@ -567,7 +569,7 @@ test('on a fine survey the sea floor reaches the quay the survey measured, not t
   let shelf = 0; let street = 0; let land = 0;
   for (let r = 0; r < W; r++) for (let c = 0; c < W; c++) {
     const [x, y] = xy(r, c); const v = out[r * W + c];
-    if (x + y < -1 && x + y > -12 && v > -0.3) shelf++;              // water within 12 m of the quay left at the surface
+    if (x + y < -1 && x + y > -12 && v > 0.1 - 1e-6) shelf++;        // water within 12 m of the quay left at the surface (the floor slopes gently from the quay: shallow there is meant)
     if (x + y > 6.5 && x + y < 9.5 && v < 0.1 - 1e-6) street++;      // the street lowered
     if (x + y > 1 && (x + y < 6 || x + y > 10) && v !== 1.5) land++;
   }

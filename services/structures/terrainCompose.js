@@ -28,6 +28,7 @@ const LOW_DECK_UNDER_M = 0.6;  // a low deck's slab: the ground is dug no furthe
 const DECK_REACH_M = 1.5;      // past a deck's half width
 const ABUTMENT_M = 8;
 const CORE_STEP_M = 2;          // road cores this far apart in height are on two levels
+const SIDE_BLEND_EPS_M = 0.25;  // side slopes blended by 1 / (distance past the core + this)^2
 // (which of two roads keeps its surface where a tunnel road left on the ground passes under another)
 const ROAD_RANK = { motorway: 9, trunk: 8, primary: 7, secondary: 6, tertiary: 5, unclassified: 4, residential: 4, living_street: 3, service: 2 };
 const END_UNDER_DECK_M = 0.06;     // the ground a ground road's end shapes under the deck it runs on from: this far under the road's line
@@ -114,7 +115,7 @@ export function composeTerrain(graph, grid) {
     const key = Math.floor(c / TILE) * 65536 + Math.floor(r / TILE);
     let t = tiles.get(key);
     if (!t) {
-      t = { h: new Float32Array(TILE * TILE), w: new Float32Array(TILE * TILE).fill(Infinity), q: new Float32Array(TILE * TILE).fill(1), n: new Uint8Array(TILE * TILE), tn: new Uint8Array(TILE * TILE), rk: new Uint8Array(TILE * TILE), cap: new Float32Array(TILE * TILE).fill(Infinity) };
+      t = { sh: new Float32Array(TILE * TILE), sw: new Float32Array(TILE * TILE), h: new Float32Array(TILE * TILE), w: new Float32Array(TILE * TILE).fill(Infinity), q: new Float32Array(TILE * TILE).fill(1), n: new Uint8Array(TILE * TILE), tn: new Uint8Array(TILE * TILE), rk: new Uint8Array(TILE * TILE), cap: new Float32Array(TILE * TILE).fill(Infinity) };
       tiles.set(key, t);
     }
     return t;
@@ -438,6 +439,11 @@ export function composeTerrain(graph, grid) {
           // car park's ramp; a primary road's underpass under a side street), the road above between equals.
           // Shared by nearest line, each cut half through the other: a slot 2 m deep and 3 m wide across the
           // avenue (its Mesh Roads deck gone with it), a fin of ground 2 m high across the underpass.
+          // (every side slope over the pixel, blended by nearness: where no road's core claims it, two corridors' slopes
+          // meet in one slope between them, not a step down the line of points nearer one than the other. That line
+          // ran on the grid's squares: a sawtooth of drops metres high between the arms of every hairpin (stelvio),
+          // and between the pieces of one road at a bend)
+          if (out > 0) { const wgt = 1 / ((out + SIDE_BLEND_EPS_M) * (out + SIDE_BLEND_EPS_M)); t.sw[j] += wgt; t.sh[j] += target * wgt; }
           const underRoad = bothCores && (sunkRoad === 1) !== (t.tn[j] === 1) && Math.abs(target - t.h[j]) > SUNK_UNDER_M
             && (sunkRoad === 1) === (target < t.h[j]);
           const twoLevels = bothCores && !underRoad && Math.abs(target - t.h[j]) > CORE_STEP_M;
@@ -471,7 +477,7 @@ export function composeTerrain(graph, grid) {
     const t = lastTile;
     if (!t) return NaN;
     const j = (r % TILE) * TILE + (c % TILE);
-    const base = Number.isFinite(t.w[j]) ? t.h[j] : raw(c, r) - minHeight;
+    const base = Number.isFinite(t.w[j]) ? (t.w[j] > 0 && t.sw[j] > 0 ? t.sh[j] / t.sw[j] : t.h[j]) : raw(c, r) - minHeight;
     if (!Number.isFinite(t.w[j]) && !Number.isFinite(t.cap[j])) return NaN;
     // a road's own core is never dug below its surface by a deck over it
     // (too little room there is the crossing's problem, counted, not a trench)
