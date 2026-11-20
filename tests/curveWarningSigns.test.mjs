@@ -70,3 +70,18 @@ test('bollards: steel by default, concrete where mapped, none on a drawn road', 
   assert.equal(bollards[0].position[2], 5);
   assert.equal(skipped.onRoad, 1);
 });
+
+// Two-way chevrons share their posts: the way back's board stands back to back with the way there's, facing the other
+// way and pointing the other way round the bend (Fizz_Mechanic: "placed twice, facing both ways" on a second row of
+// posts beside the first).
+test('chevrons for both directions stand back to back on the same posts', () => {
+  const { props } = place([cw(roadWithArc(40, 120))]);
+  const left = props.filter((p) => p.kind === 'chevronLeft'); const right = props.filter((p) => p.kind === 'chevronRight');
+  assert.ok(left.length >= 3 && left.length === right.length, `${left.length} / ${right.length}`);
+  for (const a of left) {
+    const b = right.find((q) => Math.hypot(q.position[0] - a.position[0], q.position[1] - a.position[1]) < 0.1);
+    assert.ok(b, `a partner within 10 cm of (${a.position[0].toFixed(1)}, ${a.position[1].toFixed(1)})`);
+    const turn = Math.abs(((b.yaw - a.yaw + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
+    assert.ok(turn > Math.PI - 0.01, `facing the other way (${turn.toFixed(2)})`);
+  }
+});

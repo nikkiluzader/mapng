@@ -63,7 +63,7 @@ push dev and main (standing go-ahead for this list).
    Roads hidden; 9.1 a thin band of terrain along Mesh and Hero Road edges (request).
 9. **5.1 World Editor:** buildings, sidewalks and lake walls grouped in big blocks; he wants single objects.
 10. **Answers owed to Fizz** (draft for the user to post: scratch/fizz033/replies_draft.md, 2026-11-20): 2.2 one continuous road (the solver works that way; the breaks are where it falls
-    short); 3.4 OSM tells galleries apart (tunnel=avalanche_protector); 4.5 double chevrons by design (back to back, one set per direction) but too many on switchbacks (1,772 of his 2,199 signs): thin them; ask him to
+    short); 3.4 OSM tells galleries apart (tunnel=avalanche_protector); 4.5 chevrons for both directions now share their posts, back to back (2026-11-20; they stood on a second row of posts beside the first); ask him to
     recheck 2.6 (now a flat-roofed gallery, no walls) and the portals on a new build.
 11. **After the list:** a desktop dev build (ask before the -dev tag) and an end-to-end test of everything.
 

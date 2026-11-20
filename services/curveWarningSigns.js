@@ -43,6 +43,7 @@ const ADVANCE_M = 50;            // warning this far before the first curve
 const MIN_ADVANCE_M = 15;
 const KERB_M = 1.5;
 const MAX_CHEVRONS = 8;
+const BACK_TO_BACK_M = 0.04;     // the way back's chevron this far behind the way there's, on the same post
 
 const norm = (v) => String(v ?? '').trim().toLowerCase();
 const isOneWay = (tags = {}) => ['yes', '1', 'true', '-1', 'reverse'].includes(norm(tags.oneway)) || tags.junction === 'roundabout';
@@ -173,11 +174,12 @@ export function placeCurveWarnings({ carriageways = [], heightAt, isBlocked = ()
     if (!curves.length) continue;
     const length = curves.length ? cw.nodes.reduce((L, p, i) => (i ? L + fastHypot(p[0] - cw.nodes[i - 1][0], p[1] - cw.nodes[i - 1][1]) : 0), 0) : 0;
     const dirs = isOneWay(cw.tags) ? [travelSign(cw.tags)] : [1, -1];
+    const backToBack = new Map();
     for (const dir of dirs) {
       // curves in travel order, in travel coordinates (u from the start of travel)
       const seq = (dir > 0 ? curves : [...curves].reverse()).map((c) => ({
         u0: dir > 0 ? c.s0 : length - c.s1, u1: dir > 0 ? c.s1 : length - c.s0,
-        left: c.turn * dir > 0, radius: c.radius,
+        left: c.turn * dir > 0, radius: c.radius, curve: c,
       }));
       const toS = (u) => (dir > 0 ? u : length - u);
       for (let g = 0; g < seq.length;) {
@@ -204,6 +206,19 @@ export function placeCurveWarnings({ carriageways = [], heightAt, isBlocked = ()
           if (c.radius > CHEVRON_RADIUS_M) continue;
           const step = Math.max(12, c.radius * 0.5);
           const count = Math.min(MAX_CHEVRONS, Math.max(3, Math.floor((c.u1 - c.u0) / step) + 1));
+          // (the way back round the same bend: its chevrons back to back on the posts the way there stood, facing the
+          // other way, as two-way chevron boards are. Each placed on its own, they stood on a second row of posts a
+          // metre or two beside the first: Fizz_Mechanic's map had 1,772 chevrons of 2,199 signs)
+          const there = backToBack.get(c.curve);
+          if (there) {
+            for (const q of there) {
+              const kind = q.kind === 'chevronLeft' ? 'chevronRight' : 'chevronLeft';
+              props.push({ kind, shape: set[kind], position: [q.position[0] - q.d[0] * BACK_TO_BACK_M, q.position[1] - q.d[1] * BACK_TO_BACK_M, q.position[2]], yaw: q.yaw + Math.PI });
+              counts[kind] = (counts[kind] || 0) + 1;
+            }
+            continue;
+          }
+          const placed = [];
           for (let j = 0; j < count; j++) {
             const uc = c.u0 + ((c.u1 - c.u0) * (j + 0.5)) / count + (dir > 0 ? 0 : 1);
             const at = pointAt(cw.nodes, toS(uc));
@@ -212,8 +227,10 @@ export function placeCurveWarnings({ carriageways = [], heightAt, isBlocked = ()
             const right = [d[1], -d[0]];
             // outside of a left curve is on the right of travel, and vice versa
             const outside = c.left ? right : [-right[0], -right[1]];
-            put(c.left ? 'chevronLeft' : 'chevronRight', at.x, at.y, d, outside, cw.half + KERB_M);
+            const kind = c.left ? 'chevronLeft' : 'chevronRight';
+            if (put(kind, at.x, at.y, d, outside, cw.half + KERB_M)) placed.push({ ...props[props.length - 1], d });
           }
+          if (dirs.length > 1 && placed.length) backToBack.set(c.curve, placed);
         }
         g = e + 1;
       }
