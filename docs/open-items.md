@@ -22,7 +22,7 @@ As of 2026-11-19, late:
 
 ## Now: Fizz_Mechanic's 0.3.3 list (2026-11-19, in progress)
 
-His 16 km Tignes / Val d'Isère map, 0.3.3, Mesh Roads on. Report and his 24 screenshots: scratch/fizz033 (report_0.3.3.txt,
+His 16 km Tignes / Val d'Isère map, 0.3.3 (the report is the Decal Roads export; some shots are from a Mesh Roads one). Report and his 24 screenshots: scratch/fizz033 (report_0.3.3.txt,
 shots/); re-checks on today's code: scratch/fizz033/run; diagrams scratch/fizz033/diag; Mapillary scratch/fizz033/mly.
 
 **Order of work (2026-11-19, after compaction start here).** Numbers are his (table in the session; shots fzNN in
@@ -40,9 +40,11 @@ push dev and main (standing go-ahead for this list).
 3. **2.8 leftover:** where a wing wall is left out beside another road (a service road crossing a raised street in
    Tignes) the fill's steep sides show as teeth: terrainCompose walls the fill before the walls are known; run the
    wall rule first and give those stations the ordinary slope.
-4. **Roads on every map** (his "most important"). He exported with Mesh Roads on, which looks like his preference
-   (user, 2026-11-19), so every point here was seen on Mesh Roads: first reproduce each on both Mesh and Decal
-   Roads to sort out which are Mesh-only (fold those in with item 8) and which every map has. Points: 1.3 road pieces not joined (offset ends, wedges at junctions and
+4. **Roads on every map** (his "most important"). The report he shared is a Decal Roads export
+   (D902_0.3.3_decalroads, build 1456410); his Mesh Roads points (item 8) come from a Mesh Roads export, which the
+   user thinks is his preference. Reproduce each point on today's code with both road kinds, on small exports of
+   just the spot (512-2048, never the 16 km map), and sort Mesh-only ones into item 8. Sidewalks were rebuilt since
+   his build: recheck every sidewalk point (4.3, curbs, 1.2) fresh. Points: 1.3 road pieces not joined (offset ends, wedges at junctions and
    bends, 8 shots); 1.6 hairpins (inner wedge, folding over); 1.8 buildings and street lights in the road; 4.3
    sidewalks along mountain-bike trails; 4.4 spikes along road edges; 9.2 terrain edges beside a road wrong (his
    diagram); 9.3 junctions with walls, slabs and tilted pieces; 1.1 narrow roads, corners tighter than the terrain;
