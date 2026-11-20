@@ -11,7 +11,7 @@ these files; they are never copied.
 
 As of 2026-11-20 morning:
 
-- `main` = `dev` at d05f34e (building=no and the alpine look since). Branch `step-walls` holds the parked 2.8 step
+- `main` = `dev` at bdaac6d (building=no, the alpine look, the crash-report fixes). Branch `step-walls` holds the parked 2.8 step
   walls. Earlier, at e67df2d, a Fizz-list push (the chevrons) carried everything then on dev to main: cul-de-sacs, the
   three sidewalk fixes and the 0.3.5 draft page (unlinked, preview tag, noindex), which were meant to wait for the
   release. Not rolled back (that is a force push: the user's call). Published: 0.3.4 as the latest release; no desktop
