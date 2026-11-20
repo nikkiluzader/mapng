@@ -9,81 +9,14 @@ these files; they are never copied.
 
 ## State of the branches
 
-As of 2026-11-19, late:
+As of 2026-11-20 morning:
 
-- `main` and `dev` are at the same commit (bac4f97). Published: 0.3.4 as the latest release. No test build since
-  0.3.3-dev.5. The user gave a standing go-ahead to push main as each Fizz list fix lands (sweep reviewed first).
-- On main since 0.3.4: Fizz's tunnel and gallery work (below), the D 87A crossing, wing walls, portals; custom
-  elevation uploads (coordinate guess, export square, resolution buttons, point cloud layers, the 2D preview's point
-  cloud views, smoother point cloud terrain); bug reports with a JSON report and the map data.
-- The sweep has two areas BeamNG developers exported (dev_szczyrk, dev_pilchowice) besides tychonas; every area
-  one of them exports is added. Its known pre-existing flags: sidewalk drift at naldo, kingst, deckpark_g, stelvio;
-  ams_centraal mh/ready; dev_szczyrk cross; ams t30/noshape swBuried.
-
-## Now: Fizz_Mechanic's 0.3.3 list (2026-11-19, in progress)
-
-His 16 km Tignes / Val d'Isère map, 0.3.3 (screenshots with Mesh Roads on; the report is a Decal Roads export of the same map). Report and his 24 screenshots: scratch/fizz033 (report_0.3.3.txt,
-shots/); re-checks on today's code: scratch/fizz033/run; diagrams scratch/fizz033/diag; Mapillary scratch/fizz033/mly.
-
-**Order of work (2026-11-19, after compaction start here).** Numbers are his (table in the session; shots fzNN in
-scratch/fizz033/shots). Test areas in scratch/levelprobe/data: fz_d87a, fz_foret, fz_funival, gt_chevril,
-gt_chevril_full, gt_tignes, val_disere. Rules: diagrams first, in game both ways, sweep before each commit, then
-push dev and main (standing go-ahead for this list).
-
-2. **2.4, the rest:** the 15-20 m terrain cliff beside a covered bore on a steep valley side (t001 at 285-294 m,
-   scratch/fizz033/diag/g283_sections_wall.png); Val d'Isère t001's south portal juts (its ground 7 m up); a bright
-   side opening in t001 at 75 % (driver's view); his fz07 cuts.
-3. **2.8 leftover** (2026-11-20: tried giving the walled fill near a deck's end the ordinary slope on sides with
-   another road beside it; no change at gt_tignes (-110, 745): the stepped vertical sides there run the whole raised
-   street, not only near the deck, so they come from elsewhere in terrainCompose. In game (scratch/fizz033/diag/
-   tigw_sheet.jpg): Rue de la Poste on a shelf, its downhill edge a vertical sawtooth on the 1 m grid with no wall
-   over it, the sidewalk's edge jagged with it: the general "vertical fill sides with no wall" fault, to fix with
-   item 4's road edges (4.4, 9.2) and the user's sidewalk jagged edges; plot scratch/fizz033/diag/wing_teeth.png): where a wing wall is left out beside another road (a service road crossing a raised street in
-   Tignes) the fill's steep sides show as teeth: terrainCompose walls the fill before the walls are known; run the
-   wall rule first and give those stations the ordinary slope.
-4. **Roads on every map** (his "most important"). All his screenshots are 0.3.3 with Mesh Roads on (his words);
-   the report he shared is a Decal Roads export of the same map (D902_0.3.3_decalroads, build 1456410). His own read:
-   most road issues come from the Decal Roads' geometry and layout, Mesh and Hero Roads being layers that follow the
-   decal paths. So fix them in the shared road geometry, and check each point with both road kinds, on small exports
-   of just the spot (512-2048, never the 16 km map); what shows only with Mesh Roads goes to item 8. Sidewalks were rebuilt since
-   his build: recheck every sidewalk point (4.3, curbs, 1.2) fresh. Points: 1.3 road pieces not joined (offset ends, wedges at junctions and
-   bends, 8 shots); 1.6 hairpins (inner wedge, folding over); 1.8 buildings and street lights in the road (seen too in bt_chicago at (-80, -196): a small building in the
-   middle of a junction, scratch/rel035/chi_5.jpg); 4.3
-   sidewalks along mountain-bike trails; 4.4 spikes along road edges; 9.2 terrain edges beside a road wrong (his
-   diagram); 9.3 junctions with walls, slabs and tilted pieces; 1.1 narrow roads, corners tighter than the terrain;
-   check 1.2 (a curb strip through a roundabout) and 1.5 (up and down under a gallery) on today's code.
-5. **Regional look (must-fix, user):** the Alps came out "Utah"; every automatic asset choice has to fit the place
-   (see the bullet below).
-6. **Buildings:** 4.1 a large building on a lakeside beach and marina (check the OSM footprint); 4.2 a building over
-   a portal juts onto the road.
-7. **Check on today's code:** 3.5 the D 902 road/gallery/tunnel junction (probably the D 87A crossing, fixed);
-   2.7 bridges' heights and shapes; the D 87A box's ends beside the lower road (headroom now fitted, 3.81 m).
-8. **Mesh Roads only** (experimental, off by default, but his chosen mode: worked together with item 4): 1.4 Mesh and Decal Roads at one height, layers showing;
-   1.7 small steps; 7.1 triangles visible in the light; 7.2 a texture layer floating over the Decal Road with Mesh
-   Roads hidden; 9.1 a thin band of terrain along Mesh and Hero Road edges (request).
-9. **5.1 World Editor:** buildings, sidewalks and lake walls grouped in big blocks; he wants single objects.
-10. **Answers owed to Fizz** (draft for the user to post: scratch/fizz033/replies_draft.md, 2026-11-20): 2.2 one continuous road (the solver works that way; the breaks are where it falls
-    short); 3.4 OSM tells galleries apart (tunnel=avalanche_protector); 4.5 chevrons for both directions now share their posts, back to back (2026-11-20; they stood on a second row of posts beside the first); ask him to
-    recheck 2.6 (now a flat-roofed gallery, no walls) and the portals on a new build.
-11. **After the list:** a desktop dev build (ask before the -dev tag) and an end-to-end test of everything.
-
-Also open, outside this list: point cloud layers steps 2-4 (trees, building heights, markings from intensity:
-refs/output/backlog.md); "Processing resolution" naming (backlog, waiting on the user); brokenbraincells_ asked on
-Discord (2026-11-20 01:42Z) whether the Game texture paints real tileable materials (the user to answer).
-
-- **Desktop Cancel did not cancel** (brokenbraincells_, Discord #general 2026-11-20). Screenshot: the export card at
-  0 % "Preparing", "Waiting for the downloads... Surroundings: Fetching USGS1M data for tile ...", 2:29 elapsed, with
-  the Cancel button. Fixed by the user, not in a release yet: goes in the next desktop build's notes. Open question
-  for the user: the export was waiting on a surroundings download, where downloads are meant to happen at Generate.
-
-- **Regional look must always make sense (user, 2026-11-19).** The French Alps came out "Utah (high rock and ice)":
-  red-rock textures, sagebrush, Utah lamps. Every automatic asset choice (look, textures, trees, rocks, lamps,
-  ground cover) has to fit the place from its position and its OSM / land cover. Italy (cypress, olive, palm) and
-  East Coast (broadleaf) don't fit the Alps either: needs a mountain look built from what the game has (alpine
-  conifers, grey rock, meadow), or per-asset choices instead of one level's whole kit. To do: list what each
-  official level offers, pick per climate band and height, test on Tignes, Zermatt, the Rockies, the Andes.
-
-Finished points of this list and their measurements: refs/output/history.md, "Fizz_Mechanic's 0.3.3 list: what was done (2026-11-19)".
+- `main` = `dev` at e67df2d. A Fizz-list push (the chevrons) carried everything then on dev to main: cul-de-sacs, the
+  three sidewalk fixes and the 0.3.5 draft page (unlinked, preview tag, noindex), which were meant to wait for the
+  release. Not rolled back (that is a force push: the user's call). Published: 0.3.4 as the latest release; no desktop
+  test build since 0.3.3-dev.5; the user plans a dev build mid-day 2026-11-20 and 0.3.5 that evening.
+- The sweep's known pre-existing flags: sidewalk drift at naldo, kingst, deckpark_g, stelvio; ams_centraal mh/ready;
+  dev_szczyrk cross; ams t30/noshape swBuried; Michiel de Ruijtertunnel joint steps (check 4).
 
 ## Before 0.3.5
 
