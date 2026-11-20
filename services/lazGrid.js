@@ -53,3 +53,25 @@ export const relaxFilled = (h, width, height, holes) => {
   }
 };
 
+
+// ─── Relaxing each pyramid level on the way down ────────────────────────────
+// The hole filler's pyramid averages whatever cells hold points, which on a slope sampled in patches is a biased
+// guess, and the relaxation on the full grid (relaxFilled) runs a few dozen passes: across a gap of tens of cells
+// (a few metres of forest floor at 10 cm) it never reaches the middle. A lone point the fill keeps exactly then stood
+// metres off the coarse guess round it, and the ground dove to it in a funnel: the "stalactite field" of sparse
+// ground under trees (Toma's 10 cm Nemuno iedas cloud, 3-4 m deep). Relaxed at every level as the pyramid is walked
+// down (multigrid), a big gap is smoothed where it is only a few cells wide; measured cells stay as they are.
+export const LEVEL_RELAX_PASSES = 12;
+export const relaxLevel = (data, width, height, holes, passes = LEVEL_RELAX_PASSES) => {
+  for (let pass = 0; pass < passes; pass++) {
+    for (let k = 0; k < holes.length; k++) {
+      const i = holes[k]; const y = (i / width) | 0; const x = i - y * width;
+      let s = 0; let c = 0;
+      if (x > 0) { s += data[i - 1]; c++; }
+      if (x < width - 1) { s += data[i + 1]; c++; }
+      if (y > 0) { s += data[i - width]; c++; }
+      if (y < height - 1) { s += data[i + width]; c++; }
+      if (c) data[i] += RELAX_OMEGA * (s / c - data[i]);
+    }
+  }
+};

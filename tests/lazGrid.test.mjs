@@ -23,3 +23,16 @@ test('smoothing filled cells: measured cells unchanged, a hole becomes the plane
   relaxFilled(z, w, h, Int32Array.from(holes));
   for (let y = 0; y < h; y++) { assert.equal(z[y * w], 0); assert.equal(z[y * w + w - 1], 8); for (let x = 1; x < w - 1; x++) assert.ok(Math.abs(z[y * w + x] - x) < 0.05, `${x}: ${z[y * w + x]}`); }
 });
+
+test('a level\'s filled cells relaxed between its measured ones: a slope, not a funnel to each point', async () => {
+  const { relaxLevel } = await import('../services/lazGrid.js');
+  // 32 x 32 cells of a plane rising 1 m per cell along x; measured only at four lone cells, the rest a flat first guess
+  const W = 32; const h = new Float32Array(W * W).fill(16); const known = new Set();
+  for (const [x, y] of [[4, 4], [27, 6], [6, 26], [25, 25]]) { h[y * W + x] = x; known.add(y * W + x); }
+  const holes = Int32Array.from([...Array(W * W).keys()].filter((i) => !known.has(i)));
+  relaxLevel(h, W, W, holes, 400);
+  // measured cells untouched; the middle of the gap near the plane's height there, and rising along x
+  for (const i of known) assert.equal(h[i], i % W);
+  const mid = h[16 * W + 16]; assert.ok(Math.abs(mid - 16) < 3, `middle ${mid}`);
+  assert.ok(h[16 * W + 24] > h[16 * W + 8], 'rises along x');
+});

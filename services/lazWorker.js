@@ -14,7 +14,7 @@ import proj4 from 'proj4';
 // Import the worker-specific build (ENVIRONMENT_IS_WORKER=true).
 // WASM is resolved via locateFile → /laz-perf.wasm in public/.
 import { createLazPerf } from 'laz-perf/lib/worker';
-import { POOL_BELOW_SPACING, poolFineCells, relaxFilled } from './lazGrid.js';
+import { POOL_BELOW_SPACING, poolFineCells, relaxFilled, relaxLevel } from './lazGrid.js';
 import { getBuiltInProj4 } from './uploadGeoMetadata.js';
 
 const NO_DATA = -99999;
@@ -250,10 +250,15 @@ const fillHoles = (heightMap, width, height) => {
     levels[levels.length - 1].data[0] = cnt > 0 ? sum / cnt : 0;
   }
 
-  // Propagate down
+  // Propagate down, each level's filled cells relaxed against its measured ones (lazGrid.relaxLevel: without it a
+  // lone point in a wide gap stood at the bottom of a funnel metres deep)
   for (let li = levels.length - 2; li >= 0; li--) {
     const coarse = levels[li + 1];
     const fine   = levels[li];
+    let nHoles = 0;
+    for (let i = 0; i < fine.data.length; i++) if (fine.data[i] === NO_DATA || !Number.isFinite(fine.data[i])) nHoles++;
+    const levelHoles = new Int32Array(nHoles);
+    for (let i = 0, k = 0; i < fine.data.length; i++) if (fine.data[i] === NO_DATA || !Number.isFinite(fine.data[i])) levelHoles[k++] = i;
     for (let y = 0; y < fine.h; y++) {
       for (let x = 0; x < fine.w; x++) {
         const idx = y * fine.w + x;
@@ -270,8 +275,33 @@ const fillHoles = (heightMap, width, height) => {
           coarse.data[cy1 * coarse.w + cx1] * fx     * fy;
       }
     }
+    // (the finest level is relaxed after, by relaxFilled, over the holes inside the footprint only)
+    if (li > 0 && levelHoles.length) relaxLevel(fine.data, fine.w, fine.h, levelHoles);
   }
   heightMap.set(levels[0].data);
+};
+
+// The empty cells outside every tile's footprint (each a quad of grid coordinates), as markExteriorNoData's mask.
+const markOutsideFootprints = (heightMap, width, height, quads) => {
+  const inside = new Uint8Array(width * height);
+  for (const q of quads) {
+    const v0 = Math.max(0, Math.floor(Math.min(...q.map((p) => p[1])))); const v1 = Math.min(height - 1, Math.ceil(Math.max(...q.map((p) => p[1]))));
+    for (let r = v0; r <= v1; r++) {
+      const y = r + 0.5; const xs = [];
+      for (let k = 0; k < 4; k++) {
+        const [ax, ay] = q[k]; const [bx, by] = q[(k + 1) % 4];
+        if ((ay > y) !== (by > y)) xs.push(ax + ((y - ay) / (by - ay)) * (bx - ax));
+      }
+      xs.sort((a, b) => a - b);
+      for (let k = 0; k + 1 < xs.length; k += 2) {
+        const c0 = Math.max(0, Math.ceil(xs[k] - 0.5)); const c1 = Math.min(width - 1, Math.floor(xs[k + 1] - 0.5));
+        for (let c = c0; c <= c1; c++) inside[r * width + c] = 1;
+      }
+    }
+  }
+  const outside = new Uint8Array(width * height);
+  for (let i = 0; i < outside.length; i++) if (!inside[i] && heightMap[i] === NO_DATA) outside[i] = 1;
+  return outside;
 };
 
 // Mark NO_DATA cells connected to the grid border so we can preserve them after
@@ -517,6 +547,7 @@ const rasterize = async (params, id) => {
     }
   };
 
+  const footprints = [];
   for (const tile of tiles) {
     const gridMapper = buildGridMapper({
       epsgCode: tile.epsgCode,
@@ -525,6 +556,10 @@ const rasterize = async (params, id) => {
       targetBounds, epsgDefs,
     });
     await accumulateTilePoints(tile, gridMapper, groundSum, groundCnt, onPoint, layers, preview);
+    // (the tile's extent on the grid: its four corners, as the mapper places them)
+    const quad = [[tile.minX, tile.minY], [tile.maxX, tile.minY], [tile.maxX, tile.maxY], [tile.minX, tile.maxY]]
+      .map(([x, y]) => { gridMapper(x, y); return [FRAC.u * width, FRAC.v * height]; });
+    if (quad.every(([u, v]) => Number.isFinite(u) && Number.isFinite(v))) footprints.push(quad);
   }
 
   // (cells finer than the points: each takes its neighbours' points too)
@@ -552,7 +587,12 @@ const rasterize = async (params, id) => {
     );
   }
 
-  const exteriorNoDataMask = markExteriorNoData(heightMap, width, height);
+  // Outside the cloud: the empty cells beyond every tile's footprint (the gap fill's, gapFillSources.js). Empty cells
+  // inside a footprint are the cloud's own gaps, filled from its points below. (Taken as every empty cell joined to the
+  // grid's edge, in sparse ground under trees, where at 10 cm nine cells in ten hold no point, nearly all of them were
+  // "outside": the base elevation filled them and each point stood as a spike or a pit among its heights, the
+  // "stalactite field" of Toma's 10 cm cloud. Without a footprint, the edge rule as before.)
+  const exteriorNoDataMask = footprints.length ? markOutsideFootprints(heightMap, width, height, footprints) : markExteriorNoData(heightMap, width, height);
 
   self.postMessage({ id, type: 'progress', current: processed, total: processed, status: 'Filling holes…' });
   // (the cells to fill inside the footprint, before filling: smoothed after)

@@ -137,7 +137,7 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
     The engine does these in C++; Lua only sets size/pressure/softness/slope mask (terrainEditor.lua). The Lua
     terraform tool (editor/terraform/terraform.lua, bCDDL: reimplement, don't copy) relaxes the band beside a held road.
 
-- **Sea walls: the promenade behind a wall at the water** (user 2026-11-20: "bring the pavement out to the retaining
+- **Sea walls: the promenade behind a wall at the water** (for 0.3.6, user 2026-11-20 night; user 2026-11-20: "bring the pavement out to the retaining
   wall and make sure it's flat"). On branch `seawall` (5009640), not on dev; dev.2 went without it (decisions.md).
   Works at cordova (flat_after.png, in-game shots); sweep regressions left, all at kingst mh (+19 floating):
   - a walled sunken garden (218, 680): the fill flattens the garden floor, its steps' slab stands up to 1.1 m over it;
@@ -182,6 +182,13 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
   Update 17:00Z: re-exported interpolated to 0.3 m (new nemuno_iedas.zip, 316 MB, #general): "this actually kinda
   rips", drives fine, still some manual work. So the spikes come mostly from the sparse 10 cm grid; the gap fill still
   worth doing for fine resolutions.
+  Fixed 2026-11-20 night (scratch/laz: probe.mjs, run.mjs drives the real worker in Node, footprint_fix.png,
+  stalactites_mg.png): the cause was not outliers. (1) Empty cells joined to the grid's edge counted as outside the
+  cloud: in sparse ground under trees (1.2 points per m2, 89 % of 10 cm cells empty) the base elevation filled them and
+  every point stood as a spike or pit among its heights; now outside = beyond every tile's footprint. (2) The pyramid
+  fill relaxed only at full resolution, so a lone point in a wide gap sat at the bottom of a 3-4 m funnel; now each
+  level is relaxed on the way down (lazGrid.relaxLevel). A two-sided outlier filter was simulated: 0.1-0.5 % of points,
+  no visible gain; left out. Next: Toma checks it on a dev build.
   Toma's recipe (Discord 2026-11-20 13:26-13:30): 1) discard irrelevant classes, 2) prune statistical outliers, 3) a
   Kriging fill (CloudCompare). Ours (lazWorker.js, lazGrid.js): 1) done (ground 2 + water 9 only); 2) weak: only cells
   > 25 m ABOVE their 8 neighbours' median are dropped, nothing low (the likely stalactites); 3) a pyramid fill relaxed
