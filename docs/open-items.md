@@ -11,12 +11,15 @@ these files; they are never copied.
 
 As of 2026-11-20 morning:
 
-- `main` = `dev` at bdaac6d (building=no, the alpine look, the crash-report fixes). Branch `step-walls` holds the parked 2.8 step
+- `main` = `dev` at bb0a431 (+ the crash-report fixes, OSM .pbf/GeoJSON import, concrete retaining walls). Desktop
+  0.3.5-dev.1 prepared (version set; the tag waits for the user's yes). Branch `step-walls` holds the parked 2.8 step
   walls. Published: 0.3.4 as the latest release; 0.3.5 planned for 2026-11-20 evening.
 - The sweep's known pre-existing flags: sidewalk drift at naldo, kingst, deckpark_g, stelvio; ams_centraal mh/ready;
   dev_szczyrk cross; ams t30/noshape swBuried; Michiel de Ruijtertunnel joint steps (check 4).
 
-## Now: Fizz_Mechanic's 0.3.3 list (2026-11-19, in progress)
+## Now: Fizz_Mechanic's 0.3.3 list (2026-11-19; on hold until after the 0.3.5 release, user 2026-11-20)
+
+Held items are listed on the release page under "Moved to the next release".
 
 His 16 km Tignes / Val d'Isère map, 0.3.3 (screenshots with Mesh Roads on; the report is a Decal Roads export of the same map). Report and his 24 screenshots: scratch/fizz033 (report_0.3.3.txt,
 shots/); re-checks on today's code: scratch/fizz033/run; diagrams scratch/fizz033/diag; Mapillary scratch/fizz033/mly.
@@ -29,7 +32,14 @@ push dev and main (standing go-ahead for this list).
 2. **2.4, the rest:** the 15-20 m terrain cliff beside a covered bore on a steep valley side (t001 at 285-294 m,
    scratch/fizz033/diag/g283_sections_wall.png); Val d'Isère t001's south portal juts (its ground 7 m up); a bright
    side opening in t001 at 75 % (driver's view); his fz07 cuts.
-3. **2.8 leftover.** Step walls are on branch `step-walls` (not on dev, 2026-11-20 morning). services/terrainSteps.js traces
+3. **2.8 leftover.** Found 2026-11-20 midday (plots scratch/steps/rdp_long.png, rdp_sections.png, rdp_osm_top.png,
+   teeth_vs_wall.png): Rue de la Poste is NOT raised in reality (survey 51 m); the export lifts it 2.5-3.8 m onto a
+   ridge because the apex of two short driveways (404256743, 1154846462, joining the street at two junctions) is held
+   3.6-4.8 m over the survey, with a generated deck b001 on the driveway. Removing the driveways puts the street back
+   on the survey (scratch/levelprobe/data/tgx_drive); removing the garage tunnel's or the passage's tags does not. The
+   apex hold is probably a pin (services/structures: shaping.js / rings.js / junctionMouths.js push pins); find which.
+   The 1.6 m step walls already cover 99 % of the grid steps in plan, so thicker walls would not help: fix the lift.
+   Step walls are on branch `step-walls` (not on dev). services/terrainSteps.js traces
    the 1.5-8 m steps the shaping leaves beside roads, keeping only those not in the survey, straightens them and stands
    them as thick concrete retaining walls. Result at Rue de la Poste (scratch/fizz033/diag/rdp_stepwalls2.jpg,
    plot scratch/steps/tig_steps.png): the lower edge between the bridge ends is walled; the upper edge by the
