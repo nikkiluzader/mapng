@@ -88,12 +88,12 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
 ## Before 0.3.5
 
 - **Release page draft** (user, 2026-11-19): `public/updates/0.3.5/` (marked as a preview, noindex), on dev for
-  testers to read ahead. Written from every commit since v0.3.4 (11f3405 the last one in it). Add each later fix to
-  it; 8 placeholders (`class="ph"`) for pictures still to take, among them a city corner on today's sidewalks (the old
-  shot had the squeezed slab texture), a suburb with a cul-de-sac, and wing walls (the old shot's road and terrain
-  round the walls looked bad: user, retake once those are fixed). Add `refs/output/releases.md` notes and the
-  updates index link at release. Any main push before then carries the draft to mapng.com/updates/0.3.5/ (unlinked,
-  noindex, marked as a preview).
+  testers to read ahead. Covers every commit through 2026-11-20 morning (cul-de-sacs, sidewalk paths and edges
+  included). Pictures in: cul-de-sacs, sidewalks (corner, suburb, hillside), gallery outside and driver's view,
+  funicular, footbridges, the long box under Rue du Cocor, the 0.5 m hint, memory estimate, Send report, point cloud
+  UI and ground. One placeholder left on purpose: wing walls (the user: not until the road and terrain round them are
+  fixed). At release: drop the preview tag and noindex, add the updates index link (worker/updates.js LATEST_UPDATE),
+  notes in refs/output/releases.md. Any main push before then carries the draft to mapng.com/updates/0.3.5/.
 - **Sidewalk fixes** (user, 2026-11-20), after cul-de-sacs:
   1. Jagged edges across many levels and situations. Found and fixed 2026-11-20 (history): the lawn-or-paving choice
      made cell by cell (ragged edges, one side paved); a second sidewalk at the curb where one is mapped behind a
