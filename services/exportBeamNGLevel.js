@@ -2238,7 +2238,7 @@ function chunkPolyline(points, maxNodes = 250, { widthM = 0, spacingM = 0 } = {}
 // a one-node kink hides.
 const TIGHT_FACTOR = 1.5;
 const TIGHT_PASSES = 40;
-export function easeTightNodes(points, halfWidthM) {
+export function easeTightNodes(points, halfWidthM, { pinned = null } = {}) {
   if (!(points?.length >= 3) || !(halfWidthM > 0)) return points;
   const lat0 = points[0].lat; const mx = 111320 * Math.cos((lat0 * Math.PI) / 180); const my = 111320;
   const xy = points.map((p) => [p.lng * mx, p.lat * my]);
@@ -2258,7 +2258,9 @@ export function easeTightNodes(points, halfWidthM) {
     moved = true;
     // the node and its neighbours toward the mean of theirs (the ends pinned)
     const next = new Map();
-    for (const t of tight) for (let i = Math.max(1, t - 2); i <= Math.min(xy.length - 2, t + 2); i++) next.set(i, [(xy[i - 1][0] + xy[i + 1][0]) / 2, (xy[i - 1][1] + xy[i + 1][1]) / 2]);
+    // (pinned nodes stay: a junction in the middle of the road)
+    for (const t of tight) for (let i = Math.max(1, t - 2); i <= Math.min(xy.length - 2, t + 2); i++) if (!pinned?.[i]) next.set(i, [(xy[i - 1][0] + xy[i + 1][0]) / 2, (xy[i - 1][1] + xy[i + 1][1]) / 2]);
+    if (!next.size) break;
     for (const [i, q] of next) xy[i] = [xy[i][0] * 0.5 + q[0] * 0.5, xy[i][1] * 0.5 + q[1] * 0.5];
   }
   return moved ? points.map((p, i) => ({ ...p, lat: xy[i][1] / my, lng: xy[i][0] / mx })) : points;
@@ -6305,6 +6307,35 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     const driving = Number.isFinite(stable) && stable > 0 ? stable : cs.drivingHalfWidth;
     return driving + (cs.leftExtra + cs.rightExtra) / 2;
   };
+  // Tight bends eased once, here, for every part of the export: the line the road is drawn on (easeTightNodes, so its
+  // strip does not fold) is the line the solver shapes the ground along. Eased only for the decals, a hairpin tighter
+  // than its half width was drawn 4.5 m inside the bend while the ground was shaped along the mapped one, the road
+  // running off its own ground over the step between the bend's halves: a 1.8 m bump at the apex (stelvio). The
+  // mapped nodes are kept and those another road shares (a junction mid-way) stay put; points every
+  // ROAD_NODE_SPACING_M are filled in between, as the decals are resampled.
+  {
+    const uses = new Map();
+    for (const seg of drivableRoads) for (const pt of seg.geometry || []) { const k = makeRoadNodeKey(pt); uses.set(k, (uses.get(k) || 0) + 1); }
+    let eased = 0; let most = 0;
+    for (const seg of drivableRoads) {
+      const g = seg.geometry; if (!(g?.length >= 3)) continue;
+      const pts = []; const pin = [];
+      const mLat = 111320; const mLng = 111320 * Math.cos((g[0].lat * Math.PI) / 180);
+      for (let i = 0; i < g.length; i++) {
+        if (i > 0) {
+          const a = g[i - 1]; const b = g[i];
+          const n = Math.floor(fastHypot((b.lng - a.lng) * mLng, (b.lat - a.lat) * mLat) / ROAD_NODE_SPACING_M);
+          for (let k = 1; k < n; k++) { const t = k / n; pts.push({ lat: a.lat + (b.lat - a.lat) * t, lng: a.lng + (b.lng - a.lng) * t }); pin.push(false); }
+        }
+        pts.push(g[i]); pin.push((uses.get(makeRoadNodeKey(g[i])) || 0) > 1);
+      }
+      const out = easeTightNodes(pts, halfOf(seg), { pinned: pin });
+      if (out === pts) continue;
+      for (let i = 0; i < out.length; i++) most = Math.max(most, fastHypot((out[i].lng - pts[i].lng) * mLng, (out[i].lat - pts[i].lat) * mLat));
+      seg.geometry = out; seg.bendsEased = true; eased++;
+    }
+    if (eased) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Tight bends: ${eased} road(s) eased where a bend is tighter than the road is wide (the drawn line and the shaped ground one line), up to ${most.toFixed(1)} m.`);
+  }
   // Railways (services/railways.js): graph edges of their own class beside
   // the roads, so a rail bridge, a rail tunnel, a road bridge over a line and
   // a level crossing come out of the one profile solve. Indexed after the
@@ -6857,7 +6888,9 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     // Clip to the terrain's safe inner boundary, splitting at crossings.
     // Then further chunk each segment so no single DecalRoad is too long.
     const clippedSegments = clipGeometryToMargin(segmentFeature.geometry, terrainData.bounds)
-      .map(s => easeTightNodes(resampleGeometryToSpacing(s, roadNodeSpacingM), styleHalfWidth))
+      // (a road whose tight bends were eased for the whole export, above, is not eased again: resampled and pulled once
+      // more, its hairpin shrank metres further inside the ground shaped for it)
+      .map(s => (segmentFeature.bendsEased ? resampleGeometryToSpacing(s, roadNodeSpacingM) : easeTightNodes(resampleGeometryToSpacing(s, roadNodeSpacingM), styleHalfWidth)))
       // (a road on a dam's crest its own pieces there, as a bridge's way is:
       // a piece reaching from the terrain onto the dam drew nothing on it)
       .flatMap((s) => splitAtDams(s, structureGraph?.dams, (pt) => geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0)))

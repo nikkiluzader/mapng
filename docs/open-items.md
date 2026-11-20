@@ -110,7 +110,9 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
     4.5 m inside a bend tighter than its half width (easeTightNodes, against folding) while the terrain is shaped along
     the OSM line, and its node heights take the nearest station in plan, which flips half at the apex
     (scratch/saw/hairpin_cause.png). Fix: one eased line for decal and terrain (junction nodes pinned), heights by
-    distance along the road. In the released code too.
+    distance along the road. In the released code too. Fixed 2026-11-20 night: tight bends eased once for the whole
+    export before the solver's graph (mapped nodes kept, shared ones pinned), not again for the decals; stelvio lane
+    bumps > 0.3 m 96 -> 9, > 0.6 m 29 -> 0 (scratch/saw/hairpin_fixed.png, hp/hairpin_ba.jpg in game).
   - *hairpin arms whose road surfaces touch*: a sheer step on the grid between them (stelvio shots 4, 6, 7). Branch
     `step-walls-2` (390b697): step walls traced from the terrain cover only parts of it in game (stelvio_ba_*.jpg).
     Next: wall lines from the composer itself (the lower road's core edge where two cores meet on two levels).
