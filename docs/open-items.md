@@ -80,9 +80,6 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
 - **A BeamNG developer:** whether dev.7 ends the console errors and the low frame rate on a lake-country level.
 - **A BeamNG developer:** whether `utcOffset` reads right (it tested correct in game here).
 - **The tester who asked about smooth roads:** what he makes of Mesh Roads.
-- **The project owner: the coarse 30 m dual-carriageway patch (v3), not committed.** Twins (opposed one-way roads of one
-  name, up to 40 m apart) pulled together on coarse data; elmarzi decks 14 -> 10 (OSM has 5). Patch and tests in
-  scratch/coarse30-wip (applies to dev 2e1ee47, needs a rebase); details in the backlog's history of it. Commit or drop?
 - **Questions for the project owner:**
   - A Performance / Balanced / Quality preset (needs measuring on more than one PC first; backlog area 9, "Export
     quality for weaker PCs").
