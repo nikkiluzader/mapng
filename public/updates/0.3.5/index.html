@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MapNG 0.3.5: Faster, Rebuilt Sidewalks, Real Tunnels</title>
+<meta name="description" content="MapNG 0.3.5: big exports nearly twice as fast with a third less memory, sidewalks rebuilt as one paved area, galleries and tunnel portals that match the real ones, point cloud uploads that place and show themselves, and bug reports that carry the map data.">
+<link rel="canonical" href="https://mapng.com/updates/0.3.5/">
+<meta name="robots" content="noindex">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MapNG 0.3.5: faster, rebuilt sidewalks, real tunnels">
+<meta property="og:description" content="Faster exports with less memory, new sidewalks, galleries and portals, point clouds, better bug reports.">
+<meta property="og:url" content="https://mapng.com/updates/0.3.5/">
+<meta property="og:image" content="https://mapng.com/updates/0.3.5/images/fine-tuning.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<script>
+  // the theme before the first paint: the app's link (?theme=), else this visit's, else the app's own choice, else the system's
+  (function () { var t; try { var q = new URLSearchParams(location.search).get('theme'); if (q === 'dark' || q === 'light') sessionStorage.setItem('mapng_page_theme', q); t = sessionStorage.getItem('mapng_page_theme') || localStorage.getItem('theme'); } catch (e) { /* storage blocked */ } if (t !== 'dark' && t !== 'light') t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; document.documentElement.setAttribute('data-theme', t); })();
+</script>
+<style>
+  /* BeamNG.drive's UI fonts, as the app (public/fonts, SIL OFL) */
+  @font-face { font-family: "Noto Sans"; src: url(/fonts/noto-sans-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass"; src: url(/fonts/overpass-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass Mono"; src: url(/fonts/overpass-mono-latin-wght-normal.woff2) format("woff2"); font-weight: 300 700; font-display: swap; }
+  :root {
+    --bg: #f7f7f8; --surface: #ffffff; --surface-2: #f2f2f4; --border: #e3e3e8;
+    --text: #1d1d22; --text-2: #4a4a55; --muted: #6e6e7a;
+    --brand: #ff6600; --brand-ink: #c2410c; --brand-tint: #fff4ec;
+    --ok: #15803d; --code-bg: #1d1d22; --code-text: #f4f4f6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+      --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+      --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+      --ok: #4ade80; --code-bg: #0b0b0e; --code-text: #ececf0;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+    --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+    --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+    --ok: #4ade80; --code-bg: #0b0b0e; --code-text: #ececf0;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--brand-ink); }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 0 16px; }
+  header.top { background: linear-gradient(90deg, #ff6600, #f59e0b); color: #fff; }
+  header.top .wrap { padding-top: 20px; padding-bottom: 36px; }
+  .brand { display: inline-flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; opacity: .95; }
+  .brand img { width: 22px; height: 22px; }
+  h1, h2, h3 { font-family: "Overpass", "Noto Sans", system-ui, sans-serif; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.15; margin: 22px 0 10px; letter-spacing: -0.01em; }
+  .lede { font-size: 18px; max-width: 640px; margin: 0; color: rgba(255,255,255,.95); }
+  main { padding: 0 0 64px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: -22px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .card b { display: block; font-size: 15px; margin-bottom: 2px; }
+  .card span { color: var(--text-2); font-size: 14px; }
+  .card .tick { color: var(--ok); font-weight: 700; margin-right: 4px; }
+  section { margin-top: 44px; }
+  h2 { font-size: 24px; line-height: 1.25; margin: 0 0 10px; }
+  h3 { font-size: 17px; margin: 22px 0 6px; }
+  p, li { color: var(--text-2); }
+  .note { background: var(--brand-tint); border-left: 3px solid var(--brand); border-radius: 0 8px 8px 0; padding: 10px 14px; color: var(--text); font-size: 15px; }
+  pre { background: var(--code-bg); color: var(--code-text); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-size: 14px; line-height: 1.5; }
+  code { font-family: "Overpass Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; }
+  p code, li code, td code { background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; color: var(--text); }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; color: var(--text); white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  td { color: var(--text-2); }
+  .flow { list-style: none; padding: 0; margin: 14px 0 0; counter-reset: step; }
+  .flow li { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px 12px 52px; margin: 0 0 22px; counter-increment: step; }
+  .flow li::before { content: counter(step); position: absolute; left: 14px; top: 12px; width: 26px; height: 26px; border-radius: 50%; background: var(--brand); color: #fff; font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+  .flow li:not(:last-child)::after { content: ""; position: absolute; left: 26px; bottom: -22px; width: 2px; height: 22px; background: var(--border); }
+  .flow b { color: var(--text); }
+  .flow .where { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .02em; color: var(--brand-ink); background: var(--brand-tint); border-radius: 999px; padding: 1px 8px; margin-left: 6px; vertical-align: 1px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 12px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .stat .v { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
+  .stat .k { font-size: 13px; color: var(--muted); }
+  .usage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 12px; }
+  .usage-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
+  .usage-card h3 { font-size: 14px; margin: 0 0 6px; }
+  .usage-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; font-size: 13px; margin: 4px 0; }
+  .usage-row .bar { grid-column: 1 / -1; height: 4px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
+  .usage-row .bar span { display: block; height: 100%; background: var(--brand); border-radius: 2px; }
+  .usage-row .n { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .never { columns: 2 240px; column-gap: 24px; padding-left: 20px; }
+  .never li { break-inside: avoid; margin-bottom: 6px; }
+  footer { border-top: 1px solid var(--border); margin-top: 56px; padding-top: 18px; font-size: 14px; color: var(--muted); }
+  footer p { color: var(--muted); }
+
+  /* this page's own pieces */
+  .pill { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .02em; border-radius: 999px; padding: 1px 9px; margin-right: 6px; vertical-align: 1px; white-space: nowrap; }
+  .pill.desk { color: var(--brand-ink); background: var(--brand-tint); }
+  .pill.web { color: var(--text); background: var(--surface-2); border: 1px solid var(--border); }
+  .pill.both { color: #fff; background: var(--brand); }
+  .measures { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 14px; }
+  .measure { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .measure h3 { margin: 6px 0 4px; font-size: 16px; }
+  .measure p { margin: 0; font-size: 14.5px; }
+  .measure .how { margin-top: 8px; font-size: 13px; color: var(--muted); }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-top: 12px; }
+  .two > div { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .two h3 { margin-top: 0; }
+  .two ul { padding-left: 18px; margin: 6px 0 0; }
+  .two li { font-size: 14.5px; margin-bottom: 4px; }
+  .limits li { margin-bottom: 8px; }
+  .toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; padding: 0; list-style: none; }
+  .toc a { display: inline-block; font-size: 14px; text-decoration: none; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; color: var(--text); }
+  .toc a:hover { border-color: var(--brand); }
+
+  /* this page: pictures and the summary tiles */
+  section { padding-top: 34px; }
+  section h2 { font-size: 24px; line-height: 1.25; margin: 0 0 10px; }
+  section p, section li { color: var(--text-2); }
+  section p { margin: 0 0 12px; max-width: 70ch; }
+  section ul { margin: 0 0 12px; padding-left: 20px; max-width: 70ch; }
+  section li { margin-bottom: 6px; }
+  figure { margin: 16px 0 20px; }
+  figure img { display: block; width: 100%; height: auto; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+  figcaption { font-size: 13.5px; color: var(--muted); margin-top: 6px; max-width: 78ch; }
+  .kicker { font: 700 11px/1 "Overpass", "Noto Sans", sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--brand-ink); margin-bottom: 8px; }
+  .cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  .btn { display: inline-block; padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 14px; text-decoration: none; border: 1px solid var(--border); color: var(--text); background: var(--surface); }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .note { border-left: 3px solid var(--brand); background: var(--brand-tint); padding: 10px 14px; margin: 14px 0; color: var(--text-2); max-width: 74ch; }
+  footer { border-top: 1px solid var(--border); margin-top: 40px; padding: 20px 0 0; font-size: 13.5px; color: var(--muted); }
+
+  /* 0.3.5: pictures still to come (draft) */
+  .ph { border: 2px dashed var(--border); border-radius: 8px; background: var(--surface-2); color: var(--muted); padding: 34px 18px; text-align: center; font-size: 14px; }
+  .ph b { display: block; color: var(--text-2); margin-bottom: 4px; }
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+  .pair figure { margin: 0; }
+  .draft-tag { display: inline-block; margin: 14px 0 0; padding: 4px 10px; border-radius: 999px; background: rgba(0,0,0,.25); color: #fff; font-size: 13px; font-weight: 600; }
+</style>
+<link rel="stylesheet" href="/pages.css">
+<script src="/pages.js" defer></script>
+</head>
+<body>
+<!-- DRAFT for 0.3.5 (started 2026-11-19). Placeholders (.ph) mark pictures still to take. Add later fixes before publishing. -->
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/favicon.svg" alt="">MapNG</a>
+    <p class="draft-tag">Preview: 0.3.5 is not released yet. This page is a draft and will grow before it is.</p>
+    <h1>MapNG 0.3.5: faster, rebuilt sidewalks, real tunnels</h1>
+    <p class="lede">A big one. Big exports run nearly twice as fast and need a third less memory. Sidewalks were rebuilt from the ground up. Tunnels, galleries and their portals now look like the ones in the photos. Point cloud uploads place themselves and show what is in them, and a bug report can carry the exact map data it was made from.</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="cards">
+    <div class="card"><b><span class="tick">✓</span>Faster exports</b><span>Nearly twice as fast, a third less memory.</span></div>
+    <div class="card"><b><span class="tick">✓</span>New sidewalks</b><span>One paved area: curbs, corners, driveways, lawns.</span></div>
+    <div class="card"><b><span class="tick">✓</span>Tunnels and galleries</b><span>Built the way the real ones are.</span></div>
+    <div class="card"><b><span class="tick">✓</span>Point clouds</b><span>Placed by a guess, their layers shown.</span></div>
+    <div class="card"><b><span class="tick">✓</span>Better bug reports</b><span>The level carries its own map data.</span></div>
+  </div>
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>
+    <a class="btn" href="/">Open MapNG in the browser</a>
+    <a class="btn" href="/updates/0.3.4/">What came in 0.3.4</a>
+  </div>
+
+  <section id="speed" data-nav="Faster exports">
+    <div class="kicker">Speed</div>
+    <h2>Faster exports that need less memory</h2>
+    <p>Most of the work in this version went into making every step of Generate and export quicker, without changing what comes out. Each change was checked against the level it replaced, and the levels match.</p>
+    <div class="stats">
+      <div class="stat"><div class="v">1053 → 553 s</div><div class="k">a dense 8 km downtown, the whole export</div></div>
+      <div class="stat"><div class="v">28 → 19 GB</div><div class="k">the same export's peak memory</div></div>
+      <div class="stat"><div class="v">121 → 106 s</div><div class="k">a city's Generate</div></div>
+      <div class="stat"><div class="v">125 → 54 s</div><div class="k">a city's bridge heights from the US lidar survey</div></div>
+    </div>
+    <ul>
+      <li>The ground under roads and the sidewalks are worked out on several threads at once.</li>
+      <li>Bridges, bridge towers, sidewalks beside decks and barrier gates no longer scan parts that cannot count, so big cities with hundreds of decks are far quicker.</li>
+      <li>The export's three downloads (the surroundings, bridge heights and the water round the map) run at the same time, each still at its server's own pace.</li>
+      <li>Generate asks which trees grow in the area as soon as it knows the map's bounds, beside the map data.</li>
+      <li>Each building tile goes into the level's zip as soon as it is built, so the whole set is never held in memory at once.</li>
+      <li><span class="pill desk">Desktop</span>Exports use at most 8 worker threads. More of them only used more memory (32 threads: 24 GB, 8 threads: 17 GB, the same time).</li>
+      <li><span class="pill desk">Desktop</span>The data step no longer runs a second time at export. Its result used to be lost on the way back to the app, about 30 seconds of work for a city.</li>
+    </ul>
+    <h3>How heavy is this level?</h3>
+    <p><span class="pill desk">Desktop</span>Before you export, the app now says how much memory the export will need at its peak, against what your computer has: fits, tight or too much. The figures come from measuring the desktop app on mountains, towns and downtowns from 2 to 16 km.</p>
+    <div class="ph"><b>Screenshot to come</b>The "How heavy is this level?" line in the desktop app, before an export.</div>
+    <h3>A progress bar that keeps time</h3>
+    <p>After all the speed work, the progress bar's idea of how long each step takes was wrong by several times: it jumped through some steps and crawled through others. It has been refitted to 281 timed exports, and now spreads the rest of the bar over the time left at your run's own pace.</p>
+  </section>
+
+  <section id="sidewalks" data-nav="New sidewalks">
+    <div class="kicker">Streets</div>
+    <h2>Sidewalks, rebuilt</h2>
+    <p>Sidewalks used to be built piece by piece along each street, with corners and walkways joined on afterwards. They are now one paved area worked out for the whole map at once: the street-side sidewalks, the corners, mapped footways and the strip between them, on a fine 25&nbsp;cm grid. From it come the slabs, the curbs and the ground under them.</p>
+    <div class="pair">
+      <figure><img src="images/sidewalk-chicago.jpg" alt="A downtown street in game: a continuous concrete sidewalk with a curb runs from the road edge to the building fronts" loading="lazy"><figcaption>Downtown: one continuous sidewalk from the curb to the buildings.</figcaption></figure>
+      <figure><div class="ph"><b>Screenshot to come</b>A city corner: sidewalks meeting round a rounded curb (retake on today's build: the old shot has the squeezed slab texture since fixed).</div></figure>
+      <figure><div class="ph"><b>Screenshot to come</b>A suburban street with lawn verges and a cul-de-sac (after cul-de-sacs are built).</div></figure>
+      <figure><img src="images/sidewalk-hillside.jpg" alt="A steep hillside street in game with a sidewalk following the bend and the slope" loading="lazy"><figcaption>On a hillside, the slab follows the road's grade.</figcaption></figure>
+    </div>
+    <ul>
+      <li>Curbs run unbroken, round each corner, and drop to a low lip where a driveway crosses to the road.</li>
+      <li>Curbs come down at crosswalks, where walkways meet the street and at car park entrances.</li>
+      <li>No paving over rivers, lakes or the sea, and none down the steep bank of a raised road.</li>
+      <li>The ground is graded round the paving in one pass, and it never rises into a bridge deck or tunnel overhead.</li>
+      <li>Fewer triangles for the same streets (New York 4 km: 2.12 to 1.95 million; Pittsburgh: 2.53 to 1.76 million) and quicker to build.</li>
+    </ul>
+  </section>
+
+  <section id="tunnels" data-nav="Tunnels and galleries">
+    <div class="kicker">Structures</div>
+    <h2>Tunnels, galleries and portals that match the real ones</h2>
+    <p>Fizz_Mechanic sent a long, careful list from his 16 km map of Tignes and Val d'Isère, with screenshots. Most of this section comes from it, checked point by point against street-level photos.</p>
+    <h3>Galleries</h3>
+    <p>A road tunnel that opens along a cliff, and an avalanche gallery mapped in OpenStreetMap (<code>tunnel=avalanche_protector</code>), are now built the way they stand: a flat roof on the uphill wall and columns on the valley side, at the height the lidar shows, with a floor slab and a valley wall going down into the ground. A portal whose first metres are a gallery takes the gallery's rectangle as its opening, not a round arch.</p>
+    <figure><img src="images/gallery-portal.jpg" alt="Before and after pictures of a tunnel portal: before, an arched opening over a gallery's flat roof; after, a rectangular opening matching the gallery" loading="lazy"><figcaption>A portal into a gallery stretch, before and after.</figcaption></figure>
+    <div class="ph"><b>Screenshot to come</b>A gallery from outside and from the driver's seat (the D 902 by Les Brévières, or the Axenstrasse).</div>
+    <h3>Portals and the ground round them</h3>
+    <ul>
+      <li>The ground behind a headwall is made up to its top and then falls away, instead of a square block standing as high as the wall.</li>
+      <li>Shallow box tunnels under a town have flat headwalls that follow the ground, not 8 m walls standing over it.</li>
+      <li>Wing walls beside a raised road start at the road's edge, with no gap between road and wall, and are left out where they would block a junction.</li>
+      <li>Where a short underpass runs under a street that the ground data has removed, the box fits under the street and the street stays on the ground.</li>
+      <li>A long box tunnel under a street now lays its road at a steady depth under the street, so the street over it stays level (Val d'Isère's Tunnel des Téléphériques: a 15&nbsp;% climb onto the roof is gone).</li>
+    </ul>
+    <figure><img src="images/wing-walls.jpg" alt="Three before-and-after pairs of wing walls at bridge ends in game, the gap between road and wall closed and walls removed from a junction" loading="lazy"><figcaption>Wing walls at bridge ends, before and after.</figcaption></figure>
+    <figure><img src="images/low-box-street.jpg" alt="Before and after: a street junction over a box tunnel. Before, the concrete roof stands out of torn ground; after, the streets meet level over covered ground" loading="lazy"><figcaption>Rue du Cocor over the Tunnel des Téléphériques, before and after.</figcaption></figure>
+    <h3>Funiculars and railway tunnels</h3>
+    <p>A railway tunnel now climbs at its own kind's grade: a funicular up to 100&nbsp;%, trams 9&nbsp;%, light rail 8&nbsp;%. The Funival in Val d'Isère, whose ends are 768 m apart in height, is built as a tunnel instead of left on the surface.</p>
+    <div class="ph"><b>Screenshot to come</b>The Funival's tunnel portal and its line up the mountain.</div>
+    <h3>A finer grid for steep maps</h3>
+    <p>Terrain holes round tunnels and galleries follow the game's terrain squares. On a steep map of 2 km or less with tunnels, MapNG now suggests a 0.5 m processing resolution: tested on Zion, the jagged ground left round the structures went from 101 to 59 m².</p>
+    <div class="ph"><b>Screenshot to come</b>The 0.5 m suggestion under the processing resolution.</div>
+  </section>
+
+  <section id="bridges" data-nav="Bridges">
+    <div class="kicker">Structures</div>
+    <h2>Bridges and footbridges</h2>
+    <ul>
+      <li>Footbridges span from end to end instead of following the ground under them (one over a river used to lie on the riverbed).</li>
+      <li>Every footbridge gets a railing on both sides; a suspension or cable-stayed footbridge stands on no posts; their ends meet the paths they join.</li>
+      <li>A sidewalk mapped beside a road bridge is carried on the bridge, the deck widened to it.</li>
+      <li>A bridge over water stays within what its road can reach from its ends at its class's grade (from a tester's St. Augustine level, checked against the map and photos).</li>
+      <li>Quay walls only stand where the survey shows a steep face.</li>
+    </ul>
+    <div class="ph"><b>Screenshot to come</b>A footbridge with railings over a river, and the St. Augustine bridges.</div>
+  </section>
+
+  <section id="pointclouds" data-nav="Point clouds">
+    <div class="kicker">Your own data</div>
+    <h2>Point cloud uploads that know where they are</h2>
+    <p>You can upload a LAS or LAZ point cloud as your elevation. This version makes that much easier.</p>
+    <ul>
+      <li><b>Placed by a best guess.</b> A file that names no coordinate system is placed from its numbers: the national grid whose area they fall in (Lithuania, Latvia, Estonia, Poland, the Netherlands, Britain, Switzerland, France, Belgium, Austria), or a UTM zone. You can pick another from the list.</li>
+      <li><b>What the level keeps, on the map.</b> The square the export takes from the middle of your upload is drawn inside the file's outline.</li>
+      <li><b>The file's own resolution, in one click.</b> The card shows the point spacing (say 25&nbsp;cm) and offers it as the processing resolution, with the level's size and a warning that finer levels are heavier in BeamNG.</li>
+      <li><b>Its layers.</b> The card lists what the file holds: ground, buildings, trees and other classes, laser brightness, colour.</li>
+      <li><b>In the 2D preview.</b> Switch the preview to the point cloud's classes or its brightness, seen from above.</li>
+      <li><b>Smoother terrain.</b> Gaps under buildings, cars and trees are filled smoothly now, without the rough blocks and seams some files showed.</li>
+    </ul>
+    <div class="pair">
+      <figure><img src="images/pointcloud-card.jpg" alt="The custom elevation card with a LAZ file loaded, showing its spacing and coordinate system in short lines" loading="lazy"><figcaption>The upload card, kept short; More about this opens the rest.</figcaption></figure>
+      <figure><img src="images/pointcloud-resolution.jpg" alt="The upload card with the Use the file's own resolution button picked, showing 25 cm and the level size" loading="lazy"><figcaption>The file's own resolution, one click.</figcaption></figure>
+    </div>
+    <figure><img src="images/pointcloud-square.jpg" alt="The map with a point cloud upload: its blue footprint and the orange square the level keeps" loading="lazy"><figcaption>The blue outline is the file; the orange square is what the level keeps.</figcaption></figure>
+    <div class="pair">
+      <figure><img src="images/pointcloud-classes.jpg" alt="The 2D preview showing a point cloud coloured by class: ground, buildings, trees" loading="lazy"><figcaption>2D preview: classes.</figcaption></figure>
+      <figure><img src="images/pointcloud-brightness.jpg" alt="The 2D preview showing a point cloud by laser brightness, road markings visible" loading="lazy"><figcaption>2D preview: brightness. Road markings show up.</figcaption></figure>
+    </div>
+    <figure><img src="images/pointcloud-terrain.jpg" alt="Before and after views of point cloud terrain in the 3D preview: before, rough blocks across streets; after, smooth ground" loading="lazy"><figcaption>Point cloud terrain in the 3D preview, before and after.</figcaption></figure>
+  </section>
+
+  <section id="reports" data-nav="Bug reports">
+    <div class="kicker">Help us help you</div>
+    <h2>Bug reports with the map inside</h2>
+    <p>Every exported level now carries the map data it was built from, its size and position, in a <code>mapng_source</code> folder, so a problem you send in can be rebuilt on exactly your data. The export report comes in two forms: <code>export_report.md</code> to read, and <code>export_report.json</code> with every check as data, without keys or tokens.</p>
+    <p><span class="pill desk">Desktop</span><b>Send report</b> in the levels list now attaches that JSON report, with home folders and keys taken out, and shows its size before you send.</p>
+    <div class="ph"><b>Screenshot to come</b>The Send report dialog with the level's report attached.</div>
+  </section>
+
+  <section id="fixes" data-nav="Fixes">
+    <div class="kicker">Fixes</div>
+    <h2>Fixes</h2>
+    <ul>
+      <li>Cancel in the save dialog stops the export. Before, the export ran on and offered the level as a download anyway.</li>
+      <li><span class="pill desk">Desktop</span>An export no longer stops when a download it no longer needs fails (seen when the USGS servers dropped connections).</li>
+      <li>Lake beds work on very large maps: Chicago at 8 km stopped carving Lake Michigan with a "Map maximum size exceeded" error.</li>
+      <li>A lake running off the map is no longer dug far too deep: Lake Michigan off Chicago came out 142 m deep, now 12 m.</li>
+      <li>A tunnel's approach no longer steps up or down at its portal where the road on each side was read from the other end.</li>
+      <li>When Generate cannot get the memory for its picture, it says the computer ran out of memory.</li>
+      <li>Model photos are asked for only on the test site; the public site and the desktop app make no such request.</li>
+    </ul>
+  </section>
+
+  <footer>
+    <p>MapNG is free and open source: <a href="https://github.com/nikkiluzader/mapng">github.com/nikkiluzader/mapng</a>. Thanks to Fizz_Mechanic and everyone on Discord who sent maps, screenshots and reports. Earlier updates: <a href="/updates/0.3.4/">0.3.4</a>, <a href="/updates/0.3.3/">0.3.3</a>, <a href="/updates/0.3.2/">0.3.2</a>.</p>
+  </footer>
+</main>
+</body>
+</html>
