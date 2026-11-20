@@ -1,6 +1,6 @@
 # MapNG open items
 
-Last reviewed: 2026-11-20 (late night).
+Last reviewed: 2026-11-20 (after the 0.3.5 release)
 
 The short "now" board: current work, what waits on someone, and checks owed on shipped work. The other tracking
 files: `refs/output/backlog.md` holds everything wanted later, by area; `refs/output/releases.md` what shipped;
@@ -11,14 +11,11 @@ these files; they are never copied.
 
 As of 2026-11-20 night (late):
 
-- `main` at 9ccd5ad: everything for 0.3.5 (the coast / terrain seams / side-slope blend 7db9fe6, the point
-  cloud fill e673d5f, the hairpin bends 712d2fd, the page 586fac8). `dev` at 66aab61 is ahead: the 0.3.5 page out of
-  preview (09648ed, LATEST_UPDATE 0.3.5: main only at the release, it publishes the page), the movable upload square
-  (599dc2b, checked end to end: the level matches the LAZ at the moved square, r 0.999, scratch/sqe2e). Desktop
-  0.3.5-dev.4 tagged (66aab61) for the user's end-to-end pass; then 0.3.5. Published: 0.3.4 as the latest release.
-  Since dev.4: the experimental "Ground as models" switch for single exports (services/groundMesh.js; checked in game
-  on tychonas: ground, roads, texture, collision, driving; web end to end: switch -> level with ground tiles and the
-  anchor terrain). Not yet in a test build. Shaped levels on branch `shaped-levels` (backlog "Non-square levels").
+- `main` = `dev` at d73b5f9: **0.3.5 published 2026-11-20 23:04 UTC as Latest** (tag v0.3.5; notes in
+  refs/output/releases.md). It carries the coast / terrain seams / side-slope blend, the point cloud fill, the hairpin
+  bends, the movable upload square and the experimental "Ground as models" switch for single exports. Checked: unit
+  tests, the smoke matrix (identical to the last committed sweep, 135 cells), web and desktop end to end with ground
+  models on, the packed AppImage from the release draft. Not checked: the Windows installer and portable builds.
   Branches: `seawall` (5009640, local: the promenade, for 0.3.6), `step-walls-2` (390b697), `hairpin-blend` (unswept),
   `step-walls` (older, superseded by -2).
 - The sweep's known pre-existing flags: sidewalk drift at naldo, kingst, deckpark_g, stelvio; ams_centraal mh/ready;
