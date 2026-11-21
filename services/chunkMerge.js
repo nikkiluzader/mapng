@@ -10,14 +10,17 @@
 // - ground materials renamed per chunk (each shows its own base texture).
 // Heights along the seams are evened before this, in each chunk's export (plan: "seam heights").
 
-const LEVEL_WIDE = new Set(['TerrainBlock', 'LevelInfo', 'ScatterSky', 'TimeOfDay', 'CloudLayer', 'SkyBox', 'Sun', 'WaterPlane', 'SpawnSphere', 'CameraBookmark', 'BeamNGWorldIconsRenderer', 'CubemapData', 'Precipitation']);
+const LEVEL_WIDE = new Set(['TerrainBlock', 'LevelInfo', 'ScatterSky', 'TimeOfDay', 'CloudLayer', 'SkyBox', 'Sun', 'WaterPlane', 'SpawnSphere', 'CameraBookmark', 'BeamNGWorldIconsRenderer', 'CubemapData', 'Precipitation', 'Forest', 'ForestWindEmitter', 'GroundCover', 'TerrainMaterialSet', 'SFXEmitter']);
 const LINES = new Set(['DecalRoad', 'River', 'MeshRoad']);
 
 /** Text with the chunk's level paths rewritten: its own assets to chunks/<key>/, the game's bundled models to the root. */
 export function rewritePaths(text, fromLevel, toLevel, key) {
   return text
     .split(`levels/${fromLevel}/map_assets/official_assets/`).join(`levels/${toLevel}/__OFFICIAL__/`)
+    // (the anchor terrain's files are level-wide, kept at the root)
+    .split(`levels/${fromLevel}/art/terrains/terrain.`).join(`levels/${toLevel}/__OFFICIAL__/../art/terrains/terrain.`)
     .split(`levels/${fromLevel}/`).join(`levels/${toLevel}/chunks/${key}/`)
+    .split(`levels/${toLevel}/__OFFICIAL__/../art/terrains/terrain.`).join(`levels/${toLevel}/art/terrains/terrain.`)
     .split(`levels/${toLevel}/__OFFICIAL__/`).join(`levels/${toLevel}/map_assets/official_assets/`)
     .split('mapng_ground_').join(`mapng_ground_c${key}_`);
 }
@@ -27,7 +30,8 @@ export function moveObject(o, dx, dy, dz, key) {
   const out = { ...o };
   if (Array.isArray(out.position)) out.position = [out.position[0] + dx, out.position[1] + dy, (out.position[2] || 0) + dz];
   if (LINES.has(out.class) && Array.isArray(out.nodes)) out.nodes = out.nodes.map((n) => [n[0] + dx, n[1] + dy, n[2] + dz, ...n.slice(3)]);
-  if (out.class !== 'SimGroup' && typeof out.name === 'string' && out.name) out.name = `${out.name}_c${key}`;
+  // (level-wide objects keep their names: info.json and the game look them up, e.g. the spawn point, theForest)
+  if (out.class !== 'SimGroup' && !LEVEL_WIDE.has(out.class) && typeof out.name === 'string' && out.name) out.name = `${out.name}_c${key}`;
   return out;
 }
 
@@ -83,7 +87,10 @@ export async function mergeChunks(JSZip, chunks, levelName, { log = () => {} } =
       if (levelWide) {
         if (first) {
           const isText = /\.(json|lua|txt|md)$/.test(rel);
-          out.file(`levels/${levelName}/${rel}`, isText ? (await f.async('string')).split(`levels/${c.levelName}/`).join(`levels/${levelName}/`) : await f.async('uint8array'));
+          // (the anchor terrain's materials point at textures kept with the first chunk's assets)
+          let text = isText ? await f.async('string') : null;
+          if (text && rel === 'art/terrains/main.materials.json') text = text.split(`levels/${c.levelName}/art/terrains/`).join(`levels/${levelName}/chunks/${c.key}/art/terrains/`);
+          out.file(`levels/${levelName}/${rel}`, isText ? text.split(`levels/${c.levelName}/`).join(`levels/${levelName}/`) : await f.async('uint8array'));
         }
         continue;
       }

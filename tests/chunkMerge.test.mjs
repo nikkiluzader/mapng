@@ -22,3 +22,10 @@ test('seam blend: weight 1 on the neighbour core edge, easing to 0', () => {
   assert.equal(b.weight[3], 1); assert.equal(b.target[3], 5); assert.equal(b.weight[4], 1); assert.equal(b.weight[7], 0.25);
   assert.equal(seamBlendFor({ x0: 100, y0: 100, size }, [f]), null);
 });
+test('level-wide objects keep their names (the spawn point, the forest)', () => {
+  assert.equal(moveObject({ class: 'SpawnSphere', name: 'spawn_default', position: [0, 0, 0] }, 1, 1, 1, 'k').name, 'spawn_default');
+  assert.equal(moveObject({ class: 'Forest', name: 'theForest' }, 1, 1, 1, 'k').name, 'theForest');
+});
+test('the anchor terrain files stay at the root', () => {
+  assert.equal(rewritePaths('levels/a_c0/art/terrains/terrain.ter levels/a_c0/art/terrains/terrain_b.color.png', 'a_c0', 'a', '0_0'), 'levels/a/art/terrains/terrain.ter levels/a/chunks/0_0/art/terrains/terrain_b.color.png');
+});
