@@ -75,6 +75,7 @@ export async function exportChunked({ JSZip, footprint, W, H, center, mpp, level
     log(`chunk ${c.key} (${k + 1}/${chunks.length}): ${((Date.now() - t0) / 1000).toFixed(1)} s${seamBlend ? ', seam blended toward finished neighbours' : ''}`);
   }
   onProgress({ step: 'merge' });
-  const zip = await mergeChunks(JSZip, parts, levelName, { log });
+  const bounds = { north: L.latOf(0), south: L.latOf(H), west: L.lngOf(0), east: L.lngOf(W) };
+  const zip = await mergeChunks(JSZip, parts, levelName, { log, bounds });
   return { zip, chunks: times };
 }

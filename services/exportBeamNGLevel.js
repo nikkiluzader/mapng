@@ -14476,7 +14476,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const powerWireDaes = generatePowerWireDAEs(streetProps.wires);
   console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Street props: ${streetProps.hydrants.length} hydrants, ${streetProps.bins.length} bins, ${streetProps.benches.length} benches, ${streetProps.poles.length} poles, ${streetProps.wires.length} wires in ${powerWireDaes.length} tile(s).`);
 
-  const { signalData, controllerDefinitions: signalControllerDefinitions, props: signalProps = [] } =
+  let { signalData, controllerDefinitions: signalControllerDefinitions, props: signalProps = [] } =
     buildBeamNGSignalExportBundle(exportTerrainData, squareSize);
 
   // Speed bumps, humps, tables and cushions from OSM traffic_calming, all
@@ -16106,7 +16106,15 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // A valid Sites Editor file (zones / parking can be authored in the World
   // Editor), with a zone along every named road: the minimap's label names
   // the road being driven (services/roadNameZones.js).
-  const roadNameZones = buildRoadNameZones(decalRoads.carriageways || []);
+  let roadNameZones = buildRoadNameZones(decalRoads.carriageways || []);
+  // (a chunk: zones by their middle, spots by position; the merge samples the level's spots once)
+  let siteSpots = parkingSpots;
+  if (chunkOwnsActive) {
+    const mid = (z) => { const v = z.vertices || []; let x = 0; let y = 0; for (const q of v) { x += q[0]; y += q[1]; } return v.length ? [x / v.length, y / v.length] : (z.top?.pos || [0, 0]); };
+    const zn = roadNameZones.length; roadNameZones = roadNameZones.filter((z) => { const [x, y] = mid(z); return chunkOwnsActive(x, y); });
+    const sn = parkingSpots.length; siteSpots = parkingSpots.filter((sp) => chunkOwnsActive(sp.pos[0], sp.pos[1]));
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunk: sites keep ${roadNameZones.length} of ${zn} road-name zone(s) and ${siteSpots.length} of ${sn} parking spot(s) (by middle / position).`);
+  }
   const parkingLines = roadType !== 'none' ? buildParkingMarkings(parkingSpots, exportTerrainData, squareSize) : [];
   if (parkingLines.length) {
     decalRoads.push({ class: 'SimGroup', name: 'parking_markings', persistentId: generatePersistentId(), __parent: 'Decal_Roads', __items: parkingLines });
@@ -16122,7 +16130,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     // rotation mirrored from ours, its parked cars sat across their bays,
     // our own stall lines being drawn from ours)
     // (parked cars switched off in What to build: no spots for traffic to fill; the bays stay painted)
-    parkingSpots: built('parkedCars') ? sampleSiteSpots(parkingSpots).map((sp) => ({ ...sp, rot: siteRotation(sp.rot) })) : [],
+    parkingSpots: built('parkedCars') ? (chunkOwnsActive ? siteSpots : sampleSiteSpots(siteSpots)).map((sp) => ({ ...sp, rot: siteRotation(sp.rot) })) : [],
     zones: roadNameZones,
   }));
 
@@ -16133,6 +16141,16 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
 
   // ── signals.json ───────────────────────────────────────────────────────────
   // Generate OSM-driven signals when available; fall back to a valid empty schema.
+  // (a chunk: the signals in its core, with the controllers and sequences they use)
+  if (chunkOwnsActive && signalData?.instances) {
+    const inst = signalData.instances.filter((i) => Array.isArray(i.pos) && chunkOwnsActive(i.pos[0], i.pos[1]));
+    const seqIds = new Set(inst.map((i) => i.sequenceId).filter(Boolean));
+    const sequences = (signalData.sequences || []).filter((q) => seqIds.has(q.id));
+    const ctlIds = new Set(inst.map((i) => i.controllerId));
+    for (const q of sequences) for (const ph of q.phases || []) for (const c of ph.controllerIds || []) ctlIds.add(c);
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunk: signals keep ${inst.length} of ${signalData.instances.length} instance(s) in its core.`);
+    signalData = { ...signalData, instances: inst, sequences, controllers: (signalData.controllers || []).filter((c) => ctlIds.has(c.id)) };
+  }
   zip.file(`${base}/signals.json`, JSON.stringify(signalData, null, 2));
   if (signalControllerDefinitions) {
     zip.file(`${base}/signalControllerDefinitions.json`, JSON.stringify(signalControllerDefinitions, null, 2));
@@ -16600,6 +16618,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       spawn: spawnPosition,
       geo: { bounds: exportTerrainData.bounds, worldSize: exportTerrainData.width * squareSize },
     });
+    // (a chunk: the probes in its core, lines by their middle point)
+    if (chunkOwnsActive && ingameProbes) {
+      ingameProbes.probes = (ingameProbes.probes || []).filter((q) => chunkOwnsActive(q.x, q.y));
+      ingameProbes.lines = (ingameProbes.lines || []).filter((l) => { const m = l.p?.[Math.floor((l.p?.length || 0) / 2)]; return m && chunkOwnsActive(m[0], m[1]); });
+    }
     zip.file(`${base}/mapng_probes.json`, JSON.stringify(ingameProbes));
   } catch (err) {
     console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} In-game probes skipped: ${err?.message || err}`);
