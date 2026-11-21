@@ -33,8 +33,16 @@ As of 2026-11-20 night (late):
   - **Road mode** (user 2026-11-21): pick a road, follow it, a width either side; plan refs/output/road-mode-plan.md.
     Built after part A-B of step 2 (shared footprint code), alongside C.
   - **Chunked pipeline** (user 2026-11-21, after a 23 km diagonal road was refused): long and diagonal shapes built in
-    chunks along the footprint, merged into one level; plan refs/output/chunked-pipeline-plan.md. Comes first now:
-    road mode is not useful for long roads without it.
+    chunks along the footprint, merged into one level; plan refs/output/chunked-pipeline-plan.md (progress there).
+    Status 2026-11-21: works end to end in the app's entry points and on dev (c5aaa71): a road or tiles shape past a
+    16384 square is chunked; seams meet exactly, roads joined across, AI drives across. Open:
+    - a long bridge or tunnel reaching more than 128 m past its owner chunk's core is cut (the chunk has no data
+      beyond its overlap): move the core boundary round it, or a wider overlap where one crosses;
+    - the previews show the overview over the whole box (part C: mask to the footprint);
+    - desktop: a chunked level's downloads saved with its project (Modify), the app run end to end, memory measured;
+    - the 23 km road end to end (web and desktop), in game;
+    - the per-chunk prefetch at Generate runs the whole Generate (a downloads-only pass would halve it);
+    - the export report is the first chunk's; the merged zip is built in memory (stream it for the biggest).
   - Then step 3 (Batch mode retired) and step 4 (speed for big shapes).
 
 ## Now: Fizz_Mechanic's 0.3.3 list (2026-11-19; on hold until after the 0.3.5 release, user 2026-11-20)
