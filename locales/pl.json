@@ -2395,9 +2395,7 @@
     "mode_road": "Tryb drogi",
     "clickHint": "Kliknij drogę na mapie: zostanie poprowadzona w obie strony po nazwie lub numerze.",
     "reading": "Odczyt dróg w tym miejscu…",
-    "handlesHint": "Przeciągnij dwa uchwyty na mapie, aby ustawić początek i koniec odcinka.",
-    "extendStart": "Wydłuż na początku",
-    "extendEnd": "Wydłuż na końcu",
+    "handlesHint": "Przeciągnij uchwyt wzdłuż drogi, aby skrócić odcinek, albo upuść go dalej: odcinek pobiegnie drogami do tego miejsca (do 20 km naraz), trzymając się tej drogi.",
     "width": "Szerokość z każdej strony",
     "widthValue": "{m} m",
     "gridLine": "Droga: {km} km · mapa {w} × {h} px · {area} km²",
@@ -2409,6 +2407,8 @@
     "pickFirst": "Najpierw wybierz drogę na mapie (Tryb drogi).",
     "error_none": "Tu nie ma drogi: kliknij bliżej drogi.",
     "error_read": "Nie udało się odczytać dróg w tym miejscu. Spróbuj ponownie za chwilę.",
-    "error_noMore": "Droga nie biegnie tam dalej pod tą samą nazwą lub numerem: kliknij następną drogę, aby kontynuować."
+    "routing": "Szukanie trasy po drogach…",
+    "error_tooFar": "Za daleko na jedno przeciągnięcie: upuść uchwyt najwyżej 20 km od końca drogi.",
+    "error_noRoute": "Brak trasy po drogach do tego miejsca: upuść uchwyt na drodze połączonej z tą."
   }
 }

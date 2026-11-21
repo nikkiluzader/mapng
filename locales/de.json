@@ -2395,9 +2395,7 @@
     "mode_road": "Straßenmodus",
     "clickHint": "Klicke auf der Karte auf eine Straße: Sie wird über ihren Namen oder ihre Nummer in beide Richtungen verfolgt.",
     "reading": "Die Straßen hier werden gelesen…",
-    "handlesHint": "Zieh die beiden Griffe auf der Karte, um Anfang und Ende des Abschnitts festzulegen.",
-    "extendStart": "Am Anfang verlängern",
-    "extendEnd": "Am Ende verlängern",
+    "handlesHint": "Zieh einen Griff an der Straße entlang, um den Abschnitt zu kürzen, oder setz ihn weiter vorn ab: Der Abschnitt folgt den Straßen dorthin (bis 20 km auf einmal) und bleibt auf dieser Straße.",
     "width": "Breite zu beiden Seiten",
     "widthValue": "{m} m",
     "gridLine": "{km} km Straße · Karte {w} × {h} px · {area} km²",
@@ -2409,6 +2407,8 @@
     "pickFirst": "Wähle zuerst eine Straße auf der Karte (Straßenmodus).",
     "error_none": "Dort ist keine Straße: Klicke näher an eine Straße.",
     "error_read": "Die Straßen hier konnten nicht gelesen werden. Versuch es gleich noch einmal.",
-    "error_noMore": "Die Straße geht dort nicht mit demselben Namen oder derselben Nummer weiter: Klicke auf die nächste Straße, um fortzufahren."
+    "routing": "Der Weg entlang der Straßen wird gesucht…",
+    "error_tooFar": "Zu weit für einmal Ziehen: Setz den Griff höchstens 20 km vom Straßenende ab.",
+    "error_noRoute": "Kein Weg entlang der Straßen dorthin: Setz den Griff auf eine Straße, die mit dieser verbunden ist."
   }
 }

@@ -2395,9 +2395,7 @@
     "mode_road": "Modalità strada",
     "clickHint": "Fai clic su una strada della mappa: viene seguita in entrambe le direzioni per nome o numero.",
     "reading": "Lettura delle strade qui…",
-    "handlesHint": "Trascina le due maniglie sulla mappa per fissare dove inizia e finisce il tratto.",
-    "extendStart": "Allunga all'inizio",
-    "extendEnd": "Allunga alla fine",
+    "handlesHint": "Trascina una maniglia lungo la strada per accorciare il tratto, o lasciala più avanti: il tratto segue le strade fin lì (fino a 20 km alla volta), restando su questa strada.",
     "width": "Larghezza per lato",
     "widthValue": "{m} m",
     "gridLine": "{km} km di strada · mappa {w} × {h} px · {area} km²",
@@ -2409,6 +2407,8 @@
     "pickFirst": "Prima scegli una strada sulla mappa (Modalità strada).",
     "error_none": "Nessuna strada lì: fai clic più vicino a una strada.",
     "error_read": "Non è stato possibile leggere le strade qui. Riprova tra un momento.",
-    "error_noMore": "La strada non continua lì con lo stesso nome o numero: fai clic sulla strada successiva per continuare."
+    "routing": "Ricerca del percorso lungo le strade…",
+    "error_tooFar": "Troppo lontano per un solo trascinamento: lascia la maniglia entro 20 km dalla fine della strada.",
+    "error_noRoute": "Nessun percorso stradale fin lì: lascia la maniglia su una strada collegata a questa."
   }
 }

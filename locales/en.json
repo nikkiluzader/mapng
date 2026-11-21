@@ -2395,9 +2395,7 @@
     "mode_road": "Road mode",
     "clickHint": "Click a road on the map: it is followed both ways by its name or number.",
     "reading": "Reading the roads here…",
-    "handlesHint": "Drag the two handles on the map to set where the stretch starts and ends.",
-    "extendStart": "Extend at the start",
-    "extendEnd": "Extend at the end",
+    "handlesHint": "Drag a handle along the road to shorten the stretch, or drop it farther along: the stretch follows the roads to it (up to 20 km at a time), keeping to this road.",
     "width": "Width either side",
     "widthValue": "{m} m",
     "gridLine": "{km} km of road · map {w} × {h} px · {area} km²",
@@ -2409,6 +2407,8 @@
     "pickFirst": "Pick a road on the map first (Road mode).",
     "error_none": "No road there: click closer to a road.",
     "error_read": "The roads here could not be read. Try again in a moment.",
-    "error_noMore": "The road does not go on there under the same name or number: click the next road to continue."
+    "routing": "Finding the way along the roads…",
+    "error_tooFar": "Too far for one drag: drop the handle within 20 km of the road's end.",
+    "error_noRoute": "No way along the roads to there: drop the handle on a road connected to this one."
   }
 }

@@ -8,7 +8,7 @@
 const DRIVABLE = new Set(['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'unclassified', 'residential',
   'motorway_link', 'trunk_link', 'primary_link', 'secondary_link', 'tertiary_link', 'living_street', 'service', 'road', 'track']);
 export const PICK_RADIUS_M = 1200;     // the box read round a click (half its side)
-export const JOIN_M = 1.5;             // ways whose ends are this close are joined
+export const JOIN_M = 3;               // ways whose ends are this close are joined
 export const MAX_PICK_M = 60;          // a click farther than this from any road picks nothing
 export const ROAD_MAX_POINTS = 6000;   // a followed road kept to this many points
 
@@ -47,8 +47,16 @@ export function nearestRoad(roads, p) {
   return best?.road || null;
 }
 
-const sameRoad = (a, b) => (a.ref && b.ref && a.ref === b.ref) || (a.name && b.name && a.name === b.name)
-  || (!a.name && !a.ref && !b.name && !b.ref && a.highway === b.highway);
+// (names and numbers compared loosely: OSM splits one road into many ways whose tags differ in form: "I 95" and
+// "I 95;US 1", "I-95", "Main St" and "main st"; any shared number or the same name is the same road)
+const refTokens = (r) => String(r || '').split(/[;,/]/).map((t) => t.replace(/[\s-]+/g, '').toUpperCase()).filter(Boolean);
+const normName = (n) => String(n || '').trim().toLowerCase().replace(/\s+/g, ' ');
+export const sameRoad = (a, b) => {
+  const ra = refTokens(a.ref); const rb = refTokens(b.ref);
+  if (ra.length && rb.length && ra.some((t) => rb.includes(t))) return true;
+  if (normName(a.name) && normName(a.name) === normName(b.name)) return true;
+  return !a.name && !a.ref && !b.name && !b.ref && a.highway === b.highway;
+};
 const heading = (a, b) => Math.atan2(b.lat - a.lat, (b.lng - a.lng) * Math.cos(a.lat * rad));
 
 /**
@@ -111,3 +119,74 @@ export function distanceAlong(pts, p) {
   for (let k = 1; k < pts.length; k++) { const q = toSegment(p, pts[k - 1], pts[k]); if (!best || q.d < best.d) best = { d: q.d, along: s[k - 1] + q.t * (s[k] - s[k - 1]) }; }
   return best ? best.along : 0;
 }
+
+// ── Routing along the roads (a handle dragged beyond the stretch) ───────────────────────────────────────────────────
+// OSM splits a road into many ways (bridges, junctions, carriageways, tag changes), so following by name alone stops
+// early. A handle dropped anywhere is reached along the road network instead: the cheapest path from the stretch's end,
+// where staying on the same road (sameRoad with the picked one) costs its length, another road of the same or a bigger
+// class ROUTE_OTHER_ROAD times its length, and a smaller road ROUTE_SMALLER_ROAD times: the route keeps to the road
+// picked and leaves it only where it must or where the handle was put on another road.
+export const ROUTE_MAX_M = 20000;       // the farthest one drop may reach (straight line from the end)
+export const ROUTE_OTHER_ROAD = 3;
+export const ROUTE_SMALLER_ROAD = 8;
+export const ROUTE_SNAP_M = 250;        // a drop this far from any road is not routed
+const RANK = { motorway: 7, trunk: 6, primary: 5, secondary: 4, tertiary: 3, unclassified: 2, residential: 2, living_street: 1, service: 1, track: 0, road: 2 };
+const rankOf = (h) => RANK[String(h || '').replace(/_link$/, '')] ?? 1;
+
+/**
+ * The path [{ lat, lng }...] along the roads from `from` to `to`, keeping to `picked` ({ name, ref, highway }) where it
+ * can; null when either end is farther than ROUTE_SNAP_M from a road or the two are not connected.
+ */
+export function routeAlongRoads(roads, from, to, picked) {
+  // the graph: a node per distinct point (ways share their junction points exactly), an edge per segment
+  const key = (p) => `${p.lat.toFixed(7)},${p.lng.toFixed(7)}`;
+  const id = new Map(); const pts = []; const adj = [];
+  const node = (p) => { const k = key(p); let i = id.get(k); if (i === undefined) { i = pts.length; id.set(k, i); pts.push(p); adj.push([]); } return i; };
+  const pr = rankOf(picked?.highway);
+  for (const r of roads) {
+    const f = sameRoad(picked || {}, r) ? 1 : rankOf(r.highway) >= pr ? ROUTE_OTHER_ROAD : ROUTE_SMALLER_ROAD;
+    for (let k = 1; k < r.pts.length; k++) {
+      const a = node(r.pts[k - 1]); const b = node(r.pts[k]); const w = metres(r.pts[k - 1], r.pts[k]) * f;
+      adj[a].push([b, w]); adj[b].push([a, w]);
+    }
+  }
+  // the start and the drop snapped onto the nearest segment (not the nearest point: a motorway's points can lie a
+  // kilometre apart on a straight, and the nearest point was then a parallel road's), the segment split there by a new
+  // node joined to both its ends at their share of its cost
+  const segs = [];
+  for (const r of roads) {
+    const f = sameRoad(picked || {}, r) ? 1 : rankOf(r.highway) >= pr ? ROUTE_OTHER_ROAD : ROUTE_SMALLER_ROAD;
+    for (let k = 1; k < r.pts.length; k++) segs.push([r.pts[k - 1], r.pts[k], f]);
+  }
+  const snap = (p) => {
+    let best = null;
+    for (const [a, b, f] of segs) { const q = toSegment(p, a, b); if (!best || q.d < best.q.d) best = { q, a, b, f }; }
+    if (!best || best.q.d > ROUTE_SNAP_M) return -1;
+    const i = node(best.q.at); const ia = node(best.a); const ib = node(best.b);
+    adj[i].push([ia, metres(best.q.at, best.a) * best.f], [ib, metres(best.q.at, best.b) * best.f]);
+    adj[ia].push([i, metres(best.q.at, best.a) * best.f]); adj[ib].push([i, metres(best.q.at, best.b) * best.f]);
+    return i;
+  };
+  const s = snap(from); const t = snap(to);
+  if (s < 0 || t < 0) return null;
+  // Dijkstra with a binary heap
+  const dist = new Float64Array(pts.length).fill(Infinity); const prev = new Int32Array(pts.length).fill(-1);
+  const heap = [[0, s]]; dist[s] = 0;
+  const push = (e) => { heap.push(e); let i = heap.length - 1; while (i > 0) { const j = (i - 1) >> 1; if (heap[j][0] <= heap[i][0]) break; [heap[i], heap[j]] = [heap[j], heap[i]]; i = j; } };
+  const pop = () => { const top = heap[0]; const last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1; const r2 = l + 1; let m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r2 < heap.length && heap[r2][0] < heap[m][0]) m = r2; if (m === i) break; [heap[i], heap[m]] = [heap[m], heap[i]]; i = m; } } return top; };
+  while (heap.length) {
+    const [d, u] = pop(); if (d > dist[u]) continue; if (u === t) break;
+    for (const [v, w] of adj[u]) if (d + w < dist[v]) { dist[v] = d + w; prev[v] = u; push([d + w, v]); }
+  }
+  if (!Number.isFinite(dist[t])) return null;
+  const path = []; for (let u = t; u >= 0; u = prev[u]) path.push(pts[u]);
+  return path.reverse();
+}
+
+/** The distance (m) from p to the polyline. */
+export function distanceToLine(pts, p) {
+  let best = Infinity; for (let k = 1; k < pts.length; k++) best = Math.min(best, toSegment(p, pts[k - 1], pts[k]).d); return best;
+}
+
+/** Metres between two points. */
+export const metresBetween = metres;

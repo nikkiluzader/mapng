@@ -105,7 +105,7 @@
       />
 
       <l-rectangle 
-        v-if="selectionBounds && !hasBatchGrid && !showUploadedCoverageBounds && !roadShown"
+        v-if="selectionBounds && !hasBatchGrid && !showUploadedCoverageBounds && !roadModeOn"
         :bounds="[[selectionBounds.south, selectionBounds.west], [selectionBounds.north, selectionBounds.east]]" 
         color="#FF6600"
         :weight="2"
@@ -357,8 +357,8 @@
       </div>
     </div>
 
-    <!-- Center Crosshair -->
-    <div v-if="!boxLocked" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[400] pointer-events-none">
+    <!-- Center Crosshair (not in road mode: the area is the road's corridor, not a box round the centre) -->
+    <div v-if="!boxLocked && !roadModeOn" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[400] pointer-events-none">
         <div class="w-8 h-8 text-brand drop-shadow-lg flex items-center justify-center">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="w-full h-full filter drop-shadow-md">
                 <line x1="12" y1="4" x2="12" y2="20" />
@@ -605,9 +605,9 @@ const corridorPx = computed(() => {
   const mPerPx = (156543.03392 * Math.cos((s[0].lat * Math.PI) / 180)) / 2 ** (currentZoom.value || 13);
   return Math.max(2, (2 * store.roadHalfWidthM) / mPerPx);
 });
-const dropRoadHandle = (which, event) => {
+const dropRoadHandle = async (which, event) => {
   const ll = event?.target?.getLatLng?.(); if (!ll) return;
-  roadApi.setHandle(which, { lat: ll.lat, lng: ll.lng });
+  await roadApi.setHandle(which, { lat: ll.lat, lng: ll.lng });
   const marker = event.target;
   nextTick(() => { const h = roadHandles.value.find((x) => x.which === which); if (h) marker.setLatLng(h.at); });
 };
@@ -997,7 +997,8 @@ watch([leafletMap, showLidarCoverage], async ([map, on]) => {
 
 // The box the map's own tools frame (the elevation preview's box): the export
 // area, the BYOD crop or the batch grid. Dimmed around, labelled with its size.
-const maskedBox = computed(() => (hasBatchGrid.value ? null : (uploadedCropBounds.value || (showUploadedCoverageBounds.value ? null : selectionBounds.value))));
+// (road mode: no box, so no dimming round it and no size label: the user, 2026-11-21)
+const maskedBox = computed(() => (hasBatchGrid.value || roadModeOn.value ? null : (uploadedCropBounds.value || (showUploadedCoverageBounds.value ? null : selectionBounds.value))));
 // Only once the box is big enough on screen to read (zoomed out, the dim
 // would just grey the whole map and the label would cover what is there).
 const maskPaneReady = ref(false);

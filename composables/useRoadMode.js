@@ -4,7 +4,7 @@
 import { computed, ref, unref } from 'vue';
 import { useMainStore } from '../stores/mainStore';
 import { fetchOSMData } from '../services/osm.js';
-import { boxAround, PICK_RADIUS_M, drivableRoads, nearestRoad, followRoad, cumulative, stretchBetween, distanceAlong } from '../services/roadPick.js';
+import { boxAround, PICK_RADIUS_M, drivableRoads, nearestRoad, followRoad, cumulative, stretchBetween, distanceAlong, distanceToLine, routeAlongRoads, metresBetween, ROUTE_MAX_M } from '../services/roadPick.js';
 import { corridorGrid } from '../services/roadCorridor.js';
 
 const val = (v) => (typeof v === 'function' ? v() : unref(v));
@@ -28,19 +28,25 @@ export function useRoadMode(mpp) {
     let side = 1; while (side < Math.max(g.width, g.height)) side *= 2;
     return { ...g, squareSide: side, webOk: side <= 16384 };
   });
-  const merge = (roads) => { const ids = new Set(known.value.map((r) => r.id)); known.value = known.value.concat(roads.filter((r) => !ids.has(r.id))); };
+  // (a way read in an earlier, smaller box comes back cut at that box's edge: the longer copy of each way is kept, or
+  // the road broke where the first box ended and no route crossed it)
+  const merge = (roads) => {
+    const byId = new Map(known.value.map((r) => [r.id, r]));
+    for (const r of roads) { const old = byId.get(r.id); if (!old || cumulative(r.pts).at(-1) > cumulative(old.pts).at(-1) + 0.5) byId.set(r.id, r); }
+    known.value = [...byId.values()];
+  };
   async function read(box) {
     const features = await fetchOSMData(box, {});
     const roads = drivableRoads(features);
     merge(roads);
-    return box;
+    return { box, roads };
   }
   /** Pick the road nearest p ({ lat, lng }) and follow it. */
   async function pickAt(p) {
     if (busy.value) return;
     busy.value = true; error.value = '';
     try {
-      const box = await read(boxAround(p, PICK_RADIUS_M));
+      const { box } = await read(boxAround(p, PICK_RADIUS_M));
       const start = nearestRoad(known.value, p);
       if (!start) { error.value = 'none'; return; }
       const f = followRoad(known.value, start, box);
@@ -60,7 +66,7 @@ export function useRoadMode(mpp) {
     busy.value = true; error.value = '';
     try {
       const endPt = which === 'start' ? r.pts[0] : r.pts[r.pts.length - 1];
-      const box = await read(boxAround(endPt, PICK_RADIUS_M));
+      const { box } = await read(boxAround(endPt, PICK_RADIUS_M));
       const cur = { id: '__picked', name: r.names?.[0] || '', ref: r.refs?.[0] || '', highway: r.highway || 'road', pts: r.pts };
       const f = followRoad(known.value.filter((k) => !(r.ids || []).includes(k.id)), cur, box);
       // (the old start moves by what was added in front of it)
@@ -79,11 +85,43 @@ export function useRoadMode(mpp) {
       error.value = 'read';
     } finally { busy.value = false; }
   }
-  /** A handle dropped at p: its end moves to the nearest point on the road. */
-  function setHandle(which, p) {
+  /**
+   * A handle dropped at p. Near the road (SLIDE_M): its end slides to the nearest point on it. Farther: the road is
+   * reached along the road network from that end (services/roadPick.js routeAlongRoads: keeping to the picked road),
+   * the stretch grows to it and the handle lands there. OSM splits roads into many ways, so this, not following by name,
+   * is how a stretch is made longer.
+   */
+  const SLIDE_M = 40;
+  async function setHandle(which, p) {
     const r = store.road; if (!r) return;
-    const d = distanceAlong(r.pts, p);
-    store.setRoad({ ...r, [which === 'start' ? 'startM' : 'endM']: d });
+    if (distanceToLine(r.pts, p) <= SLIDE_M) {
+      store.setRoad({ ...r, [which === 'start' ? 'startM' : 'endM']: distanceAlong(r.pts, p) });
+      return;
+    }
+    const endPt = which === 'start' ? r.pts[0] : r.pts[r.pts.length - 1];
+    if (metresBetween(endPt, p) > ROUTE_MAX_M) { error.value = 'tooFar'; return; }
+    if (busy.value) return;
+    busy.value = true; error.value = '';
+    try {
+      // the roads between the road's end and the drop, with room round them
+      // (routed on this read alone: the map data comes clipped to the box asked for, so the road's end from an earlier,
+      // smaller read is a cut point on that box's edge, joined to nothing; this read covers both ends whole)
+      const PAD = 0.006;
+      const { roads } = await read({ north: Math.max(endPt.lat, p.lat) + PAD, south: Math.min(endPt.lat, p.lat) - PAD, east: Math.max(endPt.lng, p.lng) + PAD, west: Math.min(endPt.lng, p.lng) - PAD });
+      const path = routeAlongRoads(roads, endPt, p, { name: r.names?.[0] || '', ref: r.refs?.[0] || '', highway: r.highway || 'road' });
+      if (!path || path.length < 2) { error.value = 'noRoute'; return; }
+      const before = cumulative(r.pts).at(-1);
+      const pts = which === 'end' ? r.pts.concat(path.slice(1)) : path.slice().reverse().concat(r.pts.slice(1));
+      const added = cumulative(pts).at(-1) - before;
+      store.setRoad({
+        ...r, pts,
+        startM: which === 'start' ? 0 : r.startM,
+        endM: which === 'end' ? cumulative(pts).at(-1) : r.endM + added,
+      });
+    } catch (e) {
+      console.warn('[Road mode] the roads could not be read:', e?.message || e);
+      error.value = 'read';
+    } finally { busy.value = false; }
   }
   function clearRoad() { store.setRoad(null); error.value = ''; }
   return { total, stretch, stretchM, grid, busy, error, pickAt, extend, setHandle, clearRoad };

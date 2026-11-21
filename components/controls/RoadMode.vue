@@ -7,10 +7,7 @@
     <template v-else>
       <p class="text-xs font-medium text-gray-700 dark:text-gray-300" data-testid="road-name">{{ roadName }}</p>
       <p class="text-micro text-gray-500 dark:text-gray-400">{{ t('road.handlesHint') }}</p>
-      <div class="flex gap-1.5">
-        <BaseButton size="sm" variant="secondary" data-testid="road-extend-start" :disabled="busy || disabled" @click="extend('start')">{{ t('road.extendStart') }}</BaseButton>
-        <BaseButton size="sm" variant="secondary" data-testid="road-extend-end" :disabled="busy || disabled" @click="extend('end')">{{ t('road.extendEnd') }}</BaseButton>
-      </div>
+      <p v-if="busy" class="text-micro text-gray-500 dark:text-gray-400" data-testid="road-busy">{{ t('road.routing') }}</p>
     </template>
     <p v-if="error" class="flex items-start gap-1.5 text-micro leading-snug text-amber-700 dark:text-amber-300" data-testid="road-error">
       <AlertTriangle :size="11" class="shrink-0 mt-px" /><span>{{ t(`road.error_${error}`) }}</span>
@@ -53,7 +50,7 @@ const props = defineProps({
 const { t } = useI18n();
 const store = useMainStore();
 const isDesktop = !!desktopApp;
-const { stretchM, grid, busy, error, extend, clearRoad } = useRoadMode(() => props.metersPerPixel);
+const { stretchM, grid, busy, error, clearRoad } = useRoadMode(() => props.metersPerPixel);
 const roadName = computed(() => {
   const r = store.road; if (!r) return '';
   const label = [...(r.refs || []), ...(r.names || [])].filter(Boolean).slice(0, 3).join(' · ');

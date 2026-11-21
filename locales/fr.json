@@ -2395,9 +2395,7 @@
     "mode_road": "Mode route",
     "clickHint": "Cliquez sur une route de la carte : elle est suivie dans les deux sens par son nom ou son numéro.",
     "reading": "Lecture des routes ici…",
-    "handlesHint": "Faites glisser les deux poignées sur la carte pour fixer le début et la fin du tronçon.",
-    "extendStart": "Prolonger au début",
-    "extendEnd": "Prolonger à la fin",
+    "handlesHint": "Faites glisser une poignée le long de la route pour raccourcir le tronçon, ou déposez-la plus loin : le tronçon suit les routes jusque-là (jusqu'à 20 km à la fois), en restant sur cette route.",
     "width": "Largeur de chaque côté",
     "widthValue": "{m} m",
     "gridLine": "{km} km de route · carte {w} × {h} px · {area} km²",
@@ -2409,6 +2407,8 @@
     "pickFirst": "Choisissez d'abord une route sur la carte (Mode route).",
     "error_none": "Pas de route ici : cliquez plus près d'une route.",
     "error_read": "Les routes ici n'ont pas pu être lues. Réessayez dans un instant.",
-    "error_noMore": "La route ne continue pas là sous le même nom ou numéro : cliquez sur la route suivante pour continuer."
+    "routing": "Recherche du chemin par les routes…",
+    "error_tooFar": "Trop loin pour un seul glisser : déposez la poignée à moins de 20 km du bout de la route.",
+    "error_noRoute": "Aucun chemin par les routes jusque-là : déposez la poignée sur une route reliée à celle-ci."
   }
 }

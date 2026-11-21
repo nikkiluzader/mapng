@@ -47,3 +47,29 @@ test('the stretch between two distances, cut exactly; a point projects onto the 
   assert.ok(Math.abs(cumulative(s).at(-1) - 500) < 1);
   assert.ok(Math.abs(distanceAlong(f.pts, P(350, 30)) - (f.pts[0].lng < f.pts.at(-1).lng ? 350 : 650) * 0.99888) < 1);
 });
+
+test('names and numbers match loosely', async () => {
+  const { sameRoad } = await import('../services/roadPick.js');
+  assert.ok(sameRoad({ ref: 'I 95' }, { ref: 'I 95;US 1' }));
+  assert.ok(sameRoad({ ref: 'I-95' }, { ref: 'I 95' }));
+  assert.ok(sameRoad({ name: 'Main St' }, { name: ' main  st' }));
+  assert.ok(!sameRoad({ ref: 'I 95' }, { ref: 'I 295' }));
+});
+
+test('a dropped handle is reached along the roads, keeping to the picked road over a shortcut', async () => {
+  const { routeAlongRoads } = await import('../services/roadPick.js');
+  // I 95 in four pieces (one tagged "I 95;US 1"), bending north at x = 1000; a residential shortcut cuts the corner
+  const roads = drivableRoads([
+    way('m1', '', 'I 95', 'motorway', [0, 0], [500, 0]),
+    way('m2', '', 'I 95;US 1', 'motorway', [500, 0], [1000, 0]),
+    way('m3', '', 'I 95', 'motorway', [1000, 0], [1000, 600]),
+    way('m4', '', 'I 95', 'motorway', [1000, 600], [1000, 1200]),
+    way('cut', 'Short Ln', '', 'residential', [500, 0], [1000, 600]),
+  ]);
+  const path = routeAlongRoads(roads, P(0, 0), P(1000, 1180), { ref: 'I 95', highway: 'motorway' });
+  assert.ok(path, 'a route');
+  const xs = path.map((p) => Math.round(p.lng / D)); const ys = path.map((p) => Math.round(p.lat / D));
+  // through the corner at (1000, 0), not the shortcut
+  assert.ok(xs.some((x, i) => x === 1000 && ys[i] === 0), JSON.stringify(xs.map((x, i) => [x, ys[i]])));
+  assert.equal(routeAlongRoads(roads, P(0, 0), P(5000, 5000), { ref: 'I 95' }), null, 'too far from any road');
+});

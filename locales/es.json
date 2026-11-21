@@ -2395,9 +2395,7 @@
     "mode_road": "Modo carretera",
     "clickHint": "Haz clic en una carretera del mapa: se sigue en ambos sentidos por su nombre o número.",
     "reading": "Leyendo las carreteras de aquí…",
-    "handlesHint": "Arrastra las dos asas del mapa para fijar dónde empieza y acaba el tramo.",
-    "extendStart": "Alargar al principio",
-    "extendEnd": "Alargar al final",
+    "handlesHint": "Arrastra un asa a lo largo de la carretera para acortar el tramo, o suéltala más adelante: el tramo sigue las carreteras hasta allí (hasta 20 km cada vez), sin salir de esta carretera.",
     "width": "Ancho a cada lado",
     "widthValue": "{m} m",
     "gridLine": "{km} km de carretera · mapa {w} × {h} px · {area} km²",
@@ -2409,6 +2407,8 @@
     "pickFirst": "Primero elige una carretera en el mapa (Modo carretera).",
     "error_none": "No hay carretera ahí: haz clic más cerca de una carretera.",
     "error_read": "No se pudieron leer las carreteras de aquí. Inténtalo de nuevo en un momento.",
-    "error_noMore": "La carretera no sigue ahí con el mismo nombre o número: haz clic en la siguiente carretera para continuar."
+    "routing": "Buscando el camino por las carreteras…",
+    "error_tooFar": "Demasiado lejos para un solo arrastre: suelta el asa a menos de 20 km del final de la carretera.",
+    "error_noRoute": "No hay camino por carretera hasta allí: suelta el asa sobre una carretera conectada con esta."
   }
 }
