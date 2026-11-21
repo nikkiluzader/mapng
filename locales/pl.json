@@ -2390,9 +2390,11 @@
     "terrain": "Kwadrat o boku będącym potęgą dwójki: budowany na terenie BeamNG, jak zwykle.",
     "models": "To nie kwadrat o boku będącym potęgą dwójki: podłoże jest budowane z modeli 3D (eksperymentalne). Wczytuje się wolniej i nie ma trawy.",
     "islands": "Niektóre kafelki nie stykają się z innymi: staną się wyspami w poziomie.",
-    "webCap": "Tego kształtu nie da się jeszcze zbudować: jest budowany na całym obejmującym go prostokącie, który miałby {side} px (najwyżej {max}), choć jego własna powierzchnia jest daleko poniżej limitu. Budowanie długich i ukośnych kształtów w kawałkach jest w przygotowaniu; do tego czasu skróć lub wyprostuj odcinek, użyj mniej kafelków albo wybierz grubszą rozdzielczość.",
+    "webCap": "Za duże dla strony: powierzchnia kształtu: {km2} km², a strona buduje najwyżej {maxKm2} km² (16384² pikseli) w dowolnym kształcie. Skróć lub zwęź odcinek, użyj mniej kafelków, grubszej rozdzielczości albo aplikacji desktopowej.",
     "desktopWarn": "Ponad {max} px: poziom może być za duży, by gra go wczytała.",
-    "clear": "Wróć do jednego kafelka"
+    "clear": "Wróć do jednego kafelka",
+    "chunked": "Budowane w częściach (eksperymentalne): ten kształt jest za długi lub zbyt ukośny na jedną siatkę, więc powstaje w kawałkach łączonych w jeden poziom. Generowanie najpierw pobiera każdy kawałek; podglądy pokazują zgrubny widok całości.",
+    "bigDesktop": "Duże: powierzchnia kształtu: {km2} km², więcej niż pozwala strona ({maxKm2} km²). Aplikacja desktopowa go zbuduje, ale może to długo trwać i wymagać dużo miejsca na dysku."
   },
   "road": {
     "areaMode": "Co obejmuje mapa",
@@ -2404,7 +2406,7 @@
     "width": "Szerokość z każdej strony",
     "widthValue": "{m} m",
     "gridLine": "Droga: {km} km · mapa {w} × {h} px · {area} km²",
-    "webCap": "Tego kształtu nie da się jeszcze zbudować: jest budowany na całym obejmującym go prostokącie, który miałby {side} px (najwyżej {max}), choć jego własna powierzchnia jest daleko poniżej limitu. Budowanie długich i ukośnych kształtów w kawałkach jest w przygotowaniu; do tego czasu skróć lub wyprostuj odcinek, użyj mniej kafelków albo wybierz grubszą rozdzielczość.",
+    "webCap": "Za duże dla strony: powierzchnia kształtu: {km2} km², a strona buduje najwyżej {maxKm2} km² (16384² pikseli) w dowolnym kształcie. Skróć lub zwęź odcinek, użyj mniej kafelków, grubszej rozdzielczości albo aplikacji desktopowej.",
     "clear": "Wybierz inną drogę",
     "unnamed": "Droga bez nazwy",
     "start": "Początek",
@@ -2414,6 +2416,8 @@
     "error_read": "Nie udało się odczytać dróg w tym miejscu. Spróbuj ponownie za chwilę.",
     "routing": "Szukanie trasy po drogach…",
     "error_tooFar": "Za daleko na jedno przeciągnięcie: upuść uchwyt najwyżej 20 km od końca drogi.",
-    "error_noRoute": "Brak trasy po drogach do tego miejsca: upuść uchwyt na drodze połączonej z tą."
+    "error_noRoute": "Brak trasy po drogach do tego miejsca: upuść uchwyt na drodze połączonej z tą.",
+    "chunked": "Budowane w częściach (eksperymentalne): ten kształt jest za długi lub zbyt ukośny na jedną siatkę, więc powstaje w kawałkach łączonych w jeden poziom. Generowanie najpierw pobiera każdy kawałek; podglądy pokazują zgrubny widok całości.",
+    "bigDesktop": "Duże: powierzchnia kształtu: {km2} km², więcej niż pozwala strona ({maxKm2} km²). Aplikacja desktopowa go zbuduje, ale może to długo trwać i wymagać dużo miejsca na dysku."
   }
 }

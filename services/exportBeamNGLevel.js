@@ -13440,6 +13440,9 @@ export const EXPORT_STEP_GROUPS = [
 ];
 
 export async function exportBeamNGLevel(terrainData, center, options = {}) {
+  // a chunked level (services/chunkedGenerate.js): the overview stands for the previews only; every chunk is generated
+  // again from the download cache and exported, then the chunks merged into one level
+  if (terrainData?.chunked && !Array.isArray(options.chunkCore)) return exportChunkedFromOverview(terrainData, center, options);
   // Every module logs to the console (OSM, roads, bridges, buildings...); the
   // export keeps its share of that for export_report.txt.
   const jobLog = captureConsole();
@@ -13461,6 +13464,35 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   } finally {
     jobLog.restore();
   }
+}
+
+/** A chunked level's export (exportBeamNGLevel with an overview that carries `chunked`). */
+async function exportChunkedFromOverview(overview, center, options) {
+  const t0 = performance.now();
+  const ch = overview.chunked;
+  const [{ default: JSZip }, { fetchTerrainData }, { exportChunkedLevel }] = await Promise.all([import('jszip'), import('./terrain.js'), import('./chunkedGenerate.js')]);
+  const levelName = sanitizeLevelId(String(options.levelName || '').trim() || `mapng_${ch.center.lat.toFixed(4)}_${ch.center.lng.toFixed(4)}`.replace(/-/g, '_').replace(/\./g, '_'));
+  const a = ch.fetchArgs || {};
+  const fetch = (c, size, o) => fetchTerrainData(c, size, a.includeOSM !== false, !!a.useUSGS, !!a.useGPXZ, !!a.useKRON86, options.gpxzApiKey || options.backdropGpxzApiKey || '', undefined, () => {}, undefined, o);
+  const onProgress = options.onProgress;
+  const n = ch.chunks || 1;
+  console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunked level ${levelName}: ${n} chunk(s) of ${ch.size} px over a ${ch.W} x ${ch.H} footprint grid at ${ch.mpp} m/px; each generated again from the download cache and exported, then merged.`);
+  const { zip, chunks } = await exportChunkedLevel({
+    JSZip, chunked: ch, fetch,
+    exportLevel: (td, cc, opts) => exportBeamNGLevel(td, cc, opts),
+    // (the view distance from the whole level's width, not a chunk's)
+    levelInfo: { visibleDistance: viewDistanceMeters(options.viewDistance, Math.max(ch.W, ch.H) * ch.mpp) },
+    // (each chunk's own steps stay in the log; the progress shows the chunk being made)
+    options: { ...options, levelName, zipSink: undefined, stepCache: null, onProgress: undefined },
+    onProgress: (p) => { if (p?.chunk) onProgress?.({ step: `Chunk ${p.chunk} of ${p.of}: ${p.step === 'generate' ? 'generating from the cache' : 'exporting'}…`, pct: Math.round((100 * (p.chunk - 1)) / p.of * 0.9) }); else onProgress?.({ step: 'Merging the chunks into one level…', pct: 92 }); },
+    log: (m) => console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunked: ${m}`),
+  });
+  let zipBlob = null;
+  if (options.zipSink) await streamZipToWritable(zip, options.zipSink, (f) => onProgress?.({ step: 'Compressing the level ZIP…', pct: 95 + Math.round(5 * (f || 0)) }));
+  else zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', streamFiles: true });
+  console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunked level written in ${((performance.now() - t0) / 1000).toFixed(1)} s: ${chunks.map((c) => `${c.key} ${(c.ms / 1000).toFixed(1)} s`).join(', ')}.`);
+  onProgress?.({ step: 'Done', pct: 100, elapsedMs: performance.now() - t0 });
+  return { blob: zipBlob, filename: `${levelName}.zip`, structureChecks: [], ingameProbes: null, report: '', reportJson: null, steps: chunks.map((c) => ({ step: `chunk ${c.key}`, ms: c.ms })), reused: [] };
 }
 
 async function runBeamNGLevelExport(terrainData, center, options, jobLog) {

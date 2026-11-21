@@ -26,7 +26,9 @@ export function useRoadMode(mpp) {
     if (!stretch.value || stretch.value.length < 2) return null;
     const g = corridorGrid(stretch.value, store.roadHalfWidthM, M.value);
     let side = 1; while (side < Math.max(g.width, g.height)) side *= 2;
-    return { ...g, squareSide: side, webOk: side <= 16384 };
+    // (past one grid's square the level is built in chunks, refs/output/chunked-pipeline-plan.md; the website's cap
+    // is the corridor's own area, 16384² px; the desktop app has none, only a warning past it)
+    return { ...g, squareSide: side, chunked: side > 16384, webOk: g.areaPx <= 16384 * 16384 };
   });
   // (a way read in an earlier, smaller box comes back cut at that box's edge: the longer copy of each way is kept, or
   // the road broke where the first box ended and no route crossed it)

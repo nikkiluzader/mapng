@@ -2390,9 +2390,11 @@
     "terrain": "Ein Quadrat mit Zweierpotenz-Seite: wie gewohnt auf BeamNG-Terrain gebaut.",
     "models": "Kein Quadrat mit Zweierpotenz-Seite: Der Boden wird als 3D-Modelle gebaut (experimentell). Er lädt langsamer und hat keinen Grasbewuchs.",
     "islands": "Einige Kacheln berühren die anderen nicht: Sie werden zu Inseln im Level.",
-    "webCap": "Diese Form lässt sich noch nicht bauen: Sie wird über ihr ganzes umschließendes Rechteck gebaut, das {side} px breit wäre (höchstens {max}), obwohl ihre eigene Fläche weit unter der Grenze liegt. Das Bauen langer und schräger Formen in Stücken ist in Arbeit; bis dahin den Abschnitt kürzen oder gerader wählen, weniger Kacheln nehmen oder eine gröbere Auflösung wählen.",
+    "webCap": "Zu groß für die Website: Diese Form umfasst {km2} km², die Website baut höchstens {maxKm2} km² (16384² Pixel) in beliebiger Form. Kürze oder verschmälere den Abschnitt, nimm weniger Kacheln, eine gröbere Auflösung oder die Desktop-App.",
     "desktopWarn": "Über {max} px breit: Das Level ist für das Spiel womöglich zu groß zum Laden.",
-    "clear": "Zurück zu einer Kachel"
+    "clear": "Zurück zu einer Kachel",
+    "chunked": "In Teilen gebaut (experimentell): Diese Form ist für ein einzelnes Raster zu lang oder zu schräg, daher wird sie in Stücken erstellt, die zu einem Level zusammengefügt werden. Generieren lädt zuerst jedes Stück herunter; die Vorschauen zeigen eine gröbere Übersicht.",
+    "bigDesktop": "Groß: Diese Form umfasst {km2} km², mehr als die Website erlaubt ({maxKm2} km²). Die Desktop-App baut sie, das kann aber lange dauern und viel Speicherplatz brauchen."
   },
   "road": {
     "areaMode": "Was die Karte abdeckt",
@@ -2404,7 +2406,7 @@
     "width": "Breite zu beiden Seiten",
     "widthValue": "{m} m",
     "gridLine": "{km} km Straße · Karte {w} × {h} px · {area} km²",
-    "webCap": "Diese Form lässt sich noch nicht bauen: Sie wird über ihr ganzes umschließendes Rechteck gebaut, das {side} px breit wäre (höchstens {max}), obwohl ihre eigene Fläche weit unter der Grenze liegt. Das Bauen langer und schräger Formen in Stücken ist in Arbeit; bis dahin den Abschnitt kürzen oder gerader wählen, weniger Kacheln nehmen oder eine gröbere Auflösung wählen.",
+    "webCap": "Zu groß für die Website: Diese Form umfasst {km2} km², die Website baut höchstens {maxKm2} km² (16384² Pixel) in beliebiger Form. Kürze oder verschmälere den Abschnitt, nimm weniger Kacheln, eine gröbere Auflösung oder die Desktop-App.",
     "clear": "Andere Straße wählen",
     "unnamed": "Unbenannte Straße",
     "start": "Anfang",
@@ -2414,6 +2416,8 @@
     "error_read": "Die Straßen hier konnten nicht gelesen werden. Versuch es gleich noch einmal.",
     "routing": "Der Weg entlang der Straßen wird gesucht…",
     "error_tooFar": "Zu weit für einmal Ziehen: Setz den Griff höchstens 20 km vom Straßenende ab.",
-    "error_noRoute": "Kein Weg entlang der Straßen dorthin: Setz den Griff auf eine Straße, die mit dieser verbunden ist."
+    "error_noRoute": "Kein Weg entlang der Straßen dorthin: Setz den Griff auf eine Straße, die mit dieser verbunden ist.",
+    "chunked": "In Teilen gebaut (experimentell): Diese Form ist für ein einzelnes Raster zu lang oder zu schräg, daher wird sie in Stücken erstellt, die zu einem Level zusammengefügt werden. Generieren lädt zuerst jedes Stück herunter; die Vorschauen zeigen eine gröbere Übersicht.",
+    "bigDesktop": "Groß: Diese Form umfasst {km2} km², mehr als die Website erlaubt ({maxKm2} km²). Die Desktop-App baut sie, das kann aber lange dauern und viel Speicherplatz brauchen."
   }
 }

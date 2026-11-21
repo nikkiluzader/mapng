@@ -22,9 +22,13 @@
     <template v-if="grid">
       <p class="text-micro text-gray-600 dark:text-gray-300" data-testid="road-grid">{{ t('road.gridLine', { km: (stretchM / 1000).toFixed(2), w: grid.width, h: grid.height, area: areaKm }) }}</p>
       <p class="flex items-start gap-1.5 text-micro leading-snug text-amber-700 dark:text-amber-300"><AlertTriangle :size="11" class="shrink-0 mt-px" /><span>{{ t('tiles.models') }}</span></p>
-      <!-- (any platform for now: the export pads the shape to its power-of-two square: refs/output/chunked-pipeline-plan.md) -->
-      <p v-if="!grid.webOk" class="flex items-start gap-1.5 text-micro font-medium leading-snug text-red-600 dark:text-red-400" data-testid="road-web-cap">
-        <AlertTriangle :size="11" class="shrink-0 mt-px" /><span>{{ t('road.webCap', { side: grid.squareSide, max: 16384 }) }}</span>
+      <!-- (past one grid's square: built in chunks, refs/output/chunked-pipeline-plan.md) -->
+      <p v-if="grid.chunked" class="flex items-start gap-1.5 text-micro leading-snug text-gray-600 dark:text-gray-300" data-testid="road-chunked">
+        <Layers :size="11" class="shrink-0 mt-px" /><span>{{ t('road.chunked') }}</span>
+      </p>
+      <!-- (the website's cap is the corridor's own area; the desktop app only warns) -->
+      <p v-if="!grid.webOk" class="flex items-start gap-1.5 text-micro leading-snug" :class="isDesktop ? 'text-amber-700 dark:text-amber-300' : 'font-medium text-red-600 dark:text-red-400'" data-testid="road-web-cap">
+        <AlertTriangle :size="11" class="shrink-0 mt-px" /><span>{{ t(isDesktop ? 'road.bigDesktop' : 'road.webCap', capArgs) }}</span>
       </p>
     </template>
     <BaseButton v-if="store.road" size="sm" variant="secondary" data-testid="road-clear" :disabled="disabled" @click="clearRoad">{{ t('road.clear') }}</BaseButton>
@@ -34,7 +38,7 @@
 <script setup>
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { AlertTriangle, MousePointerClick } from 'lucide-vue-next';
+import { AlertTriangle, Layers, MousePointerClick } from 'lucide-vue-next';
 import BaseButton from '../base/BaseButton.vue';
 import { useMainStore } from '../../stores/mainStore';
 import { useRoadMode } from '../../composables/useRoadMode.js';
@@ -53,6 +57,10 @@ const roadName = computed(() => {
   const r = store.road; if (!r) return '';
   const label = [...(r.refs || []), ...(r.names || [])].filter(Boolean).slice(0, 3).join(' · ');
   return label || t('road.unnamed');
+});
+const capArgs = computed(() => {
+  const m = Number(props.metersPerPixel) > 0 ? Number(props.metersPerPixel) : 1;
+  return { km2: Math.round((grid.value?.areaPx || 0) * m * m / 1e6), maxKm2: Math.round(16384 * 16384 * m * m / 1e6) };
 });
 const areaKm = computed(() => {
   const g = grid.value; if (!g) return '0';

@@ -59,3 +59,8 @@ test('road ends a few cm apart at a seam are joined at their midpoint', () => {
   const b = { o: { class: 'DecalRoad', material: 'm', nodes: [[10, 0.16, 0, 6], [20, 0, 0, 6]] }, chunk: 'b' };
   assert.equal(joinSeamRoads([a, b]).joins, 1); assert.deepEqual(a.o.nodes[1].slice(0, 2), [10, 0.08]); assert.equal(a.o.nodes.length, 3);
 });
+test('seam blend reads only the neighbour footprint (outside it Generate only fills)', () => {
+  const size = 16; const f = { x0: 0, y0: 0, size, core: [0, 0, 12, 16], heights: new Float32Array(size * size).fill(5), runs: [[0, 0, 16]] };
+  const b = seamBlendFor({ x0: 8, y0: 0, size }, [f], 4);
+  assert.equal(b.weight[3], 1); assert.equal(b.weight[16 + 3], 0);   // row 1 is outside the neighbour's footprint
+});

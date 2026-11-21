@@ -2390,9 +2390,11 @@
     "terrain": "Un carré de côté puissance de deux : construit sur le terrain BeamNG, comme d'habitude.",
     "models": "Pas un carré de côté puissance de deux : le sol est construit en modèles 3D (expérimental). Il se charge plus lentement et n'a pas d'herbe.",
     "islands": "Certaines tuiles ne touchent pas les autres : elles deviennent des îles dans le niveau.",
-    "webCap": "Cette forme ne peut pas encore être construite : elle est construite sur tout son rectangle englobant, qui ferait {side} px de côté (au plus {max}), bien que sa propre surface soit loin de la limite. La construction des formes longues et en diagonale par morceaux est en cours ; d'ici là, raccourcissez ou redressez le tronçon, utilisez moins de tuiles ou choisissez une résolution plus grossière.",
+    "webCap": "Trop grand pour le site : cette forme couvre {km2} km², et le site construit au plus {maxKm2} km² (16384² pixels), quelle que soit la forme. Raccourcissez ou rétrécissez le tronçon, utilisez moins de tuiles, une résolution plus grossière ou l'application de bureau.",
     "desktopWarn": "Au-delà de {max} px : le niveau risque d'être trop grand pour que le jeu le charge.",
-    "clear": "Revenir à une tuile"
+    "clear": "Revenir à une tuile",
+    "chunked": "Construit en morceaux (expérimental) : cette forme est trop longue ou trop en diagonale pour une seule grille, elle est donc faite en morceaux réunis en un seul niveau. Générer télécharge d'abord chaque morceau ; les aperçus montrent une vue d'ensemble plus grossière.",
+    "bigDesktop": "Grand : cette forme couvre {km2} km², plus que ce que permet le site ({maxKm2} km²). L'application de bureau la construit, mais cela peut prendre longtemps et demander beaucoup d'espace disque."
   },
   "road": {
     "areaMode": "Ce que couvre la carte",
@@ -2404,7 +2406,7 @@
     "width": "Largeur de chaque côté",
     "widthValue": "{m} m",
     "gridLine": "{km} km de route · carte {w} × {h} px · {area} km²",
-    "webCap": "Cette forme ne peut pas encore être construite : elle est construite sur tout son rectangle englobant, qui ferait {side} px de côté (au plus {max}), bien que sa propre surface soit loin de la limite. La construction des formes longues et en diagonale par morceaux est en cours ; d'ici là, raccourcissez ou redressez le tronçon, utilisez moins de tuiles ou choisissez une résolution plus grossière.",
+    "webCap": "Trop grand pour le site : cette forme couvre {km2} km², et le site construit au plus {maxKm2} km² (16384² pixels), quelle que soit la forme. Raccourcissez ou rétrécissez le tronçon, utilisez moins de tuiles, une résolution plus grossière ou l'application de bureau.",
     "clear": "Choisir une autre route",
     "unnamed": "Route sans nom",
     "start": "Début",
@@ -2414,6 +2416,8 @@
     "error_read": "Les routes ici n'ont pas pu être lues. Réessayez dans un instant.",
     "routing": "Recherche du chemin par les routes…",
     "error_tooFar": "Trop loin pour un seul glisser : déposez la poignée à moins de 20 km du bout de la route.",
-    "error_noRoute": "Aucun chemin par les routes jusque-là : déposez la poignée sur une route reliée à celle-ci."
+    "error_noRoute": "Aucun chemin par les routes jusque-là : déposez la poignée sur une route reliée à celle-ci.",
+    "chunked": "Construit en morceaux (expérimental) : cette forme est trop longue ou trop en diagonale pour une seule grille, elle est donc faite en morceaux réunis en un seul niveau. Générer télécharge d'abord chaque morceau ; les aperçus montrent une vue d'ensemble plus grossière.",
+    "bigDesktop": "Grand : cette forme couvre {km2} km², plus que ce que permet le site ({maxKm2} km²). L'application de bureau la construit, mais cela peut prendre longtemps et demander beaucoup d'espace disque."
   }
 }

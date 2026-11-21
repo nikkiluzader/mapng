@@ -145,7 +145,7 @@ export function moveObject(o, dx, dy, dz, key) {
  * Merge chunk zips into one level: chunks [{ zip (JSZip), key, levelName (the chunk's), offsetM: { x, y }, minHeight }],
  * the level's name; returns a JSZip of the level. JSZip is passed in (works in the browser and in Node).
  */
-export async function mergeChunks(JSZip, chunks, levelName, { log = () => {}, bounds = null } = {}) {
+export async function mergeChunks(JSZip, chunks, levelName, { log = () => {}, bounds = null, levelInfo = null } = {}) {
   const out = new JSZip();
   const levelMin = Math.min(...chunks.map((c) => Number(c.minHeight) || 0));
   const gathered = new Map();   // path -> lines (items, forest) or decal instances
@@ -163,7 +163,9 @@ export async function mergeChunks(JSZip, chunks, levelName, { log = () => {}, bo
       if (isItems || isForest) {
         const text = rewritePaths(await f.async('string'), c.levelName, levelName, c.key);
         const lines = text.split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((o) => first || (!LEVEL_WIDE.has(o.class) && !LEVEL_WIDE_NAMES.has(o.name)))
-          .map((o) => (isForest ? { ...o, pos: [o.pos[0] + dx, o.pos[1] + dy, o.pos[2] + dz] } : moveObject(o, dx, dy, dz, c.key)));
+          .map((o) => (isForest ? { ...o, pos: [o.pos[0] + dx, o.pos[1] + dy, o.pos[2] + dz] } : moveObject(o, dx, dy, dz, c.key)))
+          // (the level's settings for the whole level, not the first chunk's: its view distance)
+          .map((o) => (o.class === 'LevelInfo' && levelInfo ? { ...o, ...levelInfo } : o));
         const path = `levels/${levelName}/${rel}`;
         const list = gathered.get(path) || []; gathered.set(path, list.concat(lines.map((o) => JSON.stringify(o)))); objects += lines.length;
         continue;
@@ -181,8 +183,10 @@ export async function mergeChunks(JSZip, chunks, levelName, { log = () => {}, bo
         }
         gathered.set('decals', cur); continue;
       }
-      if (rel.endsWith('materials.json') && rel !== 'art/terrains/main.materials.json') {
-        const shared = rel.startsWith('map_assets/official_assets/');
+      // (materials, and the forest's item types: one object per file, every chunk's entries joined; the forest's types
+      // once at the root, as each chunk declares the same ones and the game refuses a type declared twice)
+      if ((rel.endsWith('materials.json') && rel !== 'art/terrains/main.materials.json') || rel === 'art/forest/managedItemData.json') {
+        const shared = rel.startsWith('map_assets/official_assets/') || rel === 'art/forest/managedItemData.json';
         const path = shared ? `levels/${levelName}/${rel}` : `levels/${levelName}/chunks/${c.key}/${rel}`;
         const obj = JSON.parse(rewritePaths(await f.async('string'), c.levelName, levelName, c.key));
         materials.set(path, { ...(materials.get(path) || {}), ...obj }); continue;

@@ -2390,9 +2390,11 @@
     "terrain": "Un quadrato con lato potenza di due: costruito sul terreno di BeamNG, come di solito.",
     "models": "Non è un quadrato con lato potenza di due: il terreno è costruito con modelli 3D (sperimentale). Si carica più lentamente e non ha erba.",
     "islands": "Alcuni riquadri non toccano gli altri: diventano isole nel livello.",
-    "webCap": "Questa forma non si può ancora costruire: viene costruita su tutto il rettangolo che la contiene, che misurerebbe {side} px (al massimo {max}), anche se la sua area è ben sotto il limite. La costruzione di forme lunghe e diagonali a pezzi è in corso; nel frattempo accorcia o raddrizza il tratto, usa meno riquadri o scegli una risoluzione più grossolana.",
+    "webCap": "Troppo grande per il sito: questa forma copre {km2} km² e il sito costruisce al massimo {maxKm2} km² (16384² pixel) in qualsiasi forma. Accorcia o restringi il tratto, usa meno riquadri, una risoluzione più grossolana o l'app desktop.",
     "desktopWarn": "Oltre {max} px: il livello potrebbe essere troppo grande perché il gioco lo carichi.",
-    "clear": "Torna a un riquadro"
+    "clear": "Torna a un riquadro",
+    "chunked": "Costruito a pezzi (sperimentale): questa forma è troppo lunga o diagonale per una sola griglia, quindi viene creata in pezzi uniti in un unico livello. Genera scarica prima ogni pezzo; le anteprime mostrano una panoramica più grossolana.",
+    "bigDesktop": "Grande: questa forma copre {km2} km², più di quanto consenta il sito ({maxKm2} km²). L'app desktop la costruisce, ma può richiedere molto tempo e molto spazio su disco."
   },
   "road": {
     "areaMode": "Cosa copre la mappa",
@@ -2404,7 +2406,7 @@
     "width": "Larghezza per lato",
     "widthValue": "{m} m",
     "gridLine": "{km} km di strada · mappa {w} × {h} px · {area} km²",
-    "webCap": "Questa forma non si può ancora costruire: viene costruita su tutto il rettangolo che la contiene, che misurerebbe {side} px (al massimo {max}), anche se la sua area è ben sotto il limite. La costruzione di forme lunghe e diagonali a pezzi è in corso; nel frattempo accorcia o raddrizza il tratto, usa meno riquadri o scegli una risoluzione più grossolana.",
+    "webCap": "Troppo grande per il sito: questa forma copre {km2} km² e il sito costruisce al massimo {maxKm2} km² (16384² pixel) in qualsiasi forma. Accorcia o restringi il tratto, usa meno riquadri, una risoluzione più grossolana o l'app desktop.",
     "clear": "Scegli un'altra strada",
     "unnamed": "Strada senza nome",
     "start": "Inizio",
@@ -2414,6 +2416,8 @@
     "error_read": "Non è stato possibile leggere le strade qui. Riprova tra un momento.",
     "routing": "Ricerca del percorso lungo le strade…",
     "error_tooFar": "Troppo lontano per un solo trascinamento: lascia la maniglia entro 20 km dalla fine della strada.",
-    "error_noRoute": "Nessun percorso stradale fin lì: lascia la maniglia su una strada collegata a questa."
+    "error_noRoute": "Nessun percorso stradale fin lì: lascia la maniglia su una strada collegata a questa.",
+    "chunked": "Costruito a pezzi (sperimentale): questa forma è troppo lunga o diagonale per una sola griglia, quindi viene creata in pezzi uniti in un unico livello. Genera scarica prima ogni pezzo; le anteprime mostrano una panoramica più grossolana.",
+    "bigDesktop": "Grande: questa forma copre {km2} km², più di quanto consenta il sito ({maxKm2} km²). L'app desktop la costruisce, ma può richiedere molto tempo e molto spazio su disco."
   }
 }

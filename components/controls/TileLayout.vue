@@ -36,9 +36,13 @@
         <AlertTriangle :size="11" class="shrink-0 mt-px" /><span>{{ t('tiles.models') }}</span>
       </p>
       <p v-if="grid.islands" class="text-micro text-gray-500 dark:text-gray-400">{{ t('tiles.islands') }}</p>
-      <!-- (any platform for now: the export pads the shape to its power-of-two square: refs/output/chunked-pipeline-plan.md) -->
-      <p v-if="!grid.webOk" class="flex items-start gap-1.5 text-micro font-medium leading-snug text-red-600 dark:text-red-400" data-testid="tile-web-cap">
-        <AlertTriangle :size="11" class="shrink-0 mt-px" /><span>{{ t('tiles.webCap', { side: grid.squareSide, max: WEB_MAX_SIDE }) }}</span>
+      <!-- (past one grid's square: built in chunks, refs/output/chunked-pipeline-plan.md) -->
+      <p v-if="grid.chunked" class="flex items-start gap-1.5 text-micro leading-snug text-gray-600 dark:text-gray-300" data-testid="tile-chunked">
+        <Layers :size="11" class="shrink-0 mt-px" /><span>{{ t('tiles.chunked') }}</span>
+      </p>
+      <!-- (the website's cap is the footprint's own area; the desktop app only warns) -->
+      <p v-if="!grid.webOk" class="flex items-start gap-1.5 text-micro leading-snug" :class="isDesktop ? 'text-amber-700 dark:text-amber-300' : 'font-medium text-red-600 dark:text-red-400'" data-testid="tile-web-cap">
+        <AlertTriangle :size="11" class="shrink-0 mt-px" /><span>{{ t(isDesktop ? 'tiles.bigDesktop' : 'tiles.webCap', capArgs) }}</span>
       </p>
       <BaseButton size="sm" variant="secondary" data-testid="tile-clear" :disabled="disabled" @click="clearTiles">{{ t('tiles.clear') }}</BaseButton>
     </template>
@@ -48,7 +52,7 @@
 <script setup>
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { Plus, X, AlertTriangle } from 'lucide-vue-next';
+import { Plus, X, AlertTriangle, Layers } from 'lucide-vue-next';
 import BaseButton from '../base/BaseButton.vue';
 import BaseSwitch from '../base/BaseSwitch.vue';
 import { useMainStore } from '../../stores/mainStore';
@@ -65,6 +69,10 @@ const { t } = useI18n();
 const store = useMainStore();
 const isDesktop = !!desktopApp;
 const { multi, grid, addTile, removeTile, clearTiles } = useTiles(() => props.resolution, () => props.metersPerPixel);
+const capArgs = computed(() => {
+  const m = Number(props.metersPerPixel) > 0 ? Number(props.metersPerPixel) : 1;
+  return { km2: Math.round((grid.value?.areaPx || 0) * m * m / 1e6), maxKm2: Math.round(WEB_MAX_SIDE * WEB_MAX_SIDE * m * m / 1e6) };
+});
 const areaKm = computed(() => {
   const m = Number(props.metersPerPixel) > 0 ? Number(props.metersPerPixel) : 1;
   return (grid.value.areaPx * m * m / 1e6).toFixed(2);

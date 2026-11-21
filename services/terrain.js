@@ -1991,6 +1991,21 @@ export const fetchTerrainData = async (
   signal,
   generationOptions = {},
 ) => {
+  // a chunked level (services/chunkedGenerate.js): every chunk's data fetched into the download cache, then a coarse
+  // overview for the previews; the export generates the chunks again from the cache
+  if (generationOptions?.chunked && !generationOptions.targetBounds) {
+    const { chunked, ...rest } = generationOptions;
+    const { generateChunked } = await import('./chunkedGenerate.js');
+    const fetchArgs = { includeOSM: !!includeOSM, useUSGS: !!useUSGS, useGPXZ: !!useGPXZ, useKRON86: !!useKRON86 };
+    const td = await generateChunked({
+      fetch: (c, size, o) => fetchTerrainData(c, size, includeOSM, useUSGS, useGPXZ, useKRON86, gpxzApiKey, baseColor, onProgress, signal, o),
+      center, W: chunked.W, H: chunked.H, mpp: Number(chunked.mpp) || 1, footprint: rest.footprint, generationOptions: rest,
+      onStatus: (st) => onProgress?.(st.overview ? 'Chunked level: making the overview for the previews…' : `Chunked level: downloading chunk ${st.chunk} of ${st.of}…`),
+      log: (m) => console.log(`[Chunked] ${m}`),
+    });
+    td.chunked.fetchArgs = fetchArgs;
+    return td;
+  }
   const {
     keepSourceGeoTiffs = true,
     generateOSMTextureAsset = true,

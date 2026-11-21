@@ -43,10 +43,13 @@ test('free with snap: an edge near a neighbour snaps to it; without snap it stay
   assert.deepEqual(placeTile(t, 1, { dx: 700, dy: 260 }, 512, { together: false, snap: true }), { dx: 700, dy: 260 }, 'too far to snap');
 });
 
-test('the web cap holds the export square, any shape', () => {
+test('past one grid\'s square a shape is chunked; the web cap is its own area, any shape', () => {
   const strip = Array.from({ length: 16 }, (_, i) => ({ dx: i * 1024, dy: 0 }));
-  assert.equal(layoutGrid(strip, 1024).webOk, true);
-  assert.equal(layoutGrid([...strip, { dx: 16 * 1024, dy: 0 }], 1024).webOk, false);
+  assert.equal(layoutGrid(strip, 1024).chunked, false);
+  const longer = layoutGrid([...strip, { dx: 16 * 1024, dy: 0 }], 1024);
+  assert.equal(longer.chunked, true); assert.equal(longer.webOk, true);   // (17 tiles: 17 M px, far under 16384²)
+  const big = Array.from({ length: 64 }, (_, i) => ({ dx: (i % 8) * 4096, dy: Math.floor(i / 8) * 4096 }));
+  assert.equal(layoutGrid(big, 4096).webOk, false);   // (64 tiles of 4096²: four times the area)
 });
 
 test('a map\'s tiles read back checked; a single map has none', async () => {

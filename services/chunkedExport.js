@@ -5,7 +5,14 @@
 import { chunkLayout, levelLattice, CHUNK_PX, OVERLAP_PX } from './chunkLayout.js';
 import { mergeChunks } from './chunkMerge.js';
 
-export const SEAM_EASE_PX = 64;   // a chunk's ground eases from a finished neighbour's heights to its own over this
+export const SEAM_EASE_PX = 64;
+
+/** Row runs [[y, x0, x1]...] as spans per row. */
+function runsByRow(runs, size) {
+  const rows = new Array(size);
+  for (const [y, p, q] of runs) (rows[y] ||= []).push([p, q]);
+  return rows;
+}   // a chunk's ground eases from a finished neighbour's heights to its own over this
 
 /**
  * A chunk's seam blend: { target, weight } (Float32Array size x size, rows from the north) from its finished
@@ -24,6 +31,9 @@ export function seamBlendFor(chunk, finished, ease = SEAM_EASE_PX) {
   const sum = new Float64Array(N * N); const wsum = new Float64Array(N * N);
   for (const f of near) {
     const [cx0, cy0, cx1, cy1] = f.core;
+    // (only the neighbour's footprint holds surveyed ground: outside it Generate only fills)
+    const rows = f.runs ? runsByRow(f.runs, f.size) : null;
+    const inFoot = (lx, ly) => { if (!rows) return true; const l = rows[ly]; if (!l) return false; for (const [p, q] of l) if (lx >= p && lx < q) return true; return false; };
     for (let r = 0; r < N; r++) {
       const gy = chunk.y0 + r; if (gy < f.y0 || gy >= f.y0 + f.size) continue;
       for (let c = 0; c < N; c++) {
@@ -32,6 +42,7 @@ export function seamBlendFor(chunk, finished, ease = SEAM_EASE_PX) {
         const d = Math.max(cx0 - gx, gx - (cx1 - 1), cy0 - gy, gy - (cy1 - 1), 0);
         // (the shared edge's own points (d <= 1) are both chunks': exactly the neighbour's)
         const w = Math.max(0, 1 - Math.max(0, d - 1) / ease); if (!(w > 0)) continue;
+        if (!inFoot(gx - f.x0, gy - f.y0)) continue;
         const h = f.heights[(gy - f.y0) * f.size + (gx - f.x0)]; if (!Number.isFinite(h)) continue;
         const k = r * N + c; sum[k] += h * w; wsum[k] += w; if (w > weight[k]) weight[k] = w;
       }
@@ -47,7 +58,7 @@ export function seamBlendFor(chunk, finished, ease = SEAM_EASE_PX) {
  * cache: the export never downloads); exportChunk(terrainData, center, options) -> the export's result (blob,
  * finalHeights, finalMinHeight); options: the export's options for every chunk.
  */
-export async function exportChunked({ JSZip, footprint, W, H, center, mpp, levelName, generateChunk, exportChunk, options = {}, size = CHUNK_PX, overlap = OVERLAP_PX, onProgress = () => {}, log = () => {} }) {
+export async function exportChunked({ JSZip, footprint, W, H, center, mpp, levelName, generateChunk, exportChunk, options = {}, size = CHUNK_PX, overlap = OVERLAP_PX, levelInfo = null, onProgress = () => {}, log = () => {} }) {
   const L = levelLattice(center, mpp, W, H);
   const chunks = chunkLayout(footprint, W, H, { size, overlap });
   log(`${chunks.length} chunk(s) of ${size} px (overlap ${overlap}) over a ${W} x ${H} footprint grid`);
@@ -65,7 +76,7 @@ export async function exportChunked({ JSZip, footprint, W, H, center, mpp, level
       chunkCore: [c.core[0] - c.x0, c.core[1] - c.y0, c.core[2] - c.x0, c.core[3] - c.y0],
       seamBlend, keepFinalHeights: true,
     });
-    finished.push({ key: c.key, x0: c.x0, y0: c.y0, size: c.size, core: c.core, heights: res.finalHeights });
+    finished.push({ key: c.key, x0: c.x0, y0: c.y0, size: c.size, core: c.core, runs: c.runs, heights: res.finalHeights });
     // (a finished chunk's heights are needed only while a later chunk can still touch it: rows two chunks back drop)
     for (let i = finished.length - 1; i >= 0; i--) if (finished[i].y0 + finished[i].size < c.y0 - overlap) finished.splice(i, 1);
     // (a Blob in the browser; JSZip in Node reads its bytes)
@@ -76,6 +87,6 @@ export async function exportChunked({ JSZip, footprint, W, H, center, mpp, level
   }
   onProgress({ step: 'merge' });
   const bounds = { north: L.latOf(0), south: L.latOf(H), west: L.lngOf(0), east: L.lngOf(W) };
-  const zip = await mergeChunks(JSZip, parts, levelName, { log, bounds });
+  const zip = await mergeChunks(JSZip, parts, levelName, { log, bounds, levelInfo });
   return { zip, chunks: times };
 }

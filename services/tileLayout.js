@@ -94,7 +94,8 @@ export function layoutGrid(tiles, R) {
   return {
     width, height, rects, areaPx, overlaps, islands: seen.size < rects.length,
     centerOffset: { x: minX + width / 2, y: -(minY + height / 2) },
-    terrainBlock, squareSide, webOk: squareSide <= WEB_MAX_SIDE,
+    // (past one grid's square the level is built in chunks; the website's cap is the footprint's own area)
+    terrainBlock, squareSide, chunked: squareSide > WEB_MAX_SIDE, webOk: areaPx <= WEB_MAX_SIDE * WEB_MAX_SIDE,
   };
 }
 

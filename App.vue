@@ -288,6 +288,7 @@ import { DEFAULT_GAP_FILL_SOURCE } from './services/gapFillSources.js';
 import { normalizeFallbackSource } from './services/elevationFallback.js';
 import { computeUploadedCropBounds, nativeSquareAt } from './services/uploadBounds';
 import { layoutGrid, WEB_MAX_SIDE, tilesFromTerrain } from './services/tileLayout.js';
+import { needsChunks } from './services/chunkedGenerate.js';
 import { corridorGrid } from './services/roadCorridor.js';
 import { stretchBetween, cumulative } from './services/roadPick.js';
 import {
@@ -1040,21 +1041,23 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         if (!r) throw new Error(t('road.pickFirst'));
         const mpp = Number(processingMpp || 1);
         const g = corridorGrid(stretchBetween(r.pts, r.startM, r.endM), store.roadHalfWidthM, mpp);
-        let side = 1; while (side < Math.max(g.width, g.height)) side *= 2;
-        if (side > WEB_MAX_SIDE) throw new Error(t('road.webCap', { side, max: WEB_MAX_SIDE }));
+        if (!desktopApp && g.areaPx > WEB_MAX_SIDE * WEB_MAX_SIDE) throw new Error(t('road.webCap', { km2: Math.round(g.areaPx * mpp * mpp / 1e6), maxKm2: Math.round(WEB_MAX_SIDE * WEB_MAX_SIDE * mpp * mpp / 1e6) }));
         genCenter = g.center; genSize = { width: g.width, height: g.height };
         generationOptions.footprint = { runs: g.runs };
+        // (past one grid's square: built in chunks, services/chunkedGenerate.js)
+        if (needsChunks(g.width, g.height)) generationOptions.chunked = { W: g.width, H: g.height, mpp };
         generationOptions.road = { pts: stretchBetween(r.pts, r.startM, r.endM), halfWidthM: g.halfWidthM, names: r.names || [], refs: r.refs || [], highway: r.highway || 'road' };
         console.log(`[Road mode] ${(Math.abs(r.endM - r.startM) / 1000).toFixed(2)} km of ${[...(r.refs || []), ...(r.names || [])].join(' / ') || 'road'}, ${g.halfWidthM} m either side: a ${g.width}×${g.height} grid, corridor ${g.areaPx} px (${g.runs.length} row runs).`);
       } else if (store.tiles.length > 1) {
         const R = Number(resolution.value);
         const mpp = Number(processingMpp || 1);
         const g = layoutGrid(store.tiles.map((t) => ({ dx: Math.round(t.dx * R), dy: Math.round(t.dy * R) })), R);
-        if (!g.webOk) throw new Error(t('tiles.webCap', { side: g.squareSide, max: WEB_MAX_SIDE }));
+        if (!desktopApp && !g.webOk) throw new Error(t('tiles.webCap', { km2: Math.round(g.areaPx * mpp * mpp / 1e6), maxKm2: Math.round(WEB_MAX_SIDE * WEB_MAX_SIDE * mpp * mpp / 1e6) }));
         const mLng = 111320 * Math.cos((center.value.lat * Math.PI) / 180);
         genCenter = { lat: center.value.lat + (g.centerOffset.y * mpp) / 111320, lng: center.value.lng + (g.centerOffset.x * mpp) / mLng };
         genSize = g.terrainBlock ? g.width : { width: g.width, height: g.height };
         if (!g.terrainBlock && g.areaPx < g.width * g.height) generationOptions.footprint = g.rects;
+        if (g.chunked) { generationOptions.footprint = g.rects; generationOptions.chunked = { W: g.width, H: g.height, mpp }; }
         // (what the tiles were: the previews, share codes and the desktop's Modify read them back; plain numbers, as
         // this goes to a worker or the desktop app)
         generationOptions.tiles = { list: store.tiles.map((t) => ({ dx: t.dx, dy: t.dy })), tilePx: R, anchor: { lat: center.value.lat, lng: center.value.lng }, together: !!store.tilesTogether, snap: !!store.tilesSnap };
