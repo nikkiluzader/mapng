@@ -8,6 +8,8 @@ import { encode } from 'fast-png';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { exportTer } from './exportTer.js';
 import { buildGroundTiles } from './groundMesh.js';
+import { footprintRows, inFootprint, keepSquareFor } from './batchShape.js';
+import { footprintClipper } from './footprintClip.js';
 import { buildTerrainMaterials, isVegetationColor } from './osmTerrainMaterials.js';
 import { createOSMGroup, createSurroundingMeshes, SCENE_SIZE } from './export3d.js';
 import { planPools, poolFootprints, poolWaterBlocks, squareOpens, POOL_WATER_BLOCK } from './pools.js';
@@ -13392,7 +13394,9 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     // The structure solver builds bridges, decks and the terrain around them
     // by default; structureSolver: 'v1' keeps today's bridge passes.
     const structureSolver = options.structureSolver ?? 'v2';
-    return await runBeamNGLevelExport(terrainData, center, { ...options, structureSolver }, jobLog);
+    // (a shaped level's ground is models: any shape but a full square is no TerrainBlock)
+    const shaped = Array.isArray(options.groundShape?.rects) && options.groundShape.rects.length > 0;
+    return await runBeamNGLevelExport(terrainData, center, { ...options, structureSolver, ...(shaped ? { groundAsModels: true } : {}) }, jobLog);
   } finally {
     jobLog.restore();
   }
@@ -13417,6 +13421,10 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     // false leaves a terrain square out (a batch level's shape)
     groundAsModels = false,
     groundKeepSquare = null,
+    // a shaped level (services/batchShape.js): { size, rects: [[x, y, w, h]...] } in the export grid's pixels (rows
+    // from the north). Plain data, so it crosses to the desktop runner. The ground, the map data, the trees and props
+    // and the spawn keep to these rects' union (the footprint).
+    groundShape = null,
     // (tests: the ground models' error bound in metres; groundMesh.js GROUND_MAX_ERROR_M when unset)
     groundMaxError = undefined,
     // the local tree mix (treeSpecies.js) when already known; undefined: fetched
@@ -13593,6 +13601,22 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   if (contentFilter.removed) {
     terrainData = { ...terrainData, osmFeatures: contentFilter.features };
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} What to build: ${contentChoice.contentOff.length} feature(s) off; ${contentFilter.removed} OSM features left out (${Object.entries(contentFilter.byTag).slice(0, 8).map(([k, n]) => `${k} ${n}`).join(', ')}).`);
+  }
+  // a shaped level: the map data kept to the footprint (services/footprintClip.js), nothing built where there is no
+  // ground; and the ground models' square test from the same rects
+  let footprint = null;
+  if (groundShape?.rects?.length) {
+    if (groundShape.size !== terrainData.width || terrainData.width !== terrainData.height || !terrainData.bounds) {
+      console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Shape: skipped, its grid (${groundShape.size}) is not the terrain's (${terrainData.width}×${terrainData.height}); the whole square is built.`);
+    } else {
+      const fc = footprintClipper(terrainData.bounds, groundShape);
+      const before = (terrainData.osmFeatures || []).length;
+      const { features, stats } = fc.clip(terrainData.osmFeatures);
+      terrainData = { ...terrainData, osmFeatures: features };
+      let px = 0; const rows = footprintRows(groundShape.rects, groundShape.size); for (const r of rows) if (r) for (const [a, b] of r) px += b - a;
+      footprint = { keepSquare: keepSquareFor(groundShape), rows, size: groundShape.size };
+      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Shape: ${groundShape.rects.length} tile(s), footprint ${formatNumber(px, 0)} px (${formatNumber((100 * px) / (groundShape.size * groundShape.size), 1)}% of the ${groundShape.size}² grid); map data kept to it: ${before} feature(s) in, ${stats.kept} kept whole, ${stats.cut} line(s) cut at its edge into ${stats.pieces} piece(s), ${stats.dropped} outside dropped.`);
+    }
   }
   const built = (id) => contentOn(options, id);
   // (Fine-tuning, "Assume street parking": off unless asked for. Town streets with no parking
@@ -13958,7 +13982,12 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // the spawn on a drawn road, not on the OSM line 3 m over the terrain (the
   // road nearest the centre was Zion's tunnel: the car dropped onto the cliff
   // over it)
-  const roadSpawn = findRoadSpawn(groundCarriageways, (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize), underDeck, { leftHandTraffic: resolvedRightHandDrive });
+  // (a shaped level: the spawn on the footprint, on ground)
+  const offShape = footprint
+    ? (x, y) => { const N = footprint.size; const i = Math.floor(x / squareSize + N / 2); const j = Math.floor(y / squareSize + N / 2); return !footprint.keepSquare(i, j); }
+    : null;
+  const roadSpawn = findRoadSpawn(groundCarriageways, (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize), offShape ? (x, y, z, zt) => offShape(x, y) || underDeck(x, y, z, zt) : underDeck, { leftHandTraffic: resolvedRightHandDrive });
+  if (footprint) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Shape: spawn ${roadSpawn ? 'on a road inside the footprint' : 'not found on a road inside the footprint (the fallback stands)'}.`);
   if (roadSpawn) ({ position: spawnPosition, rotationMatrix: spawnRotationMatrix } = roadSpawn);
   await yield_();
   await roadPart('beds');
@@ -14929,7 +14958,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     await yield_();
     const t0 = performance.now();
     groundModels = await generateGroundModelDAEs(exportTerrainData, squareSize, {
-      layerMap: terLayerMap, materialNames: pbrResult?.materialNames, materialDefs: pbrResult?.materialDefs, keepSquare: groundKeepSquare, maxError: groundMaxError,
+      layerMap: terLayerMap, materialNames: pbrResult?.materialNames, materialDefs: pbrResult?.materialDefs, keepSquare: footprint?.keepSquare || groundKeepSquare, maxError: groundMaxError,
     });
     const gs = groundModels.summary;
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Ground models: ${groundModels.tiles.length} tiles of ${gs.tile} squares, ${formatNumber(gs.triangles, 0)} triangles (${formatNumber((100 * gs.triangles) / Math.max(1, gs.fullTriangles), 1)}% of the full grid's ${formatNumber(gs.fullTriangles, 0)}), within ${gs.maxError} m of every grid point; full resolution kept at tile edges, holes and surface changes; ${gs.refinePasses} re-split pass(es) to hold the bound; ${gs.holeTriangles} triangle(s) left open at holes, ${gs.outsideTriangles} outside the grid or the shape; surfaces: ${groundModels.groundModels.join(', ') || 'none'}; ${formatNumber((performance.now() - t0) / 1000, 1)} s.`);
@@ -15775,6 +15804,18 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   for (const [x, y, z] of mappedStreetProps.bins) addPropPlacement(binType(x, y), x, y, z, propHash(x, y) * Math.PI * 2);
   for (const b of streetProps.bins) addPropPlacement(binType(b.x, b.y), b.x, b.y, b.z, b.yaw);
   vegLap('kept off roads, props added');
+  // a shaped level: trees and props only on the footprint (no ground outside it)
+  if (footprint) {
+    const N = footprint.size; let dropped = 0;
+    for (const [type, list] of forestPlacements) {
+      const keep = list.filter((it) => {
+        const x = Math.floor(it.pos[0] / squareSize + N / 2); const y = N - 1 - Math.floor(it.pos[1] / squareSize + N / 2);
+        return x >= 0 && y >= 0 && x < N && y < N && inFootprint(footprint.rows, x, y);
+      });
+      dropped += list.length - keep.length; forestPlacements.set(type, keep);
+    }
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Shape: ${dropped} tree(s) and prop(s) outside the footprint left out.`);
+  }
   const forestFiles = serializeForestFiles(forestPlacements);
   vegLap('forest files written');
   // (grass and ground cover switched off in What to build: none)
@@ -16621,7 +16662,12 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // TerrainMaterial texture slots must be own-level or /assets paths only —
   // the material templates guarantee this (beamngTerrainMaterialLibrary.js);
   // TerrainCellMaterial does not resolve .link redirects, so no link routing.
-  zip.file(`${base}/art/terrains/main.materials.json`, JSON.stringify(terrainMaterialDefs, null, 2));
+  // (the ground as models: the anchor terrain's materials point at the base texture under its colour name, the only
+  // copy written; at terrain.png the game logged "Missing Terrain texture" for every terrain cell)
+  const terrainMaterialsJson = JSON.stringify(terrainMaterialDefs, null, 2);
+  zip.file(`${base}/art/terrains/main.materials.json`, groundAsModels
+    ? terrainMaterialsJson.split(`levels/${levelName}/art/terrains/terrain.png`).join(`levels/${levelName}/${GROUND_TEXTURE_REL}`)
+    : terrainMaterialsJson);
 
   // ── groundModels/mapng_groundmodels.json ──────────────────────────────────
   // Self-contained physics surfaces (Ground-Models.md). Merged after the global
