@@ -21,6 +21,17 @@ As of 2026-11-20 night (late):
 - The sweep's known pre-existing flags: sidewalk drift at naldo, kingst, deckpark_g, stelvio; ams_centraal mh/ready;
   dev_szczyrk cross; ams t30/noshape swBuried; Michiel de Ruijtertunnel joint steps (check 4).
 
+## Now: tiles in step 1 (one workflow, any shape)
+
+- **Tiles in step 1 replace the Single tile / Batch modes** (user, 2026-11-20; decision in refs/output/decisions.md).
+  Status: steps 1, 2a, 2b and the core of 2c done on dev (25977dc): any-shape Generate and export, the Tiles section,
+  tiles on the map, the 3D preview's proportions. Not in a release or test build yet.
+  - Whole plan: refs/output/tiles-plan.md (steps 1-4).
+  - **Now: the rest of step 2**, planned part by part in refs/output/tiles-step2-plan.md: A the tiled map says what it
+    is, B map data clipped at Generate, C previews show the footprint, D share codes / saved settings / Modify,
+    E tests (drag, desktop, languages, game), F step 2d (edge skirt, buildings at the edge, masked minimap).
+  - Then step 3 (Batch mode retired) and step 4 (a true width x height export; speed for big shapes).
+
 ## Now: Fizz_Mechanic's 0.3.3 list (2026-11-19; on hold until after the 0.3.5 release, user 2026-11-20)
 
 Held items are listed on the release page under "Moved to the next release".
