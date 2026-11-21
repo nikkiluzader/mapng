@@ -1642,7 +1642,12 @@
     "roadSurface": "Road surface",
     "otherSettings": "Other settings",
     "otherSettingsValue": "{n} more, under Fine-tuning",
-    "bundleOsm": "Include the map data for bug reports"
+    "bundleOsm": "Include the map data for bug reports",
+    "tiles": "Tiles",
+    "tilesValue": "{n} tiles",
+    "road": "Road",
+    "roadValue": "{name}: {km} km, {m} m either side",
+    "roadValueUnnamed": "{km} km of road, {m} m either side"
   },
   "usage": {
     "askTitle": "Share which settings you use?",

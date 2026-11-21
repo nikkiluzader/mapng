@@ -1637,7 +1637,12 @@
     "roadSurface": "Superficie stradale",
     "otherSettings": "Altre impostazioni",
     "otherSettingsValue": "altre {n}, in «Regolazione fine»",
-    "bundleOsm": "Includi i dati della mappa per le segnalazioni"
+    "bundleOsm": "Includi i dati della mappa per le segnalazioni",
+    "tiles": "Riquadri",
+    "tilesValue": "{n} riquadri",
+    "road": "Strada",
+    "roadValue": "{name}: {km} km, {m} m per lato",
+    "roadValueUnnamed": "{km} km di strada, {m} m per lato"
   },
   "usage": {
     "askTitle": "Condividere quali impostazioni usi?",

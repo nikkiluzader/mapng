@@ -190,3 +190,24 @@ export function distanceToLine(pts, p) {
 
 /** Metres between two points. */
 export const metresBetween = metres;
+
+/**
+ * The polyline with points dropped that lie within tolM of the line through their neighbours (Douglas-Peucker), the
+ * ends kept: a road for a share code. The tolerance is doubled until at most maxPts are left.
+ */
+export function simplifyPts(pts, tolM = 0.5, maxPts = 2000) {
+  if (!Array.isArray(pts) || pts.length <= 2) return pts ? pts.slice() : [];
+  const run = (tol) => {
+    const keep = new Uint8Array(pts.length); keep[0] = 1; keep[pts.length - 1] = 1;
+    const stack = [[0, pts.length - 1]];
+    while (stack.length) {
+      const [a, b] = stack.pop(); let best = -1; let bi = -1;
+      for (let i = a + 1; i < b; i++) { const d = toSegment(pts[i], pts[a], pts[b]).d; if (d > best) { best = d; bi = i; } }
+      if (best > tol) { keep[bi] = 1; stack.push([a, bi], [bi, b]); }
+    }
+    return pts.filter((_, i) => keep[i]);
+  };
+  let tol = tolM; let out = run(tol);
+  while (out.length > maxPts && tol < 1000) { tol *= 2; out = run(tol); }
+  return out;
+}

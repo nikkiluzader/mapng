@@ -252,14 +252,17 @@ async function reviveTerrainValue(value, base) {
 // detail, Generate Data makes its terrain from its saved sources, offline,
 // instead of fetching the area; e.g. again after ticking Raw terrain)
 let modifyingLevel = null;   // { levelName, lat, lng, resolution, mpp }
+// (a size: a number, or { width, height } for tiles and roads: compared as text, Number() of the object was NaN and a
+// tiled level's Modify never replayed its saved downloads)
+const sizeKey = (r) => (r && typeof r === 'object' ? `${Math.round(r.width)}x${Math.round(r.height)}` : String(Number(r)));
 export function generateNextFromLevel(levelName, { center, resolution, mpp } = {}) {
-  modifyingLevel = levelName ? { levelName, lat: Number(center?.lat), lng: Number(center?.lng), resolution: Number(resolution), mpp: Number(mpp) || 1 } : null;
+  modifyingLevel = levelName ? { levelName, lat: Number(center?.lat), lng: Number(center?.lng), resolution: sizeKey(resolution), mpp: Number(mpp) || 1 } : null;
 }
 const levelBeingModified = (center, resolution, mpp) => {
   const m = modifyingLevel;
   if (!m) return null;
   const same = Math.abs(Number(center?.lat) - m.lat) < 1e-5 && Math.abs(Number(center?.lng) - m.lng) < 1e-5
-    && Number(resolution) === m.resolution && (Number(mpp) || 1) === m.mpp;
+    && sizeKey(resolution) === m.resolution && (Number(mpp) || 1) === m.mpp;
   if (!same) modifyingLevel = null;   // (moved on: a new area is fetched as usual)
   return same ? m.levelName : null;
 };

@@ -1637,7 +1637,12 @@
     "roadSurface": "Nawierzchnia dróg",
     "otherSettings": "Inne ustawienia",
     "otherSettingsValue": "jeszcze {n}, w zakładce „Dostrajanie”",
-    "bundleOsm": "Dołącz dane mapy do zgłoszeń błędów"
+    "bundleOsm": "Dołącz dane mapy do zgłoszeń błędów",
+    "tiles": "Kafelki",
+    "tilesValue": "Kafelki: {n}",
+    "road": "Droga",
+    "roadValue": "{name}: {km} km, {m} m z każdej strony",
+    "roadValueUnnamed": "Droga: {km} km, {m} m z każdej strony"
   },
   "usage": {
     "askTitle": "Udostępniać, jakich ustawień używasz?",

@@ -10,6 +10,32 @@ import { PERSONAL_STORAGE_KEYS, withoutPersonal } from './personalKeys.js';
 import { sanitizePoints, pointLabel } from './spawnPoints.js';
 import { sanitizeContentOff, sanitizeExcludeTags, PRESET_IDS } from './buildContent.js';
 import { sanitizeTreeKindsOff, sanitizeTreeModelsOff, sanitizeTreeSwaps } from './beamngTrees.js';
+import { simplifyPts, cumulative } from './roadPick.js';
+
+// ---- the area: tiles or a road (refs/output/tiles-step2-plan.md D, road-mode-plan.md) ----
+const MAX_CODE_TILES = 64;
+const MAX_CODE_ROAD_POINTS = 2000;
+const num = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : null; };
+const shortTexts = (a) => (Array.isArray(a) ? a.filter((x) => typeof x === 'string' && x).slice(0, 5).map((x) => x.slice(0, 80)) : []);
+/**
+ * A config's area, checked (a pasted code is someone else's data): { mode: 'tiles', tiles: { list, together, snap } }
+ * or { mode: 'road', road: { pts, startM, endM, halfWidthM, names, refs, highway } }; null for one tile (the default).
+ */
+export function sanitizeArea(a) {
+  if (!a || typeof a !== 'object') return null;
+  if (a.mode === 'road' && a.road && Array.isArray(a.road.pts)) {
+    const pts = a.road.pts.map((p) => ({ lat: num(p?.lat, -85.06, 85.06), lng: num(p?.lng, -180, 180) })).filter((p) => p.lat !== null && p.lng !== null);
+    if (pts.length < 2) return null;
+    const simple = simplifyPts(pts, 0.5, MAX_CODE_ROAD_POINTS);
+    const total = cumulative(simple).at(-1);
+    const startM = num(a.road.startM, 0, total) ?? 0; const endM = num(a.road.endM, 0, total) ?? total;
+    return { mode: 'road', road: { pts: simple, startM, endM, halfWidthM: num(a.road.halfWidthM, 50, 2000) ?? 250, names: shortTexts(a.road.names), refs: shortTexts(a.road.refs), highway: typeof a.road.highway === 'string' ? a.road.highway.slice(0, 40) : 'road' } };
+  }
+  const list = Array.isArray(a.tiles?.list) ? a.tiles.list.slice(0, MAX_CODE_TILES).map((t) => ({ dx: num(t?.dx, -1000, 1000) ?? 0, dy: num(t?.dy, -1000, 1000) ?? 0 })) : [];
+  if (list.length < 2) return null;
+  list[0] = { dx: 0, dy: 0 };
+  return { mode: 'tiles', tiles: { list, together: a.tiles.together !== false, snap: a.tiles.snap !== false } };
+}
 
 /** Export-panel settings: [name in the config, localStorage key, kind, default]. */
 export const EXPORT_FIELDS = [
@@ -112,7 +138,7 @@ export const withoutSecrets = withoutPersonal;
 export const usableMask = (m) => !!(m && typeof m === 'object' && m.version && m.bounds
   && ['lines', 'shade', 'unshade', 'roads', 'paint', 'raw'].some((k) => Array.isArray(m[k]) && m[k].length));
 
-export function buildSessionConfig(runConfiguration, storage = globalThis.localStorage, { backgroundMask = null, points = null } = {}) {
+export function buildSessionConfig(runConfiguration, storage = globalThis.localStorage, { backgroundMask = null, points = null, area = null } = {}) {
   const run = withoutSecrets(runConfiguration || {});
   const keep = ['schemaVersion', 'mode', 'center', 'zoom', 'resolution', 'includeOSM', 'elevationSource', 'useUSGS', 'useGPXZ', 'useKRON86', 'processingMetersPerPixel', 'rawTerrain'];
   const config = Object.fromEntries(keep.filter((k) => run[k] !== undefined).map((k) => [k, run[k]]));
@@ -127,6 +153,9 @@ export function buildSessionConfig(runConfiguration, storage = globalThis.localS
   // so they travel with or without a box
   const kept = sanitizePoints(points);
   if (kept.length) config.points = kept;
+  // the area: tiles or a road, when it is not the single square
+  const a = sanitizeArea(area);
+  if (a) config.area = a;
   return config;
 }
 
@@ -248,6 +277,7 @@ const MAX_MASK_ITEMS = 20000;
  */
 export function sanitizeSessionConfig(config) {
   const c = { ...config };
+  if (c.area != null) { const a = sanitizeArea(c.area); if (a) c.area = a; else delete c.area; }
   if (c.center != null) {
     const lat = Number(c.center?.lat); const lng = Number(c.center?.lng);
     if (Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 85.06 && Math.abs(lng) <= 180) c.center = { ...c.center, lat, lng };
@@ -297,6 +327,12 @@ export function describeSessionConfig(config, { hasGpxzKey = false } = {}) {
     const mpp = Number(c.processingMetersPerPixel) > 0 ? Number(c.processingMetersPerPixel) : 1;
     const km = (Number(c.resolution) * mpp) / 1000;
     add('data', 'config.area', { valueKey: 'config.areaValue', params: { px: Number(c.resolution), mpp, km: km >= 10 ? km.toFixed(1) : km.toFixed(2) } });
+  }
+  // (the area beyond one square: the tiles, or the road)
+  if (c.area?.mode === 'tiles' && c.area.tiles?.list?.length > 1) add('data', 'config.tiles', { valueKey: 'config.tilesValue', params: { n: c.area.tiles.list.length } });
+  if (c.area?.mode === 'road' && c.area.road?.pts?.length > 1) {
+    const r = c.area.road; const name = [...(r.refs || []), ...(r.names || [])].join(' / ');
+    add('data', 'config.road', { valueKey: name ? 'config.roadValue' : 'config.roadValueUnnamed', params: { name, km: (Math.abs(r.endM - r.startM) / 1000).toFixed(2), m: r.halfWidthM } });
   }
   if (c.elevationSource) {
     add('data', 'config.elevation', { valueKey: `config.source_${c.elevationSource}`, warn: c.elevationSource === 'gpxz' && !hasGpxzKey ? 'config.needsGpxzKey' : null });

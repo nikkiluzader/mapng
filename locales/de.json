@@ -1637,7 +1637,12 @@
     "roadSurface": "Straßenbelag",
     "otherSettings": "Weitere Einstellungen",
     "otherSettingsValue": "{n} weitere, unter „Feinabstimmung“",
-    "bundleOsm": "Kartendaten für Fehlerberichte beilegen"
+    "bundleOsm": "Kartendaten für Fehlerberichte beilegen",
+    "tiles": "Kacheln",
+    "tilesValue": "{n} Kacheln",
+    "road": "Straße",
+    "roadValue": "{name}: {km} km, {m} m zu beiden Seiten",
+    "roadValueUnnamed": "{km} km Straße, {m} m zu beiden Seiten"
   },
   "usage": {
     "askTitle": "Teilen, welche Einstellungen du nutzt?",

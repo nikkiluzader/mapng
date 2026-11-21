@@ -287,9 +287,9 @@ import { mergeElevationSlots } from './services/tifLoader.js';
 import { DEFAULT_GAP_FILL_SOURCE } from './services/gapFillSources.js';
 import { normalizeFallbackSource } from './services/elevationFallback.js';
 import { computeUploadedCropBounds, nativeSquareAt } from './services/uploadBounds';
-import { layoutGrid, WEB_MAX_SIDE } from './services/tileLayout.js';
+import { layoutGrid, WEB_MAX_SIDE, tilesFromTerrain } from './services/tileLayout.js';
 import { corridorGrid } from './services/roadCorridor.js';
-import { stretchBetween } from './services/roadPick.js';
+import { stretchBetween, cumulative } from './services/roadPick.js';
 import {
   computeGridTiles,
   computeGridTilesWithOffsets,
@@ -1044,7 +1044,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         if (side > WEB_MAX_SIDE && !desktopApp) throw new Error(t('road.webCap', { max: WEB_MAX_SIDE }));
         genCenter = g.center; genSize = { width: g.width, height: g.height };
         generationOptions.footprint = { runs: g.runs };
-        generationOptions.road = { pts: stretchBetween(r.pts, r.startM, r.endM), halfWidthM: g.halfWidthM, names: r.names || [], refs: r.refs || [] };
+        generationOptions.road = { pts: stretchBetween(r.pts, r.startM, r.endM), halfWidthM: g.halfWidthM, names: r.names || [], refs: r.refs || [], highway: r.highway || 'road' };
         console.log(`[Road mode] ${(Math.abs(r.endM - r.startM) / 1000).toFixed(2)} km of ${[...(r.refs || []), ...(r.names || [])].join(' / ') || 'road'}, ${g.halfWidthM} m either side: a ${g.width}×${g.height} grid, corridor ${g.areaPx} px (${g.runs.length} row runs).`);
       } else if (store.tiles.length > 1) {
         const R = Number(resolution.value);
@@ -1195,8 +1195,24 @@ const handleModifyLevel = async (level) => {
   // (and its spawn and quicktravel points: as last exported, its mapng.json, else as generated)
   const levelPoints = info.options?.points || info.generationOptions?.points;
   if (Array.isArray(levelPoints)) store.setPoints(levelPoints);
-  setCenter({ lat: info.center.lat, lng: info.center.lng }, { force: true });
-  if (info.resolution) setResolution(info.resolution, { force: true });
+  // the level's area: its tiles (tile 0's centre and the tile size), its road (the stretch and width), or one square
+  const savedTiles = tilesFromTerrain({ tiles: info.generationOptions?.tiles });
+  const savedRoad = info.generationOptions?.road;
+  if (savedRoad?.pts?.length > 1) {
+    store.setAreaMode('road');
+    store.setRoad({ pts: savedRoad.pts, names: savedRoad.names || [], refs: savedRoad.refs || [], highway: savedRoad.highway || 'road', startM: 0, endM: cumulative(savedRoad.pts).at(-1), ids: [] });
+    store.setRoadHalfWidthM(savedRoad.halfWidthM);
+    setCenter({ lat: info.center.lat, lng: info.center.lng }, { force: true });
+  } else if (savedTiles) {
+    store.setAreaMode('tiles');
+    store.setTiles(savedTiles.list); store.setTilesTogether(savedTiles.together); store.setTilesSnap(savedTiles.snap);
+    setCenter(savedTiles.anchor || { lat: info.center.lat, lng: info.center.lng }, { force: true });
+    setResolution(savedTiles.tilePx, { force: true });
+  } else {
+    store.setAreaMode('tiles'); store.setTiles([{ dx: 0, dy: 0 }]);
+    setCenter({ lat: info.center.lat, lng: info.center.lng }, { force: true });
+    if (info.resolution && typeof info.resolution !== 'object') setResolution(info.resolution, { force: true });
+  }
   const mpp = Number(info.generationOptions?.processingMetersPerPixel) || 1;
   handleProcessingMetersPerPixelChange(mpp, { force: true });
   lastGenerationKey.value = null;

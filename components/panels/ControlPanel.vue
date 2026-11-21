@@ -476,7 +476,7 @@ import RasterMetaCard from '../controls/RasterMetaCard.vue';
 import { checkUSGSStatus, probeGPXZLimits } from '../../services/terrain';
 import { downloadJsonFile } from '../../services/traceability';
 import { buildRunConfiguration as buildRunConfigurationBase } from '../../services/runConfiguration';
-import { isShareHash, applyStoredSettings, usableMask, buildSessionConfig, describeSessionConfig, encodeSessionCode, encodeSessionCodeWithin, configPoints, fetchSharedCode, looksLikeSessionCode, parseSessionText, sendSessionCode, shareIdFrom, shareLink } from '../../services/sessionConfig.js';
+import { isShareHash, applyStoredSettings, usableMask, buildSessionConfig, describeSessionConfig, encodeSessionCode, encodeSessionCodeWithin, configPoints, sanitizeArea, fetchSharedCode, looksLikeSessionCode, parseSessionText, sendSessionCode, shareIdFrom, shareLink } from '../../services/sessionConfig.js';
 import { setBaseTexture } from '../../composables/useBaseTexture.js';
 import SessionConfigDialog from '../modals/SessionConfigDialog.vue';
 import ShareDialog from '../modals/ShareDialog.vue';
@@ -876,7 +876,11 @@ const triggerDownload = (blob, filename) => {
 // The whole control panel (data + export settings) as one config, never
 // with keys: services/sessionConfig.js. Copy gives a one-line "mapng:1:…"
 // code; Paste, Load and Ctrl+V on the map show what it would change first.
-const currentSessionConfig = () => buildSessionConfig({ ...buildRunConfiguration(), rawTerrain: store.rawTerrain }, localStorage, { backgroundMask: store.backgroundActive ? toRaw(store.backgroundMask) : null, points: toRaw(store.points) });
+// (the area beyond one square goes too: the tiles, or the road and its stretch)
+const currentArea = () => (store.areaMode === 'road' && store.road
+  ? { mode: 'road', road: { ...toRaw(store.road), halfWidthM: store.roadHalfWidthM } }
+  : { mode: 'tiles', tiles: { list: toRaw(store.tiles), together: store.tilesTogether, snap: store.tilesSnap } });
+const currentSessionConfig = () => buildSessionConfig({ ...buildRunConfiguration(), rawTerrain: store.rawTerrain }, localStorage, { backgroundMask: store.backgroundActive ? toRaw(store.backgroundMask) : null, points: toRaw(store.points), area: currentArea() });
 
 const copyRunConfiguration = async () => {
   try {
@@ -932,6 +936,15 @@ const applyPendingConfig = () => {
     // (a config with points brings its own; one without leaves the user's: they are geographic, and kept outside the box)
     const points = configPoints(config);
     if (points) store.setPoints(points);
+    // the area: the code's tiles or road; a code with a place but no area is one square (as it was shared)
+    const area = sanitizeArea(config.area);
+    if (area?.mode === 'road') {
+      store.setAreaMode('road'); store.setRoad({ ...area.road, ids: [] }); store.setRoadHalfWidthM(area.road.halfWidthM);
+    } else if (area?.mode === 'tiles') {
+      store.setAreaMode('tiles'); store.setTiles(area.tiles.list); store.setTilesTogether(area.tiles.together); store.setTilesSnap(area.tiles.snap);
+    } else if (hasArea) {
+      store.setAreaMode('tiles'); store.setTiles([{ dx: 0, dy: 0 }]);
+    }
     if (typeof config.rawTerrain === 'boolean') store.setRawTerrain(config.rawTerrain);
     if (typeof config.gapFillSource === 'string' && config.gapFillSource) gapFillSource.value = normalizeGapFillSource(config.gapFillSource);
     if (typeof config.elevationUnitOverride === 'string' && config.elevationUnitOverride) elevationUnitOverride.value = config.elevationUnitOverride;

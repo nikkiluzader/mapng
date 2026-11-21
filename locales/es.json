@@ -1637,7 +1637,12 @@
     "roadSurface": "Superficie de las carreteras",
     "otherSettings": "Otros ajustes",
     "otherSettingsValue": "{n} más, en «Ajuste fino»",
-    "bundleOsm": "Incluir los datos del mapa para informes de errores"
+    "bundleOsm": "Incluir los datos del mapa para informes de errores",
+    "tiles": "Teselas",
+    "tilesValue": "{n} teselas",
+    "road": "Carretera",
+    "roadValue": "{name}: {km} km, {m} m a cada lado",
+    "roadValueUnnamed": "{km} km de carretera, {m} m a cada lado"
   },
   "usage": {
     "askTitle": "¿Compartir qué ajustes usas?",

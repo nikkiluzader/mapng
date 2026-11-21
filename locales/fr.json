@@ -1637,7 +1637,12 @@
     "roadSurface": "Revêtement des routes",
     "otherSettings": "Autres réglages",
     "otherSettingsValue": "{n} de plus, dans « Réglages fins »",
-    "bundleOsm": "Inclure les données de la carte pour les rapports de bug"
+    "bundleOsm": "Inclure les données de la carte pour les rapports de bug",
+    "tiles": "Tuiles",
+    "tilesValue": "{n} tuiles",
+    "road": "Route",
+    "roadValue": "{name} : {km} km, {m} m de chaque côté",
+    "roadValueUnnamed": "{km} km de route, {m} m de chaque côté"
   },
   "usage": {
     "askTitle": "Partager les réglages que vous utilisez ?",
