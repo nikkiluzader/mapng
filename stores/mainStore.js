@@ -180,6 +180,22 @@ export const useMainStore = defineStore('main', () => {
     tiles.value[0] = { dx: 0, dy: 0 };   // (tile 0 is the map's centre)
     localStorage.setItem('mapng_tiles', JSON.stringify(tiles.value));
   }
+  // road mode (refs/output/road-mode-plan.md): the area is a picked road widened either side, instead of tiles
+  const areaMode = ref(localStorage.getItem('mapng_area_mode') === 'road' ? 'road' : 'tiles');
+  const road = ref((() => {
+    try {
+      const r = JSON.parse(localStorage.getItem('mapng_road') || 'null');
+      return r && Array.isArray(r.pts) && r.pts.length >= 2 ? r : null;
+    } catch { return null; }
+  })());
+  const roadHalfWidthM = ref(Number(localStorage.getItem('mapng_road_half_width')) || 250);
+  function setAreaMode(m) { areaMode.value = m === 'road' ? 'road' : 'tiles'; localStorage.setItem('mapng_area_mode', areaMode.value); }
+  function setRoad(r) {
+    road.value = r && Array.isArray(r.pts) && r.pts.length >= 2 ? r : null;
+    try { if (road.value) localStorage.setItem('mapng_road', JSON.stringify(road.value)); else localStorage.removeItem('mapng_road'); } catch { /* full storage: kept for this session */ }
+  }
+  function setRoadHalfWidthM(v) { roadHalfWidthM.value = Number(v) || 250; localStorage.setItem('mapng_road_half_width', String(roadHalfWidthM.value)); }
+
   function setTilesTogether(v) { tilesTogether.value = !!v; localStorage.setItem('mapng_tiles_together', String(!!v)); }
   function setTilesSnap(v) { tilesSnap.value = !!v; localStorage.setItem('mapng_tiles_snap', String(!!v)); }
 
@@ -363,6 +379,7 @@ export const useMainStore = defineStore('main', () => {
     setBatchTileFollowCenter,
     setBatchTileOffsets,
     tiles, tilesTogether, tilesSnap, setTiles, setTilesTogether, setTilesSnap,
+    areaMode, road, roadHalfWidthM, setAreaMode, setRoad, setRoadHalfWidthM,
     setBatchTileNames
   };
 });

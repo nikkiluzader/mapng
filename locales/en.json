@@ -2388,5 +2388,27 @@
     "webCap": "Too big for the browser: the level can be at most {max} px across. Use fewer tiles, a coarser resolution, or the desktop app.",
     "desktopWarn": "Past {max} px across: the level may be too big for the game to load.",
     "clear": "Back to one tile"
+  },
+  "road": {
+    "areaMode": "What the map covers",
+    "mode_tiles": "Tile mode",
+    "mode_road": "Road mode",
+    "clickHint": "Click a road on the map: it is followed both ways by its name or number.",
+    "reading": "Reading the roads here…",
+    "handlesHint": "Drag the two handles on the map to set where the stretch starts and ends.",
+    "extendStart": "Extend at the start",
+    "extendEnd": "Extend at the end",
+    "width": "Width either side",
+    "widthValue": "{m} m",
+    "gridLine": "{km} km of road · map {w} × {h} px · {area} km²",
+    "webCap": "Too big for the browser: the level can be at most {max} px across. Shorten the stretch, narrow it, choose a coarser resolution, or use the desktop app.",
+    "clear": "Pick another road",
+    "unnamed": "Unnamed road",
+    "start": "Start",
+    "end": "End",
+    "pickFirst": "Pick a road on the map first (Road mode).",
+    "error_none": "No road there: click closer to a road.",
+    "error_read": "The roads here could not be read. Try again in a moment.",
+    "error_noMore": "The road does not go on there under the same name or number: click the next road to continue."
   }
 }

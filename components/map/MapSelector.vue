@@ -105,7 +105,7 @@
       />
 
       <l-rectangle 
-        v-if="selectionBounds && !hasBatchGrid && !showUploadedCoverageBounds"
+        v-if="selectionBounds && !hasBatchGrid && !showUploadedCoverageBounds && !roadShown"
         :bounds="[[selectionBounds.south, selectionBounds.west], [selectionBounds.north, selectionBounds.east]]" 
         color="#FF6600"
         :weight="2"
@@ -113,6 +113,17 @@
         :interactive="false"
         :options="{ dashArray: '2, 8', lineCap: 'round' }"
       />
+
+      <!-- road mode (refs/output/road-mode-plan.md): the followed road (dashed), the chosen stretch with its corridor
+           (shaded, its width to scale) and the two end handles, which slide along the road -->
+      <template v-if="roadShown">
+        <l-polyline :lat-lngs="roadLine" color="#FF6600" :weight="2" :opacity="0.7" :interactive="false" :options="{ dashArray: '4, 6' }" />
+        <l-polyline v-if="stretchLine.length > 1" :lat-lngs="stretchLine" color="#FF6600" :weight="corridorPx" :opacity="0.18" :interactive="false" :options="{ lineCap: 'round', lineJoin: 'round' }" />
+        <l-polyline v-if="stretchLine.length > 1" :lat-lngs="stretchLine" color="#FF6600" :weight="3" :interactive="false" />
+        <l-marker v-for="h in roadHandles" :key="'road-' + h.which" :lat-lng="h.at" :draggable="true" :icon="batchHandleIcon" @dragend="(event) => dropRoadHandle(h.which, event)">
+          <l-tooltip :permanent="false" direction="top" :offset="[0, -8]">{{ t(h.which === 'start' ? 'road.start' : 'road.end') }}</l-tooltip>
+        </l-marker>
+      </template>
 
       <!-- tiles in step 1 beyond the first (services/tileLayout.js): each a box with a handle; dropped, it is placed by
            the mode's rule (a grid spot when together, snapped to a neighbour when free) -->
@@ -393,7 +404,8 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import { useUsageStats } from '../../composables/useUsageStats.js';
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { LMap, LTileLayer, LRectangle, LMarker, LTooltip, LPolygon } from '@vue-leaflet/vue-leaflet';
+import { LMap, LTileLayer, LRectangle, LMarker, LTooltip, LPolygon, LPolyline } from '@vue-leaflet/vue-leaflet';
+import { useRoadMode } from '../../composables/useRoadMode.js';
 import { Layers, ChevronDown, Star, Navigation } from 'lucide-vue-next';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -575,6 +587,29 @@ const dropTile = (tile, event) => {
   // to redraw it cancelled the map library's queued position updates, one unhandled rejection per drag step)
   const marker = event.target;
   nextTick(() => { const placed = extraTiles.value.find((x) => x.i === tile.i); if (placed) marker.setLatLng([placed.center.lat, placed.center.lng]); });
+};
+
+// road mode on the map
+const roadApi = useRoadMode(() => props.processingMetersPerPixel);
+const roadModeOn = computed(() => store.areaMode === 'road' && !store.batchMode && !hasBatchGrid.value && !showUploadedCoverageBounds.value);
+const roadShown = computed(() => roadModeOn.value && !!store.road);
+const roadLine = computed(() => (store.road?.pts || []).map((p) => [p.lat, p.lng]));
+const stretchLine = computed(() => (roadApi.stretch.value || []).map((p) => [p.lat, p.lng]));
+const roadHandles = computed(() => {
+  const s = roadApi.stretch.value; if (!s || s.length < 2) return [];
+  return [{ which: 'start', at: [s[0].lat, s[0].lng] }, { which: 'end', at: [s[s.length - 1].lat, s[s.length - 1].lng] }];
+});
+// (the corridor's width in screen pixels at this zoom: metres per pixel of web mercator at the road's latitude)
+const corridorPx = computed(() => {
+  const s = roadApi.stretch.value; if (!s?.length) return 2;
+  const mPerPx = (156543.03392 * Math.cos((s[0].lat * Math.PI) / 180)) / 2 ** (currentZoom.value || 13);
+  return Math.max(2, (2 * store.roadHalfWidthM) / mPerPx);
+});
+const dropRoadHandle = (which, event) => {
+  const ll = event?.target?.getLatLng?.(); if (!ll) return;
+  roadApi.setHandle(which, { lat: ll.lat, lng: ll.lng });
+  const marker = event.target;
+  nextTick(() => { const h = roadHandles.value.find((x) => x.which === which); if (h) marker.setLatLng(h.at); });
 };
 
 const batchHandleIcon = L.divIcon({
@@ -1285,6 +1320,11 @@ const onMapReady = (map) => {
   map.on('resize', () => fitMinZoom(map));
   keepCenterOnWorld(map);
   addMapTools(map);
+  // road mode: a click picks the road there (not while a point tool places points)
+  map.on('click', (e) => {
+    if (!roadModeOn.value || store.pointTool) return;
+    roadApi.pickAt({ lat: e.latlng.lat, lng: e.latlng.lng });
+  });
   map.on('contextmenu', (e) => {
     copiedNotice.value = false;
     // (kept inside the map: the menu is ~220 × 100 px, 170 with the point items)

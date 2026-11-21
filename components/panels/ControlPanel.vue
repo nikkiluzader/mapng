@@ -97,7 +97,13 @@
           </div>
         </div>
 
-        <fieldset v-else :disabled="store.boxLocked" :class="store.boxLocked ? 'opacity-60' : ''" :title="store.boxLocked ? (store.boxLockedByBackground ? t('backgroundAreas.lockedField') : t('map.lockedField')) : null">
+        <!-- the area: tiles (one is today's square) or a road widened either side (refs/output/road-mode-plan.md) -->
+        <div v-if="!nativeDims && !store.batchMode" class="grid grid-cols-2 gap-1.5" role="radiogroup" :aria-label="t('road.areaMode')">
+          <button v-for="m in ['tiles', 'road']" :key="m" type="button" role="radio" :aria-checked="store.areaMode === m" :data-testid="`area-mode-${m}`" :disabled="isGenerating"
+            :class="['rounded border px-2 py-1.5 text-xs font-medium transition-colors', store.areaMode === m ? 'border-brand bg-brand-50/60 dark:bg-brand/10 text-brand' : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300']"
+            @click="store.setAreaMode(m)">{{ t(`road.mode_${m}`) }}</button>
+        </div>
+        <fieldset v-if="!nativeDims && (store.areaMode !== 'road' || store.batchMode)" :disabled="store.boxLocked" :class="store.boxLocked ? 'opacity-60' : ''" :title="store.boxLocked ? (store.boxLockedByBackground ? t('backgroundAreas.lockedField') : t('map.lockedField')) : null">
           <ResolutionSelector
             :modelValue="resolution"
             @update:modelValue="$emit('resolutionChange', $event)"
@@ -137,8 +143,13 @@
 
         <!-- tiles: one map of any shape (not with an uploaded elevation file, not in a batch job; editable with the area
              locked: the lock pins the selection while the map pans, the tiles stay movable: the user, 2026-11-21) -->
+        <RoadMode
+          v-if="!nativeDims && !store.batchMode && store.areaMode === 'road'"
+          :meters-per-pixel="processingMetersPerPixel"
+          :disabled="isGenerating"
+        />
         <TileLayout
-          v-if="!nativeDims && !store.batchMode"
+          v-if="!nativeDims && !store.batchMode && store.areaMode !== 'road'"
           :resolution="resolution"
           :meters-per-pixel="processingMetersPerPixel"
           :disabled="isGenerating"
@@ -157,7 +168,7 @@
       <!-- Background areas (advanced; not with an uploaded elevation file, which picks its own box) -->
       <!-- (not with several tiles: background areas are drawn on the first tile's box: refs/output/tiles-step2-plan.md) -->
       <BackgroundAreas
-        v-if="store.advancedMode && !uploadedElevationFile && store.tiles.length < 2"
+        v-if="store.advancedMode && !uploadedElevationFile && store.tiles.length < 2 && store.areaMode !== 'road'"
         :center="center"
         :resolution="resolution"
         :meters-per-pixel="processingMetersPerPixel"
@@ -450,7 +461,9 @@ import SurroundingTiles from '../map/SurroundingTiles.vue';
 import BackgroundAreas from '../controls/BackgroundAreas.vue';
 import SpawnPoints from '../controls/SpawnPoints.vue';
 import TileLayout from '../controls/TileLayout.vue';
+import RoadMode from '../controls/RoadMode.vue';
 import { useTiles } from '../../composables/useTiles.js';
+import { useRoadMode } from '../../composables/useRoadMode.js';
 import ExportPanel from './ExportPanel.vue';
 import { useMainStore } from '../../stores/mainStore';
 import GenerateActions from '../controls/GenerateActions.vue';
@@ -770,7 +783,13 @@ watch(previewStale, (v) => emit('update:previewStale', v), { immediate: true });
 const totalWidthMeters = computed(() => props.resolution * metersPerPixel.value);
 // (tiles in step 1: the footprint's area, overlaps once; one tile: the square as before)
 const tileApi = useTiles(() => props.resolution, () => props.processingMetersPerPixel);
+const roadApi = useRoadMode(() => props.processingMetersPerPixel);
 const totalAreaSqM = computed(() => {
+  // (road mode: the corridor's area)
+  if (store.areaMode === 'road' && !nativeDims.value && !store.batchMode) {
+    const g = roadApi.grid.value; const m = Number(props.processingMetersPerPixel) > 0 ? Number(props.processingMetersPerPixel) : 1;
+    return g ? g.areaPx * m * m : 0;
+  }
   if (store.tiles.length > 1 && !nativeDims.value && !store.batchMode) {
     const m = Number(props.processingMetersPerPixel) > 0 ? Number(props.processingMetersPerPixel) : 1;
     return tileApi.grid.value.areaPx * m * m;

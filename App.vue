@@ -288,6 +288,8 @@ import { DEFAULT_GAP_FILL_SOURCE } from './services/gapFillSources.js';
 import { normalizeFallbackSource } from './services/elevationFallback.js';
 import { computeUploadedCropBounds, nativeSquareAt } from './services/uploadBounds';
 import { layoutGrid, WEB_MAX_SIDE } from './services/tileLayout.js';
+import { corridorGrid } from './services/roadCorridor.js';
+import { stretchBetween } from './services/roadPick.js';
 import {
   computeGridTiles,
   computeGridTilesWithOffsets,
@@ -658,7 +660,8 @@ const buildGenerationKey = (c, res, osm, elevationSource, gpxzKey, uploadedEleva
     lng: c.lng,
     resolution: res,
     // (tiles in step 1: the layout changes the map; one tile adds nothing, so a single square's key is as before)
-    ...(store.tiles.length > 1 ? { tiles: store.tiles.map((t) => [Math.round(t.dx * 1e4), Math.round(t.dy * 1e4)]) } : {}),
+    ...(store.areaMode === 'road' && !store.batchMode ? { road: store.road ? [store.road.pts.length, Math.round(store.road.startM), Math.round(store.road.endM), store.roadHalfWidthM, store.road.pts[0]?.lat, store.road.pts.at(-1)?.lng] : null }
+      : store.tiles.length > 1 ? { tiles: store.tiles.map((t) => [Math.round(t.dx * 1e4), Math.round(t.dy * 1e4)]) } : {}),
     processingMetersPerPixel: processingMpp,
     osm,
     elevationSource,
@@ -1021,7 +1024,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         ...texturesToGenerate(baseTexture.value),
         // (a plain copy: it goes to a worker / the desktop app)
         // (not with several tiles: the mask belongs to the first tile's box)
-        ...(store.backgroundActive && store.tiles.length < 2 ? { backgroundMask: JSON.parse(JSON.stringify(store.backgroundMask)) } : {}),
+        ...(store.backgroundActive && store.tiles.length < 2 && store.areaMode !== 'road' ? { backgroundMask: JSON.parse(JSON.stringify(store.backgroundMask)) } : {}),
         // (the desktop app keeps these with the level's project, so Modify
         // brings the points back; they never change the terrain made)
         ...(desktopApp && store.points.length ? { points: JSON.parse(JSON.stringify(store.points)) } : {}),
@@ -1030,7 +1033,20 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
       // rectangle centred on its middle; a footprint that fills a power-of-two square is generated as today's square
       // (a TerrainBlock); any other shape carries its footprint (ground models at export). One tile: as before.
       let genCenter = center.value; let genSize = resolution.value;
-      if (store.tiles.length > 1) {
+      // road mode (refs/output/road-mode-plan.md): the chosen stretch widened either side; its grid and row runs from
+      // services/roadCorridor.js (the same frame and pixels Generate uses); always ground models
+      if (store.areaMode === 'road' && !store.batchMode) {
+        const r = store.road;
+        if (!r) throw new Error(t('road.pickFirst'));
+        const mpp = Number(processingMpp || 1);
+        const g = corridorGrid(stretchBetween(r.pts, r.startM, r.endM), store.roadHalfWidthM, mpp);
+        let side = 1; while (side < Math.max(g.width, g.height)) side *= 2;
+        if (side > WEB_MAX_SIDE && !desktopApp) throw new Error(t('road.webCap', { max: WEB_MAX_SIDE }));
+        genCenter = g.center; genSize = { width: g.width, height: g.height };
+        generationOptions.footprint = { runs: g.runs };
+        generationOptions.road = { pts: stretchBetween(r.pts, r.startM, r.endM), halfWidthM: g.halfWidthM, names: r.names || [], refs: r.refs || [] };
+        console.log(`[Road mode] ${(Math.abs(r.endM - r.startM) / 1000).toFixed(2)} km of ${[...(r.refs || []), ...(r.names || [])].join(' / ') || 'road'}, ${g.halfWidthM} m either side: a ${g.width}×${g.height} grid, corridor ${g.areaPx} px (${g.runs.length} row runs).`);
+      } else if (store.tiles.length > 1) {
         const R = Number(resolution.value);
         const mpp = Number(processingMpp || 1);
         const g = layoutGrid(store.tiles.map((t) => ({ dx: Math.round(t.dx * R), dy: Math.round(t.dy * R) })), R);
@@ -1053,7 +1069,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         : await fetchTerrainData(genCenter, genSize, fetchOSM, useUSGS, useGPXZ, useKRON86, gpxzApiKey, undefined, applyLoadingUpdate, signal, generationOptions);
     }
     // (the export leaves objects out of the same background areas)
-    if (data && store.backgroundActive && !uploadedElevationFile.value && store.tiles.length < 2) data.backgroundMask = JSON.parse(JSON.stringify(store.backgroundMask));
+    if (data && store.backgroundActive && !uploadedElevationFile.value && store.tiles.length < 2 && store.areaMode !== 'road') data.backgroundMask = JSON.parse(JSON.stringify(store.backgroundMask));
     markJobEnd();
     terrainData.value = data;
     lastGenerationKey.value = requestKey;

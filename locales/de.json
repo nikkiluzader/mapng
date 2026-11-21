@@ -2388,5 +2388,27 @@
     "webCap": "Zu groß für den Browser: Das Level darf höchstens {max} px breit sein. Nimm weniger Kacheln, eine gröbere Auflösung oder die Desktop-App.",
     "desktopWarn": "Über {max} px breit: Das Level ist für das Spiel womöglich zu groß zum Laden.",
     "clear": "Zurück zu einer Kachel"
+  },
+  "road": {
+    "areaMode": "Was die Karte abdeckt",
+    "mode_tiles": "Kachelmodus",
+    "mode_road": "Straßenmodus",
+    "clickHint": "Klicke auf der Karte auf eine Straße: Sie wird über ihren Namen oder ihre Nummer in beide Richtungen verfolgt.",
+    "reading": "Die Straßen hier werden gelesen…",
+    "handlesHint": "Zieh die beiden Griffe auf der Karte, um Anfang und Ende des Abschnitts festzulegen.",
+    "extendStart": "Am Anfang verlängern",
+    "extendEnd": "Am Ende verlängern",
+    "width": "Breite zu beiden Seiten",
+    "widthValue": "{m} m",
+    "gridLine": "{km} km Straße · Karte {w} × {h} px · {area} km²",
+    "webCap": "Zu groß für den Browser: Das Level darf höchstens {max} px breit sein. Kürze den Abschnitt, mach ihn schmaler, wähle eine gröbere Auflösung oder nimm die Desktop-App.",
+    "clear": "Andere Straße wählen",
+    "unnamed": "Unbenannte Straße",
+    "start": "Anfang",
+    "end": "Ende",
+    "pickFirst": "Wähle zuerst eine Straße auf der Karte (Straßenmodus).",
+    "error_none": "Dort ist keine Straße: Klicke näher an eine Straße.",
+    "error_read": "Die Straßen hier konnten nicht gelesen werden. Versuch es gleich noch einmal.",
+    "error_noMore": "Die Straße geht dort nicht mit demselben Namen oder derselben Nummer weiter: Klicke auf die nächste Straße, um fortzufahren."
   }
 }

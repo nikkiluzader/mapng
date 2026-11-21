@@ -2388,5 +2388,27 @@
     "webCap": "Za duże dla przeglądarki: poziom może mieć najwyżej {max} px szerokości. Użyj mniej kafelków, grubszej rozdzielczości lub aplikacji desktopowej.",
     "desktopWarn": "Ponad {max} px: poziom może być za duży, by gra go wczytała.",
     "clear": "Wróć do jednego kafelka"
+  },
+  "road": {
+    "areaMode": "Co obejmuje mapa",
+    "mode_tiles": "Tryb kafelków",
+    "mode_road": "Tryb drogi",
+    "clickHint": "Kliknij drogę na mapie: zostanie poprowadzona w obie strony po nazwie lub numerze.",
+    "reading": "Odczyt dróg w tym miejscu…",
+    "handlesHint": "Przeciągnij dwa uchwyty na mapie, aby ustawić początek i koniec odcinka.",
+    "extendStart": "Wydłuż na początku",
+    "extendEnd": "Wydłuż na końcu",
+    "width": "Szerokość z każdej strony",
+    "widthValue": "{m} m",
+    "gridLine": "Droga: {km} km · mapa {w} × {h} px · {area} km²",
+    "webCap": "Za duże dla przeglądarki: poziom może mieć najwyżej {max} px szerokości. Skróć odcinek, zwęź go, wybierz grubszą rozdzielczość lub użyj aplikacji desktopowej.",
+    "clear": "Wybierz inną drogę",
+    "unnamed": "Droga bez nazwy",
+    "start": "Początek",
+    "end": "Koniec",
+    "pickFirst": "Najpierw wybierz drogę na mapie (Tryb drogi).",
+    "error_none": "Tu nie ma drogi: kliknij bliżej drogi.",
+    "error_read": "Nie udało się odczytać dróg w tym miejscu. Spróbuj ponownie za chwilę.",
+    "error_noMore": "Droga nie biegnie tam dalej pod tą samą nazwą lub numerem: kliknij następną drogę, aby kontynuować."
   }
 }

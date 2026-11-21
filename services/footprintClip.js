@@ -7,7 +7,7 @@
 //   ground they paint are kept inside it later);
 // - point features are kept when inside.
 // Pixel space as batchShape.js: the export grid's N x N pixels over `bounds`, x east, y south.
-import { footprintRows, inFootprint } from './batchShape.js';
+import { shapeRows, shapeBoxes, inFootprint } from './batchShape.js';
 
 const LINE_TYPES = new Set(['road', 'railway', 'barrier', 'power_line', 'waterway', 'path', 'cliff', 'wall', 'pier']);
 
@@ -17,14 +17,14 @@ const LINE_TYPES = new Set(['road', 'railway', 'barrier', 'power_line', 'waterwa
  */
 export function footprintClipper(bounds, shape) {
   const W = shape.width ?? shape.size; const H = shape.height ?? shape.size;
-  const rows = footprintRows(shape.rects, H, W);
+  const rows = shapeRows(shape, H, W);
   const sx = W / (bounds.east - bounds.west); const sy = H / (bounds.north - bounds.south);
   const inside = (lat, lng) => {
     const x = Math.floor((lng - bounds.west) * sx); const y = Math.floor((bounds.north - lat) * sy);
     return x >= 0 && y >= 0 && x < W && y < H && inFootprint(rows, x, y);
   };
   // the footprint's own box per rect (lat/lng), for the areas' overlap test
-  const rectBoxes = shape.rects.map(([x, y, w, h]) => ({
+  const rectBoxes = shapeBoxes(shape).map(([x, y, w, h]) => ({
     west: bounds.west + x / sx, east: bounds.west + (x + w) / sx, north: bounds.north - y / sy, south: bounds.north - (y + h) / sy,
   }));
   const boxTouches = (pts) => {

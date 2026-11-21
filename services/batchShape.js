@@ -103,7 +103,7 @@ export function inFootprint(rows, x, y) {
  * tiles is kept; one past the footprint's edge is not). shape: { size: N, rects }.
  */
 export function keepSquareFor(shape) {
-  const N = shape.size; const rows = footprintRows(shape.rects, N);
+  const N = shape.size; const rows = shapeRows(shape, N);
   return (i, j) => {
     const y1 = N - 1 - j; const y0 = y1 - 1;   // the square's two rows (north y0, south y1)
     if (y0 < 0) return false;
@@ -147,4 +147,61 @@ export function fillOutsideFootprint(heights, rows, N, W = N) {
     const src = lastFull < 0 ? next : next >= N ? lastFull : (y - lastFull <= next - y ? lastFull : next);
     heights.copyWithin(y * W, src * W, src * W + W);
   }
+}
+
+// ── Footprints of any shape ───────────────────────────────────────────────────────────────────────────────────────────
+// A footprint is tile rects [[x, y, w, h]...] (a plain array, or { rects }), or row runs { runs: [[y, x0, x1]...] } (a
+// road corridor, services/roadCorridor.js: [x0, x1) pixels of row y). Everything that reads a footprint goes through
+// these, so both forms work everywhere.
+
+/** The footprint as { rects } or { runs }, or null for none. */
+export const shapeOf = (fp) => (Array.isArray(fp) ? { rects: fp } : fp && (Array.isArray(fp.rects) || Array.isArray(fp.runs)) ? fp : null);
+
+/** Whether there is a footprint at all. */
+export const hasShape = (fp) => { const s = shapeOf(fp); return !!s && ((s.rects?.length || 0) + (s.runs?.length || 0)) > 0; };
+
+/** The footprint's row intervals (as footprintRows) for either form: N rows of W pixels. */
+export function shapeRows(fp, N, W = N) {
+  const s = shapeOf(fp);
+  if (!s) { const r = new Array(N); for (let y = 0; y < N; y++) r[y] = null; return r; }
+  if (!s.runs) return footprintRows(s.rects || [], N, W);
+  const rows = new Array(N); for (let y = 0; y < N; y++) rows[y] = null;
+  for (const [y, a, b] of s.runs) {
+    if (y < 0 || y >= N) continue;
+    const x0 = Math.max(0, a); const x1 = Math.min(W, b); if (x1 <= x0) continue;
+    (rows[y] || (rows[y] = [])).push([x0, x1]);
+  }
+  for (let y = 0; y < N; y++) {
+    const l = rows[y]; if (!l || l.length < 2) continue;
+    l.sort((p, q) => p[0] - q[0]);
+    const m = []; for (const [a, b] of l) { const last = m[m.length - 1]; if (last && a <= last[1]) last[1] = Math.max(last[1], b); else m.push([a, b]); }
+    rows[y] = m;
+  }
+  return rows;
+}
+
+/** Boxes [[x, y, w, h]...] covering the footprint: its rects, or its runs gathered into bands of `band` rows. */
+export function shapeBoxes(fp, band = 32) {
+  const s = shapeOf(fp); if (!s) return [];
+  if (!s.runs) return s.rects || [];
+  const bands = new Map();
+  for (const [y, a, b] of s.runs) {
+    const k = Math.floor(y / band); const bx = bands.get(k);
+    if (!bx) bands.set(k, { x0: a, x1: b, y0: y, y1: y + 1 });
+    else { bx.x0 = Math.min(bx.x0, a); bx.x1 = Math.max(bx.x1, b); bx.y0 = Math.min(bx.y0, y); bx.y1 = Math.max(bx.y1, y + 1); }
+  }
+  return [...bands.values()].map((b) => [b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0]);
+}
+
+/** The footprint moved by (ox, oy) pixels, in its own form. */
+export function shiftShape(fp, ox, oy) {
+  const s = shapeOf(fp); if (!s) return null;
+  if (s.runs) return { runs: s.runs.map(([y, a, b]) => [y + oy, a + ox, b + ox]) };
+  return { rects: (s.rects || []).map(([x, y, w, h]) => [x + ox, y + oy, w, h]) };
+}
+
+/** The footprint's pixel count (overlaps once). */
+export function shapeArea(fp, N, W = N) {
+  let px = 0; for (const r of shapeRows(fp, N, W)) if (r) for (const [a, b] of r) px += b - a;
+  return px;
 }

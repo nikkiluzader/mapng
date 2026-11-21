@@ -8,7 +8,7 @@ import { encode } from 'fast-png';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { exportTer } from './exportTer.js';
 import { buildGroundTiles } from './groundMesh.js';
-import { footprintRows, inFootprint, keepSquareFor } from './batchShape.js';
+import { shapeRows, shapeOf, hasShape, inFootprint, keepSquareFor } from './batchShape.js';
 import { footprintClipper } from './footprintClip.js';
 import { padTerrainToSquare } from './padToSquare.js';
 import { buildTerrainMaterials, isVegetationColor } from './osmTerrainMaterials.js';
@@ -13397,14 +13397,14 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     const structureSolver = options.structureSolver ?? 'v2';
     // a rectangular map, or one with a footprint (tiles in step 1): made square for the export, the shape kept to
     // the rectangle or the footprint (services/padToSquare.js)
-    if (terrainData && (terrainData.width !== terrainData.height || terrainData.footprint?.length) && !options.groundShape) {
+    if (terrainData && (terrainData.width !== terrainData.height || hasShape(terrainData.footprint)) && !options.groundShape) {
       const padded = await padTerrainToSquare(terrainData, { footprint: terrainData.footprint || null, log: (m) => console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Shape: ${m}.`) });
       terrainData = padded.terrainData;
       if (padded.shape) options = { ...options, groundShape: padded.shape };
       if (padded.padded) center = { lat: (terrainData.bounds.north + terrainData.bounds.south) / 2, lng: (terrainData.bounds.east + terrainData.bounds.west) / 2 };
     }
     // (a shaped level's ground is models: any shape but a full square is no TerrainBlock)
-    const shaped = Array.isArray(options.groundShape?.rects) && options.groundShape.rects.length > 0;
+    const shaped = hasShape(options.groundShape);
     return await runBeamNGLevelExport(terrainData, center, { ...options, structureSolver, ...(shaped ? { groundAsModels: true } : {}) }, jobLog);
   } finally {
     jobLog.restore();
@@ -13614,7 +13614,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // a shaped level: the map data kept to the footprint (services/footprintClip.js), nothing built where there is no
   // ground; and the ground models' square test from the same rects
   let footprint = null;
-  if (groundShape?.rects?.length) {
+  if (hasShape(groundShape)) {
     if (groundShape.size !== terrainData.width || terrainData.width !== terrainData.height || !terrainData.bounds) {
       console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Shape: skipped, its grid (${groundShape.size}) is not the terrain's (${terrainData.width}×${terrainData.height}); the whole square is built.`);
     } else {
@@ -13622,9 +13622,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       const before = (terrainData.osmFeatures || []).length;
       const { features, stats } = fc.clip(terrainData.osmFeatures);
       terrainData = { ...terrainData, osmFeatures: features };
-      let px = 0; const rows = footprintRows(groundShape.rects, groundShape.size); for (const r of rows) if (r) for (const [a, b] of r) px += b - a;
+      let px = 0; const rows = shapeRows(groundShape, groundShape.size); for (const r of rows) if (r) for (const [a, b] of r) px += b - a;
       footprint = { keepSquare: keepSquareFor(groundShape), rows, size: groundShape.size };
-      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Shape: ${groundShape.rects.length} tile(s), footprint ${formatNumber(px, 0)} px (${formatNumber((100 * px) / (groundShape.size * groundShape.size), 1)}% of the ${groundShape.size}² grid); map data kept to it: ${before} feature(s) in, ${stats.kept} kept whole, ${stats.cut} line(s) cut at its edge into ${stats.pieces} piece(s), ${stats.dropped} outside dropped.`);
+      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Shape: ${shapeOf(groundShape).runs ? 'a corridor' : `${shapeOf(groundShape).rects.length} tile(s)`}, footprint ${formatNumber(px, 0)} px (${formatNumber((100 * px) / (groundShape.size * groundShape.size), 1)}% of the ${groundShape.size}² grid); map data kept to it: ${before} feature(s) in, ${stats.kept} kept whole, ${stats.cut} line(s) cut at its edge into ${stats.pieces} piece(s), ${stats.dropped} outside dropped.`);
     }
   }
   const built = (id) => contentOn(options, id);

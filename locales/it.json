@@ -2388,5 +2388,27 @@
     "webCap": "Troppo grande per il browser: il livello può essere al massimo di {max} px. Usa meno riquadri, una risoluzione più grossolana o l'app desktop.",
     "desktopWarn": "Oltre {max} px: il livello potrebbe essere troppo grande perché il gioco lo carichi.",
     "clear": "Torna a un riquadro"
+  },
+  "road": {
+    "areaMode": "Cosa copre la mappa",
+    "mode_tiles": "Modalità riquadri",
+    "mode_road": "Modalità strada",
+    "clickHint": "Fai clic su una strada della mappa: viene seguita in entrambe le direzioni per nome o numero.",
+    "reading": "Lettura delle strade qui…",
+    "handlesHint": "Trascina le due maniglie sulla mappa per fissare dove inizia e finisce il tratto.",
+    "extendStart": "Allunga all'inizio",
+    "extendEnd": "Allunga alla fine",
+    "width": "Larghezza per lato",
+    "widthValue": "{m} m",
+    "gridLine": "{km} km di strada · mappa {w} × {h} px · {area} km²",
+    "webCap": "Troppo grande per il browser: il livello può essere al massimo di {max} px. Accorcia il tratto, restringilo, scegli una risoluzione più grossolana o usa l'app desktop.",
+    "clear": "Scegli un'altra strada",
+    "unnamed": "Strada senza nome",
+    "start": "Inizio",
+    "end": "Fine",
+    "pickFirst": "Prima scegli una strada sulla mappa (Modalità strada).",
+    "error_none": "Nessuna strada lì: fai clic più vicino a una strada.",
+    "error_read": "Non è stato possibile leggere le strade qui. Riprova tra un momento.",
+    "error_noMore": "La strada non continua lì con lo stesso nome o numero: fai clic sulla strada successiva per continuare."
   }
 }

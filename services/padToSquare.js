@@ -5,7 +5,7 @@
 // rectangle's edge (never drawn; the export's smoothing and grading near the edge then see the edge's own heights).
 // Generate stays rectangular (fetching and memory follow the rectangle); only the export pads. A true rectangular
 // export is a later step.
-import { footprintRows, fillOutsideFootprint } from './batchShape.js';
+import { shapeRows, fillOutsideFootprint, hasShape, shiftShape } from './batchShape.js';
 
 /** The power-of-two square side holding a W x H grid. */
 export const squareSideFor = (W, H) => { let N = 1; while (N < Math.max(W, H)) N *= 2; return N; };
@@ -43,15 +43,15 @@ const canvasBlob = (canvas) => new Promise((r) => canvas.toBlob(r, 'image/png'))
  */
 export async function padTerrainToSquare(td, { footprint = null, log = () => {} } = {}) {
   const W = td.width; const H = td.height;
-  const rects0 = footprint?.length ? footprint : [[0, 0, W, H]];
-  if (W === H) return { terrainData: td, shape: footprint?.length ? { size: W, rects: footprint } : null, offset: { x: 0, y: 0 }, padded: false };
+  const own = hasShape(footprint) ? footprint : [[0, 0, W, H]];
+  if (W === H) return { terrainData: td, shape: hasShape(footprint) ? { size: W, ...shiftShape(footprint, 0, 0) } : null, offset: { x: 0, y: 0 }, padded: false };
   const N = squareSideFor(W, H);
   const ox = Math.floor((N - W) / 2); const oy = Math.floor((N - H) / 2);
-  const rects = rects0.map(([x, y, w, h]) => [x + ox, y + oy, w, h]);
+  const moved = shiftShape(own, ox, oy);
   // heights: the rectangle copied in, the rest stretched from the footprint's edge
   const hm = new Float32Array(N * N);
   for (let r = 0; r < H; r++) hm.set(td.heightMap.subarray(r * W, r * W + W), (r + oy) * N + ox);
-  fillOutsideFootprint(hm, footprintRows(rects, N), N);
+  fillOutsideFootprint(hm, shapeRows(moved, N), N);
   // bounds: widened around their middle at the rectangle's own degrees per pixel (the export maps them linearly)
   const b = td.bounds; const midLat = (b.north + b.south) / 2; const midLng = (b.east + b.west) / 2;
   const latPx = (b.north - b.south) / H; const lngPx = (b.east - b.west) / W;
@@ -88,6 +88,6 @@ export async function padTerrainToSquare(td, { footprint = null, log = () => {} 
   if (td.satelliteTextureUrl) {
     try { out.satelliteTextureUrl = URL.createObjectURL(await canvasBlob(await padTexture(td.satelliteTextureUrl, W, N, ox, oy))); } catch (e) { log(`the satellite texture could not be padded (${e?.message || e})`); out.satelliteTextureUrl = null; }
   }
-  log(`a ${W}×${H} map padded to ${N}×${N} for the export (offset ${ox}, ${oy}); ${rects.length} footprint rect(s); heights outside stretched from the edge; land cover ${landCover?.n ?? 'none'}²; textures padded`);
-  return { terrainData: out, shape: { size: N, rects }, offset: { x: ox, y: oy }, padded: true };
+  log(`a ${W}×${H} map padded to ${N}×${N} for the export (offset ${ox}, ${oy}); footprint ${moved.runs ? `${moved.runs.length} row run(s)` : `${moved.rects.length} rect(s)`}; heights outside stretched from the edge; land cover ${landCover?.n ?? 'none'}²; textures padded`);
+  return { terrainData: out, shape: { size: N, ...moved }, offset: { x: ox, y: oy }, padded: true };
 }

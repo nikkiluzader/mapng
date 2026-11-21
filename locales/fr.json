@@ -2388,5 +2388,27 @@
     "webCap": "Trop grand pour le navigateur : le niveau peut faire au plus {max} px de côté. Utilisez moins de tuiles, une résolution plus grossière ou l'application de bureau.",
     "desktopWarn": "Au-delà de {max} px : le niveau risque d'être trop grand pour que le jeu le charge.",
     "clear": "Revenir à une tuile"
+  },
+  "road": {
+    "areaMode": "Ce que couvre la carte",
+    "mode_tiles": "Mode tuiles",
+    "mode_road": "Mode route",
+    "clickHint": "Cliquez sur une route de la carte : elle est suivie dans les deux sens par son nom ou son numéro.",
+    "reading": "Lecture des routes ici…",
+    "handlesHint": "Faites glisser les deux poignées sur la carte pour fixer le début et la fin du tronçon.",
+    "extendStart": "Prolonger au début",
+    "extendEnd": "Prolonger à la fin",
+    "width": "Largeur de chaque côté",
+    "widthValue": "{m} m",
+    "gridLine": "{km} km de route · carte {w} × {h} px · {area} km²",
+    "webCap": "Trop grand pour le navigateur : le niveau peut faire au plus {max} px de côté. Raccourcissez le tronçon, rétrécissez-le, choisissez une résolution plus grossière ou utilisez l'application de bureau.",
+    "clear": "Choisir une autre route",
+    "unnamed": "Route sans nom",
+    "start": "Début",
+    "end": "Fin",
+    "pickFirst": "Choisissez d'abord une route sur la carte (Mode route).",
+    "error_none": "Pas de route ici : cliquez plus près d'une route.",
+    "error_read": "Les routes ici n'ont pas pu être lues. Réessayez dans un instant.",
+    "error_noMore": "La route ne continue pas là sous le même nom ou numéro : cliquez sur la route suivante pour continuer."
   }
 }

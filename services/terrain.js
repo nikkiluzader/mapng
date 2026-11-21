@@ -5,7 +5,7 @@ import { withMeasuredWidths } from './satRoadWidth.js';
 import { withRegionalWidths } from './regionalWidths.js';
 import { loadDataImage } from './dataCache.js';
 import { backgroundLookup, filterFeaturesByBackground, makeSkipBox, keptBoxes, tileLatLngBox, rawWeightLookup } from './backgroundMask.js';
-import { footprintRows, fillOutsideFootprint } from './batchShape.js';
+import { shapeRows, shapeBoxes, shapeOf, hasShape, fillOutsideFootprint } from './batchShape.js';
 import { footprintClipper } from './footprintClip.js';
 import { fetchOSMData, getLastOSMRequestInfo, getOSMQueryParameters } from "./osm.js";
 import { fetchWord, replayingSources, gpxzUsable } from './sourceWording.js';
@@ -2019,6 +2019,8 @@ export const fetchTerrainData = async (
     footprint = null,
     // the tiles the map was made from (App.vue; services/tileLayout.js tilesFromTerrain): kept with the map as given
     tiles = null,
+    // road mode: the stretch and its width (App.vue): kept with the map as given
+    road = null,
   } = generationOptions || {};
   // the grid: `resolution` pixels a side, or { width, height } for a rectangle (a footprint's bounding box: tiles in
   // step 1, refs/output/tiles-plan.md). Sizes that follow the grid take its long side.
@@ -2027,7 +2029,7 @@ export const fetchTerrainData = async (
   const longSide = Math.max(gridW, gridH);
   const backgroundAt = backgroundMask ? backgroundLookup(backgroundMask, { n: 1024, metersAcross: longSide * (Number(processingMetersPerPixel) || 1) }) : null;
   const backgroundSkip = backgroundAt ? makeSkipBox(backgroundAt, backgroundMask.bounds) : null;
-  const fp = Array.isArray(footprint) && footprint.length ? footprint : null;
+  const fp = hasShape(footprint) ? footprint : null;
   let skipBox = backgroundSkip;   // (with a footprint: set once the bounds are known)
   let footprintBoxes = null;
   // Normalize longitude to handle world wrapping
@@ -2062,14 +2064,14 @@ export const fetchTerrainData = async (
   if (fp) {
     const FOOTPRINT_MARGIN_PX = 16;
     const latPx = (fetchBounds.north - fetchBounds.south) / height; const lngPx = (fetchBounds.east - fetchBounds.west) / width;
-    footprintBoxes = fp.map(([x, y, w, h]) => ({
+    footprintBoxes = shapeBoxes(fp).map(([x, y, w, h]) => ({
       north: fetchBounds.north - (y - FOOTPRINT_MARGIN_PX) * latPx, south: fetchBounds.north - (y + h + FOOTPRINT_MARGIN_PX) * latPx,
       west: fetchBounds.west + (x - FOOTPRINT_MARGIN_PX) * lngPx, east: fetchBounds.west + (x + w + FOOTPRINT_MARGIN_PX) * lngPx,
     }));
     const outside = (box) => !footprintBoxes.some((b) => box.west < b.east && box.east > b.west && box.south < b.north && box.north > b.south);
     skipBox = backgroundSkip ? (box) => outside(box) || backgroundSkip(box) : outside;
-    let px = 0; for (const r of footprintRows(fp, height, width)) if (r) for (const [a, b] of r) px += b - a;
-    console.log(`[Footprint] ${fp.length} tile(s) on a ${width}×${height} grid: ${px} px (${Math.round((100 * px) / (width * height))}% of the grid); data outside it skipped or fetched coarse.`);
+    let px = 0; for (const r of shapeRows(fp, height, width)) if (r) for (const [a, b] of r) px += b - a;
+    console.log(`[Footprint] ${shapeOf(fp).runs ? 'a corridor' : `${shapeOf(fp).rects.length} tile(s)`} on a ${width}×${height} grid: ${px} px (${Math.round((100 * px) / (width * height))}% of the grid); data outside it skipped or fetched coarse.`);
   }
 
   const { zoom: satelliteZoom, texturePx: satelliteTexturePx } = pickSatelliteTexture(
@@ -2539,7 +2541,7 @@ export const fetchTerrainData = async (
   const treeSpeciesEarly = includeTreeSpeciesEarly(finalBounds);
   // (a footprint: the heights outside it stretched from its edge, before anything shapes the ground: what was fetched
   // coarse or not at all there is never drawn, and the steps near the edge see the edge's own heights)
-  if (fp) fillOutsideFootprint(heightMap, footprintRows(fp, height, width), height, width);
+  if (fp) fillOutsideFootprint(heightMap, shapeRows(fp, height, width), height, width);
 
   // 7. Fetch OSM Data
   let osmFeatures = [];
@@ -2648,7 +2650,7 @@ export const fetchTerrainData = async (
   // (a footprint: the map data kept to it once the roads have shaped the ground, so the previews show what the export
   // builds: roads cut at its edge, buildings by their centre, areas by overlap: services/footprintClip.js)
   if (fp && osmFeatures.length) {
-    const { features, stats } = footprintClipper(finalBounds, { width, height, rects: fp }).clip(osmFeatures);
+    const { features, stats } = footprintClipper(finalBounds, { width, height, ...shapeOf(fp) }).clip(osmFeatures);
     console.log(`[Footprint] map data kept to the footprint: ${osmFeatures.length} feature(s) in, ${stats.kept} kept whole, ${stats.cut} line(s) cut at its edge into ${stats.pieces} piece(s), ${stats.dropped} outside dropped.`);
     osmFeatures = features;
   }
@@ -2677,6 +2679,7 @@ export const fetchTerrainData = async (
     height,
     ...(fp ? { footprint: fp } : {}),
     ...(tiles?.list?.length > 1 ? { tiles } : {}),
+    ...(road?.pts?.length > 1 ? { road } : {}),
     minHeight,
     maxHeight,
     satelliteTextureUrl,
