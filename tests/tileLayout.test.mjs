@@ -48,3 +48,13 @@ test('the web cap holds the export square, any shape', () => {
   assert.equal(layoutGrid(strip, 1024).webOk, true);
   assert.equal(layoutGrid([...strip, { dx: 16 * 1024, dy: 0 }], 1024).webOk, false);
 });
+
+test('a map\'s tiles read back checked; a single map has none', async () => {
+  const { tilesFromTerrain, MAX_TILES } = await import('../services/tileLayout.js');
+  assert.equal(tilesFromTerrain({}), null);
+  assert.equal(tilesFromTerrain({ tiles: { list: [{ dx: 0, dy: 0 }] } }), null);
+  const t = tilesFromTerrain({ tiles: { list: [{ dx: 3, dy: 1 }, { dx: 1, dy: 'x' }], tilePx: 512, anchor: { lat: 1, lng: 2 }, together: false } });
+  assert.deepEqual(t, { list: [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }], tilePx: 512, anchor: { lat: 1, lng: 2 }, together: false, snap: true });
+  const many = { tiles: { list: Array.from({ length: 200 }, (_, i) => ({ dx: i, dy: 0 })), tilePx: 256 } };
+  assert.equal(tilesFromTerrain(many).list.length, MAX_TILES);
+});

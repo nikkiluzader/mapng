@@ -36,3 +36,9 @@ test('buildings by their centre, areas by overlap, points by position', () => {
   ]);
   assert.deepEqual(features.map((f) => f.id).sort(), ['b-in', 'forest', 'tree-in']);
 });
+
+test('a rectangular grid: the footprint read on its own width and height', () => {
+  // 200 x 100 px over 0..2 x 0..1 degrees; the footprint: the west quarter (x < 50)
+  const c = footprintClipper({ west: 0, east: 2, south: 0, north: 1 }, { width: 200, height: 100, rects: [[0, 0, 50, 100]] });
+  assert.equal(c.inside(0.5, 0.2), true); assert.equal(c.inside(0.5, 0.6), false);
+});

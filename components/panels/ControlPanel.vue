@@ -154,8 +154,9 @@
       />
 
       <!-- Background areas (advanced; not with an uploaded elevation file, which picks its own box) -->
+      <!-- (not with several tiles: background areas are drawn on the first tile's box: refs/output/tiles-step2-plan.md) -->
       <BackgroundAreas
-        v-if="store.advancedMode && !uploadedElevationFile"
+        v-if="store.advancedMode && !uploadedElevationFile && store.tiles.length < 2"
         :center="center"
         :resolution="resolution"
         :meters-per-pixel="processingMetersPerPixel"

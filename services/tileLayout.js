@@ -13,6 +13,7 @@
 
 export const WEB_MAX_SIDE = 16384;
 export const SNAP_FRACTION = 0.15;
+export const MAX_TILES = 64;   // (a pasted code or saved project with more is cut to this)
 
 /** A fresh layout: one tile. */
 export const singleTile = () => [{ dx: 0, dy: 0 }];
@@ -94,5 +95,22 @@ export function layoutGrid(tiles, R) {
     width, height, rects, areaPx, overlaps, islands: seen.size < rects.length,
     centerOffset: { x: minX + width / 2, y: -(minY + height / 2) },
     terrainBlock, squareSide, webOk: squareSide <= WEB_MAX_SIDE,
+  };
+}
+
+/**
+ * The tiles a map was made from (terrainData.tiles, set by Generate), checked: { list, tilePx, anchor, together, snap }
+ * with tile 0 at the origin, or null for a single square (old maps, one tile).
+ */
+export function tilesFromTerrain(td) {
+  const t = td?.tiles;
+  if (!t || !Array.isArray(t.list) || t.list.length < 2) return null;
+  const list = t.list.slice(0, MAX_TILES).map((p) => ({ dx: Number(p?.dx) || 0, dy: Number(p?.dy) || 0 }));
+  list[0] = { dx: 0, dy: 0 };
+  const lat = Number(t.anchor?.lat); const lng = Number(t.anchor?.lng);
+  return {
+    list, tilePx: Math.max(1, Math.round(Number(t.tilePx) || 1024)),
+    anchor: Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null,
+    together: t.together !== false, snap: t.snap !== false,
   };
 }

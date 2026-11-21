@@ -6,6 +6,7 @@ import { withRegionalWidths } from './regionalWidths.js';
 import { loadDataImage } from './dataCache.js';
 import { backgroundLookup, filterFeaturesByBackground, makeSkipBox, keptBoxes, tileLatLngBox, rawWeightLookup } from './backgroundMask.js';
 import { footprintRows, fillOutsideFootprint } from './batchShape.js';
+import { footprintClipper } from './footprintClip.js';
 import { fetchOSMData, getLastOSMRequestInfo, getOSMQueryParameters } from "./osm.js";
 import { fetchWord, replayingSources, gpxzUsable } from './sourceWording.js';
 import { parseRasterOrGridElevationFile, parseTifFile, parseTifFiles, parseGridFiles } from "./tifLoader.js";
@@ -2016,6 +2017,8 @@ export const fetchTerrainData = async (
     // the north). Data outside it is skipped or fetched coarse, as in a background area; its heights are stretched
     // from the footprint's edge; the map keeps it (terrainData.footprint) for the previews and the export.
     footprint = null,
+    // the tiles the map was made from (App.vue; services/tileLayout.js tilesFromTerrain): kept with the map as given
+    tiles = null,
   } = generationOptions || {};
   // the grid: `resolution` pixels a side, or { width, height } for a rectangle (a footprint's bounding box: tiles in
   // step 1, refs/output/tiles-plan.md). Sizes that follow the grid take its long side.
@@ -2642,6 +2645,14 @@ export const fetchTerrainData = async (
     console.info(`[Terrain] No smoothing areas: ${restored.cells} cells kept as downloaded (${restored.eased} eased at the edges).`);
   }
 
+  // (a footprint: the map data kept to it once the roads have shaped the ground, so the previews show what the export
+  // builds: roads cut at its edge, buildings by their centre, areas by overlap: services/footprintClip.js)
+  if (fp && osmFeatures.length) {
+    const { features, stats } = footprintClipper(finalBounds, { width, height, rects: fp }).clip(osmFeatures);
+    console.log(`[Footprint] map data kept to the footprint: ${osmFeatures.length} feature(s) in, ${stats.kept} kept whole, ${stats.cut} line(s) cut at its edge into ${stats.pieces} piece(s), ${stats.dropped} outside dropped.`);
+    osmFeatures = features;
+  }
+
   // 6. Calculate Min/Max
   let minHeight = Infinity;
   let maxHeight = -Infinity;
@@ -2665,6 +2676,7 @@ export const fetchTerrainData = async (
     width,
     height,
     ...(fp ? { footprint: fp } : {}),
+    ...(tiles?.list?.length > 1 ? { tiles } : {}),
     minHeight,
     maxHeight,
     satelliteTextureUrl,

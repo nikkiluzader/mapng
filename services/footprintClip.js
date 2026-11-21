@@ -11,14 +11,17 @@ import { footprintRows, inFootprint } from './batchShape.js';
 
 const LINE_TYPES = new Set(['road', 'railway', 'barrier', 'power_line', 'waterway', 'path', 'cliff', 'wall', 'pier']);
 
-/** The clipper for one footprint: { inside(lat, lng), clip(features) -> { features, stats } }. */
+/**
+ * The clipper for one footprint: { inside(lat, lng), clip(features) -> { features, stats } }. shape: { size, rects } on
+ * a square grid, or { width, height, rects } on a rectangle (Generate's grid).
+ */
 export function footprintClipper(bounds, shape) {
-  const N = shape.size;
-  const rows = footprintRows(shape.rects, N);
-  const sx = N / (bounds.east - bounds.west); const sy = N / (bounds.north - bounds.south);
+  const W = shape.width ?? shape.size; const H = shape.height ?? shape.size;
+  const rows = footprintRows(shape.rects, H, W);
+  const sx = W / (bounds.east - bounds.west); const sy = H / (bounds.north - bounds.south);
   const inside = (lat, lng) => {
     const x = Math.floor((lng - bounds.west) * sx); const y = Math.floor((bounds.north - lat) * sy);
-    return x >= 0 && y >= 0 && x < N && y < N && inFootprint(rows, x, y);
+    return x >= 0 && y >= 0 && x < W && y < H && inFootprint(rows, x, y);
   };
   // the footprint's own box per rect (lat/lng), for the areas' overlap test
   const rectBoxes = shape.rects.map(([x, y, w, h]) => ({

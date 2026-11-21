@@ -1020,7 +1020,8 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         // (all three textures, every time: services/textureOnDemand.js)
         ...texturesToGenerate(baseTexture.value),
         // (a plain copy: it goes to a worker / the desktop app)
-        ...(store.backgroundActive ? { backgroundMask: JSON.parse(JSON.stringify(store.backgroundMask)) } : {}),
+        // (not with several tiles: the mask belongs to the first tile's box)
+        ...(store.backgroundActive && store.tiles.length < 2 ? { backgroundMask: JSON.parse(JSON.stringify(store.backgroundMask)) } : {}),
         // (the desktop app keeps these with the level's project, so Modify
         // brings the points back; they never change the terrain made)
         ...(desktopApp && store.points.length ? { points: JSON.parse(JSON.stringify(store.points)) } : {}),
@@ -1038,6 +1039,9 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         genCenter = { lat: center.value.lat + (g.centerOffset.y * mpp) / 111320, lng: center.value.lng + (g.centerOffset.x * mpp) / mLng };
         genSize = g.terrainBlock ? g.width : { width: g.width, height: g.height };
         if (!g.terrainBlock && g.areaPx < g.width * g.height) generationOptions.footprint = g.rects;
+        // (what the tiles were: the previews, share codes and the desktop's Modify read them back; plain numbers, as
+        // this goes to a worker or the desktop app)
+        generationOptions.tiles = { list: store.tiles.map((t) => ({ dx: t.dx, dy: t.dy })), tilePx: R, anchor: { lat: center.value.lat, lng: center.value.lng }, together: !!store.tilesTogether, snap: !!store.tilesSnap };
         console.log(`[Tiles] ${store.tiles.length} tiles: a ${g.width}×${g.height} grid, ${g.terrainBlock ? 'a power-of-two square (TerrainBlock)' : `ground models${generationOptions.footprint ? ', footprint ' + g.areaPx + ' px' : ''}`}${g.overlaps ? ', overlaps fetched once' : ''}${g.islands ? ', islands' : ''}.`);
       }
       // (the desktop app fetches and processes in a Node process: no 4 GB
@@ -1049,7 +1053,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         : await fetchTerrainData(genCenter, genSize, fetchOSM, useUSGS, useGPXZ, useKRON86, gpxzApiKey, undefined, applyLoadingUpdate, signal, generationOptions);
     }
     // (the export leaves objects out of the same background areas)
-    if (data && store.backgroundActive && !uploadedElevationFile.value) data.backgroundMask = JSON.parse(JSON.stringify(store.backgroundMask));
+    if (data && store.backgroundActive && !uploadedElevationFile.value && store.tiles.length < 2) data.backgroundMask = JSON.parse(JSON.stringify(store.backgroundMask));
     markJobEnd();
     terrainData.value = data;
     lastGenerationKey.value = requestKey;
