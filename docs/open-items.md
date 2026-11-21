@@ -30,6 +30,8 @@ As of 2026-11-20 night (late):
   - **Now: the rest of step 2**, planned part by part in refs/output/tiles-step2-plan.md: A the tiled map says what it
     is, B map data clipped at Generate, C previews show the footprint, D share codes / saved settings / Modify,
     E tests (drag, desktop, languages, game), F step 2d (edge skirt, buildings at the edge, masked minimap).
+  - **Road mode** (user 2026-11-21): pick a road, follow it, a width either side; plan refs/output/road-mode-plan.md.
+    Built after part A-B of step 2 (shared footprint code), alongside C.
   - Then step 3 (Batch mode retired) and step 4 (a true width x height export; speed for big shapes).
 
 ## Now: Fizz_Mechanic's 0.3.3 list (2026-11-19; on hold until after the 0.3.5 release, user 2026-11-20)
