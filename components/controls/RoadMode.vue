@@ -22,11 +22,9 @@
     <template v-if="grid">
       <p class="text-micro text-gray-600 dark:text-gray-300" data-testid="road-grid">{{ t('road.gridLine', { km: (stretchM / 1000).toFixed(2), w: grid.width, h: grid.height, area: areaKm }) }}</p>
       <p class="flex items-start gap-1.5 text-micro leading-snug text-amber-700 dark:text-amber-300"><AlertTriangle :size="11" class="shrink-0 mt-px" /><span>{{ t('tiles.models') }}</span></p>
-      <p v-if="!grid.webOk && !isDesktop" class="flex items-start gap-1.5 text-micro font-medium leading-snug text-red-600 dark:text-red-400" data-testid="road-web-cap">
-        <AlertTriangle :size="11" class="shrink-0 mt-px" /><span>{{ t('road.webCap', { max: 16384 }) }}</span>
-      </p>
-      <p v-else-if="!grid.webOk" class="flex items-start gap-1.5 text-micro leading-snug text-amber-700 dark:text-amber-300">
-        <AlertTriangle :size="11" class="shrink-0 mt-px" /><span>{{ t('tiles.desktopWarn', { max: 16384 }) }}</span>
+      <!-- (any platform for now: the export pads the shape to its power-of-two square: refs/output/chunked-pipeline-plan.md) -->
+      <p v-if="!grid.webOk" class="flex items-start gap-1.5 text-micro font-medium leading-snug text-red-600 dark:text-red-400" data-testid="road-web-cap">
+        <AlertTriangle :size="11" class="shrink-0 mt-px" /><span>{{ t('road.webCap', { side: grid.squareSide, max: 16384 }) }}</span>
       </p>
     </template>
     <BaseButton v-if="store.road" size="sm" variant="secondary" data-testid="road-clear" :disabled="disabled" @click="clearRoad">{{ t('road.clear') }}</BaseButton>

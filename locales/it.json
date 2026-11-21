@@ -2390,7 +2390,7 @@
     "terrain": "Un quadrato con lato potenza di due: costruito sul terreno di BeamNG, come di solito.",
     "models": "Non è un quadrato con lato potenza di due: il terreno è costruito con modelli 3D (sperimentale). Si carica più lentamente e non ha erba.",
     "islands": "Alcuni riquadri non toccano gli altri: diventano isole nel livello.",
-    "webCap": "Troppo grande per il browser: il livello può essere al massimo di {max} px. Usa meno riquadri, una risoluzione più grossolana o l'app desktop.",
+    "webCap": "Questa forma non si può ancora costruire: viene costruita su tutto il rettangolo che la contiene, che misurerebbe {side} px (al massimo {max}), anche se la sua area è ben sotto il limite. La costruzione di forme lunghe e diagonali a pezzi è in corso; nel frattempo accorcia o raddrizza il tratto, usa meno riquadri o scegli una risoluzione più grossolana.",
     "desktopWarn": "Oltre {max} px: il livello potrebbe essere troppo grande perché il gioco lo carichi.",
     "clear": "Torna a un riquadro"
   },
@@ -2404,7 +2404,7 @@
     "width": "Larghezza per lato",
     "widthValue": "{m} m",
     "gridLine": "{km} km di strada · mappa {w} × {h} px · {area} km²",
-    "webCap": "Troppo grande per il browser: il livello può essere al massimo di {max} px. Accorcia il tratto, restringilo, scegli una risoluzione più grossolana o usa l'app desktop.",
+    "webCap": "Questa forma non si può ancora costruire: viene costruita su tutto il rettangolo che la contiene, che misurerebbe {side} px (al massimo {max}), anche se la sua area è ben sotto il limite. La costruzione di forme lunghe e diagonali a pezzi è in corso; nel frattempo accorcia o raddrizza il tratto, usa meno riquadri o scegli una risoluzione più grossolana.",
     "clear": "Scegli un'altra strada",
     "unnamed": "Strada senza nome",
     "start": "Inizio",

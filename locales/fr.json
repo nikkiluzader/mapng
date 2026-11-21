@@ -2390,7 +2390,7 @@
     "terrain": "Un carré de côté puissance de deux : construit sur le terrain BeamNG, comme d'habitude.",
     "models": "Pas un carré de côté puissance de deux : le sol est construit en modèles 3D (expérimental). Il se charge plus lentement et n'a pas d'herbe.",
     "islands": "Certaines tuiles ne touchent pas les autres : elles deviennent des îles dans le niveau.",
-    "webCap": "Trop grand pour le navigateur : le niveau peut faire au plus {max} px de côté. Utilisez moins de tuiles, une résolution plus grossière ou l'application de bureau.",
+    "webCap": "Cette forme ne peut pas encore être construite : elle est construite sur tout son rectangle englobant, qui ferait {side} px de côté (au plus {max}), bien que sa propre surface soit loin de la limite. La construction des formes longues et en diagonale par morceaux est en cours ; d'ici là, raccourcissez ou redressez le tronçon, utilisez moins de tuiles ou choisissez une résolution plus grossière.",
     "desktopWarn": "Au-delà de {max} px : le niveau risque d'être trop grand pour que le jeu le charge.",
     "clear": "Revenir à une tuile"
   },
@@ -2404,7 +2404,7 @@
     "width": "Largeur de chaque côté",
     "widthValue": "{m} m",
     "gridLine": "{km} km de route · carte {w} × {h} px · {area} km²",
-    "webCap": "Trop grand pour le navigateur : le niveau peut faire au plus {max} px de côté. Raccourcissez le tronçon, rétrécissez-le, choisissez une résolution plus grossière ou utilisez l'application de bureau.",
+    "webCap": "Cette forme ne peut pas encore être construite : elle est construite sur tout son rectangle englobant, qui ferait {side} px de côté (au plus {max}), bien que sa propre surface soit loin de la limite. La construction des formes longues et en diagonale par morceaux est en cours ; d'ici là, raccourcissez ou redressez le tronçon, utilisez moins de tuiles ou choisissez une résolution plus grossière.",
     "clear": "Choisir une autre route",
     "unnamed": "Route sans nom",
     "start": "Début",

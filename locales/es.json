@@ -2390,7 +2390,7 @@
     "terrain": "Un cuadrado de lado potencia de dos: se construye sobre terreno de BeamNG, como siempre.",
     "models": "No es un cuadrado de lado potencia de dos: el suelo se construye con modelos 3D (experimental). Carga más lento y no tiene hierba.",
     "islands": "Algunas teselas no tocan a las demás: serán islas en el nivel.",
-    "webCap": "Demasiado grande para el navegador: el nivel puede medir como máximo {max} px. Usa menos teselas, una resolución más gruesa o la aplicación de escritorio.",
+    "webCap": "Esta forma aún no se puede construir: se construye sobre todo su rectángulo envolvente, que mediría {side} px (como máximo {max}), aunque su propia área está muy por debajo del límite. La construcción de formas largas y diagonales por partes está en marcha; hasta entonces, acorta o endereza el tramo, usa menos teselas o elige una resolución más gruesa.",
     "desktopWarn": "Más de {max} px: el nivel puede ser demasiado grande para que el juego lo cargue.",
     "clear": "Volver a una tesela"
   },
@@ -2404,7 +2404,7 @@
     "width": "Ancho a cada lado",
     "widthValue": "{m} m",
     "gridLine": "{km} km de carretera · mapa {w} × {h} px · {area} km²",
-    "webCap": "Demasiado grande para el navegador: el nivel puede medir como máximo {max} px. Acorta el tramo, estréchalo, elige una resolución más gruesa o usa la aplicación de escritorio.",
+    "webCap": "Esta forma aún no se puede construir: se construye sobre todo su rectángulo envolvente, que mediría {side} px (como máximo {max}), aunque su propia área está muy por debajo del límite. La construcción de formas largas y diagonales por partes está en marcha; hasta entonces, acorta o endereza el tramo, usa menos teselas o elige una resolución más gruesa.",
     "clear": "Elegir otra carretera",
     "unnamed": "Carretera sin nombre",
     "start": "Inicio",

@@ -32,7 +32,10 @@ As of 2026-11-20 night (late):
     E tests (drag, desktop, languages, game), F step 2d (edge skirt, buildings at the edge, masked minimap).
   - **Road mode** (user 2026-11-21): pick a road, follow it, a width either side; plan refs/output/road-mode-plan.md.
     Built after part A-B of step 2 (shared footprint code), alongside C.
-  - Then step 3 (Batch mode retired) and step 4 (a true width x height export; speed for big shapes).
+  - **Chunked pipeline** (user 2026-11-21, after a 23 km diagonal road was refused): long and diagonal shapes built in
+    chunks along the footprint, merged into one level; plan refs/output/chunked-pipeline-plan.md. Comes first now:
+    road mode is not useful for long roads without it.
+  - Then step 3 (Batch mode retired) and step 4 (speed for big shapes).
 
 ## Now: Fizz_Mechanic's 0.3.3 list (2026-11-19; on hold until after the 0.3.5 release, user 2026-11-20)
 

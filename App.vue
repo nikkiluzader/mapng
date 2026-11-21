@@ -1041,7 +1041,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         const mpp = Number(processingMpp || 1);
         const g = corridorGrid(stretchBetween(r.pts, r.startM, r.endM), store.roadHalfWidthM, mpp);
         let side = 1; while (side < Math.max(g.width, g.height)) side *= 2;
-        if (side > WEB_MAX_SIDE && !desktopApp) throw new Error(t('road.webCap', { max: WEB_MAX_SIDE }));
+        if (side > WEB_MAX_SIDE) throw new Error(t('road.webCap', { side, max: WEB_MAX_SIDE }));
         genCenter = g.center; genSize = { width: g.width, height: g.height };
         generationOptions.footprint = { runs: g.runs };
         generationOptions.road = { pts: stretchBetween(r.pts, r.startM, r.endM), halfWidthM: g.halfWidthM, names: r.names || [], refs: r.refs || [], highway: r.highway || 'road' };
@@ -1050,7 +1050,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         const R = Number(resolution.value);
         const mpp = Number(processingMpp || 1);
         const g = layoutGrid(store.tiles.map((t) => ({ dx: Math.round(t.dx * R), dy: Math.round(t.dy * R) })), R);
-        if (!g.webOk && !desktopApp) throw new Error(t('tiles.webCap', { max: WEB_MAX_SIDE }));
+        if (!g.webOk) throw new Error(t('tiles.webCap', { side: g.squareSide, max: WEB_MAX_SIDE }));
         const mLng = 111320 * Math.cos((center.value.lat * Math.PI) / 180);
         genCenter = { lat: center.value.lat + (g.centerOffset.y * mpp) / 111320, lng: center.value.lng + (g.centerOffset.x * mpp) / mLng };
         genSize = g.terrainBlock ? g.width : { width: g.width, height: g.height };

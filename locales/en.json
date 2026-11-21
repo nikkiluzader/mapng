@@ -2390,7 +2390,7 @@
     "terrain": "A square with a power-of-two side: built on BeamNG terrain, as usual.",
     "models": "Not a power-of-two square: the ground is built as 3D models (experimental). It loads slower and has no grass cover.",
     "islands": "Some tiles don't touch the others: they become islands in the level.",
-    "webCap": "Too big for the browser: the level can be at most {max} px across. Use fewer tiles, a coarser resolution, or the desktop app.",
+    "webCap": "This shape can't be built yet: it is built over its whole bounding box, which would be {side} px across (at most {max}), though its own area is well under the limit. Building long and diagonal shapes in pieces is in the works; until then, shorten or straighten the stretch, use fewer tiles, or choose a coarser resolution.",
     "desktopWarn": "Past {max} px across: the level may be too big for the game to load.",
     "clear": "Back to one tile"
   },
@@ -2404,7 +2404,7 @@
     "width": "Width either side",
     "widthValue": "{m} m",
     "gridLine": "{km} km of road · map {w} × {h} px · {area} km²",
-    "webCap": "Too big for the browser: the level can be at most {max} px across. Shorten the stretch, narrow it, choose a coarser resolution, or use the desktop app.",
+    "webCap": "This shape can't be built yet: it is built over its whole bounding box, which would be {side} px across (at most {max}), though its own area is well under the limit. Building long and diagonal shapes in pieces is in the works; until then, shorten or straighten the stretch, use fewer tiles, or choose a coarser resolution.",
     "clear": "Pick another road",
     "unnamed": "Unnamed road",
     "start": "Start",

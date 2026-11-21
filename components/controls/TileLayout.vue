@@ -36,11 +36,9 @@
         <AlertTriangle :size="11" class="shrink-0 mt-px" /><span>{{ t('tiles.models') }}</span>
       </p>
       <p v-if="grid.islands" class="text-micro text-gray-500 dark:text-gray-400">{{ t('tiles.islands') }}</p>
-      <p v-if="!grid.webOk && !isDesktop" class="flex items-start gap-1.5 text-micro font-medium leading-snug text-red-600 dark:text-red-400" data-testid="tile-web-cap">
-        <AlertTriangle :size="11" class="shrink-0 mt-px" /><span>{{ t('tiles.webCap', { max: WEB_MAX_SIDE }) }}</span>
-      </p>
-      <p v-else-if="!grid.webOk" class="flex items-start gap-1.5 text-micro leading-snug text-amber-700 dark:text-amber-300" data-testid="tile-desktop-warn">
-        <AlertTriangle :size="11" class="shrink-0 mt-px" /><span>{{ t('tiles.desktopWarn', { max: WEB_MAX_SIDE }) }}</span>
+      <!-- (any platform for now: the export pads the shape to its power-of-two square: refs/output/chunked-pipeline-plan.md) -->
+      <p v-if="!grid.webOk" class="flex items-start gap-1.5 text-micro font-medium leading-snug text-red-600 dark:text-red-400" data-testid="tile-web-cap">
+        <AlertTriangle :size="11" class="shrink-0 mt-px" /><span>{{ t('tiles.webCap', { side: grid.squareSide, max: WEB_MAX_SIDE }) }}</span>
       </p>
       <BaseButton size="sm" variant="secondary" data-testid="tile-clear" :disabled="disabled" @click="clearTiles">{{ t('tiles.clear') }}</BaseButton>
     </template>
