@@ -10,6 +10,7 @@ import { exportTer } from './exportTer.js';
 import { buildGroundTiles } from './groundMesh.js';
 import { footprintRows, inFootprint, keepSquareFor } from './batchShape.js';
 import { footprintClipper } from './footprintClip.js';
+import { padTerrainToSquare } from './padToSquare.js';
 import { buildTerrainMaterials, isVegetationColor } from './osmTerrainMaterials.js';
 import { createOSMGroup, createSurroundingMeshes, SCENE_SIZE } from './export3d.js';
 import { planPools, poolFootprints, poolWaterBlocks, squareOpens, POOL_WATER_BLOCK } from './pools.js';
@@ -13394,6 +13395,14 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     // The structure solver builds bridges, decks and the terrain around them
     // by default; structureSolver: 'v1' keeps today's bridge passes.
     const structureSolver = options.structureSolver ?? 'v2';
+    // a rectangular map, or one with a footprint (tiles in step 1): made square for the export, the shape kept to
+    // the rectangle or the footprint (services/padToSquare.js)
+    if (terrainData && (terrainData.width !== terrainData.height || terrainData.footprint?.length) && !options.groundShape) {
+      const padded = await padTerrainToSquare(terrainData, { footprint: terrainData.footprint || null, log: (m) => console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Shape: ${m}.`) });
+      terrainData = padded.terrainData;
+      if (padded.shape) options = { ...options, groundShape: padded.shape };
+      if (padded.padded) center = { lat: (terrainData.bounds.north + terrainData.bounds.south) / 2, lng: (terrainData.bounds.east + terrainData.bounds.west) / 2 };
+    }
     // (a shaped level's ground is models: any shape but a full square is no TerrainBlock)
     const shaped = Array.isArray(options.groundShape?.rects) && options.groundShape.rects.length > 0;
     return await runBeamNGLevelExport(terrainData, center, { ...options, structureSolver, ...(shaped ? { groundAsModels: true } : {}) }, jobLog);

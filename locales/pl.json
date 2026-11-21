@@ -2366,5 +2366,27 @@
       "updates": "Aktualizacje aplikacji (GitHub)",
       "analytics": "Liczenie odsłon (tylko strona)"
     }
+  },
+  "tiles": {
+    "title": "Kafelki",
+    "count": "Kafelki: {n}",
+    "add": "Dodaj kafelek",
+    "oneHint": "Jeden kafelek daje zwykłą kwadratową mapę. Dodaj kafelki, aby objąć dłuższy lub nieregularny obszar jedną mapą.",
+    "arrange": "Ułożenie kafelków",
+    "together": "Trzymaj razem",
+    "free": "Przesuwaj swobodnie",
+    "togetherHint": "Kafelki leżą obok siebie na siatce; przeciągnij uchwyt kafelka na mapie, aby przenieść go w inne miejsce.",
+    "freeHint": "Przeciągnij uchwyt kafelka na mapie, aby położyć go w dowolnym miejscu. Nakładające się części są pobierane raz.",
+    "snap": "Przyciągaj do sąsiadów",
+    "list": "Kafelki",
+    "tile": "Kafelek {n}",
+    "remove": "Usuń kafelek {n}",
+    "gridLine": "Mapa: {w} × {h} px, {km} km² kafelków",
+    "terrain": "Kwadrat o boku będącym potęgą dwójki: budowany na terenie BeamNG, jak zwykle.",
+    "models": "To nie kwadrat o boku będącym potęgą dwójki: podłoże jest budowane z modeli 3D (eksperymentalne). Wczytuje się wolniej i nie ma trawy.",
+    "islands": "Niektóre kafelki nie stykają się z innymi: staną się wyspami w poziomie.",
+    "webCap": "Za duże dla przeglądarki: poziom może mieć najwyżej {max} px szerokości. Użyj mniej kafelków, grubszej rozdzielczości lub aplikacji desktopowej.",
+    "desktopWarn": "Ponad {max} px: poziom może być za duży, by gra go wczytała.",
+    "clear": "Wróć do jednego kafelka"
   }
 }

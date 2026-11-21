@@ -2366,5 +2366,27 @@
       "updates": "Actualizaciones de la aplicación (GitHub)",
       "analytics": "Recuento de visitas (solo el sitio web)"
     }
+  },
+  "tiles": {
+    "title": "Teselas",
+    "count": "{n} tesela | {n} teselas",
+    "add": "Añadir tesela",
+    "oneHint": "Una tesela da el mapa cuadrado habitual. Añade teselas para cubrir una zona más larga o irregular como un solo mapa.",
+    "arrange": "Cómo se colocan las teselas",
+    "together": "Mantener juntas",
+    "free": "Mover libremente",
+    "togetherHint": "Las teselas van una al lado de otra en una cuadrícula; arrastra el asa de una tesela en el mapa para moverla a otro sitio.",
+    "freeHint": "Arrastra el asa de una tesela en el mapa para ponerla donde quieras. Los solapes se descargan una sola vez.",
+    "snap": "Ajustar a las vecinas",
+    "list": "Teselas",
+    "tile": "Tesela {n}",
+    "remove": "Quitar la tesela {n}",
+    "gridLine": "Mapa: {w} × {h} px, {km} km² de teselas",
+    "terrain": "Un cuadrado de lado potencia de dos: se construye sobre terreno de BeamNG, como siempre.",
+    "models": "No es un cuadrado de lado potencia de dos: el suelo se construye con modelos 3D (experimental). Carga más lento y no tiene hierba.",
+    "islands": "Algunas teselas no tocan a las demás: serán islas en el nivel.",
+    "webCap": "Demasiado grande para el navegador: el nivel puede medir como máximo {max} px. Usa menos teselas, una resolución más gruesa o la aplicación de escritorio.",
+    "desktopWarn": "Más de {max} px: el nivel puede ser demasiado grande para que el juego lo cargue.",
+    "clear": "Volver a una tesela"
   }
 }

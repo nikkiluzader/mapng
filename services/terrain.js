@@ -5,6 +5,7 @@ import { withMeasuredWidths } from './satRoadWidth.js';
 import { withRegionalWidths } from './regionalWidths.js';
 import { loadDataImage } from './dataCache.js';
 import { backgroundLookup, filterFeaturesByBackground, makeSkipBox, keptBoxes, tileLatLngBox, rawWeightLookup } from './backgroundMask.js';
+import { footprintRows, fillOutsideFootprint } from './batchShape.js';
 import { fetchOSMData, getLastOSMRequestInfo, getOSMQueryParameters } from "./osm.js";
 import { fetchWord, replayingSources, gpxzUsable } from './sourceWording.js';
 import { parseRasterOrGridElevationFile, parseTifFile, parseTifFiles, parseGridFiles } from "./tifLoader.js";
@@ -713,12 +714,13 @@ const getSatelliteZoomForProcessingMpp = (processingMetersPerPixel = 1, textureS
  * getBaseTextureSize(grid) pixels (2× up to 4096 grids), and the zoom is the
  * coarsest that still carries that much detail.
  */
-const pickSatelliteTexture = (fetchBounds, processingMetersPerPixel, gridSize) => {
+const pickSatelliteTexture = (fetchBounds, processingMetersPerPixel, gridSize, tall = false) => {
   const texturePx = getBaseTextureSize(gridSize);
   const zoom = clampSatelliteZoomForOutput(
     fetchBounds,
     getSatelliteZoomForProcessingMpp(processingMetersPerPixel, texturePx / Math.max(1, gridSize)),
     texturePx,
+    tall,
   );
   return { zoom, texturePx };
 };
@@ -775,10 +777,13 @@ const SAT_TEXTURE_MAX_SIZE = 8192;
  * 52°N) replaces z17's 75×75-tile / ~1.4 GB mosaic with 38×38 tiles at
  * ~370 MB — identical output quality. Never raises the zoom.
  */
-const clampSatelliteZoomForOutput = (fetchBounds, requestedZoom, outputPx) => {
+const clampSatelliteZoomForOutput = (fetchBounds, requestedZoom, outputPx, tall = false) => {
   const outPx = Math.min(Number(outputPx) || SAT_TEXTURE_MAX_SIZE, SAT_TEXTURE_MAX_SIZE);
   const latRad = ((fetchBounds.north + fetchBounds.south) / 2) * Math.PI / 180;
-  const widthMeters = Math.abs(fetchBounds.east - fetchBounds.west) * 111320 * Math.cos(latRad);
+  // (the texture's long side spans the grid's long side: north-south on a tall grid)
+  const widthMeters = tall
+    ? Math.abs(fetchBounds.north - fetchBounds.south) * 111320
+    : Math.abs(fetchBounds.east - fetchBounds.west) * 111320 * Math.cos(latRad);
   if (!(widthMeters > 0) || !(outPx > 0)) return requestedZoom;
   const neededMpp = widthMeters / outPx;
   // Web-mercator ground resolution at zoom z: 156543.03392 · cos(lat) / 2^z.
@@ -2007,9 +2012,21 @@ export const fetchTerrainData = async (
     smoothRoads = true,
     // background areas (backgroundMask.js): no objects there, data at lower detail
     backgroundMask = null,
+    // a footprint (tiles in step 1, services/batchShape.js): rects [[x, y, w, h]...] on this grid's pixels (rows from
+    // the north). Data outside it is skipped or fetched coarse, as in a background area; its heights are stretched
+    // from the footprint's edge; the map keeps it (terrainData.footprint) for the previews and the export.
+    footprint = null,
   } = generationOptions || {};
-  const backgroundAt = backgroundMask ? backgroundLookup(backgroundMask, { n: 1024, metersAcross: resolution * (Number(processingMetersPerPixel) || 1) }) : null;
-  const skipBox = backgroundAt ? makeSkipBox(backgroundAt, backgroundMask.bounds) : null;
+  // the grid: `resolution` pixels a side, or { width, height } for a rectangle (a footprint's bounding box: tiles in
+  // step 1, refs/output/tiles-plan.md). Sizes that follow the grid take its long side.
+  const gridW = typeof resolution === 'object' ? Math.round(Number(resolution.width)) : Number(resolution);
+  const gridH = typeof resolution === 'object' ? Math.round(Number(resolution.height)) : Number(resolution);
+  const longSide = Math.max(gridW, gridH);
+  const backgroundAt = backgroundMask ? backgroundLookup(backgroundMask, { n: 1024, metersAcross: longSide * (Number(processingMetersPerPixel) || 1) }) : null;
+  const backgroundSkip = backgroundAt ? makeSkipBox(backgroundAt, backgroundMask.bounds) : null;
+  const fp = Array.isArray(footprint) && footprint.length ? footprint : null;
+  let skipBox = backgroundSkip;   // (with a footprint: set once the bounds are known)
+  let footprintBoxes = null;
   // Normalize longitude to handle world wrapping
   const normalizedCenter = {
     lat: center.lat,
@@ -2020,8 +2037,8 @@ export const fetchTerrainData = async (
     : 1;
   // 1. Define Target Metric Grid
   // Resolution is output pixels; meters-per-pixel controls world coverage.
-  const width = resolution;
-  const height = resolution;
+  const width = gridW;
+  const height = gridH;
 
   onProgress?.("Calculating metric bounds...");
 
@@ -2037,10 +2054,26 @@ export const fetchTerrainData = async (
         height * effectiveMetersPerPixel,
       );
 
+  // the footprint as lat/lng boxes (a margin of FOOTPRINT_MARGIN_PX round each tile, so a source tile is skipped only
+  // when it is clearly outside): whatever lies wholly outside every box is skipped or fetched coarse
+  if (fp) {
+    const FOOTPRINT_MARGIN_PX = 16;
+    const latPx = (fetchBounds.north - fetchBounds.south) / height; const lngPx = (fetchBounds.east - fetchBounds.west) / width;
+    footprintBoxes = fp.map(([x, y, w, h]) => ({
+      north: fetchBounds.north - (y - FOOTPRINT_MARGIN_PX) * latPx, south: fetchBounds.north - (y + h + FOOTPRINT_MARGIN_PX) * latPx,
+      west: fetchBounds.west + (x - FOOTPRINT_MARGIN_PX) * lngPx, east: fetchBounds.west + (x + w + FOOTPRINT_MARGIN_PX) * lngPx,
+    }));
+    const outside = (box) => !footprintBoxes.some((b) => box.west < b.east && box.east > b.west && box.south < b.north && box.north > b.south);
+    skipBox = backgroundSkip ? (box) => outside(box) || backgroundSkip(box) : outside;
+    let px = 0; for (const r of footprintRows(fp, height, width)) if (r) for (const [a, b] of r) px += b - a;
+    console.log(`[Footprint] ${fp.length} tile(s) on a ${width}×${height} grid: ${px} px (${Math.round((100 * px) / (width * height))}% of the grid); data outside it skipped or fetched coarse.`);
+  }
+
   const { zoom: satelliteZoom, texturePx: satelliteTexturePx } = pickSatelliteTexture(
     fetchBounds,
     effectiveMetersPerPixel,
-    width,
+    Math.max(width, height),
+    height > width,
   );
 
   // 2. Try GPXZ / USGS
@@ -2496,11 +2529,14 @@ export const fetchTerrainData = async (
     undefined, // expandFilledGaps (defaults to true)
     flat,
     null, // gapFillData
-    { width: satelliteTexturePx, height: Math.round(satelliteTexturePx * height / width) },
+    (height > width ? { width: Math.round(satelliteTexturePx * width / height), height: satelliteTexturePx } : { width: satelliteTexturePx, height: Math.round(satelliteTexturePx * height / width) }),
   );
   // which trees grow here (iNaturalist), asked now, beside the map data and the satellite road widths: another
   // server, at its own pace as before, and needing only the bounds; one after another it added 14 s to a city
   const treeSpeciesEarly = includeTreeSpeciesEarly(finalBounds);
+  // (a footprint: the heights outside it stretched from its edge, before anything shapes the ground: what was fetched
+  // coarse or not at all there is never drawn, and the steps near the edge see the edge's own heights)
+  if (fp) fillOutsideFootprint(heightMap, footprintRows(fp, height, width), height, width);
 
   // 7. Fetch OSM Data
   let osmFeatures = [];
@@ -2511,7 +2547,7 @@ export const fetchTerrainData = async (
     osmFeatures = shapeRoads(await fetchOSMData(finalBounds, {
       onStatus: onProgress, signal,
       // (background areas: map tiles wholly inside them skipped, Overpass asked for the kept parts only)
-      ...(backgroundAt ? { skipBox, keptBoxes: keptBoxes(backgroundAt, backgroundMask.bounds) } : {}),
+      ...(fp ? { skipBox, keptBoxes: footprintBoxes } : backgroundAt ? { skipBox, keptBoxes: keptBoxes(backgroundAt, backgroundMask.bounds) } : {}),
     }));
     // (Map data > Measure road widths: paved widths read off the satellite picture, before anything is drawn or shaped)
     osmFeatures = await withRegionalWidths(osmFeatures, finalBounds);
@@ -2530,7 +2566,7 @@ export const fetchTerrainData = async (
     };
   }
   // what covers the ground (ESA WorldCover), with the map data
-  const landCoverRead = { bounds: finalBounds, width, processingMetersPerPixel: effectiveMetersPerPixel };
+  const landCoverRead = { bounds: finalBounds, width, height, processingMetersPerPixel: effectiveMetersPerPixel };
   await attachLandCover(landCoverRead, { onProgress: (m) => onProgress?.(m), signal });
 
   // The shaping steps below run in one go on the page's own thread: without a
@@ -2582,7 +2618,7 @@ export const fetchTerrainData = async (
   // there before the roads are smoothed in, put back after (eased in at the
   // edges); the rest of the map is smoothed as usual
   const rawAreas = !flat && !raw && smoothRoads && osmFeatures.length > 0 && backgroundMask
-    ? rawWeightLookup(backgroundMask, { n: 1024, metersAcross: resolution * (Number(processingMetersPerPixel) || 1) })
+    ? rawWeightLookup(backgroundMask, { n: 1024, metersAcross: longSide * (Number(processingMetersPerPixel) || 1) })
     : null;
   const beforeRoads = rawAreas ? heightMap.slice() : null;
   if (!flat && !raw && smoothRoads && osmFeatures.length > 0) {
@@ -2628,6 +2664,7 @@ export const fetchTerrainData = async (
     heightMap,
     width,
     height,
+    ...(fp ? { footprint: fp } : {}),
     minHeight,
     maxHeight,
     satelliteTextureUrl,
@@ -2839,7 +2876,8 @@ export const loadTerrainFromTif = async (
   const { zoom: satelliteZoom, texturePx: satelliteTexturePx } = pickSatelliteTexture(
     fetchBounds,
     effectiveMetersPerPixel,
-    width,
+    Math.max(width, height),
+    height > width,
   );
   emitProgress({
     status: 'Downloading satellite tiles...',
@@ -2921,7 +2959,7 @@ export const loadTerrainFromTif = async (
       !skipGapExpansion,
       false,
       gapFillData,
-      { width: satelliteTexturePx, height: Math.round(satelliteTexturePx * height / width) },
+      (height > width ? { width: Math.round(satelliteTexturePx * width / height), height: satelliteTexturePx } : { width: satelliteTexturePx, height: Math.round(satelliteTexturePx * height / width) }),
     );
     heightMap = result.heightMap;
     finalBounds = result.bounds;
@@ -2985,7 +3023,7 @@ export const loadTerrainFromTif = async (
       height,
       imageSamplerData,
       fetchBounds,
-      { width: satelliteTexturePx, height: Math.round(satelliteTexturePx * height / width) },
+      (height > width ? { width: Math.round(satelliteTexturePx * width / height), height: satelliteTexturePx } : { width: satelliteTexturePx, height: Math.round(satelliteTexturePx * height / width) }),
     );
   }
 
@@ -3147,7 +3185,8 @@ export const loadTerrainFromLaz = async (
   const { zoom: satelliteZoom, texturePx: satelliteTexturePx } = pickSatelliteTexture(
     fetchBounds,
     effectiveMetersPerPixel,
-    width,
+    Math.max(width, height),
+    height > width,
   );
   onProgress?.(`${fetchWord('Downloading')} satellite tiles...`);
   const { satDataImg, satMinTileX, satMinTileY } = await fetchSatelliteMosaic(
@@ -3228,7 +3267,7 @@ export const loadTerrainFromLaz = async (
     height,
     imageSamplerData,
     fetchBounds,
-    { width: satelliteTexturePx, height: Math.round(satelliteTexturePx * height / width) },
+    (height > width ? { width: Math.round(satelliteTexturePx * width / height), height: satelliteTexturePx } : { width: satelliteTexturePx, height: Math.round(satelliteTexturePx * height / width) }),
   );
 
   // ── OSM ───────────────────────────────────────────────────────────────────

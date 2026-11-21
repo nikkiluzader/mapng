@@ -1849,7 +1849,8 @@ export const generateOSMTexture = async (terrainData, options = {}) => {
   const MAX_TEX_SIZE = 8192;
   const requestedSize = Number(options.outputSize || terrainData.width || 1024);
   const targetSize = Math.max(1, Math.min(MAX_TEX_SIZE, Math.floor(requestedSize)));
-  const SCALE_FACTOR = targetSize / Math.max(1, terrainData.width);
+  // (the long side within the cap too: a tall grid's canvas height)
+  const SCALE_FACTOR = Math.min(targetSize / Math.max(1, terrainData.width), MAX_TEX_SIZE / Math.max(1, terrainData.width, terrainData.height || 0));
   const processingMetersPerPixel = Number.isFinite(Number(terrainData?.processingMetersPerPixel))
     && Number(terrainData.processingMetersPerPixel) > 0
     ? Number(terrainData.processingMetersPerPixel)
@@ -2490,7 +2491,8 @@ export const generateGameTexture = async (terrainData, options = {}) => {
   const MAX_TEX_SIZE = 8192;
   const requestedSize = Number(options.outputSize || terrainData.width || 1024);
   const targetSize = Math.max(1, Math.min(MAX_TEX_SIZE, Math.floor(requestedSize)));
-  const SCALE_FACTOR = targetSize / Math.max(1, terrainData.width);
+  // (the long side within the cap too: a tall grid's canvas height)
+  const SCALE_FACTOR = Math.min(targetSize / Math.max(1, terrainData.width), MAX_TEX_SIZE / Math.max(1, terrainData.width, terrainData.height || 0));
   const processingMetersPerPixel = Number(terrainData?.processingMetersPerPixel) > 0 ? Number(terrainData.processingMetersPerPixel) : 1;
   const METERS_TO_PX = SCALE_FACTOR / processingMetersPerPixel;
   const canvas = document.createElement("canvas");
@@ -2755,7 +2757,8 @@ export const generateHybridTexture = async (terrainData, options = {}) => {
   const satelliteWidth = satellite ? (satellite.naturalWidth || satellite.width) : 0;
   const requestedSize = Number(options.outputSize || satelliteWidth || terrainData.width || 1024);
   const targetSize = Math.max(1, Math.min(MAX_TEX_SIZE, Math.floor(requestedSize)));
-  const SCALE_FACTOR = targetSize / Math.max(1, terrainData.width);
+  // (the long side within the cap too: a tall grid's canvas height)
+  const SCALE_FACTOR = Math.min(targetSize / Math.max(1, terrainData.width), MAX_TEX_SIZE / Math.max(1, terrainData.width, terrainData.height || 0));
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(terrainData.width * SCALE_FACTOR));
   canvas.height = Math.max(1, Math.round(terrainData.height * SCALE_FACTOR));

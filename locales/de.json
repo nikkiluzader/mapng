@@ -2366,5 +2366,27 @@
       "updates": "App-Updates (GitHub)",
       "analytics": "Seitenaufrufe zählen (nur Website)"
     }
+  },
+  "tiles": {
+    "title": "Kacheln",
+    "count": "{n} Kachel | {n} Kacheln",
+    "add": "Kachel hinzufügen",
+    "oneHint": "Eine Kachel ergibt die übliche quadratische Karte. Füge Kacheln hinzu, um ein längeres oder unregelmäßiges Gebiet als eine Karte abzudecken.",
+    "arrange": "Anordnung der Kacheln",
+    "together": "Zusammenhalten",
+    "free": "Frei bewegen",
+    "togetherHint": "Kacheln liegen nebeneinander auf einem Raster; zieh den Griff einer Kachel auf der Karte, um sie an eine andere Stelle zu setzen.",
+    "freeHint": "Zieh den Griff einer Kachel auf der Karte, um sie beliebig zu platzieren. Überlappungen werden nur einmal geladen.",
+    "snap": "An Nachbarn einrasten",
+    "list": "Kacheln",
+    "tile": "Kachel {n}",
+    "remove": "Kachel {n} entfernen",
+    "gridLine": "Karte: {w} × {h} px, {km} km² Kacheln",
+    "terrain": "Ein Quadrat mit Zweierpotenz-Seite: wie gewohnt auf BeamNG-Terrain gebaut.",
+    "models": "Kein Quadrat mit Zweierpotenz-Seite: Der Boden wird als 3D-Modelle gebaut (experimentell). Er lädt langsamer und hat keinen Grasbewuchs.",
+    "islands": "Einige Kacheln berühren die anderen nicht: Sie werden zu Inseln im Level.",
+    "webCap": "Zu groß für den Browser: Das Level darf höchstens {max} px breit sein. Nimm weniger Kacheln, eine gröbere Auflösung oder die Desktop-App.",
+    "desktopWarn": "Über {max} px breit: Das Level ist für das Spiel womöglich zu groß zum Laden.",
+    "clear": "Zurück zu einer Kachel"
   }
 }

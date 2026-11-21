@@ -287,6 +287,7 @@ import { mergeElevationSlots } from './services/tifLoader.js';
 import { DEFAULT_GAP_FILL_SOURCE } from './services/gapFillSources.js';
 import { normalizeFallbackSource } from './services/elevationFallback.js';
 import { computeUploadedCropBounds, nativeSquareAt } from './services/uploadBounds';
+import { layoutGrid, WEB_MAX_SIDE } from './services/tileLayout.js';
 import {
   computeGridTiles,
   computeGridTilesWithOffsets,
@@ -656,6 +657,8 @@ const buildGenerationKey = (c, res, osm, elevationSource, gpxzKey, uploadedEleva
     lat: c.lat,
     lng: c.lng,
     resolution: res,
+    // (tiles in step 1: the layout changes the map; one tile adds nothing, so a single square's key is as before)
+    ...(store.tiles.length > 1 ? { tiles: store.tiles.map((t) => [Math.round(t.dx * 1e4), Math.round(t.dy * 1e4)]) } : {}),
     processingMetersPerPixel: processingMpp,
     osm,
     elevationSource,
@@ -1022,13 +1025,28 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         // brings the points back; they never change the terrain made)
         ...(desktopApp && store.points.length ? { points: JSON.parse(JSON.stringify(store.points)) } : {}),
       };
+      // tiles in step 1 (services/tileLayout.js): one map over their footprint. The grid is the footprint's bounding
+      // rectangle centred on its middle; a footprint that fills a power-of-two square is generated as today's square
+      // (a TerrainBlock); any other shape carries its footprint (ground models at export). One tile: as before.
+      let genCenter = center.value; let genSize = resolution.value;
+      if (store.tiles.length > 1) {
+        const R = Number(resolution.value);
+        const mpp = Number(processingMpp || 1);
+        const g = layoutGrid(store.tiles.map((t) => ({ dx: Math.round(t.dx * R), dy: Math.round(t.dy * R) })), R);
+        if (!g.webOk && !desktopApp) throw new Error(t('tiles.webCap', { max: WEB_MAX_SIDE }));
+        const mLng = 111320 * Math.cos((center.value.lat * Math.PI) / 180);
+        genCenter = { lat: center.value.lat + (g.centerOffset.y * mpp) / 111320, lng: center.value.lng + (g.centerOffset.x * mpp) / mLng };
+        genSize = g.terrainBlock ? g.width : { width: g.width, height: g.height };
+        if (!g.terrainBlock && g.areaPx < g.width * g.height) generationOptions.footprint = g.rects;
+        console.log(`[Tiles] ${store.tiles.length} tiles: a ${g.width}×${g.height} grid, ${g.terrainBlock ? 'a power-of-two square (TerrainBlock)' : `ground models${generationOptions.footprint ? ', footprint ' + g.areaPx + ' px' : ''}`}${g.overlaps ? ', overlaps fetched once' : ''}${g.islands ? ', islands' : ''}.`);
+      }
       // (the desktop app fetches and processes in a Node process: no 4 GB
       // window limit; the website does it here)
       // (a note that a Generate is running: services/sessionGuard.js)
       markJobStart('generate', { code: await currentSessionCode(), build: typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : '' });
       data = desktopApp
-        ? await fetchTerrainDataOnDesktop(center.value, resolution.value, fetchOSM, useUSGS, useGPXZ, useKRON86, gpxzApiKey, applyLoadingUpdate, signal, generationOptions)
-        : await fetchTerrainData(center.value, resolution.value, fetchOSM, useUSGS, useGPXZ, useKRON86, gpxzApiKey, undefined, applyLoadingUpdate, signal, generationOptions);
+        ? await fetchTerrainDataOnDesktop(genCenter, genSize, fetchOSM, useUSGS, useGPXZ, useKRON86, gpxzApiKey, applyLoadingUpdate, signal, generationOptions)
+        : await fetchTerrainData(genCenter, genSize, fetchOSM, useUSGS, useGPXZ, useKRON86, gpxzApiKey, undefined, applyLoadingUpdate, signal, generationOptions);
     }
     // (the export leaves objects out of the same background areas)
     if (data && store.backgroundActive && !uploadedElevationFile.value) data.backgroundMask = JSON.parse(JSON.stringify(store.backgroundMask));

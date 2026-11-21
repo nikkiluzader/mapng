@@ -145,7 +145,8 @@ export async function attachLandCover(terrainData, { onProgress, signal } = {}) 
   // (read already, with the map data: kept, even when it failed)
   if (terrainData.landCover !== undefined) return terrainData.landCover;
   const mpp = Number(terrainData.processingMetersPerPixel) || 1;
-  const worldSize = terrainData.width * mpp;
+  // (n x n cells over the bounds, n from the long side: a rectangle's cells are stretched, every u/v read stays right)
+  const worldSize = Math.max(terrainData.width, terrainData.height || terrainData.width) * mpp;
   const n = Math.min(4096, Math.max(64, Math.ceil(worldSize / 10)));
   try {
     onProgress?.('Loading land cover (ESA WorldCover)…');
@@ -159,12 +160,16 @@ export async function attachLandCover(terrainData, { onProgress, signal } = {}) 
   return terrainData.landCover;
 }
 
-/** The land cover class at world (x, y) metres (terrain centre origin), 0 without one. */
+/**
+ * The land cover class at world (x, y) metres (terrain centre origin), 0 without one. worldSize: the map's width in
+ * metres, or { x, y } for a rectangle.
+ */
 export function landCoverAt(landCover, worldSize, x, y) {
   if (!landCover?.grid) return 0;
   const { grid, n } = landCover;
-  const c = Math.min(n - 1, Math.max(0, Math.floor((x / worldSize + 0.5) * n)));
-  const r = Math.min(n - 1, Math.max(0, Math.floor((0.5 - y / worldSize) * n)));
+  const wx = typeof worldSize === 'object' ? worldSize.x : worldSize; const wy = typeof worldSize === 'object' ? worldSize.y : worldSize;
+  const c = Math.min(n - 1, Math.max(0, Math.floor((x / wx + 0.5) * n)));
+  const r = Math.min(n - 1, Math.max(0, Math.floor((0.5 - y / wy) * n)));
   return grid[r * n + c];
 }
 

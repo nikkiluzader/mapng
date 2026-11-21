@@ -72,12 +72,13 @@ export function pixelOwner(layout, t) {
  * The footprint as row intervals: for row y, sorted merged [x0, x1) pixel runs covered by a tile. A fast test for
  * every pixel without a full-grid mask (a 16k square's mask would be 256 MB).
  */
-export function footprintRows(rects, N) {
+export function footprintRows(rects, N, W = N) {
+  // (N rows of W pixels: a square by default)
   const rows = new Array(N);
   for (let y = 0; y < N; y++) rows[y] = null;
   const byRow = new Map();
   for (const [x, y, w, h] of rects) {
-    for (let r = Math.max(0, y); r < Math.min(N, y + h); r++) { let l = byRow.get(r); if (!l) byRow.set(r, (l = [])); l.push([Math.max(0, x), Math.min(N, x + w)]); }
+    for (let r = Math.max(0, y); r < Math.min(N, y + h); r++) { let l = byRow.get(r); if (!l) byRow.set(r, (l = [])); l.push([Math.max(0, x), Math.min(W, x + w)]); }
   }
   for (const [r, l] of byRow) {
     l.sort((a, b) => a[0] - b[0]);
@@ -116,13 +117,14 @@ export function keepSquareFor(shape) {
  * are never drawn (no ground there); the export's smoothing and grading near the edge then see the edge's own heights,
  * not a cliff to nothing.
  */
-export function fillOutsideFootprint(heights, rows, N) {
+export function fillOutsideFootprint(heights, rows, N, W = N) {
+  // (N rows of W pixels: a square by default)
   let firstRow = -1;
   for (let y = 0; y < N; y++) {
     const l = rows[y];
     if (!l || !l.length) continue;
     if (firstRow < 0) firstRow = y;
-    const o = y * N;
+    const o = y * W;
     // before the first run, between runs (each half from its nearer side), after the last
     let prevEnd = 0; let prevVal = heights[o + l[0][0]];
     for (let k = 0; k < l.length; k++) {
@@ -134,7 +136,7 @@ export function fillOutsideFootprint(heights, rows, N) {
       }
       prevEnd = b; prevVal = heights[o + b - 1];
     }
-    for (let x = prevEnd; x < N; x++) heights[o + x] = prevVal;
+    for (let x = prevEnd; x < W; x++) heights[o + x] = prevVal;
   }
   if (firstRow < 0) return;
   // rows with no run: copied from the nearest row that has one
@@ -143,6 +145,6 @@ export function fillOutsideFootprint(heights, rows, N) {
     if (rows[y] && rows[y].length) { lastFull = y; continue; }
     let next = y + 1; while (next < N && !(rows[next] && rows[next].length)) next++;
     const src = lastFull < 0 ? next : next >= N ? lastFull : (y - lastFull <= next - y ? lastFull : next);
-    heights.copyWithin(y * N, src * N, src * N + N);
+    heights.copyWithin(y * W, src * W, src * W + W);
   }
 }

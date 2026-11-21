@@ -46,6 +46,9 @@
             <PostFX v-if="cinematic" :ao="true" :bloom="activeSunPreset.bloom" />
             <IdleRender v-else />
 
+            <!-- the map in the scene's 100-unit square, its north-south axis scaled to the map's real proportions: a
+                 rectangle (tiles in step 1) was squashed into the square; a square map's scale is 1 -->
+            <TresGroup :scale="[1, 1, sceneDepthScale]">
             <TerrainMesh
               :terrain-data="mergedTerrainData"
               :quality="meshQuality"
@@ -76,6 +79,7 @@
               :texture-mode="surroundingTextureType"
               @loading-state="handleSurroundingsLoadingState"
             />
+            </TresGroup>
 
             <OrbitControls
               ref="controlsRef"
@@ -409,7 +413,7 @@
 
 <script setup>
 import { hasTexture } from '../../services/textureOnDemand.js';
-import { ref, computed, reactive, watch, onErrorCaptured } from "vue";
+import { ref, computed, reactive, watch, onErrorCaptured, toRaw } from "vue";
 import { useBaseTexture } from '../../composables/useBaseTexture.js';
 import { useI18n } from 'vue-i18n';
 import * as THREE from "three";
@@ -445,6 +449,12 @@ import BaseSwitch from "../base/BaseSwitch.vue";
 
 import RenderPause from "./RenderPause.vue";
 const props = defineProps(["terrainData"]);
+// the map's north-south extent over its east-west one: the scene lays the map out in a 100 x 100 square
+const sceneDepthScale = computed(() => {
+  const d = toRaw(props.terrainData);
+  const w = Number(d?.width); const h = Number(d?.height);
+  return w > 0 && h > 0 ? h / w : 1;
+});
 const store = useMainStore();
 const advancedMode = computed(() => store.advancedMode);
 

@@ -114,6 +114,29 @@
         :options="{ dashArray: '2, 8', lineCap: 'round' }"
       />
 
+      <!-- tiles in step 1 beyond the first (services/tileLayout.js): each a box with a handle; dropped, it is placed by
+           the mode's rule (a grid spot when together, snapped to a neighbour when free) -->
+      <l-rectangle
+        v-for="tile in extraTiles"
+        :key="'tile-' + tile.i"
+        :bounds="[[tile.bounds.south, tile.bounds.west], [tile.bounds.north, tile.bounds.east]]"
+        color="#FF6600"
+        :weight="2"
+        :fill-opacity="0.1"
+        :interactive="false"
+        :options="{ dashArray: '2, 8', lineCap: 'round' }"
+      />
+      <l-marker
+        v-for="tile in extraTiles"
+        :key="'tile-handle-' + tile.i + '-' + tileDrops"
+        :lat-lng="[tile.center.lat, tile.center.lng]"
+        :draggable="!boxLocked"
+        :icon="batchHandleIcon"
+        @dragend="(event) => dropTile(tile, event)"
+      >
+        <l-tooltip :permanent="false" direction="top" :offset="[0, -8]">{{ t('tiles.tile', { n: tile.i + 1 }) }}</l-tooltip>
+      </l-marker>
+
       <l-rectangle
         v-if="showUploadedCoverageBounds && !hasBatchGrid"
         :bounds="[[nativeCoverageBounds.south, nativeCoverageBounds.west], [nativeCoverageBounds.north, nativeCoverageBounds.east]]"
@@ -375,6 +398,7 @@ import { Layers, ChevronDown, Star, Navigation } from 'lucide-vue-next';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { getAdjacentBounds, POSITION_LABELS } from '../../services/surroundingTiles';
+import { useTiles } from '../../composables/useTiles.js';
 import { computeMetricSelectionBounds, computeUploadedCropBounds, nativeSquareAt } from '../../services/uploadBounds';
 import { CHECKBOX } from '../base/controlStyles.js';
 import { useOsmCoverage } from '../../composables/useOsmCoverage.js';
@@ -528,6 +552,26 @@ const PANEL_HEADING = 'px-1 text-micro font-semibold uppercase tracking-wider te
 watch(satelliteNames, (v) => writeStored('mapng_satelliteLabels', String(v)));
 const isMovingProgrammatically = ref(false);
 
+
+// tiles in step 1 beyond the first, as drawn: their centres and boxes round the map's centre (they follow it like the
+// selection box)
+const tileApi = useTiles(() => props.resolution, () => props.processingMetersPerPixel);
+const tileDrops = ref(0);   // (a dropped handle redrawn at its placed spot, even when that is where it was)
+const extraTiles = computed(() => {
+  if (store.batchMode || hasBatchGrid.value || store.tiles.length < 2 || showUploadedCoverageBounds.value) return [];
+  const c = currentCenter.value; const mpp = Number(props.processingMetersPerPixel) > 0 ? Number(props.processingMetersPerPixel) : 1;
+  const span = tileApi.R.value * mpp; const mLng = 111320 * Math.cos((c.lat * Math.PI) / 180);
+  return tileApi.tileOffsetsM.value.slice(1).map((o, k) => {
+    const center = { lat: c.lat + o.y / 111320, lng: c.lng + o.x / mLng };
+    return { i: k + 1, center, bounds: computeMetricSelectionBounds(center, span) };
+  });
+});
+const dropTile = (tile, event) => {
+  const ll = event?.target?.getLatLng?.(); if (!ll) return;
+  const c = currentCenter.value; const mLng = 111320 * Math.cos((c.lat * Math.PI) / 180);
+  tileApi.moveTile(tile.i, { x: (ll.lng - c.lng) * mLng, y: (ll.lat - c.lat) * 111320 });
+  tileDrops.value++;
+};
 
 const batchHandleIcon = L.divIcon({
   className: 'mapng-batch-handle',

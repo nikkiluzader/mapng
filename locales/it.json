@@ -2366,5 +2366,27 @@
       "updates": "Aggiornamenti dell'app (GitHub)",
       "analytics": "Conteggio delle visite (solo sito web)"
     }
+  },
+  "tiles": {
+    "title": "Riquadri",
+    "count": "{n} riquadro | {n} riquadri",
+    "add": "Aggiungi un riquadro",
+    "oneHint": "Un riquadro dà la solita mappa quadrata. Aggiungi riquadri per coprire un'area più lunga o irregolare come una sola mappa.",
+    "arrange": "Disposizione dei riquadri",
+    "together": "Tenere uniti",
+    "free": "Muovere liberamente",
+    "togetherHint": "I riquadri stanno uno accanto all'altro su una griglia; trascina la maniglia di un riquadro sulla mappa per spostarlo altrove.",
+    "freeHint": "Trascina la maniglia di un riquadro sulla mappa per metterlo dove vuoi. Le sovrapposizioni si scaricano una sola volta.",
+    "snap": "Aggancia ai vicini",
+    "list": "Riquadri",
+    "tile": "Riquadro {n}",
+    "remove": "Rimuovi il riquadro {n}",
+    "gridLine": "Mappa: {w} × {h} px, {km} km² di riquadri",
+    "terrain": "Un quadrato con lato potenza di due: costruito sul terreno di BeamNG, come di solito.",
+    "models": "Non è un quadrato con lato potenza di due: il terreno è costruito con modelli 3D (sperimentale). Si carica più lentamente e non ha erba.",
+    "islands": "Alcuni riquadri non toccano gli altri: diventano isole nel livello.",
+    "webCap": "Troppo grande per il browser: il livello può essere al massimo di {max} px. Usa meno riquadri, una risoluzione più grossolana o l'app desktop.",
+    "desktopWarn": "Oltre {max} px: il livello potrebbe essere troppo grande perché il gioco lo carichi.",
+    "clear": "Torna a un riquadro"
   }
 }

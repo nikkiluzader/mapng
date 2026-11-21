@@ -164,6 +164,25 @@ export const useMainStore = defineStore('main', () => {
   // the Export step open (the 2D map's "Colour the map by group" shows only there: components/map/contentLayer.js)
   const exportStepOpen = ref(false);
 
+  // --- Tiles in step 1 (services/tileLayout.js, refs/output/tiles-plan.md) ---
+  // tile offsets from tile 0 (on the map's centre) in tiles (x east, y north): a change of tile size scales the layout;
+  // one tile is today's single square. Together: on a grid of whole tiles; free: anywhere, snapping when near.
+  const tiles = ref((() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('mapng_tiles') || 'null');
+      return Array.isArray(saved) && saved.length && saved.every((t) => Number.isFinite(t?.dx) && Number.isFinite(t?.dy)) ? saved : [{ dx: 0, dy: 0 }];
+    } catch { return [{ dx: 0, dy: 0 }]; }
+  })());
+  const tilesTogether = ref(localStorage.getItem('mapng_tiles_together') !== 'false');
+  const tilesSnap = ref(localStorage.getItem('mapng_tiles_snap') !== 'false');
+  function setTiles(list) {
+    tiles.value = Array.isArray(list) && list.length ? list.map((t) => ({ dx: Number(t.dx) || 0, dy: Number(t.dy) || 0 })) : [{ dx: 0, dy: 0 }];
+    tiles.value[0] = { dx: 0, dy: 0 };   // (tile 0 is the map's centre)
+    localStorage.setItem('mapng_tiles', JSON.stringify(tiles.value));
+  }
+  function setTilesTogether(v) { tilesTogether.value = !!v; localStorage.setItem('mapng_tiles_together', String(!!v)); }
+  function setTilesSnap(v) { tilesSnap.value = !!v; localStorage.setItem('mapng_tiles_snap', String(!!v)); }
+
   // --- Batch Job State ---
   const batchGridCols = ref(parseInt(localStorage.getItem('mapng_batch_cols')) || 3);
   const batchGridRows = ref(parseInt(localStorage.getItem('mapng_batch_rows')) || 3);
@@ -343,6 +362,7 @@ export const useMainStore = defineStore('main', () => {
     setBatchGridRows,
     setBatchTileFollowCenter,
     setBatchTileOffsets,
+    tiles, tilesTogether, tilesSnap, setTiles, setTilesTogether, setTilesSnap,
     setBatchTileNames
   };
 });

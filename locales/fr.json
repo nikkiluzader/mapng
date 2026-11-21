@@ -2366,5 +2366,27 @@
       "updates": "Mises à jour de l'application (GitHub)",
       "analytics": "Comptage des pages vues (site web uniquement)"
     }
+  },
+  "tiles": {
+    "title": "Tuiles",
+    "count": "{n} tuile | {n} tuiles",
+    "add": "Ajouter une tuile",
+    "oneHint": "Une tuile donne la carte carrée habituelle. Ajoutez des tuiles pour couvrir une zone plus longue ou irrégulière en une seule carte.",
+    "arrange": "Disposition des tuiles",
+    "together": "Garder ensemble",
+    "free": "Déplacer librement",
+    "togetherHint": "Les tuiles sont côte à côte sur une grille ; faites glisser la poignée d'une tuile sur la carte pour la mettre ailleurs.",
+    "freeHint": "Faites glisser la poignée d'une tuile sur la carte pour la placer où vous voulez. Les chevauchements ne sont téléchargés qu'une fois.",
+    "snap": "Aimanter aux voisines",
+    "list": "Tuiles",
+    "tile": "Tuile {n}",
+    "remove": "Retirer la tuile {n}",
+    "gridLine": "Carte : {w} × {h} px, {km} km² de tuiles",
+    "terrain": "Un carré de côté puissance de deux : construit sur le terrain BeamNG, comme d'habitude.",
+    "models": "Pas un carré de côté puissance de deux : le sol est construit en modèles 3D (expérimental). Il se charge plus lentement et n'a pas d'herbe.",
+    "islands": "Certaines tuiles ne touchent pas les autres : elles deviennent des îles dans le niveau.",
+    "webCap": "Trop grand pour le navigateur : le niveau peut faire au plus {max} px de côté. Utilisez moins de tuiles, une résolution plus grossière ou l'application de bureau.",
+    "desktopWarn": "Au-delà de {max} px : le niveau risque d'être trop grand pour que le jeu le charge.",
+    "clear": "Revenir à une tuile"
   }
 }

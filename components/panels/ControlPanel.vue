@@ -135,6 +135,14 @@
           <span>{{ t('controlPanel.farShake') }}</span>
         </p>
 
+        <!-- tiles: one map of any shape (not with an uploaded elevation file, not in a batch job) -->
+        <TileLayout
+          v-if="!nativeDims && !store.batchMode"
+          :resolution="resolution"
+          :meters-per-pixel="processingMetersPerPixel"
+          :disabled="store.boxLocked || isGenerating"
+        />
+
       </SettingSection>
 
       <!-- Spawn and quicktravel points (Basic too: where the car starts is a basic wish; not in a batch job) -->
@@ -439,6 +447,8 @@ import ResolutionSelector from '../map/ResolutionSelector.vue';
 import SurroundingTiles from '../map/SurroundingTiles.vue';
 import BackgroundAreas from '../controls/BackgroundAreas.vue';
 import SpawnPoints from '../controls/SpawnPoints.vue';
+import TileLayout from '../controls/TileLayout.vue';
+import { useTiles } from '../../composables/useTiles.js';
 import ExportPanel from './ExportPanel.vue';
 import { useMainStore } from '../../stores/mainStore';
 import GenerateActions from '../controls/GenerateActions.vue';
@@ -756,7 +766,15 @@ watch(previewStale, (v) => emit('update:previewStale', v), { immediate: true });
 
 // Area calculations (resolution is in metres because metersPerPixel = 1)
 const totalWidthMeters = computed(() => props.resolution * metersPerPixel.value);
-const totalAreaSqM = computed(() => totalWidthMeters.value * totalWidthMeters.value);
+// (tiles in step 1: the footprint's area, overlaps once; one tile: the square as before)
+const tileApi = useTiles(() => props.resolution, () => props.processingMetersPerPixel);
+const totalAreaSqM = computed(() => {
+  if (store.tiles.length > 1 && !nativeDims.value && !store.batchMode) {
+    const m = Number(props.processingMetersPerPixel) > 0 ? Number(props.processingMetersPerPixel) : 1;
+    return tileApi.grid.value.areaPx * m * m;
+  }
+  return totalWidthMeters.value * totalWidthMeters.value;
+});
 const areaSqKm = computed(() => totalAreaSqM.value / 1000000);
 
 const signatureForKey = (key) => {

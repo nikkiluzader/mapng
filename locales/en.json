@@ -2366,5 +2366,27 @@
       "updates": "App updates (GitHub)",
       "analytics": "Page view counting (website only)"
     }
+  },
+  "tiles": {
+    "title": "Tiles",
+    "count": "{n} tile | {n} tiles",
+    "add": "Add a tile",
+    "oneHint": "One tile makes the usual square map. Add tiles to cover a longer or odd-shaped area as one map.",
+    "arrange": "How the tiles are arranged",
+    "together": "Keep together",
+    "free": "Move freely",
+    "togetherHint": "Tiles sit side by side on a grid; drag a tile's handle on the map to move it to another spot.",
+    "freeHint": "Drag a tile's handle on the map to put it anywhere. Overlaps are fetched once.",
+    "snap": "Snap to neighbours",
+    "list": "Tiles",
+    "tile": "Tile {n}",
+    "remove": "Remove tile {n}",
+    "gridLine": "Map: {w} × {h} px, {km} km² of tiles",
+    "terrain": "A square with a power-of-two side: built on BeamNG terrain, as usual.",
+    "models": "Not a power-of-two square: the ground is built as 3D models (experimental). It loads slower and has no grass cover.",
+    "islands": "Some tiles don't touch the others: they become islands in the level.",
+    "webCap": "Too big for the browser: the level can be at most {max} px across. Use fewer tiles, a coarser resolution, or the desktop app.",
+    "desktopWarn": "Past {max} px across: the level may be too big for the game to load.",
+    "clear": "Back to one tile"
   }
 }
