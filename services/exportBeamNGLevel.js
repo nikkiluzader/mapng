@@ -1077,6 +1077,8 @@ const WIRE_HALF_W = 0.015;
  * no collision.
  */
 function generatePowerWireDAEs(wires) {
+  // (a chunk: the spans whose middle is in its core)
+  if (chunkOwnsActive) wires = wires.filter((line) => { const m = line[Math.floor(line.length / 2)]; return m && chunkOwnsActive(m[0], m[1]); });
   if (!wires.length) return [];
   const tiles = new Map();
   for (const line of wires) {
@@ -1310,7 +1312,7 @@ function railTileDae(tile) {
 function buildLevelRailways(sg, terrainData, squareSize, levelName) {
   const segs = sg.railSegments || [];
   const tagsOf = (e) => segs[e.seg]?.tags || {};
-  const track = buildTrackGeometry(sg, { tagsOf });
+  const track = buildTrackGeometry(sg, { tagsOf, owns: chunkOwnsActive });
   const daes = [];
   for (const tile of track.tiles) {
     const data = railTileDae(tile);
@@ -7903,7 +7905,11 @@ let chunkOwnsActive = null;
 let chunkZAdjustActive = null;
 // (objects the merge places once for the whole level, never filtered by a chunk)
 const LEVEL_WIDE_CLASSES = new Set(['SimGroup', 'TerrainBlock', 'LevelInfo', 'ScatterSky', 'TimeOfDay', 'CloudLayer', 'SkyBox', 'Sun', 'WaterPlane', 'SpawnSphere', 'CameraBookmark', 'BeamNGWorldIconsRenderer', 'CubemapData', 'Forest', 'ForestWindEmitter', 'GroundCover', 'SFXEmitter', 'Precipitation', 'TerrainMaterialSet']);
-const GENERATED_MESH = /\/custom_assets\//;   // (meshes in level coordinates at the origin or a tile origin: filtered where built)
+// (meshes in level coordinates at the origin or a tile origin, already cut to the chunk's core where built: ground
+// squares, sidewalk triangles, buildings by their middle, rail pieces, wire spans; the flag is deduplicated in the
+// merge. Every other generated mesh (a bridge, a tunnel part, a lamp glow) sits at its own centre and is owned by
+// the chunk whose core holds it, like any placed object.)
+const GENERATED_MESH = /\/custom_assets\/(ground|sidewalks|osm_objects|power_lines|railways|terrain_backdrop|mapng_flag)\//;
 
 /** A line's nodes [[x, y, z, w?]...] cut to what `owns`: the stretches inside, each ended exactly at the core's edge. */
 export function cutNodesTo(nodes, owns) {

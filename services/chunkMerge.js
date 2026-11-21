@@ -12,6 +12,8 @@
 
 const LEVEL_WIDE = new Set(['TerrainBlock', 'LevelInfo', 'ScatterSky', 'TimeOfDay', 'CloudLayer', 'SkyBox', 'Sun', 'WaterPlane', 'SpawnSphere', 'CameraBookmark', 'BeamNGWorldIconsRenderer', 'CubemapData', 'Precipitation', 'Forest', 'ForestWindEmitter', 'GroundCover', 'TerrainMaterialSet', 'SFXEmitter']);
 const LINES = new Set(['DecalRoad', 'River', 'MeshRoad']);
+// (single objects of other classes: the MapNG flag at the spawn)
+const LEVEL_WIDE_NAMES = new Set(['mapng_flag_marker']);
 // (level files every chunk has a part of: joined here, see mergeLevelData)
 const JOINED = new Set(['city.sites.json', 'signals.json', 'mapng_probes.json']);
 const SITES_MAX_SPOTS = 3000;   // (BeamNG's Sites loader is n² log n: as exportBeamNGLevel.js SITES_MAX_PARKING_SPOTS)
@@ -160,7 +162,7 @@ export async function mergeChunks(JSZip, chunks, levelName, { log = () => {}, bo
       const isForest = /^forest\/.*\.forest4\.json$/.test(rel);
       if (isItems || isForest) {
         const text = rewritePaths(await f.async('string'), c.levelName, levelName, c.key);
-        const lines = text.split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((o) => first || !LEVEL_WIDE.has(o.class))
+        const lines = text.split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((o) => first || (!LEVEL_WIDE.has(o.class) && !LEVEL_WIDE_NAMES.has(o.name)))
           .map((o) => (isForest ? { ...o, pos: [o.pos[0] + dx, o.pos[1] + dy, o.pos[2] + dz] } : moveObject(o, dx, dy, dz, c.key)));
         const path = `levels/${levelName}/${rel}`;
         const list = gathered.get(path) || []; gathered.set(path, list.concat(lines.map((o) => JSON.stringify(o)))); objects += lines.length;

@@ -353,20 +353,23 @@ function quad(part, a, b, c, d, uvs = NO_UV) {
 /**
  * The track meshes of every railway edge of a solved graph, in tiles of
  * RAIL_TILE_M: { tiles: [{ key, origin: [x, y, z], parts: { [material]: { pos, uv } },
- * collision: { pos }, triangles }], stats } in world metres.
+ * collision: { pos }, triangles }], stats } in world metres. owns(x, y): a chunk keeps only the pieces it owns.
  *   tagsOf(edge) -> its OSM tags (tracks, gauge, service...)
  * Rails and sleepers are left out inside a level crossing (the crossing's
  * surface, crossingDecals, shows its rails); a monorail is a concrete beam.
  * The ballast and the rails' tops collide (the sleepers do not: a car
  * crossing the line rides on the ballast and the rails).
  */
-export function buildTrackGeometry(graph, { tagsOf = () => ({}) } = {}) {
+export function buildTrackGeometry(graph, { tagsOf = () => ({}), owns = null } = {}) {
   const { edges } = graph;
   const z = graph.profile?.z;
   const tiles = new Map();
   const stats = { edges: 0, trackKm: 0, sleepers: 0, triangles: 0 };
   if (!z) return { tiles: [], stats };
+  // (a chunk of a chunked level: pieces whose middle it does not own go to a tile that is never written)
+  const discard = { key: 'discard', parts: {}, collision: { pos: [] } };
   const tileOf = (x, y) => {
+    if (owns && !owns(x, y)) { discard.parts = {}; discard.collision = { pos: [] }; return discard; }
     const key = `${Math.floor(x / RAIL_TILE_M)}_${Math.floor(y / RAIL_TILE_M)}`.replace(/-/g, 'm');
     let t = tiles.get(key);
     if (!t) { t = { key, parts: {}, collision: { pos: [] } }; tiles.set(key, t); }
