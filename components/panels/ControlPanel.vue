@@ -135,12 +135,13 @@
           <span>{{ t('controlPanel.farShake') }}</span>
         </p>
 
-        <!-- tiles: one map of any shape (not with an uploaded elevation file, not in a batch job) -->
+        <!-- tiles: one map of any shape (not with an uploaded elevation file, not in a batch job; editable with the area
+             locked: the lock pins the selection while the map pans, the tiles stay movable: the user, 2026-11-21) -->
         <TileLayout
           v-if="!nativeDims && !store.batchMode"
           :resolution="resolution"
           :meters-per-pixel="processingMetersPerPixel"
-          :disabled="store.boxLocked || isGenerating"
+          :disabled="isGenerating"
         />
 
       </SettingSection>
