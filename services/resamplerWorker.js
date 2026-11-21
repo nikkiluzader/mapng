@@ -63,8 +63,12 @@ const normalizeLng = (lng) => ((((lng + 180) % 360) + 360) % 360) - 180;
 const getPixelLatLng = (x, y, width, height, toWGS84, targetBounds) => {
     if (targetBounds && Number.isFinite(targetBounds.north) && Number.isFinite(targetBounds.south)
         && Number.isFinite(targetBounds.east) && Number.isFinite(targetBounds.west)) {
-        const u = width > 1 ? x / (width - 1) : 0.5;
-        const v = height > 1 ? y / (height - 1) : 0.5;
+        // (pixelEdges: the bounds are the edges of the grid's squares, a chunk of the level's lattice
+        // (services/chunkLayout.js): vertex x at x / width of the span, so neighbouring chunks share their pixels;
+        // otherwise the first and last pixels sit on the bounds, as before)
+        const edges = !!targetBounds.pixelEdges;
+        const u = edges ? x / width : width > 1 ? x / (width - 1) : 0.5;
+        const v = edges ? y / height : height > 1 ? y / (height - 1) : 0.5;
         const lat = targetBounds.north - v * (targetBounds.north - targetBounds.south);
 
         let lngSpan = targetBounds.east - targetBounds.west;

@@ -2052,6 +2052,8 @@ export const fetchTerrainData = async (
         north: Number(targetBounds.north),
         south: Number(targetBounds.south),
         ...continuousLngRange(targetBounds.west, targetBounds.east),
+        // (a chunk of the level's lattice: services/chunkLayout.js chunkBounds)
+        ...(targetBounds.pixelEdges ? { pixelEdges: true } : {}),
       }
     : computeMetricFetchBounds(
         normalizedCenter,
