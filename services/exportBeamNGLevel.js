@@ -890,7 +890,10 @@ async function generateSidewalkTileDAEs(meshes, tileM) {
     for (const gr of groups) {
       for (let v = gr.start; v + 2 < gr.start + gr.count; v += 3) {
         const o = v * 3;
-        const k = `${tileKey((pos[o] + pos[o + 3] + pos[o + 6]) / 3, (pos[o + 1] + pos[o + 4] + pos[o + 7]) / 3)}|${mi}|${gr.materialIndex}`;
+        // (a chunk: triangles whose middle is outside its core are its neighbours')
+        const cx = (pos[o] + pos[o + 3] + pos[o + 6]) / 3; const cy = (pos[o + 1] + pos[o + 4] + pos[o + 7]) / 3;
+        if (chunkOwnsActive && !chunkOwnsActive(cx, cy)) { keys[v / 3] = null; continue; }
+        const k = `${tileKey(cx, cy)}|${mi}|${gr.materialIndex}`;
         keys[v / 3] = k;
         counts.set(k, (counts.get(k) || 0) + 1);
       }
@@ -907,6 +910,7 @@ async function generateSidewalkTileDAEs(meshes, tileM) {
     for (const gr of groups) {
       for (let v = gr.start; v + 2 < gr.start + gr.count; v += 3) {
         const b = buckets.get(keys[v / 3]);
+        if (!b) continue;   // (a triangle another chunk owns)
         b.pos.set(pos.subarray(v * 3, v * 3 + 9), b.at * 9);
         if (uv) b.uv.set(uv.subarray(v * 2, v * 2 + 6), b.at * 6);
         if (nrm) b.nrm.set(nrm.subarray(v * 3, v * 3 + 9), b.at * 9);
@@ -7892,13 +7896,55 @@ export function generateTurnArrowDecals(terrainData, squareSize, { carriageways 
 // (set at the start of every export: with the ground as models every DecalRoad is projected onto objects, the
 // ground being one; without overObjects a DecalRoad lies on the TerrainBlock only, and there is none)
 let groundAsModelsActive = false;
+// (set at the start of every export: a chunk of a chunked level (refs/output/chunked-pipeline-plan.md) keeps only what
+// lies in its core: owns(x, y) in its world metres, or null for a whole level)
+let chunkOwnsActive = null;
+// (a chunk's seam blend moved its ground near a finished neighbour: what lies on it moves by the same: dz(x, y))
+let chunkZAdjustActive = null;
+// (objects the merge places once for the whole level, never filtered by a chunk)
+const LEVEL_WIDE_CLASSES = new Set(['SimGroup', 'TerrainBlock', 'LevelInfo', 'ScatterSky', 'TimeOfDay', 'CloudLayer', 'SkyBox', 'Sun', 'WaterPlane', 'SpawnSphere', 'CameraBookmark', 'BeamNGWorldIconsRenderer', 'CubemapData', 'Forest', 'ForestWindEmitter', 'GroundCover', 'SFXEmitter', 'Precipitation', 'TerrainMaterialSet']);
+const GENERATED_MESH = /\/custom_assets\//;   // (meshes in level coordinates at the origin or a tile origin: filtered where built)
+
+/** A line's nodes [[x, y, z, w?]...] cut to what `owns`: the stretches inside, each ended exactly at the core's edge. */
+export function cutNodesTo(nodes, owns) {
+  const ins = nodes.map((n) => owns(n[0], n[1]));
+  if (ins.every(Boolean)) return [nodes];
+  if (!ins.some(Boolean)) return [];
+  const edge = (a, b) => {   // a inside, b outside: the point between them on the core's edge (bisected)
+    let lo = 0; let hi = 1;
+    for (let k = 0; k < 22; k++) { const m = (lo + hi) / 2; if (owns(a[0] + (b[0] - a[0]) * m, a[1] + (b[1] - a[1]) * m)) lo = m; else hi = m; }
+    return a.map((v, i) => (i < 3 ? v + (b[i] - v) * lo : v));
+  };
+  const pieces = []; let cur = null;
+  for (let i = 0; i < nodes.length; i++) {
+    if (ins[i]) { if (!cur) { cur = []; if (i > 0) cur.push(edge(nodes[i], nodes[i - 1])); } cur.push(nodes[i]); }
+    else if (cur) { cur.push(edge(nodes[i - 1], nodes[i])); pieces.push(cur); cur = null; }
+  }
+  if (cur) pieces.push(cur);
+  return pieces.filter((p) => p.length >= 2);
+}
 
 function toNDJSON(objects) {
+  const owns = chunkOwnsActive;
+  const dz = chunkZAdjustActive;
   return objects
-    .map((o) => {
+    .flatMap((o) => {
       const { __items, ...rest } = o;
       if (groundAsModelsActive && rest.class === 'DecalRoad') rest.overObjects = true;
-      return JSON.stringify(rest);
+      if (!owns || LEVEL_WIDE_CLASSES.has(rest.class)) return [JSON.stringify(rest)];
+      // (on ground the seam blend moved: up or down with it)
+      if (dz && rest.class !== 'SimGroup') {
+        if (Array.isArray(rest.position) && rest.position.length >= 3 && !(rest.class === 'TSStatic' && GENERATED_MESH.test(rest.shapeName || ''))) rest.position = [rest.position[0], rest.position[1], rest.position[2] + dz(rest.position[0], rest.position[1])];
+        if (Array.isArray(rest.nodes)) rest.nodes = rest.nodes.map((n) => [n[0], n[1], n[2] + dz(n[0], n[1]), ...n.slice(3)]);
+      }
+      // a chunk: lines cut at its core's edge, placed objects kept by position, generated meshes as built
+      if ((rest.class === 'DecalRoad' || rest.class === 'River' || rest.class === 'MeshRoad') && Array.isArray(rest.nodes)) {
+        const pieces = cutNodesTo(rest.nodes, owns);
+        return pieces.map((nodes, k) => JSON.stringify({ ...rest, ...(pieces.length > 1 ? { name: `${rest.name}~${k}`, persistentId: generatePersistentId() } : {}), nodes, ...(Array.isArray(rest.position) ? { position: nodes[0].slice(0, 3) } : {}) }));
+      }
+      if (rest.class === 'TSStatic' && GENERATED_MESH.test(rest.shapeName || '')) return [JSON.stringify(rest)];
+      if (Array.isArray(rest.position) && !owns(rest.position[0], rest.position[1])) return [];
+      return [JSON.stringify(rest)];
     })
     .join('\n') + '\n';
 }
@@ -13434,6 +13480,15 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     // from the north). Plain data, so it crosses to the desktop runner. The ground, the map data, the trees and props
     // and the spawn keep to these rects' union (the footprint).
     groundShape = null,
+    // a chunk of a chunked level (services/chunkLayout.js): [cx0, cy0, cx1, cy1], the core it owns in this grid's
+    // pixels (rows from the north); only what lies in it is kept (ground, objects, roads cut at its edge)
+    chunkCore = null,
+    // a chunk's seam with its finished neighbours (services/chunkedExport.js): { target, weight } (Float32Array N x N,
+    // rows from the north): the final ground blended toward target by weight (1 at the shared edge, 0 EASE pixels in);
+    // everything on that ground moves with it
+    seamBlend = null,
+    // hand back the final heights (Float32Array, rows from the north) for the neighbours' seams
+    keepFinalHeights = false,
     // (tests: the ground models' error bound in metres; groundMesh.js GROUND_MAX_ERROR_M when unset)
     groundMaxError = undefined,
     // the local tree mix (treeSpecies.js) when already known; undefined: fetched
@@ -13469,6 +13524,16 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     onProgress,
   } = options;
   groundAsModelsActive = !!groundAsModels;
+  chunkZAdjustActive = null;
+  {
+    // (the chunk's test in its own world metres: pixel x = x / sq + N / 2, row y = N / 2 - y / sq)
+    const N = Number(terrainData?.width) || 0;
+    const sqC = Number(terrainData?.processingMetersPerPixel) > 0 ? Number(terrainData.processingMetersPerPixel) : 1;
+    chunkOwnsActive = Array.isArray(chunkCore) && chunkCore.length === 4 && N > 0
+      ? (x, y) => { const px = x / sqC + N / 2; const py = N / 2 - y / sqC; return px >= chunkCore[0] && px < chunkCore[2] && py >= chunkCore[1] && py < chunkCore[3]; }
+      : null;
+    if (chunkOwnsActive) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunk: keeping only its core, pixels ${chunkCore.join(', ')} of ${N}² (ground, objects by position, roads cut at its edge).`);
+  }
   console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Ground: ${groundAsModels ? `as models (experimental): the ground in tiled models with collision (the only TerrainBlock a small flat anchor far outside the map)${groundKeepSquare ? ', only the shape\'s squares' : ''}; DecalRoads projected onto objects; no ground cover (it grows on TerrainBlock layers only)` : 'a TerrainBlock (the default)'}.`);
   // (raised sidewalks are built only in the mesh style; the decal style draws strips instead)
   const includeSidewalks = sidewalksWanted && sidewalkStyle !== 'decal';
@@ -13624,6 +13689,18 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       terrainData = { ...terrainData, osmFeatures: features };
       let px = 0; const rows = shapeRows(groundShape, groundShape.size); for (const r of rows) if (r) for (const [a, b] of r) px += b - a;
       footprint = { keepSquare: keepSquareFor(groundShape), rows, size: groundShape.size };
+      // a chunk: buildings made by the chunk whose core holds their middle (each building's mesh exactly once)
+      if (Array.isArray(chunkCore)) {
+        const b = terrainData.bounds; const N = groundShape.size; let dropped = 0;
+        const inCore = (lat, lng) => { const px = (lng - b.west) / (b.east - b.west) * N; const py = (b.north - lat) / (b.north - b.south) * N; return px >= chunkCore[0] && px < chunkCore[2] && py >= chunkCore[1] && py < chunkCore[3]; };
+        const kept = terrainData.osmFeatures.filter((f) => {
+          if (f?.type !== 'building' || !Array.isArray(f.geometry) || !f.geometry.length) return true;
+          let la = 0; let ln = 0; for (const q of f.geometry) { la += q.lat; ln += q.lng; }
+          const own = inCore(la / f.geometry.length, ln / f.geometry.length); if (!own) dropped++; return own;
+        });
+        terrainData = { ...terrainData, osmFeatures: kept };
+        console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunk: ${dropped} building(s) whose middle is outside its core left to their own chunks.`);
+      }
       console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Shape: ${shapeOf(groundShape).runs ? 'a corridor' : `${shapeOf(groundShape).rects.length} tile(s)`}, footprint ${formatNumber(px, 0)} px (${formatNumber((100 * px) / (groundShape.size * groundShape.size), 1)}% of the ${groundShape.size}² grid); map data kept to it: ${before} feature(s) in, ${stats.kept} kept whole, ${stats.cut} line(s) cut at its edge into ${stats.pieces} piece(s), ${stats.dropped} outside dropped.`);
     }
   }
@@ -14962,12 +15039,35 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
 
   // (experimental) the ground as models: from the finished heights and the painted surfaces, holes included
   let groundModels = null;
+  // (a chunk: its core's squares only; square (i, j), j from the south, is in when its middle is)
+  const chunkSquareFilter = (keep) => {
+    if (!Array.isArray(chunkCore)) return keep;
+    const N = exportTerrainData.width;
+    return (i, j) => { const px = i + 0.5; const py = N - 1 - j - 0.5; const inCore = px >= chunkCore[0] && px < chunkCore[2] && py >= chunkCore[1] && py < chunkCore[3]; return inCore && (!keep || keep(i, j)); };
+  };
+  // a chunk: its ground blended toward its finished neighbours along their shared edges, so the ground models meet
+  // exactly; dz kept for what stands on that ground (roads, objects, trees: toNDJSON and the forest)
+  if (seamBlend?.target && seamBlend?.weight && exportTerrainData.heightMap.length === seamBlend.target.length) {
+    const hm = exportTerrainData.heightMap; const T = seamBlend.target; const Wt = seamBlend.weight; const N = exportTerrainData.width;
+    const delta = new Float32Array(hm.length); let moved = 0; let maxD = 0;
+    for (let k = 0; k < hm.length; k++) {
+      const w = Wt[k]; if (!(w > 0) || !Number.isFinite(T[k])) continue;
+      const d = (T[k] - hm[k]) * w; hm[k] += d; delta[k] = d; moved++; if (Math.abs(d) > maxD) maxD = Math.abs(d);
+    }
+    const sqC = squareSize;
+    chunkZAdjustActive = (x, y) => {
+      const fx = Math.max(0, Math.min(N - 1.001, x / sqC + N / 2)); const fy = Math.max(0, Math.min(N - 1.001, N / 2 - y / sqC));
+      const c0 = Math.floor(fx); const r0 = Math.floor(fy); const tx = fx - c0; const ty = fy - r0;
+      return delta[r0 * N + c0] * (1 - tx) * (1 - ty) + delta[r0 * N + c0 + 1] * tx * (1 - ty) + delta[(r0 + 1) * N + c0] * (1 - tx) * ty + delta[(r0 + 1) * N + c0 + 1] * tx * ty;
+    };
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunk: seam blend toward finished neighbours: ${moved} grid point(s) eased, at most ${maxD.toFixed(2)} m; roads, objects and trees on them move with the ground.`);
+  }
   if (groundAsModels) {
     beginStep('ground', 'Building the ground as models…');
     await yield_();
     const t0 = performance.now();
     groundModels = await generateGroundModelDAEs(exportTerrainData, squareSize, {
-      layerMap: terLayerMap, materialNames: pbrResult?.materialNames, materialDefs: pbrResult?.materialDefs, keepSquare: footprint?.keepSquare || groundKeepSquare, maxError: groundMaxError,
+      layerMap: terLayerMap, materialNames: pbrResult?.materialNames, materialDefs: pbrResult?.materialDefs, keepSquare: chunkSquareFilter(footprint?.keepSquare || groundKeepSquare), maxError: groundMaxError,
     });
     const gs = groundModels.summary;
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Ground models: ${groundModels.tiles.length} tiles of ${gs.tile} squares, ${formatNumber(gs.triangles, 0)} triangles (${formatNumber((100 * gs.triangles) / Math.max(1, gs.fullTriangles), 1)}% of the full grid's ${formatNumber(gs.fullTriangles, 0)}), within ${gs.maxError} m of every grid point; full resolution kept at tile edges, holes and surface changes; ${gs.refinePasses} re-split pass(es) to hold the bound; ${gs.holeTriangles} triangle(s) left open at holes, ${gs.outsideTriangles} outside the grid or the shape; surfaces: ${groundModels.groundModels.join(', ') || 'none'}; ${formatNumber((performance.now() - t0) / 1000, 1)} s.`);
@@ -15813,6 +15913,16 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   for (const [x, y, z] of mappedStreetProps.bins) addPropPlacement(binType(x, y), x, y, z, propHash(x, y) * Math.PI * 2);
   for (const b of streetProps.bins) addPropPlacement(binType(b.x, b.y), b.x, b.y, b.z, b.yaw);
   vegLap('kept off roads, props added');
+  // a chunk: trees and props only in its core (and moved with the seam blend's ground)
+  if (chunkOwnsActive) {
+    let dropped = 0;
+    for (const [type, list] of forestPlacements) {
+      const keep = list.filter((it) => chunkOwnsActive(it.pos[0], it.pos[1]));
+      if (chunkZAdjustActive) for (const it of keep) it.pos = [it.pos[0], it.pos[1], roundTo(it.pos[2] + chunkZAdjustActive(it.pos[0], it.pos[1]), 3)];
+      dropped += list.length - keep.length; forestPlacements.set(type, keep);
+    }
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunk: ${dropped} tree(s) and prop(s) outside its core left out.`);
+  }
   // a shaped level: trees and props only on the footprint (no ground outside it)
   if (footprint) {
     const N = footprint.size; let dropped = 0;
@@ -16048,9 +16158,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
 
   // ── art/decals + main.decals.json: turn-lane arrows ───────────────────────
   // Painted from OSM turn:lanes via the core road-markings atlas.
-  const turnArrowInstances = includeRoads
+  const turnArrowInstances = (includeRoads
     ? generateTurnArrowDecals(exportTerrainData, squareSize, { carriageways: decalRoads.carriageways || null, stops: decalRoads.stopBars || [] })
-    : [];
+    : [])
+    // (a chunk: the arrows in its core; an instance's position is at 3, 4)
+    .filter((inst) => !chunkOwnsActive || !Array.isArray(inst) || chunkOwnsActive(inst[3], inst[4]));
   zip.file(`${base}/art/decals/managedDecalData.json`, JSON.stringify(
     turnArrowInstances.length > 0
       ? { [ROAD_ARROW_DECAL_DATA.name]: ROAD_ARROW_DECAL_DATA }
@@ -17373,6 +17485,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Completed exportBeamNGLevel`);
   return {
     blob: zipBlob, filename: `${levelName}.zip`, structureChecks, ingameProbes,
+    // (a chunk: its final heights for its neighbours' seams, services/chunkedExport.js)
+    ...(keepFinalHeights ? { finalHeights: Float32Array.from(exportTerrainData.heightMap), finalMinHeight: exportTerrainData.minHeight } : {}),
     // (the level's reports for the "done" window, read there without opening the zip again: export_report.md, and
     // export_report.json with the map data, for "Save report")
     report: reportMarkdown,
