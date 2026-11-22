@@ -171,6 +171,14 @@ export async function createZipCompressor(JSZip, { concurrency, inFlightBytes = 
       const d = entry?._data;
       return isCompressed(d) ? { packed: d.compressedContent, crc: d.crc32, size: d.uncompressedSize } : null;
     },
+    // An entry as a step cache can keep it: { packed } once compressed, else { data } as plain bytes. (An entry
+    // left uncompressed, small or failed, holds JSZip's own object, often a promise: kept as it was, the disk
+    // cache wrote it as {} and the next export could not zip it, report MR-H5AWFT.)
+    async keepableOf(entry) {
+      const packed = this.packedOf(entry);
+      if (packed) return { packed };
+      return { data: entry ? await entry.async('uint8array') : null };
+    },
     // A kept entry put into a zip as it was compressed (zip.file with a placeholder, then its bytes).
     putPacked(zip, name, { packed, crc, size }, options) {
       zip.file(name, '', options);

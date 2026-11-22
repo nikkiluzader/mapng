@@ -616,6 +616,8 @@
       "whereMods": "Dans votre dossier de mods BeamNG : {path}",
       "whereChosen": "Il se trouve dans le dossier choisi dans la fenêtre d'enregistrement. (Un navigateur indique à la page le nom du fichier, pas son dossier : MapNG ne peut donc pas afficher le chemin.)",
       "whereDownload": "Cliquez sur Télécharger pour l'enregistrer. Votre navigateur le place dans son dossier de téléchargements.",
+      "saveFailedDisk": "Impossible de l'enregistrer à l'endroit choisi : ce disque semble plein. Libérez de l'espace ou téléchargez-le ici à la place.",
+      "saveFailed": "Impossible de l'enregistrer à l'endroit choisi. Téléchargez-le ici à la place.",
       "nextWeb": "Pour y jouer : déplacez le zip dans le dossier de mods de BeamNG.drive, puis choisissez Freeroam et sélectionnez le niveau.",
       "download": "Télécharger",
       "close": "Fermer",

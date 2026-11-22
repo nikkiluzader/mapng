@@ -1,6 +1,6 @@
 # MapNG open items
 
-Last reviewed: 2026-11-20 (after the 0.3.5 release)
+Last reviewed: 2026-11-21 (crash reports to-do added)
 
 The short "now" board: current work, what waits on someone, and checks owed on shipped work. The other tracking
 files: `refs/output/backlog.md` holds everything wanted later, by area; `refs/output/releases.md` what shipped;
@@ -236,6 +236,23 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
   - o5m: a compact binary sibling of .osm; a decoder is moderate work;
   - o5c, osc, osh: change and history files, not map snapshots; poor fit for a one-off level import;
   - Shapefile, obf (OsmAnd): other data models; most work.
+
+## Now: crash reports 2026-11-20 to 2026-11-22
+
+- **What is left from the 14 reports since the last review** (2026-11-21; copies in scratch/reports/r1121, R2
+  crash-reports/). Fixed the same day (cached buildings, save step, desktop wording, desktop Generate log): see
+  history.md, "Crash reports 2026-11-20 to 2026-11-22".
+  - **Desktop Generate out of memory at 8192 x 2 m on 16 GB (MR-PM849Z, then a window crash dump MR-WNMAMX, then
+    16384 x 1 m MR-NTHDMB; same machine, Essex UK).** The resampler worker died with a bare "Worker error". 8192
+    should fit on 16 GB: check the satellite resample's peak with scratch/memprobe at 8192 and lower it if it is
+    the cause; log the worker's message.
+  - **Website exports die in big cities (MR-A7KRF8 + MR-FYTC2E same area twice, MR-9RGDN8, MR-ZHEMFQ; page closed,
+    Chrome/Brave on 16-32 GB; MR-BY8N7H Seattle 16384 x 1 m, Array buffer allocation failed after 22 min).** The log
+    tail (90fe27e) shows three during "Building bridge models", one after the terrain shaping, all heavy networks
+    (up to 26k roads, 456 km of rail, 6.6 M track triangles). Probably tab memory. Options: measure the web export's
+    peak at bridge models on such an area; warn before the export when the road/rail load is past what a tab holds.
+  - **Closed-page reports have no area (area null).** Decode the session code into lat/lng/size when the report is
+    made.
 
 ## Waiting on someone
 

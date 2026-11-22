@@ -1101,13 +1101,15 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
       // (the reason, and the offer to send a report: with the job's log in the desktop app, the page's last lines on the website)
       // (a desktop report read only "ENOSPC: no space left on device, write": the disk was full)
       const message = isDiskFull(byodMessage) ? t('app.error.diskFull')
-        // (the desktop app could not get the memory for a picture the size of the map: "Create skia surface failed")
-        : isOutOfMemory(byodMessage) && /skia surface/i.test(byodMessage) ? t('app.error.outOfMemoryComputer')
-        : byodMessage.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') || t('app.error.fetchTerrain');
+        // (the desktop app could not get the memory for a picture the size of the map: "Create skia surface failed";
+        // in the desktop app every out-of-memory says so, not the website's "use the desktop app", report MR-PM849Z)
+        : isOutOfMemory(byodMessage) && (desktopApp || /skia surface/i.test(byodMessage)) ? t('app.error.outOfMemoryComputer')
+        : byodMessage.replace(/^Error invoking remote method '[^']+': (Error: )?/, '').replace(/\s*\[log: [^\]]+\]$/, '') || t('app.error.fetchTerrain');
       markJobEnd();
       openReportDialog('generate', {
         error: message,
-        logPath: logPathFrom(message),
+        // (from the raw text: the desktop job's log goes with the report, reports MR-PM849Z and MR-NTHDMB had none)
+        logPath: logPathFrom(byodMessage),
         area: { lat: center.value.lat, lng: center.value.lng, resolution: resolution.value, metersPerPixel: Number(processingMpp || 1) },
       });
     } else if (byodMessage) {

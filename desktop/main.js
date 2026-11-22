@@ -894,7 +894,8 @@ ipcMain.handle('terrain:generate', async (event, requested) => {
       child.on('exit', (code, signal) => {
         if (done) resolve({ id, ...done });
         else if (failure?.aborted || signal) resolve({ id, cancelled: true });
-        else reject(new Error(failure?.message || `terrain generation ended with code ${code}; log: ${path.join(dir, 'export.log')}`));
+        // (the reason and its log, "<reason> [log: <file>]", so a problem report carries the job's log as an export's does)
+        else reject(new Error(`${failure?.message || `terrain generation ended with code ${code}`} [log: ${path.join(dir, 'export.log')}]`));
       });
     });
     if (result.cancelled) fs.rmSync(dir, { recursive: true, force: true });

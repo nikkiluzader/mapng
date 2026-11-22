@@ -15244,12 +15244,14 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       if (onTile && tiles.some((t) => t.handedOver)) {
         buildingPart('pack');
         await zipCompressor.drain();
-        tiles = tiles.map((t) => {
+        let unpacked = 0;
+        tiles = await Promise.all(tiles.map(async (t) => {
           if (!t.handedOver) return t;
-          const entry = zip.files[tileName(t.key)];
-          const packed = zipCompressor.packedOf(entry);
-          return packed ? { key: t.key, origin: t.origin, packed, inZip: true } : { key: t.key, origin: t.origin, data: entry?._data, inZip: true };
-        });
+          const kept = await zipCompressor.keepableOf(zip.files[tileName(t.key)]);
+          if (!kept.packed) unpacked++;
+          return { key: t.key, origin: t.origin, ...kept, inZip: true };
+        }));
+        console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Building tiles kept for the step cache: ${tiles.length - unpacked} compressed, ${unpacked} as plain bytes (small or not compressed).`);
       }
       return out ? { data: out.data || null, tiles, report: stats } : { data: null, tiles: [], report: stats };
     });

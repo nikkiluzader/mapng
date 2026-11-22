@@ -72,3 +72,42 @@ test('an entry kept compressed and put back unzips as it was', async () => {
   assert.equal(await back.file('levels/x/t.dae').async('string'), text);
   assert.equal(c.packedOf({ _data: 'small' }), null);
 });
+
+// A level's building tiles kept by the step cache (desktop: on disk) and put into the next export's zip: small
+// tiles are never compressed and handed over as a promise, and must come back as their bytes (report MR-H5AWFT:
+// kept as JSZip's own object, they came back {} and the second export failed).
+test('entries kept for the disk step cache go into the next zip intact', async () => {
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const { createZipCompressor } = await import('../services/zipCompress.js');
+  const { diskStepCache } = await import('../desktop/runner/diskStepCache.mjs');
+  const big = 'big tile '.repeat(40000);
+  const small = '<COLLADA>small</COLLADA>';
+  const zip = new JSZip();
+  const c = await createZipCompressor(JSZip);
+  // (as the export hands a tile over: its text as a promise of bytes)
+  for (const [name, text] of [['big.dae', big], ['small.dae', small]]) {
+    zip.file(name, Promise.resolve(new TextEncoder().encode(text)));
+    c.add(zip.files[name]);
+  }
+  await c.drain();
+  const kept = { tiles: [await c.keepableOf(zip.files['big.dae']), await c.keepableOf(zip.files['small.dae'])] };
+  assert.ok(kept.tiles[0].packed, 'the big tile kept compressed');
+  assert.ok(kept.tiles[1].data instanceof Uint8Array, 'the small tile kept as bytes');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mapng-stepcache-'));
+  try {
+    const store = diskStepCache(dir);
+    await store.set('k', kept);
+    const back = await store.get('k');
+    const zip2 = new JSZip();
+    const c2 = await createZipCompressor(JSZip);
+    c2.putPacked(zip2, 'big.dae', back.tiles[0].packed);
+    zip2.file('small.dae', back.tiles[1].data);
+    const out = await JSZip.loadAsync(await zip2.generateAsync({ type: 'uint8array', compression: 'DEFLATE' }), { checkCRC32: true });
+    assert.equal(await out.file('big.dae').async('string'), big);
+    assert.equal(await out.file('small.dae').async('string'), small);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

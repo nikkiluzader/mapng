@@ -626,6 +626,7 @@
               <template v-else-if="exportDone.where === 'downloaded'">{{ t('exportPanel.done.whereDownloaded') }}</template>
               <template v-else>{{ t('exportPanel.done.whereDownload') }}</template>
             </p>
+            <p v-if="exportDone.saveFailed" class="text-caption text-amber-700 dark:text-amber-400" data-testid="export-done-save-failed">{{ t(exportDone.saveFailed === 'disk' ? 'exportPanel.done.saveFailedDisk' : 'exportPanel.done.saveFailed') }}</p>
           </div>
           <p class="text-caption text-gray-500 dark:text-gray-400">{{ t(exportDone.where === 'mods' ? 'exportPanel.desktopLoadHint' : 'exportPanel.done.nextWeb') }}</p>
           <!-- the level's export report: to read here, or to save as a text file -->
@@ -2560,15 +2561,31 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       blobSize: blob.size,
     });
 
+    // (writing to the place the visitor picked can fail with the level built: a full disk gave QuotaExceededError,
+    // report MR-S89DMQ. The level is still in memory, so it is offered as a normal download instead of lost.)
+    let saveFailed = null;
     if (beamNGSaveHandle) {
-      const writable = await beamNGSaveHandle.createWritable();
-      await writable.write(blob);
-      await writable.close();
+      let writable = null;
+      try {
+        writable = await beamNGSaveHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+      } catch (saveError) {
+        saveFailed = isDiskFull(saveError?.message || saveError) || saveError?.name === 'QuotaExceededError' ? 'disk' : 'other';
+        console.warn(`${BEAMNG_EXPORT_UI_LOG} Could not write the level to the chosen place (${saveError?.name || 'Error'}: ${saveError?.message || saveError}); offering it as a download instead (${saveFailed === 'disk' ? 'the disk looks full' : 'other reason'}).`);
+        try { await writable?.abort?.(); } catch { /* nothing left to undo */ }
+      }
+    }
+    if (beamNGSaveHandle && !saveFailed) {
       console.log(`${BEAMNG_EXPORT_UI_LOG} Download written via File System Access API.`);
       // (the name the visitor gave it in the save window)
       doneInfo = { filename: beamNGSaveHandle.name || filename, size: blob.size, where: 'chosen', report: exportReportText, reportJson: exportReportJson };
       announceWhenClosed = ['beamng_level_zip', filename];
       console.log(`${BEAMNG_EXPORT_UI_LOG} Export success notification emitted.`);
+    } else if (saveFailed) {
+      beamNGPendingDownloadUrl.value = URL.createObjectURL(blob);
+      beamNGPendingDownloadName.value = beamNGSaveHandle.name || filename;
+      doneInfo = { filename: beamNGSaveHandle.name || filename, size: blob.size, where: 'download', saveFailed, report: exportReportText, reportJson: exportReportJson };
     } else {
       // Stage a blob URL and expose a real user-clicked anchor download link.
       beamNGPendingDownloadUrl.value = URL.createObjectURL(blob);

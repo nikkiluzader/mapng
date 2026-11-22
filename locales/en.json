@@ -621,6 +621,8 @@
       "whereMods": "In your BeamNG mods folder: {path}",
       "whereChosen": "It is in the folder you picked in the save window. (A browser tells a page the file's name, not its folder, so MapNG cannot show the path.)",
       "whereDownload": "Click Download to save it. Your browser puts it in its downloads folder.",
+      "saveFailedDisk": "It could not be saved where you chose: that disk looks full. Free some space there, or download it here instead.",
+      "saveFailed": "It could not be saved where you chose. Download it here instead.",
       "nextWeb": "To play it: move the zip into BeamNG.drive's mods folder, then choose Freeroam and pick the level.",
       "download": "Download",
       "close": "Close",
