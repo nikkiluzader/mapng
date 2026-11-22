@@ -1997,10 +1997,21 @@ export const fetchTerrainData = async (
     const { chunked, ...rest } = generationOptions;
     const { generateChunked } = await import('./chunkedGenerate.js');
     const fetchArgs = { includeOSM: !!includeOSM, useUSGS: !!useUSGS, useGPXZ: !!useGPXZ, useKRON86: !!useKRON86 };
+    // (each chunk's own lines as "Chunk 3 of 43: <line>": the progress card counts chunks with them,
+    // services/generationProgress.js parseChunkStatus, instead of running through every stage once per chunk)
+    let current = null;
+    const chunkLine = (update) => {
+      if (!current || !onProgress) return onProgress?.(update);
+      const prefix = `Chunk ${current.chunk} of ${current.of}: `;
+      return onProgress(typeof update === 'string' ? prefix + update : (update && typeof update === 'object' ? { ...update, status: prefix + (update.status || '') } : update));
+    };
     const td = await generateChunked({
-      fetch: (c, size, o) => fetchTerrainData(c, size, includeOSM, useUSGS, useGPXZ, useKRON86, gpxzApiKey, baseColor, onProgress, signal, o),
+      fetch: (c, size, o) => fetchTerrainData(c, size, includeOSM, useUSGS, useGPXZ, useKRON86, gpxzApiKey, baseColor, o?.chunkPrefetch ? chunkLine : onProgress, signal, o),
       center, W: chunked.W, H: chunked.H, mpp: Number(chunked.mpp) || 1, footprint: rest.footprint, generationOptions: rest,
-      onStatus: (st) => onProgress?.(st.overview ? 'Chunked level: making the overview for the previews…' : `Chunked level: downloading chunk ${st.chunk} of ${st.of}…`),
+      onStatus: (st) => {
+        current = st.overview ? null : st;
+        onProgress?.(st.overview ? 'Chunked level: making the overview for the previews…' : `Chunk ${st.chunk} of ${st.of}: starting…`);
+      },
       log: (m) => console.log(`[Chunked] ${m}`),
     });
     td.chunked.fetchArgs = fetchArgs;

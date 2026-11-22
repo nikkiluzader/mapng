@@ -82,6 +82,15 @@ export function classifyGenerationStatus(text) {
   return null;
 }
 
+// (a chunk's download, in seconds: about 9-17 s each on a 43-chunk road at 1 m)
+const CHUNK_SECONDS = 10;
+
+/** A chunked level's line "Chunk 3 of 43: <its own line>" as { n, of, sub }, or null. */
+export function parseChunkStatus(text) {
+  const m = /^Chunk (\d+) of (\d+): ([\s\S]*)$/.exec(String(text || ''));
+  return m ? { n: Number(m[1]), of: Number(m[2]), sub: m[3] } : null;
+}
+
 const countFraction = (text) => {
   // "mirror 2/6" is which Overpass server is being tried, not progress
   if (/mirror/i.test(String(text || ''))) return null;
@@ -106,7 +115,8 @@ export function createGenerationProgress({ resolution, includeOSM, upload = fals
   const seconds = stageSeconds({ px, includeOSM, upload, raw, flat, source, groundFilter, smoothRoads });
   const startIndex = startAt ? Math.max(0, GENERATION_STAGES.indexOf(startAt)) : 0;
   GENERATION_STAGES.forEach((stage, i) => { if (i < startIndex) seconds[stage] = 0; });
-  const total = GENERATION_STAGES.reduce((sum, stage) => sum + seconds[stage], 0) || 1;
+  let total = GENERATION_STAGES.reduce((sum, stage) => sum + seconds[stage], 0) || 1;
+  let chunkCount = 0;             // a chunked level: how many chunks the download stage holds (0: not chunked)
 
   let index = startIndex;
   let stageStartedAt = now();
@@ -135,6 +145,32 @@ export function createGenerationProgress({ resolution, includeOSM, upload = fals
   };
 
   const update = (status, statusPercent = null) => {
+    // a chunked level (services/chunkedGenerate.js): each chunk runs a whole Generate of its own, so its lines would
+    // walk the card through every stage once per chunk and leave it at the last one, near 99 %, for the rest (a
+    // 43-chunk road looked stuck in a loop). They are the download stage instead, chunk by chunk.
+    const chunk = parseChunkStatus(status);
+    if (chunk) {
+      if (chunk.of !== chunkCount) {
+        chunkCount = chunk.of;
+        seconds.source = Math.max(seconds.source, CHUNK_SECONDS * chunk.of);
+        total = GENERATION_STAGES.reduce((sum, st) => sum + seconds[st], 0) || 1;
+      }
+      const sourceIndex = GENERATION_STAGES.indexOf('source');
+      let completed = null;
+      if (sourceIndex > index) {
+        if (stageLabel) completed = { step: stageLabel, durationMs: now() - stageStartedAt };
+        index = sourceIndex; stageFraction = 0; stageStartedAt = now(); stageLabel = null; reported = 0;
+      }
+      if (index === sourceIndex) {
+        stageLabel ||= `Downloading ${chunk.of} chunks`;
+        // (inside a chunk: how far its own run is, by the stage its line belongs to)
+        const inner = classifyGenerationStatus(chunk.sub);
+        const within = inner ? GENERATION_STAGES.indexOf(inner) / GENERATION_STAGES.length : 0;
+        reported = Math.max(reported, Math.min(1, (chunk.n - 1 + within) / chunk.of));
+        counted = true;
+      }
+      return { pct: percent(), completed, stage: GENERATION_STAGES[index], stageFraction };
+    }
     let completed = null;
     const stage = classifyGenerationStatus(status);
     const next = stage ? GENERATION_STAGES.indexOf(stage) : -1;

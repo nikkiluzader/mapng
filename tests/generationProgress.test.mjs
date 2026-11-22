@@ -84,3 +84,26 @@ test('a counting stage still creeps between its counts, but never far past the l
   assert.ok(b.stageFraction > a.stageFraction, 'moving while it waits');
   assert.ok(b.stageFraction <= 0.25 + 0.25 * 0.75 + 1e-9, `not past a quarter of the rest (${b.stageFraction})`);
 });
+
+// A chunked level: each chunk's run reports every stage with a "Chunk n of m:" prefix. The card counts the chunks
+// in the download stage and never jumps to the last stage after the first chunk (a 43-chunk road sat at 99 %,
+// cycling through the same lines, and looked stuck).
+test('chunked Generate counts chunks in the download stage', async () => {
+  const { createGenerationProgress, parseChunkStatus } = await import('../services/generationProgress.js');
+  assert.deepEqual(parseChunkStatus('Chunk 3 of 43: Fetching global tiles'), { n: 3, of: 43, sub: 'Fetching global tiles' });
+  assert.equal(parseChunkStatus('Fetching global tiles'), null);
+  let t = 0;
+  const g = createGenerationProgress({ resolution: 2853, includeOSM: true, source: 'mapterhorn', now: () => t });
+  const inner = ['starting…', 'Fetching global tiles 3/9', 'Resampling heightmap to 1m/px…', 'Generating game map texture…'];
+  let last = 0; let mid = null;
+  for (let n = 1; n <= 10; n++) for (const l of inner) {
+    t += 2000;
+    const r = g.update(`Chunk ${n} of 10: ${l}`);
+    assert.equal(r.stage, 'source', 'every chunk line stays in the download stage');
+    assert.ok(r.pct >= last); last = r.pct;
+    if (n === 5 && l === inner[3]) mid = r.pct;
+  }
+  assert.ok(mid > 20 && mid < 80, `half the chunks is mid-way (${mid} %)`);
+  assert.ok(last < 99, 'room left for the overview');
+  assert.equal(g.update('Generating game map texture…').stage, 'textures', 'the overview runs the stages after');
+});
