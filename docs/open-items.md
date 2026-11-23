@@ -32,7 +32,7 @@ Known and not blocking 0.3.6 (say so on the page):
 10. **Sidewalk drift, jagged terrain from our own steps, sawtooth on steep roads, the sea-wall branch,** and
     Fizz_Mechanic's held list.
 
-Waiting on the user: the three lines to remove from mapng.env, a second update key pair, a look at mapng.com/admin.
+Waiting on the user: a second update key pair (optional), so the first can be retired one day.
 
 ## State of the branches
 
@@ -486,11 +486,12 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
 - **Left for the user:**
   - (done 2026-11-23: the four secrets are in the `release` environment only, the repository holds none; the Azure
     values were checked to sign in and the signing key to match `UPDATE_KEYS` before the old ones were deleted)
-  - remove the `AZURE_CLIENT_SECRET` line from mapng.env;
-  - take `UPDATE_SIGNING_KEY` out of mapng.env (keep it offline), and make a second key pair so the first can be
-    retired (its public half into `UPDATE_KEYS`);
-  - (done 2026-11-23: the `CRASH_ADMIN_TOKEN` worker secret is deleted on both workers) remove its line
-    (`MAPNG_CRASH_ADMIN_TOKEN`) from mapng.env;
+  - (decided 2026-11-23: the keys stay in mapng.env. The user: they are stored locally, never reach the repo, are
+    backed up, and may be needed for later security work. Not asked for again.)
+  - optional: a second update key pair so the first can be retired (its public half into `UPDATE_KEYS`);
+  - (done 2026-11-23: the user signed in to mapng.com/admin after the content policy and cookie change; it loads.)
+  - (done 2026-11-23: the `CRASH_ADMIN_TOKEN` worker secret is deleted on both workers; its line in mapng.env
+    stays with the others and opens nothing now);
   - (done 2026-11-23: GitHub's immutable releases are on. A published release's files and tag can no longer be
     changed: a release that needs a rebuild gets a new version number. Drafts can still be changed, so the workflow's
     uploads, signatures and checksums go on before publishing, as they already do.)
