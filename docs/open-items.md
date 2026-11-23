@@ -339,6 +339,11 @@ As of 2026-11-23:
   - **Mesh Roads only: [03] joins that puncture tyres, [04] hairpins.** Mesh Roads are experimental and off by
     default; the 0.3.3 list's item 8.
   - **Unnumbered:** sidewalk slabs tilted at a roundabout and lying across a junction.
+  **His three export reports read 2026-11-24** (`refs/fizz_exports`, unpacked to `scratch/fizz035/reports`; notes
+  at the end of `feedback_0.3.5.md`): the Perce-Neige funicular is pushed under six dips of the ground and the dips
+  filled (his waves and bulge); the Pigettes gallery's end climbs 35 % beside a bridge; every gallery has the same
+  5.20 m crown; the Mesh Roads export has 6 stepped joints where the Decal Roads one has none; 584 terrain spikes
+  near structures. Nothing done since 0.3.5 touched any of it; `fz_funival` on today's code still ends at 97 %.
   Proposed for 0.3.6 (not agreed yet): the galleries' heights, the funicular's steady slope, bridge width and the
   bridge spikes. For later: Mesh Road joins and hairpins, the big tunnel box, water under small bridges.
 
