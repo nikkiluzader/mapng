@@ -752,6 +752,8 @@
       "halfLevel": "Poziom BeamNG",
       "halfAssets": "Zasoby dla twórców",
       "halfAssetsHint": "Pliki do własnych narzędzi. Każdy pobiera się osobno.",
+      "perTile": "Jeden plik na kafel ({n} kafli)",
+      "perTileHint": "Wyłączone: jeden plik dla całej mapy. Włączone: mapa wysokości, obrazy, maska dróg, GeoTIFF i .ter powstają osobno dla każdego kafla, z nazwami _tile1, _tile2 itd.",
       "meshSpacing": "Odstęp punktów",
       "meshSpacingAuto": "Automatycznie (co {m} m)",
       "meshSpacingEvery": "Co {m} m",

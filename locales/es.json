@@ -752,6 +752,8 @@
       "halfLevel": "Nivel de BeamNG",
       "halfAssets": "Recursos para creadores",
       "halfAssetsHint": "Archivos para tus propias herramientas. Cada uno se descarga por separado.",
+      "perTile": "Un archivo por tesela ({n} teselas)",
+      "perTileHint": "Desactivado: un archivo para todo el mapa. Activado: el mapa de alturas, las imágenes, la máscara de carreteras, el GeoTIFF y el .ter se crean una vez por tesela, con los nombres _tile1, _tile2, etc.",
       "meshSpacing": "Separación entre puntos",
       "meshSpacingAuto": "Automática (cada {m} m)",
       "meshSpacingEvery": "Cada {m} m",

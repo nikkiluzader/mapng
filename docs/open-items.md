@@ -71,7 +71,13 @@ Known and not blocking 0.3.6 (say so on the page):
 
 7. **Long tunnels and bridges across pieces of a chunked level:** planned per piece; a plan made once for the whole
    level is the fix. A street on a lid over a tunnel trench on a join can dip.
-8. **Per-tile asset export from tiles** (the old batch jobs' purpose); then the batch code and its texts removed.
+8. **Per-tile asset export from tiles** (the old batch jobs' purpose). Done on dev 2026-11-23: with several tiles,
+   step 3's assets have a switch "One file per tile": the heightmap, the pictures, the road mask, the GeoTIFF and the
+   .ter are made once per tile, named `_tile1`, `_tile2` (`components/panels/ExportPanel.vue` assetExport, the
+   crop helper's own corner option). Checked in the browser on two 512 tiles (`scratch/verify-pw/e2e_pertile.mjs`):
+   two files of 512 x 512, each exactly its half of the whole map's. Not per tile: the 3D models (they have their
+   own tiling), the GeoJSON (it is the whole map's data), a chunked level (its overview is too coarse). Left: the
+   batch code and its texts removed (the old panel still opens for an unfinished saved job).
 9. **Desktop Generate runs out of memory at 8192 on 16 GB;** big-city exports on the website.
 10. **Sidewalk drift, jagged terrain from our own steps, sawtooth on steep roads, the sea-wall branch,** and
     Fizz_Mechanic's held list.

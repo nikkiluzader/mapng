@@ -752,6 +752,8 @@
       "halfLevel": "Niveau BeamNG",
       "halfAssets": "Ressources pour créateurs",
       "halfAssetsHint": "Des fichiers pour vos propres outils. Chacun se télécharge séparément.",
+      "perTile": "Un fichier par tuile ({n} tuiles)",
+      "perTileHint": "Désactivé : un fichier pour toute la carte. Activé : la heightmap, les images, le masque de routes, le GeoTIFF et le .ter sont créés une fois par tuile, nommés _tile1, _tile2, etc.",
       "meshSpacing": "Espacement des points",
       "meshSpacingAuto": "Auto (tous les {m} m)",
       "meshSpacingEvery": "Tous les {m} m",

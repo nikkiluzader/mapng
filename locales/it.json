@@ -752,6 +752,8 @@
       "halfLevel": "Livello BeamNG",
       "halfAssets": "Risorse per creatori",
       "halfAssetsHint": "File per i tuoi strumenti. Ognuno si scarica separatamente.",
+      "perTile": "Un file per tessera ({n} tessere)",
+      "perTileHint": "Disattivato: un file per tutta la mappa. Attivato: la mappa di altezza, le immagini, la maschera stradale, il GeoTIFF e il .ter vengono creati una volta per tessera, con i nomi _tile1, _tile2 e così via.",
       "meshSpacing": "Distanza tra i punti",
       "meshSpacingAuto": "Automatica (ogni {m} m)",
       "meshSpacingEvery": "Ogni {m} m",

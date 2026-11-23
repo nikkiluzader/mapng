@@ -346,11 +346,20 @@
         <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.halfAssetsHint') }}</p>
       </div>
       <!-- 2D Assets -->
+      <!-- a map of several tiles: its pictures, heightmap, GeoTIFF and .ter as one file each for the whole map, or one
+           per tile (what the old batch jobs made) -->
+      <div v-if="showAssets && tileParts.length > 1" class="rounded border border-gray-200 dark:border-gray-700 px-3 py-2 space-y-1" data-testid="assets-per-tile">
+        <label class="flex items-center justify-between gap-2 text-xs text-gray-700 dark:text-gray-300">
+          <span>{{ t('exportPanel.ui.perTile', { n: tileParts.length }) }}</span>
+          <BaseSwitch :on="assetsPerTile" :label="t('exportPanel.ui.perTile', { n: tileParts.length })" data-testid="assets-per-tile-switch" :disabled="isAnyExporting" @toggle="assetsPerTile = !assetsPerTile" />
+        </label>
+        <p class="text-micro leading-snug text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.perTileHint') }}</p>
+      </div>
       <SettingSection v-if="showAssets" v-model:open="showExport2D" :title="t('exportPanel.assets2d')" :icon="Layers" data-testid="export-2d-section">
         <div class="grid grid-cols-2 gap-1.5">
           <!-- Heightmap -->
           <button 
-            @click="downloadHeightmap"
+            @click="assetExport(downloadHeightmap)"
             :disabled="isAnyExporting"
             class="relative flex flex-col items-center justify-center p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
           >
@@ -366,7 +375,7 @@
 
           <!-- Satellite Texture -->
           <button 
-            @click="downloadTexture"
+            @click="assetExport(downloadTexture)"
             :disabled="isAnyExporting"
             class="relative flex flex-col items-center justify-center p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
           >
@@ -382,7 +391,7 @@
 
           <!-- OSM Texture -->
           <button 
-            @click="downloadOSMTexture"
+            @click="assetExport(downloadOSMTexture)"
             :disabled="!hasOsmData || isAnyExporting"
             class="relative flex flex-col items-center justify-center p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
           >
@@ -398,7 +407,7 @@
 
           <!-- Game Texture -->
           <button 
-            @click="downloadGameTexture"
+            @click="assetExport(downloadGameTexture)"
             :disabled="!hasOsmData || isAnyExporting"
             class="relative flex flex-col items-center justify-center p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
           >
@@ -414,7 +423,7 @@
 
           <!-- Road Mask -->
           <button 
-            @click="downloadRoadMask"
+            @click="assetExport(downloadRoadMask)"
             :disabled="!terrainData.osmFeatures || terrainData.osmFeatures.length === 0 || isAnyExporting"
             class="relative flex flex-col items-center justify-center p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
           >
@@ -527,7 +536,7 @@
             
             <!-- TER (BeamNG) Model -->
             <button 
-              @click="handleTERExport"
+              @click="assetExport(handleTERExport)"
               :disabled="isAnyExporting"
               class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-20"
             >
@@ -549,7 +558,7 @@
           <div class="grid grid-cols-2 gap-1.5">
             <!-- GeoTIFF -->
             <button 
-              @click="downloadGeoTIFF"
+              @click="assetExport(downloadGeoTIFF)"
               :disabled="isAnyExporting"
               class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-20"
             >
@@ -752,6 +761,8 @@ import { sanitizeTreeKindsOff, sanitizeTreeModelsOff, sanitizeTreeSwaps } from '
 import { squareCropNotice } from '../../services/squareCrop.js';
 import { CHECKBOX, SELECT_XS } from '../base/controlStyles.js';
 import { prepareCroppedTerrainData } from '../../services/cropTerrain';
+import BaseSwitch from '../base/BaseSwitch.vue';
+import { tilesFromTerrain, layoutGrid } from '../../services/tileLayout.js';
 import { reverseLocationName } from '../../services/nominatim';
 
 const { t } = useI18n({ useScope: 'global' });
@@ -1823,6 +1834,7 @@ const downloadBlobUrlAsFile = async (url, filename, expectedMimePrefix = 'image/
 };
 
 const triggerDownload = (blob, filename) => {
+  filename = partFile(filename);
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.download = filename;
@@ -1900,7 +1912,40 @@ const prepareTexture = async (kind) => {
   store.texturePreparing = kind;
   try { if (await ensureTexture(td, kind)) store.texturesMade++; } finally { if (store.texturePreparing === kind) store.texturePreparing = ''; }
 };
-const getExportTerrainData = () => prepareCroppedTerrainData(toRaw(props.terrainData));
+// One tile of a map of several (services/tileLayout.js): its square of the map, for the files that can be made per
+// tile. The tiles are the map's own (terrainData.tiles, as Generate laid them); a chunked level's overview is too
+// coarse to cut tiles from, and a map padded to another size has no such squares.
+const assetsPerTile = ref(localStorage.getItem('mapng_assetsPerTile') === 'true');
+watch(assetsPerTile, (v) => { try { localStorage.setItem('mapng_assetsPerTile', String(v)); } catch { /* private mode */ } });
+const tileParts = computed(() => {
+  const td = props.terrainData; const tl = tilesFromTerrain(td);
+  if (!tl || td?.chunked) return [];
+  const R = tl.tilePx; const g = layoutGrid(tl.list.map((p) => ({ dx: Math.round(p.dx * R), dy: Math.round(p.dy * R) })), R);
+  if (g.width !== td.width || g.height !== td.height) return [];
+  return g.rects.map(([x, y], i) => ({ n: i + 1, x, y, size: R }));
+});
+let activePart = null;
+/** A file's name for the tile being made: "name_tile3.png" (the whole map: the name as it is). */
+// (before the file's own ending, the last dot followed by a letter: the names carry coordinates with dots in them)
+const partFile = (filename) => {
+  const name = String(filename);
+  if (!activePart || /_tile\d+(\.|$)/.test(name)) return name;
+  const m = /\.[A-Za-z][A-Za-z0-9]*$/.exec(name);
+  return m ? `${name.slice(0, m.index)}_tile${activePart.n}${m[0]}` : `${name}_tile${activePart.n}`;
+};
+/** Runs an export for the whole map, or once per tile when that is asked for. */
+const assetExport = async (run) => {
+  if (!assetsPerTile.value || tileParts.value.length < 2) return run();
+  for (const part of tileParts.value) {
+    activePart = part;
+    try { await run(); } finally { activePart = null; }
+    // (a moment between files: a browser drops downloads started in one burst)
+    await new Promise((r) => setTimeout(r, 400));
+  }
+};
+const getExportTerrainData = () => (activePart
+  ? prepareCroppedTerrainData({ ...toRaw(props.terrainData), exportCropSize: activePart.size, exportCropStart: { x: activePart.x, y: activePart.y } })
+  : prepareCroppedTerrainData(toRaw(props.terrainData)));
 
 const resolveProcessingMetersPerPixel = (terrainData) => {
   const parsed = Number(terrainData?.processingMetersPerPixel);
@@ -1940,7 +1985,7 @@ const createRoadMaskProjection = (terrainData, targetWidth, targetHeight, fallba
 
 const downloadMetadataSidecar = (exportFilename, metadata) => {
   if (!ENABLE_METADATA_SIDECARS) return;
-  const baseName = exportFilename.replace(/\.[^.]+$/, '');
+  const baseName = partFile(exportFilename).replace(/\.[^.]+$/, '');
   downloadJsonFile(metadata, `${baseName}.metadata.json`);
 };
 
@@ -2661,7 +2706,7 @@ const handleTERExport = async () => {
     await yieldToUi();
     const td = await getExportTerrainData();
     const terBlob = await generateTerBlob(td);
-    const filename = `terrain_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.ter`;
+    const filename = partFile(`terrain_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.ter`);
     
     // Create download link
     const url = URL.createObjectURL(terBlob);

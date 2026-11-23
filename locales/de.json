@@ -752,6 +752,8 @@
       "halfLevel": "BeamNG-Level",
       "halfAssets": "Assets für Ersteller",
       "halfAssetsHint": "Dateien für deine eigenen Werkzeuge. Jede wird einzeln heruntergeladen.",
+      "perTile": "Eine Datei pro Kachel ({n} Kacheln)",
+      "perTileHint": "Aus: eine Datei für die ganze Karte. An: Heightmap, Bilder, Straßenmaske, GeoTIFF und .ter werden für jede Kachel einzeln erstellt und _tile1, _tile2 usw. benannt.",
       "meshSpacing": "Punktabstand",
       "meshSpacingAuto": "Automatisch (alle {m} m)",
       "meshSpacingEvery": "Alle {m} m",

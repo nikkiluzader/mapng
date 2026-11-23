@@ -757,6 +757,8 @@
       "halfLevel": "BeamNG level",
       "halfAssets": "Assets for creators",
       "halfAssetsHint": "Files for your own tools. Each one downloads on its own.",
+      "perTile": "One file per tile ({n} tiles)",
+      "perTileHint": "Off: one file for the whole map. On: the heightmap, the pictures, the road mask, the GeoTIFF and the .ter are made once for each tile, named _tile1, _tile2 and so on.",
       "meshSpacing": "Point spacing",
       "meshSpacingAuto": "Auto (every {m} m)",
       "meshSpacingEvery": "Every {m} m",
