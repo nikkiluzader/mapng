@@ -27,7 +27,7 @@
     "resetBody": "Every setting goes back to its default. The tiles, the picked road, drawn masks and any terrain you have generated are cleared, and MapNG starts as on a first visit.",
     "resetKeepPlace": "Keep the map where it is",
     "resetKeepPlaceHint": "Unticked: MapNG asks for your location and goes there, or to its default place.",
-    "resetKept": "Kept: your API key and your own Overpass server, the language, light or dark mode, and your sharing choices. Levels you have already saved are not touched.",
+    "resetKept": "Kept: your API key and your own Overpass server, the language, light or dark mode, Basic or Advanced, the output size, your sharing choices, and two map data choices (road widths from the satellite picture, buildings from Overture). Levels you have already saved are not touched.",
     "resetOnceAWeek": "You will not be asked again for a week.",
     "resetCancel": "Cancel",
     "resetConfirm": "Reset",

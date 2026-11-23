@@ -22,7 +22,7 @@
     "resetBody": "Alle Einstellungen gehen auf ihre Standardwerte zurück. Die Kacheln, die gewählte Straße, gezeichnete Masken und bereits erzeugtes Gelände werden gelöscht, und MapNG startet wie beim ersten Besuch.",
     "resetKeepPlace": "Karte bleibt, wo sie ist",
     "resetKeepPlaceHint": "Ohne Haken: MapNG fragt nach deinem Standort und springt dorthin, sonst zu seinem Standardort.",
-    "resetKept": "Bleibt erhalten: dein API-Schlüssel und dein eigener Overpass-Server, die Sprache, heller oder dunkler Modus und deine Freigabe-Einstellungen. Bereits gespeicherte Level werden nicht angetastet.",
+    "resetKept": "Bleibt erhalten: dein API-Schlüssel und dein eigener Overpass-Server, die Sprache, heller oder dunkler Modus, Einfach oder Erweitert, die Ausgabegröße, deine Freigabe-Einstellungen und zwei Kartendaten-Optionen (Straßenbreiten aus dem Satellitenbild, Gebäude von Overture). Bereits gespeicherte Level werden nicht angetastet.",
     "resetOnceAWeek": "Eine Woche lang wird nicht erneut gefragt.",
     "resetCancel": "Abbrechen",
     "resetConfirm": "Zurücksetzen",

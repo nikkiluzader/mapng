@@ -22,7 +22,7 @@
     "resetBody": "Todos los ajustes vuelven a sus valores por defecto. Se borran las teselas, la carretera elegida, las máscaras dibujadas y el terreno que hayas generado, y MapNG empieza como en la primera visita.",
     "resetKeepPlace": "Mantener el mapa donde está",
     "resetKeepPlaceHint": "Sin marcar: MapNG pide tu ubicación y va allí, o a su lugar por defecto.",
-    "resetKept": "Se conservan: tu clave de API y tu propio servidor Overpass, el idioma, el modo claro u oscuro y tus opciones de compartir. Los niveles ya guardados no se tocan.",
+    "resetKept": "Se conservan: tu clave de API y tu propio servidor Overpass, el idioma, el modo claro u oscuro, Básico o Avanzado, el tamaño de salida, tus opciones de compartir y dos opciones de datos del mapa (anchos de carretera a partir de la imagen de satélite, edificios de Overture). Los niveles ya guardados no se tocan.",
     "resetOnceAWeek": "No se volverá a preguntar durante una semana.",
     "resetCancel": "Cancelar",
     "resetConfirm": "Restablecer",

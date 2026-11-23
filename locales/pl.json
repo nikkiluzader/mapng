@@ -22,7 +22,7 @@
     "resetBody": "Wszystkie ustawienia wracają do wartości domyślnych. Usuwane są kafle, wybrana droga, narysowane maski i wygenerowany teren, a MapNG uruchomi się jak przy pierwszej wizycie.",
     "resetKeepPlace": "Zostaw mapę tam, gdzie jest",
     "resetKeepPlaceHint": "Bez zaznaczenia: MapNG zapyta o Twoją lokalizację i tam przejdzie, a bez niej do miejsca domyślnego.",
-    "resetKept": "Zostają: Twój klucz API i własny serwer Overpass, język, tryb jasny lub ciemny oraz ustawienia udostępniania. Zapisane już poziomy pozostają nietknięte.",
+    "resetKept": "Zostają: Twój klucz API i własny serwer Overpass, język, tryb jasny lub ciemny, tryb podstawowy lub zaawansowany, rozmiar wyjściowy, ustawienia udostępniania oraz dwie opcje danych mapy (szerokości dróg ze zdjęcia satelitarnego, budynki z Overture). Zapisane już poziomy pozostają nietknięte.",
     "resetOnceAWeek": "Przez tydzień to pytanie się nie pojawi.",
     "resetCancel": "Anuluj",
     "resetConfirm": "Zresetuj",

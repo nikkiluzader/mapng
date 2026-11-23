@@ -22,7 +22,7 @@
     "resetBody": "Tous les réglages reviennent à leurs valeurs par défaut. Les tuiles, la route choisie, les masques dessinés et le terrain déjà généré sont effacés, et MapNG démarre comme à la première visite.",
     "resetKeepPlace": "Garder la carte où elle est",
     "resetKeepPlaceHint": "Décoché : MapNG demande votre position et s’y rend, sinon à son lieu par défaut.",
-    "resetKept": "Conservés : votre clé d’API et votre propre serveur Overpass, la langue, le mode clair ou sombre et vos choix de partage. Les niveaux déjà enregistrés ne sont pas touchés.",
+    "resetKept": "Conservés : votre clé d’API et votre propre serveur Overpass, la langue, le mode clair ou sombre, Simple ou Avancé, la taille de sortie, vos choix de partage et deux options de données cartographiques (largeurs de route d’après l’image satellite, bâtiments d’Overture). Les niveaux déjà enregistrés ne sont pas touchés.",
     "resetOnceAWeek": "La question ne sera plus posée pendant une semaine.",
     "resetCancel": "Annuler",
     "resetConfirm": "Réinitialiser",

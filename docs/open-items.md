@@ -306,8 +306,10 @@ As of 2026-11-23:
   in Tile mode with one 1024 tile. Decided by the user the same day: keys, language, theme and sharing choices are
   never cleared; the question shows once a week at most; a checkbox "Keep the map where it is", on by default and
   remembered, keeps the place and zoom (unticked: the location is asked for, else Flagstaff). Off while a job runs.
-  Checked in the browser (`scratch/verify-pw/e2e_reset_week.mjs`, `e2e_reset_keep.mjs`). Open: a look in the packed
-  desktop app.
+  Checked in the browser (`scratch/verify-pw/e2e_reset_week.mjs`, `e2e_reset_keep.mjs`) and in the packed desktop
+  app. 2026-11-24, from the user's dev notes: Reset also keeps Basic / Advanced, the last output size, "Measure
+  road widths" and "Add missing buildings from Overture"; after it Location, Area & detail and the elevation data
+  source are open and every other section of steps 1 and 2 is closed (`RESET_SECTIONS`).
 
 ## Now: Fizz_Mechanic's 0.3.3 list (2026-11-19; on hold until after the 0.3.5 release, user 2026-11-20)
 

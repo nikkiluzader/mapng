@@ -10,10 +10,19 @@ import { PERSONAL_STORAGE_KEYS } from './personalKeys.js';
 export const RESET_KEEPS = new Set([
   ...PERSONAL_STORAGE_KEYS,                                 // the user's own key and server (services/personalKeys.js)
   'mapng_locale',                                           // the language
+  // (user, 2026-11-23, dev notes) the top-level mode, the last output size, and two map data choices
+  'mapng_advanced_mode', 'mapng_resolution', 'mapng_measureRoadWidths', 'mapng_overtureBuildings',
   'mapng_share_exports', 'mapng_share_settings',            // privacy choices (asked once; never asked again by a reset)
   'mapng_tip_last_shown_at', 'mapng_levelDeleteWarned', 'mapng_reset_asked_at', 'mapng_reset_keep_place',   // "already shown" notes
   'mapng_job_running', 'mapng_overpass_health_v1', 'mapng_overpass_probe_at',   // bookkeeping
 ]);
+// How the panel looks after a reset (user, 2026-11-23): step 1 shows Location and Area & detail, step 2 the
+// elevation data source; every other section is closed. Written after the clear, as each section's own stored state.
+export const RESET_SECTIONS = {
+  mapng_showCoordinates: 'true', mapng_ui_sec_area: 'true', mapng_showElevationSource: 'true',
+  mapng_ui_sec_points: 'false', mapng_ui_sec_background: 'false', mapng_ui_sec_mapdata: 'false',
+};
+
 /** The stored settings a reset clears: every `mapng_` key but the kept ones. */
 export const settingsToClear = (keys) => keys.filter((k) => typeof k === 'string' && k.startsWith('mapng_') && !RESET_KEEPS.has(k));
 
@@ -38,6 +47,7 @@ export async function resetApp({ storage = globalThis.localStorage, locate = ask
   // (again: nothing the page stored while the question was open survives)
   cleared.push(...clear());
   if (here) { try { storage.setItem('mapng_center', JSON.stringify(here)); } catch { /* private mode */ } }
+  for (const [k, v] of Object.entries(RESET_SECTIONS)) { try { storage.setItem(k, v); } catch { /* private mode */ } }
   for (const [k, v] of place) { try { storage.setItem(k, v); } catch { /* private mode */ } }
   reload();
   return { cleared, here };
