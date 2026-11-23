@@ -1,6 +1,6 @@
 # MapNG open items
 
-Last reviewed: 2026-11-23 (security pass: fixed on dev, the user's part listed)
+Last reviewed: 2026-11-23 (security pass fixed; main = dev at e6ee91e)
 
 The short "now" board: current work, what waits on someone, and checks owed on shipped work. The other tracking
 files: `refs/output/backlog.md` holds everything wanted later, by area; `refs/output/releases.md` what shipped;
@@ -9,13 +9,18 @@ these files; they are never copied.
 
 ## State of the branches
 
-As of 2026-11-20 night (late):
+As of 2026-11-23:
 
-- `main` = `dev` at d73b5f9: **0.3.5 published 2026-11-20 23:04 UTC as Latest** (tag v0.3.5; notes in
-  refs/output/releases.md). It carries the coast / terrain seams / side-slope blend, the point cloud fill, the hairpin
-  bends, the movable upload square and the experimental "Ground as models" switch for single exports. Checked: unit
-  tests, the smoke matrix (identical to the last committed sweep, 135 cells), web and desktop end to end with ground
-  models on, the packed AppImage from the release draft. Not checked: the Windows installer and portable builds.
+- `main` = `dev` at e6ee91e (pushed 2026-11-23 on the user's word, after a sweep). mapng.com now carries tiles in
+  step 1, road mode, chunked levels and the security pass (worker, pages). The desktop app on users' machines is
+  still 0.3.5: the desktop security fixes (updater, switches, permission handler, redirect guard, Electron 44.11.5,
+  Node 26.13.1) reach users with the next desktop release. Checked before the push: 1,441 unit tests; the smoke
+  matrix, 135 cells, every one identical to the 0.3.5 sweep (scratch/sweep_secpass.json against scratch/sweep_2a.json;
+  the ten values over the stored baselines are the same ten as then); web end to end on the production build with
+  the content policy on; the packed Linux app and an unpacked Windows build (run on Windows) through Generate and an
+  export. Live after the deploy: the app page's policy, `/crash-reports` and `/api/crash/list` gone (404), the
+  wording on /security. Not checked: the dashboard's page signed in (behind the user's sign-in), the new release
+  workflow (first tag), a signed Windows installer.
   Branches: `seawall` (5009640, local: the promenade, for 0.3.6), `step-walls-2` (390b697), `hairpin-blend` (unswept),
   `step-walls` (older, superseded by -2).
 - The sweep's known pre-existing flags: sidewalk drift at naldo, kingst, deckpark_g, stelvio; ams_centraal mh/ready;
@@ -279,7 +284,8 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
   - remove the `AZURE_CLIENT_SECRET` line from mapng.env;
   - take `UPDATE_SIGNING_KEY` out of mapng.env (keep it offline), and make a second key pair so the first can be
     retired (its public half into `UPDATE_KEYS`);
-  - after main deploys: delete the `CRASH_ADMIN_TOKEN` worker secret (both workers) and its line in mapng.env;
+  - (done 2026-11-23: the `CRASH_ADMIN_TOKEN` worker secret is deleted on both workers) remove its line
+    (`MAPNG_CRASH_ADMIN_TOKEN`) from mapng.env;
   - decide on GitHub's immutable releases (a published release could then not be rebuilt in place);
 - **Checked 2026-11-23 with the user's token:** Workers Builds has one trigger per worker (`main` for mapng, `dev`
   for dev-mapng), no other branch builds, no build variables; Access: the admin app covers `mapng.com/admin*` and
