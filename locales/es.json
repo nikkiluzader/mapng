@@ -19,8 +19,11 @@
     "resetTooltip": "Restablecer MapNG",
     "resetBusy": "Espera a que termine el trabajo en curso y luego restablece",
     "resetTitle": "¿Restablecer MapNG?",
-    "resetBody": "Todos los ajustes vuelven a sus valores por defecto. Se borran la ubicación, las teselas, la carretera elegida, las máscaras dibujadas y el terreno que hayas generado. MapNG empieza como en la primera visita y vuelve a pedir tu ubicación.",
+    "resetBody": "Todos los ajustes vuelven a sus valores por defecto. Se borran las teselas, la carretera elegida, las máscaras dibujadas y el terreno que hayas generado, y MapNG empieza como en la primera visita.",
+    "resetKeepPlace": "Mantener el mapa donde está",
+    "resetKeepPlaceHint": "Sin marcar: MapNG pide tu ubicación y va allí, o a su lugar por defecto.",
     "resetKept": "Se conservan: tu clave de API y tu propio servidor Overpass, el idioma, el modo claro u oscuro y tus opciones de compartir. Los niveles ya guardados no se tocan.",
+    "resetOnceAWeek": "No se volverá a preguntar durante una semana.",
     "resetCancel": "Cancelar",
     "resetConfirm": "Restablecer",
     "disclaimer": "Aviso",
@@ -784,7 +787,7 @@
       "bundleOsm": "Incluir los datos del mapa para informes de errores",
       "bundleOsmHint": "Activado: los datos de OpenStreetMap con los que se construyó el nivel se incluyen en él (levels/<name>/mapng_source/, unos pocos MB como mucho, que el juego nunca lee), para poder reconstruir un informe sobre el nivel con exactamente los mismos datos. Desactivado: no se incluyen.",
       "groundModels": "Suelo como modelos (experimental)",
-      "groundModelsHint": "Activado: el suelo se construye como modelos 3D en lugar del terreno de BeamNG, así un nivel por lotes puede tener cualquier forma (una franja larga de teselas). El nivel carga más lento (su colisión se construye al cargar) y no tiene hierba; el editor de terreno no funciona en él. Desactivado: el terreno habitual."
+      "groundModelsHint": "Activado: el suelo se construye como modelos 3D en lugar del terreno de BeamNG, así un nivel de varias teselas o a lo largo de una carretera puede tener cualquier forma (una franja larga de teselas). El nivel carga más lento (su colisión se construye al cargar) y no tiene hierba; el editor de terreno no funciona en él. Desactivado: el terreno habitual."
     },
     "weight": {
       "title": "¿Cuánto pesa este nivel?",
@@ -987,7 +990,7 @@
     "subtitle": "Mapas reales para BeamNG.drive",
     "hero": "MapNG convierte cualquier lugar real en un nivel jugable de BeamNG.drive: terreno, texturas, carreteras con marcas y semáforos, edificios, puentes, vegetación y más, creado en tu navegador o en la app de escritorio gratuita para Windows y Linux.",
     "whatTitle": "¿Qué hace?",
-    "whatBody": "Elige un lugar y una fuente de elevación y genera. La vista previa 2D muestra lo que se construirá, con vistas de relieve, pendiente y altura; la vista previa 3D te deja mirar alrededor. Después exporta un nivel de BeamNG completo en ZIP hecho con elevación real y datos de OpenStreetMap, o llévate datos GeoTIFF y GeoJSON a tu propio flujo de trabajo. El modo por lotes procesa cuadrículas enteras de teselas y puede unirlas en un nivel grande.",
+    "whatBody": "Elige un lugar y una fuente de elevación y genera. La vista previa 2D muestra lo que se construirá, con vistas de relieve, pendiente y altura; la vista previa 3D te deja mirar alrededor. Después exporta un nivel de BeamNG completo en ZIP hecho con elevación real y datos de OpenStreetMap, o llévate datos GeoTIFF y GeoJSON a tu propio flujo de trabajo. Añade teselas para construir un nivel de cualquier forma, o elige una carretera y construye el nivel a lo largo de ella.",
     "elevationTitle": "Fuentes de elevación",
     "elevationItems": [
       "Global 30 m (AWS Terrain Tiles, sobre todo SRTM): el respaldo donde no hay lidar, o por sí solo; carreteras suavizadas y niveladas y ríos bajo sus orillas, automáticamente; edificios, árboles y viaductos eliminados automáticamente",
@@ -1012,7 +1015,7 @@
       "Paquete de nivel BeamNG (.zip), hasta 16384 x 16384",
       "Elevación GeoTIFF (WGS84 o CRS de origen)",
       "Datos vectoriales OSM en GeoJSON",
-      "El modo avanzado y el modo por lotes (por tesela) añaden: mapas de altura de 16 bits, imágenes satélite, OSM, híbridas y de textura del juego, máscaras de carretera, GLB, DAE y .ter"
+      "El modo avanzado añade: mapas de altura de 16 bits, imágenes satélite, OSM, híbridas y de textura del juego, máscaras de carretera, GLB, DAE y .ter"
     ],
     "osmTitle": "Datos de OpenStreetMap",
     "osmItems": [
@@ -1027,18 +1030,16 @@
     "resolutionTitle": "Resolución",
     "resolutionStrong": "Tamaños de salida de 512 a 16384 px con cualquier escala de procesamiento (m/px).",
     "resolutionBody": "A 1 m/px eso cubre de 0,26 km² a 268 km². La elevación global de 30 m se sobremuestrea y sus carreteras se suavizan automáticamente; USGS, GPXZ, NMT y tus archivos conservan su detalle real.",
-    "batchTitle": "Modo por lotes",
-    "batchIntro": "Procesa áreas grandes como una cuadrícula de teselas (hasta 20 x 20). Cada tesela se genera por turno y sus exportaciones elegidas se empaquetan en su propio ZIP. Incluye:",
-    "batchItems": [
-      "Nivel BeamNG combinado: une una cuadrícula de 2 x 2, 4 x 4 u 8 x 8 en un solo nivel jugable (hasta 16384 px)",
-      "Tamaño de cuadrícula, resolución y exportaciones configurables",
-      "Desplazamientos X/Y por tesela con edición arrastrando en el mapa",
-      "Teselas que siguen el centro del mapa, para diseños centrados o fijos",
-      "Base de elevación compartida y mapa de altura de 16 bits unido para verificación",
-      "Progreso en vivo con cuadrícula de teselas por colores y miniaturas satélite",
-      "Pausar, reanudar y reintentar teselas fallidas; el estado sobrevive a una recarga",
-      "Peticiones GPXZ simultáneas en planes de pago",
-      "Nombres de archivo con coordenadas para cada tesela"
+    "shapesTitle": "Teselas y modo carretera",
+    "shapesIntro": "El paso 1 decide qué cubre el mapa. Una tesela es el cuadrado de siempre; más teselas, o una carretera, forman un nivel de otra forma:",
+    "shapesItems": [
+      "Añade teselas junto a la primera, mantenlas juntas en una cuadrícula o muévelas libremente, y arrastra cada una en el mapa",
+      "Elige el ancla con un clic: cualquier tesela o el centro de todas",
+      "Modo carretera: haz clic en una carretera y fija el tramo con un tirador en cada extremo y una anchura a cada lado",
+      "Un solo nivel, con carreteras, edificios y suelo que continúan sin cortes",
+      "Las formas largas y diagonales se construyen por trozos y se unen en un nivel",
+      "Los códigos para compartir, los ajustes guardados y Modificar en la aplicación de escritorio llevan las teselas o la carretera",
+      "Hasta 64 teselas"
     ],
     "beamngTitle": "Exportación de nivel BeamNG",
     "beamngBody": "Un nivel ZIP listo para conducir en BeamNG.drive 0.40, creado a partir del lugar real:",
@@ -1138,7 +1139,7 @@
         },
         {
           "name": "Exportadores Collada y GLTF",
-          "desc": "Formas DAE de BeamNG (edificios, puentes, aceras, tendido eléctrico, fondo) y modelos GLB/DAE en modo avanzado y por lotes"
+          "desc": "Formas DAE de BeamNG (edificios, puentes, aceras, tendido eléctrico, fondo) y modelos GLB/DAE en modo avanzado"
         }
       ],
       "map": [
@@ -1228,7 +1229,7 @@
         },
         {
           "name": "JSZip",
-          "desc": "Empaquetado ZIP en el navegador para niveles BeamNG y trabajos por lotes, escrito directamente a disco (OPFS) en niveles grandes"
+          "desc": "Empaquetado ZIP en el navegador para niveles BeamNG, escrito directamente a disco (OPFS) en niveles grandes"
         },
         {
           "name": "Gestión de Blob URL",

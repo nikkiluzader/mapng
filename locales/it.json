@@ -19,8 +19,11 @@
     "resetTooltip": "Reimposta MapNG",
     "resetBusy": "Attendi la fine del lavoro in corso, poi reimposta",
     "resetTitle": "Reimpostare MapNG?",
-    "resetBody": "Tutte le impostazioni tornano ai valori predefiniti. Vengono cancellati il luogo, le tessere, la strada scelta, le maschere disegnate e il terreno già generato. MapNG riparte come alla prima visita e chiede di nuovo la tua posizione.",
+    "resetBody": "Tutte le impostazioni tornano ai valori predefiniti. Vengono cancellate le tessere, la strada scelta, le maschere disegnate e il terreno già generato, e MapNG riparte come alla prima visita.",
+    "resetKeepPlace": "Lascia la mappa dov’è",
+    "resetKeepPlaceHint": "Senza spunta: MapNG chiede la tua posizione e ci va, altrimenti va al luogo predefinito.",
     "resetKept": "Restano: la tua chiave API e il tuo server Overpass, la lingua, la modalità chiara o scura e le tue scelte di condivisione. I livelli già salvati non vengono toccati.",
+    "resetOnceAWeek": "Per una settimana non verrà più chiesto.",
     "resetCancel": "Annulla",
     "resetConfirm": "Reimposta",
     "disclaimer": "Note legali",
@@ -784,7 +787,7 @@
       "bundleOsm": "Includi i dati della mappa per le segnalazioni",
       "bundleOsmHint": "Attivo: i dati OpenStreetMap con cui è stato costruito il livello vengono inclusi (levels/<name>/mapng_source/, al massimo pochi MB, mai letti dal gioco), così una segnalazione sul livello può essere ricostruita esattamente sugli stessi dati. Disattivo: esclusi.",
       "groundModels": "Terreno come modelli (sperimentale)",
-      "groundModelsHint": "Attivo: il terreno è costruito come modelli 3D invece del terreno di BeamNG, così un livello batch può avere qualsiasi forma (una lunga striscia di riquadri). Il livello si carica più lentamente (la sua collisione è costruita al caricamento) e non ha erba; l'editor del terreno non funziona su di esso. Disattivo: il terreno solito."
+      "groundModelsHint": "Attivo: il terreno è costruito come modelli 3D invece del terreno di BeamNG, così un livello di più tessere o lungo una strada può avere qualsiasi forma (una lunga striscia di riquadri). Il livello si carica più lentamente (la sua collisione è costruita al caricamento) e non ha erba; l'editor del terreno non funziona su di esso. Disattivo: il terreno solito."
     },
     "weight": {
       "title": "Quanto è pesante questo livello?",
@@ -987,7 +990,7 @@
     "subtitle": "Mappe del mondo reale per BeamNG.drive",
     "hero": "MapNG trasforma qualsiasi luogo reale in un livello giocabile di BeamNG.drive: terreno, texture, strade con segnaletica e semafori, edifici, ponti, vegetazione e altro, creato nel browser o nell'app desktop gratuita per Windows e Linux.",
     "whatTitle": "A cosa serve?",
-    "whatBody": "Scegli un luogo e una sorgente di elevazione e genera. L'anteprima 2D mostra ciò che verrà costruito, con viste di rilievo, pendenza e altezza; l'anteprima 3D ti fa guardare intorno. Poi esporta un livello BeamNG completo in ZIP, costruito da elevazione reale e dati OpenStreetMap, o porta dati GeoTIFF e GeoJSON nel tuo flusso di lavoro. La modalità batch elabora intere griglie di riquadri e può unirle in un unico grande livello.",
+    "whatBody": "Scegli un luogo e una sorgente di elevazione e genera. L'anteprima 2D mostra ciò che verrà costruito, con viste di rilievo, pendenza e altezza; l'anteprima 3D ti fa guardare intorno. Poi esporta un livello BeamNG completo in ZIP, costruito da elevazione reale e dati OpenStreetMap, o porta dati GeoTIFF e GeoJSON nel tuo flusso di lavoro. Aggiungi tessere per costruire un livello di qualsiasi forma, oppure scegli una strada e costruisci il livello lungo di essa.",
     "elevationTitle": "Fonti dei dati altimetrici",
     "elevationItems": [
       "Globale 30 m (AWS Terrain Tiles, soprattutto SRTM): il ripiego dove non c'è lidar, o da solo; strade levigate e livellate e fiumi sotto le sponde, automaticamente; edifici, alberi e viadotti tolti automaticamente",
@@ -1012,7 +1015,7 @@
       "Pacchetto livello BeamNG (.zip), fino a 16384 x 16384",
       "Altitudine GeoTIFF (WGS84 o CRS di origine)",
       "Dati vettoriali OSM in GeoJSON",
-      "La modalità avanzata e la modalità batch (per tessera) aggiungono: mappe di altezza a 16 bit, immagini satellite, OSM, ibride e Texture di gioco, maschere stradali, GLB, DAE e .ter"
+      "La modalità avanzata aggiunge: mappe di altezza a 16 bit, immagini satellite, OSM, ibride e Texture di gioco, maschere stradali, GLB, DAE e .ter"
     ],
     "osmTitle": "Dati OpenStreetMap",
     "osmItems": [
@@ -1027,18 +1030,16 @@
     "resolutionTitle": "Risoluzione",
     "resolutionStrong": "Dimensioni di output da 512 a 16384 px, con qualsiasi scala di elaborazione (m/px).",
     "resolutionBody": "A 1 m/px copre da 0,26 km² a 268 km². L'altitudine globale 30 m viene sovracampionata e le sue strade levigate automaticamente; USGS, GPXZ, NMT e i tuoi file mantengono il dettaglio reale.",
-    "batchTitle": "Modalità job batch",
-    "batchIntro": "Elabora aree estese organizzandole in una griglia di caselle (fino a 20 × 20). Ogni casella viene generata in sequenza e le esportazioni selezionate vengono raccolte nel relativo file ZIP. Le funzionalità includono:",
-    "batchItems": [
-      "Livello BeamNG combinato: unisci una griglia 2 × 2, 4 × 4 o 8 × 8 in un unico livello giocabile (fino a 16384 px)",
-      "Dimensioni della griglia, risoluzione e selezione delle esportazioni configurabili",
-      "Offset X/Y per ogni casella, modificabili trascinando direttamente sulla mappa",
-      "Caselle che seguono il centro della mappa, per layout ancorati al centro o bloccati sul mondo",
-      "Base altimetrica condivisa e heightmap di verifica a 16 bit ottenuta dall’unione delle caselle",
-      "Avanzamento in tempo reale con griglia di caselle colorata e miniature satellitari",
-      "Metti in pausa, riprendi e riprova le caselle non riuscite; lo stato viene mantenuto anche dopo un ricaricamento",
-      "Richieste GPXZ simultanee nei piani a pagamento",
-      "Nomi dei file di ogni casella con coordinate incorporate"
+    "shapesTitle": "Tessere e modalità strada",
+    "shapesIntro": "Il passo 1 decide che cosa copre la mappa. Una tessera è il solito quadrato; più tessere, o una strada, formano un livello di un’altra forma:",
+    "shapesItems": [
+      "Aggiungi tessere accanto alla prima, tienile insieme su una griglia o spostale liberamente, e trascina ciascuna sulla mappa",
+      "Scegli l’ancora con un clic: una tessera qualsiasi o il centro di tutte",
+      "Modalità strada: fai clic su una strada, imposta il tratto con una maniglia a ogni estremità e una larghezza per lato",
+      "Un solo livello, con strade, edifici e suolo che proseguono senza interruzioni",
+      "Le forme lunghe e diagonali vengono costruite a pezzi e unite in un livello",
+      "I codici di condivisione, le impostazioni salvate e Modifica nell’app desktop portano con sé le tessere o la strada",
+      "Fino a 64 tessere"
     ],
     "beamngTitle": "Esportazione livello BeamNG",
     "beamngBody": "Un livello ZIP pronto per essere utilizzato in BeamNG.drive 0.40, ricreato a partire da un luogo reale:",
@@ -1138,7 +1139,7 @@
         },
         {
           "name": "Esportatori Collada e GLTF",
-          "desc": "Forme DAE di BeamNG (edifici, ponti, marciapiedi, linee elettriche, sfondo) e modelli GLB/DAE in modalità avanzata e batch"
+          "desc": "Forme DAE di BeamNG (edifici, ponti, marciapiedi, linee elettriche, sfondo) e modelli GLB/DAE in modalità avanzata"
         }
       ],
       "map": [
@@ -1228,7 +1229,7 @@
         },
         {
           "name": "JSZip",
-          "desc": "Creazione di ZIP nel browser per livelli BeamNG e job batch, scritti direttamente su disco (OPFS) per i livelli grandi"
+          "desc": "Creazione di ZIP nel browser per livelli BeamNG, scritti direttamente su disco (OPFS) per i livelli grandi"
         },
         {
           "name": "Gestione Blob URL",

@@ -19,8 +19,11 @@
     "resetTooltip": "Zresetuj MapNG",
     "resetBusy": "Poczekaj, aż bieżące zadanie się skończy, potem zresetuj",
     "resetTitle": "Zresetować MapNG?",
-    "resetBody": "Wszystkie ustawienia wracają do wartości domyślnych. Usuwane są: miejsce, kafle, wybrana droga, narysowane maski i wygenerowany teren. MapNG uruchomi się jak przy pierwszej wizycie i ponownie zapyta o Twoją lokalizację.",
+    "resetBody": "Wszystkie ustawienia wracają do wartości domyślnych. Usuwane są kafle, wybrana droga, narysowane maski i wygenerowany teren, a MapNG uruchomi się jak przy pierwszej wizycie.",
+    "resetKeepPlace": "Zostaw mapę tam, gdzie jest",
+    "resetKeepPlaceHint": "Bez zaznaczenia: MapNG zapyta o Twoją lokalizację i tam przejdzie, a bez niej do miejsca domyślnego.",
     "resetKept": "Zostają: Twój klucz API i własny serwer Overpass, język, tryb jasny lub ciemny oraz ustawienia udostępniania. Zapisane już poziomy pozostają nietknięte.",
+    "resetOnceAWeek": "Przez tydzień to pytanie się nie pojawi.",
     "resetCancel": "Anuluj",
     "resetConfirm": "Zresetuj",
     "disclaimer": "Zastrzeżenie",
@@ -784,7 +787,7 @@
       "bundleOsm": "Dołącz dane mapy do zgłoszeń błędów",
       "bundleOsmHint": "Włączone: dane OpenStreetMap, z których zbudowano poziom, trafiają do poziomu (levels/<name>/mapng_source/, najwyżej kilka MB, gra ich nie czyta), aby zgłoszenie dotyczące poziomu można było odtworzyć na dokładnie tych samych danych. Wyłączone: pominięte.",
       "groundModels": "Podłoże jako modele (eksperymentalne)",
-      "groundModelsHint": "Włączone: podłoże jest budowane jako modele 3D zamiast terenu BeamNG, dzięki czemu poziom wsadowy może mieć dowolny kształt (długi pas kafelków). Poziom wczytuje się wolniej (jego kolizja jest budowana przy wczytywaniu) i nie ma trawy; edytor terenu na nim nie działa. Wyłączone: zwykły teren."
+      "groundModelsHint": "Włączone: podłoże jest budowane jako modele 3D zamiast terenu BeamNG, dzięki czemu poziom z kilku kafli albo wzdłuż drogi może mieć dowolny kształt (długi pas kafelków). Poziom wczytuje się wolniej (jego kolizja jest budowana przy wczytywaniu) i nie ma trawy; edytor terenu na nim nie działa. Wyłączone: zwykły teren."
     },
     "weight": {
       "title": "Jak ciężki jest ten poziom?",
@@ -987,7 +990,7 @@
     "subtitle": "Prawdziwe miejsca jako mapy BeamNG.drive",
     "hero": "MapNG zamienia dowolne prawdziwe miejsce w grywalny poziom BeamNG.drive: teren, tekstury, drogi z oznakowaniem i sygnalizacją, budynki, mosty, roślinność i więcej, tworzone w przeglądarce albo w darmowej aplikacji desktopowej dla Windows i Linux.",
     "whatTitle": "Co robi?",
-    "whatBody": "Wybierz miejsce i źródło wysokości, a potem wygeneruj. Podgląd 2D pokazuje, co zostanie zbudowane, z widokami rzeźby, nachylenia i wysokości; w podglądzie 3D można się rozejrzeć. Następnie wyeksportuj kompletny poziom BeamNG w ZIP, zbudowany z prawdziwych wysokości i danych OpenStreetMap, albo zabierz dane GeoTIFF i GeoJSON do własnej pracy. Tryb wsadowy przetwarza całe siatki kafli i może połączyć je w jeden duży poziom.",
+    "whatBody": "Wybierz miejsce i źródło wysokości, a potem wygeneruj. Podgląd 2D pokazuje, co zostanie zbudowane, z widokami rzeźby, nachylenia i wysokości; w podglądzie 3D można się rozejrzeć. Następnie wyeksportuj kompletny poziom BeamNG w ZIP, zbudowany z prawdziwych wysokości i danych OpenStreetMap, albo zabierz dane GeoTIFF i GeoJSON do własnej pracy. Dodaj kafle, aby zbudować poziom o dowolnym kształcie, albo wybierz drogę i zbuduj poziom wzdłuż niej.",
     "elevationTitle": "Źródła wysokości",
     "elevationItems": [
       "Globalne 30 m (AWS Terrain Tiles, głównie SRTM): zastępstwo tam, gdzie nie ma lidaru, lub samodzielnie; drogi automatycznie wygładzane i wyrównywane, rzeki poniżej brzegów; budynki, drzewa i wiadukty usuwane automatycznie",
@@ -1012,7 +1015,7 @@
       "Pakiet poziomu BeamNG (.zip), do 16384 x 16384",
       "Wysokości GeoTIFF (WGS84 lub CRS źródła)",
       "Dane wektorowe OSM w GeoJSON",
-      "Tryb zaawansowany i tryb wsadowy (dla każdego kafelka) dodają: 16-bitowe mapy wysokości, obrazy satelitarne, OSM, hybrydowe i tekstury gry, maski dróg, GLB, DAE i .ter"
+      "Tryb zaawansowany dodaje: 16-bitowe mapy wysokości, obrazy satelitarne, OSM, hybrydowe i tekstury gry, maski dróg, GLB, DAE i .ter"
     ],
     "osmTitle": "Dane OpenStreetMap",
     "osmItems": [
@@ -1027,18 +1030,16 @@
     "resolutionTitle": "Rozdzielczość",
     "resolutionStrong": "Rozmiary wyjściowe od 512 do 16384 px przy dowolnej skali przetwarzania (m/px).",
     "resolutionBody": "Przy 1 m/px to od 0,26 km² do 268 km². Globalne dane 30 m są nadpróbkowane, a ich drogi automatycznie wygładzane; USGS, GPXZ, NMT i własne pliki zachowują prawdziwe szczegóły.",
-    "batchTitle": "Tryb zadań wsadowych",
-    "batchIntro": "Przetwarzaj duże obszary jako siatkę kafelków (do 20 x 20). Każdy kafelek jest generowany po kolei, a wybrane eksporty trafiają do jego własnego ZIP. Funkcje:",
-    "batchItems": [
-      "Połączony poziom BeamNG: złóż siatkę 2 x 2, 4 x 4 lub 8 x 8 w jeden grywalny poziom (do 16384 px)",
-      "Konfigurowalny rozmiar siatki, rozdzielczość i wybór eksportów",
-      "Przesunięcia X/Y dla każdego kafelka z przeciąganiem na mapie",
-      "Kafelki podążają za środkiem mapy, dla układów wyśrodkowanych lub stałych",
-      "Wspólna baza wysokości i złożona 16-bitowa mapa kontrolna",
-      "Postęp na żywo z kolorową siatką kafelków i miniaturami satelitarnymi",
-      "Pauza, wznawianie i ponawianie nieudanych kafelków; stan przetrwa przeładowanie",
-      "Równoległe zapytania GPXZ w planach płatnych",
-      "Nazwy plików ze współrzędnymi dla każdego kafelka"
+    "shapesTitle": "Kafle i tryb drogi",
+    "shapesIntro": "Krok 1 określa, co obejmuje mapa. Jeden kafel to zwykły kwadrat; więcej kafli albo droga dają poziom o innym kształcie:",
+    "shapesItems": [
+      "Dodawaj kafle obok pierwszego, trzymaj je razem na siatce albo przesuwaj swobodnie i przeciągaj każdy na mapie",
+      "Wybierz kotwicę jednym kliknięciem: dowolny kafel albo środek wszystkich",
+      "Tryb drogi: kliknij drogę, ustaw odcinek uchwytem na każdym końcu i szerokość po obu stronach",
+      "Jeden poziom, w którym drogi, budynki i podłoże biegną bez przerw",
+      "Długie i ukośne kształty są budowane w częściach i łączone w jeden poziom",
+      "Kody udostępniania, zapisane ustawienia i Modyfikuj w aplikacji na komputer zawierają kafle albo drogę",
+      "Do 64 kafli"
     ],
     "beamngTitle": "Eksport poziomu BeamNG",
     "beamngBody": "Gotowy do jazdy poziom ZIP dla BeamNG.drive 0.40, zbudowany z prawdziwego miejsca:",
@@ -1138,7 +1139,7 @@
         },
         {
           "name": "Eksportery Collada i GLTF",
-          "desc": "Kształty DAE dla BeamNG (budynki, mosty, chodniki, linie energetyczne, tło) oraz modele GLB/DAE w trybie zaawansowanym i wsadowym"
+          "desc": "Kształty DAE dla BeamNG (budynki, mosty, chodniki, linie energetyczne, tło) oraz modele GLB/DAE w trybie zaawansowanym"
         }
       ],
       "map": [
@@ -1228,7 +1229,7 @@
         },
         {
           "name": "JSZip",
-          "desc": "Tworzenie ZIP w przeglądarce dla poziomów BeamNG i zadań wsadowych, przy dużych poziomach zapisywane od razu na dysk (OPFS)"
+          "desc": "Tworzenie ZIP w przeglądarce dla poziomów BeamNG, przy dużych poziomach zapisywane od razu na dysk (OPFS)"
         },
         {
           "name": "Zarządzanie adresami Blob URL",

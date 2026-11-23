@@ -19,8 +19,11 @@
     "resetTooltip": "Réinitialiser MapNG",
     "resetBusy": "Attendez la fin de la tâche en cours, puis réinitialisez",
     "resetTitle": "Réinitialiser MapNG ?",
-    "resetBody": "Tous les réglages reviennent à leurs valeurs par défaut. Le lieu, les tuiles, la route choisie, les masques dessinés et le terrain déjà généré sont effacés. MapNG démarre alors comme à la première visite et redemande votre position.",
+    "resetBody": "Tous les réglages reviennent à leurs valeurs par défaut. Les tuiles, la route choisie, les masques dessinés et le terrain déjà généré sont effacés, et MapNG démarre comme à la première visite.",
+    "resetKeepPlace": "Garder la carte où elle est",
+    "resetKeepPlaceHint": "Décoché : MapNG demande votre position et s’y rend, sinon à son lieu par défaut.",
     "resetKept": "Conservés : votre clé d’API et votre propre serveur Overpass, la langue, le mode clair ou sombre et vos choix de partage. Les niveaux déjà enregistrés ne sont pas touchés.",
+    "resetOnceAWeek": "La question ne sera plus posée pendant une semaine.",
     "resetCancel": "Annuler",
     "resetConfirm": "Réinitialiser",
     "disclaimer": "Avertissement",
@@ -784,7 +787,7 @@
       "bundleOsm": "Inclure les données de la carte pour les rapports de bug",
       "bundleOsmHint": "Activé : les données OpenStreetMap ayant servi à construire le niveau y sont incluses (levels/<name>/mapng_source/, quelques Mo au plus, jamais lues par le jeu), afin qu’un rapport sur le niveau puisse être reproduit sur exactement les mêmes données. Désactivé : non incluses.",
       "groundModels": "Sol en modèles (expérimental)",
-      "groundModelsHint": "Activé : le sol est construit en modèles 3D au lieu du terrain de BeamNG, ainsi un niveau par lots peut avoir n'importe quelle forme (une longue bande de tuiles). Le niveau se charge plus lentement (sa collision est construite au chargement) et n'a pas d'herbe ; l'éditeur de terrain ne fonctionne pas dessus. Désactivé : le terrain habituel."
+      "groundModelsHint": "Activé : le sol est construit en modèles 3D au lieu du terrain de BeamNG, ainsi un niveau de plusieurs tuiles ou le long d'une route peut avoir n'importe quelle forme (une longue bande de tuiles). Le niveau se charge plus lentement (sa collision est construite au chargement) et n'a pas d'herbe ; l'éditeur de terrain ne fonctionne pas dessus. Désactivé : le terrain habituel."
     },
     "weight": {
       "title": "Quel est le poids de ce niveau ?",
@@ -987,7 +990,7 @@
     "subtitle": "Des cartes réelles pour BeamNG.drive",
     "hero": "MapNG transforme n'importe quel lieu réel en niveau jouable pour BeamNG.drive : terrain, textures, routes avec marquages et feux, bâtiments, ponts, végétation et plus encore, construit dans votre navigateur ou dans l'application de bureau gratuite pour Windows et Linux.",
     "whatTitle": "Que fait-il ?",
-    "whatBody": "Choisissez un lieu et une source d'altitude, puis générez. L'aperçu 2D montre ce qui sera construit, avec des vues relief, pente et hauteur ; l'aperçu 3D permet de regarder autour. Exportez ensuite un niveau BeamNG complet en ZIP, construit à partir d'altitudes réelles et des données OpenStreetMap, ou emportez des données GeoTIFF et GeoJSON dans votre propre flux de travail. Le mode par lots traite des grilles entières de tuiles et peut les assembler en un grand niveau.",
+    "whatBody": "Choisissez un lieu et une source d'altitude, puis générez. L'aperçu 2D montre ce qui sera construit, avec des vues relief, pente et hauteur ; l'aperçu 3D permet de regarder autour. Exportez ensuite un niveau BeamNG complet en ZIP, construit à partir d'altitudes réelles et des données OpenStreetMap, ou emportez des données GeoTIFF et GeoJSON dans votre propre flux de travail. Ajoutez des tuiles pour construire un niveau de n’importe quelle forme, ou choisissez une route et construisez le niveau le long de celle-ci.",
     "elevationTitle": "Sources d'élévation",
     "elevationItems": [
       "Global 30 m (AWS Terrain Tiles, surtout SRTM) : le relais là où il n'y a pas de lidar, ou seul ; routes lissées et nivelées et rivières sous leurs berges, automatiquement; bâtiments, arbres et viaducs retirés automatiquement",
@@ -1012,7 +1015,7 @@
       "Package de niveau BeamNG (.zip), jusqu'à 16384 x 16384",
       "Élévation GeoTIFF (WGS84 ou CRS source)",
       "Données vectorielles OSM GeoJSON",
-      "Le mode avancé et le mode par lot (par tuile) ajoutent : heightmaps 16 bits, images satellite, OSM, hybride et Texture de jeu, masques de route, GLB, DAE et .ter"
+      "Le mode avancé ajoute : heightmaps 16 bits, images satellite, OSM, hybride et Texture de jeu, masques de route, GLB, DAE et .ter"
     ],
     "osmTitle": "Données OpenStreetMap",
     "osmItems": [
@@ -1027,18 +1030,16 @@
     "resolutionTitle": "Résolution",
     "resolutionStrong": "Tailles de sortie de 512 à 16384 px, à n'importe quelle échelle de traitement (m/px).",
     "resolutionBody": "À 1 m/px, cela couvre de 0,26 km² à 268 km². L'élévation globale 30 m est suréchantillonnée et ses routes lissées automatiquement ; USGS, GPXZ, NMT et vos fichiers gardent leur vrai détail.",
-    "batchTitle": "Mode par lot",
-    "batchIntro": "Traitez de grandes zones sous forme de grille de tuiles (jusqu'à 20 x 20). Chaque tuile est générée à son tour et ses exports sélectionnés sont regroupés dans son propre ZIP. Fonctionnalités :",
-    "batchItems": [
-      "Niveau BeamNG combiné : assemblez une grille 2 x 2, 4 x 4 ou 8 x 8 en un seul niveau jouable (jusqu'à 16384 px)",
-      "Taille de grille, résolution et exports configurables",
-      "Décalages X/Y par tuile avec édition par glisser sur la carte",
-      "Les tuiles suivent le centre de la carte, pour des dispositions centrées ou fixes",
-      "Base d'élévation partagée et heightmap 16 bits assemblée de vérification",
-      "Progression en direct avec grille de tuiles colorée et vignettes satellite",
-      "Pause, reprise et nouvelle tentative des tuiles échouées ; l'état survit à un rechargement",
-      "Requêtes GPXZ simultanées avec les offres payantes",
-      "Noms de fichiers avec coordonnées pour chaque tuile"
+    "shapesTitle": "Tuiles et mode route",
+    "shapesIntro": "L’étape 1 décide de ce que couvre la carte. Une tuile est le carré habituel ; plusieurs tuiles, ou une route, donnent un niveau d’une autre forme :",
+    "shapesItems": [
+      "Ajoutez des tuiles à côté de la première, gardez-les ensemble sur une grille ou déplacez-les librement, et faites glisser chacune sur la carte",
+      "Choisissez l’ancre d’un clic : n’importe quelle tuile, ou le centre de toutes",
+      "Mode route : cliquez sur une route, réglez le tronçon avec une poignée à chaque bout et une largeur de chaque côté",
+      "Un seul niveau, où routes, bâtiments et sol se poursuivent sans coupure",
+      "Les formes longues et diagonales sont construites en morceaux puis réunies en un niveau",
+      "Les codes de partage, les réglages enregistrés et Modifier dans l’application de bureau conservent les tuiles ou la route",
+      "Jusqu’à 64 tuiles"
     ],
     "beamngTitle": "Export de niveau BeamNG",
     "beamngBody": "Un niveau ZIP prêt à rouler pour BeamNG.drive 0.40, construit à partir du vrai lieu :",
@@ -1138,7 +1139,7 @@
         },
         {
           "name": "Exporteurs Collada et GLTF",
-          "desc": "Formes DAE BeamNG (bâtiments, ponts, trottoirs, lignes électriques, décor), et modèles GLB/DAE en mode avancé et par lot"
+          "desc": "Formes DAE BeamNG (bâtiments, ponts, trottoirs, lignes électriques, décor), et modèles GLB/DAE en mode avancé"
         }
       ],
       "map": [
@@ -1228,7 +1229,7 @@
         },
         {
           "name": "JSZip",
-          "desc": "Création de ZIP côté client pour les niveaux BeamNG et les tâches par lot, écrits directement sur le disque (OPFS) pour les grands niveaux"
+          "desc": "Création de ZIP côté client pour les niveaux BeamNG, écrits directement sur le disque (OPFS) pour les grands niveaux"
         },
         {
           "name": "Gestion des URL Blob",

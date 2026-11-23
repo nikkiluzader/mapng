@@ -24,8 +24,11 @@
     "resetTooltip": "Reset MapNG",
     "resetBusy": "Wait for the running job to finish, then reset",
     "resetTitle": "Reset MapNG?",
-    "resetBody": "Every setting goes back to its default. The location, the tiles, the picked road, drawn masks and any terrain you have generated are cleared. MapNG then starts as on a first visit and asks for your location again.",
+    "resetBody": "Every setting goes back to its default. The tiles, the picked road, drawn masks and any terrain you have generated are cleared, and MapNG starts as on a first visit.",
+    "resetKeepPlace": "Keep the map where it is",
+    "resetKeepPlaceHint": "Unticked: MapNG asks for your location and goes there, or to its default place.",
     "resetKept": "Kept: your API key and your own Overpass server, the language, light or dark mode, and your sharing choices. Levels you have already saved are not touched.",
+    "resetOnceAWeek": "You will not be asked again for a week.",
     "resetCancel": "Cancel",
     "resetConfirm": "Reset",
     "disclaimer": "Disclaimer",
@@ -789,7 +792,7 @@
       "bundleOsm": "Include the map data for bug reports",
       "bundleOsmHint": "On: the OpenStreetMap data the level was built from goes into the level (levels/<name>/mapng_source/, a few MB at most, which the game never reads), so a report about the level can be rebuilt on exactly the same data. Off: left out.",
       "groundModels": "Ground as models (experimental)",
-      "groundModelsHint": "On: the ground is built as 3D models instead of BeamNG's terrain, so a batch level can be any shape (a long strip of tiles). The level loads slower (its collision is built at load) and has no grass cover; the terrain editor does not work on it. Off: the usual terrain."
+      "groundModelsHint": "On: the ground is built as 3D models instead of BeamNG's terrain, so a level of several tiles or along a road can be any shape (a long strip of tiles). The level loads slower (its collision is built at load) and has no grass cover; the terrain editor does not work on it. Off: the usual terrain."
     },
     "weight": {
       "title": "How heavy is this level?",
@@ -992,7 +995,7 @@
     "subtitle": "Real-world maps for BeamNG.drive",
     "hero": "MapNG turns any real-world location into a playable BeamNG.drive level: terrain, textures, roads with markings and traffic signals, buildings, bridges, vegetation and more, built in your browser or in the free desktop app for Windows and Linux.",
     "whatTitle": "What does it do?",
-    "whatBody": "Pick a location, choose an elevation source and generate. The 2D preview shows what will be built, with relief, slope and height views; the 3D preview lets you look round. Then export a complete BeamNG level ZIP built from real elevation and OpenStreetMap data, or take GeoTIFF and GeoJSON data into your own workflow. Batch mode processes whole grids of tiles and can stitch them into one large level.",
+    "whatBody": "Pick a location, choose an elevation source and generate. The 2D preview shows what will be built, with relief, slope and height views; the 3D preview lets you look round. Then export a complete BeamNG level ZIP built from real elevation and OpenStreetMap data, or take GeoTIFF and GeoJSON data into your own workflow. Add tiles to build one level of any shape, or pick a road and build the level along it.",
     "elevationTitle": "Elevation Sources",
     "elevationItems": [
       "Global 30 m (AWS Terrain Tiles, mostly SRTM): the fallback where there's no lidar, or on its own; roads smoothed and levelled and rivers kept below their banks automatically; buildings, trees and viaduct decks taken out automatically",
@@ -1017,7 +1020,7 @@
       "BeamNG level package (.zip), up to 16384 x 16384",
       "GeoTIFF elevation (WGS84 or the source CRS)",
       "GeoJSON OSM vector data",
-      "Advanced mode and Batch mode (per tile) add: 16-bit heightmaps, satellite, OSM, hybrid and Game Texture images, road masks, GLB, DAE and .ter"
+      "Advanced mode adds: 16-bit heightmaps, satellite, OSM, hybrid and Game Texture images, road masks, GLB, DAE and .ter"
     ],
     "osmTitle": "OpenStreetMap Data",
     "osmItems": [
@@ -1032,18 +1035,16 @@
     "resolutionTitle": "Resolution",
     "resolutionStrong": "Output sizes from 512 to 16384 px at any processing scale (m/px).",
     "resolutionBody": "At 1 m/px that covers 0.26 km² up to 268 km². Global 30 m elevation is upsampled and its roads are smoothed automatically; USGS, GPXZ, NMT and uploads keep their real detail.",
-    "batchTitle": "Batch job mode",
-    "batchIntro": "Process large areas as a grid of tiles (up to 20 x 20). Each tile is generated in turn and its selected exports are packaged into its own ZIP. Features include:",
-    "batchItems": [
-      "Combined BeamNG level: stitch a 2 x 2, 4 x 4 or 8 x 8 grid into one playable level (up to 16384 px)",
-      "Configurable grid size, resolution and export selection",
-      "Per-tile X/Y offsets with live drag editing on the map",
-      "Tiles Follow Map Center for center-anchored or world-locked layouts",
-      "Shared elevation baseline and a stitched 16-bit verification heightmap",
-      "Live progress with a color-coded tile grid and satellite thumbnails",
-      "Pause, resume and retry failed tiles; state survives a reload",
-      "GPXZ concurrent requests on paid plans",
-      "Coordinate-stamped filenames for every tile"
+    "shapesTitle": "Tiles and Road mode",
+    "shapesIntro": "Step 1 decides what the map covers. One tile is the usual square; more tiles, or a road, make one level of another shape:",
+    "shapesItems": [
+      "Add tiles beside the first, keep them together on a grid or move them freely, and drag each one on the map",
+      "Pick the anchor with one click: any tile, or the centre of them all",
+      "Road mode: click a road, set the stretch with a handle at each end and a width either side",
+      "One level, with roads, buildings and ground running straight through",
+      "Long and diagonal shapes are built in pieces and joined into one level",
+      "Share codes, saved settings and the desktop app's Modify carry the tiles or the road",
+      "Up to 64 tiles"
     ],
     "beamngTitle": "BeamNG Level Export",
     "beamngBody": "A ready-to-drive level ZIP for BeamNG.drive 0.40, built from the real place:",
@@ -1143,7 +1144,7 @@
         },
         {
           "name": "Collada and GLTF exporters",
-          "desc": "BeamNG DAE shapes (buildings, bridges, sidewalks, power lines, backdrop), and GLB/DAE models in Advanced mode and batch"
+          "desc": "BeamNG DAE shapes (buildings, bridges, sidewalks, power lines, backdrop), and GLB/DAE models in Advanced mode"
         }
       ],
       "map": [
@@ -1233,7 +1234,7 @@
         },
         {
           "name": "JSZip",
-          "desc": "Client-side ZIP packaging for BeamNG levels and batch jobs, streamed to disk (OPFS) for large levels"
+          "desc": "Client-side ZIP packaging for BeamNG levels, streamed to disk (OPFS) for large levels"
         },
         {
           "name": "Blob URL Management",

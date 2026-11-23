@@ -36,7 +36,7 @@
         :disabled="heavyJobRunning"
         :title="heavyJobRunning ? t('sidebar.resetBusy') : t('sidebar.resetTooltip')"
         :aria-label="t('sidebar.resetTooltip')"
-        @click="confirmReset = true"
+        @click="askReset"
       >
         <RotateCcw :size="18" />
       </BaseButton>
@@ -131,7 +131,11 @@
         <div class="w-full max-w-md rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-2xl p-5 space-y-3">
           <h2 class="text-base font-bold text-gray-900 dark:text-white">{{ t('sidebar.resetTitle') }}</h2>
           <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{{ t('sidebar.resetBody') }}</p>
-          <p class="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">{{ t('sidebar.resetKept') }}</p>
+          <p class="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">{{ t('sidebar.resetKept') }} {{ t('sidebar.resetOnceAWeek') }}</p>
+          <label class="flex items-start gap-2 text-sm text-gray-800 dark:text-gray-200 cursor-pointer">
+            <input v-model="keepPlace" type="checkbox" class="mt-0.5 accent-[var(--brand)]" data-testid="reset-keep-place" :disabled="resetting" />
+            <span>{{ t('sidebar.resetKeepPlace') }}<span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('sidebar.resetKeepPlaceHint') }}</span></span>
+          </label>
           <div class="flex flex-wrap items-center justify-end gap-2 pt-1">
             <button ref="cancelReset" type="button" class="px-4 py-1.5 rounded bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs font-medium transition-colors" :disabled="resetting" @click="confirmReset = false">{{ t('sidebar.resetCancel') }}</button>
             <button type="button" data-testid="reset-confirm" :disabled="resetting" class="px-4 py-1.5 rounded bg-red-600 hover:bg-red-500 text-white text-xs font-semibold transition-colors disabled:opacity-60" @click="doReset">{{ t('sidebar.resetConfirm') }}</button>
@@ -146,7 +150,7 @@
 import { netPanelOpen } from '../../composables/useNetworkMonitor.js';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { heavyJobRunning } from '../../services/heavyJob.js';
-import { resetApp } from '../../services/resetApp.js';
+import { resetApp, resetNeedsAsking, noteResetAsked, resetKeepsPlace, setResetKeepsPlace } from '../../services/resetApp.js';
 import { desktopApp, DESKTOP_DOWNLOAD_URL } from '../../services/platform/desktop.js';
 import { useI18n } from 'vue-i18n';
 import BaseButton from '../base/BaseButton.vue';
@@ -161,7 +165,12 @@ const confirmReset = ref(false);
 const cancelReset = ref(null);
 watch(confirmReset, (on) => { if (on) nextTick(() => cancelReset.value?.focus()); });
 const resetting = ref(false);
-const doReset = async () => { if (resetting.value) return; resetting.value = true; try { await resetApp(); } finally { resetting.value = false; confirmReset.value = false; } };
+// (keep the map where it is: on unless switched off, and remembered)
+const keepPlace = ref(resetKeepsPlace());
+watch(keepPlace, (on) => setResetKeepsPlace(on));
+// (asked once a week at most: within a week of the last answer the button resets at once)
+const askReset = () => { if (resetNeedsAsking()) confirmReset.value = true; else doReset(); };
+const doReset = async () => { if (confirmReset.value) noteResetAsked();  if (resetting.value) return; resetting.value = true; try { await resetApp(); } finally { resetting.value = false; confirmReset.value = false; } };
 const locales = computed(() => getSupportedLocales());
 // (the language's short name on the footer button: EN, DE, … and 中文)
 const localeShort = computed(() => (String(locale.value).startsWith('zh') ? '中文' : String(locale.value).slice(0, 2).toUpperCase()));

@@ -7,6 +7,33 @@ files: `refs/output/backlog.md` holds everything wanted later, by area; `refs/ou
 `refs/output/history.md` finished narratives; `refs/output/decisions.md` choices made and why. Items move between
 these files; they are never copied.
 
+## Priority list (2026-11-23, asked for by the user; details in the sections below)
+
+Before the 0.3.6 desktop release:
+
+1. **Desktop app end to end on today's work** (packed Linux app, unpacked Windows build): Generate, export, Reset
+   (Electron has no location service: unticked "Keep the map where it is" should land on Flagstaff), the progress
+   card during a real export, the thumbnail in the game's level list. None run since the security pass.
+2. **The new release workflow has never run:** first tag, watch `sign-manifest` and both `.sig` files. Ask before the
+   tag.
+3. **Seams in game on a small level** (only the target area): the tunnel and the street at a join. The last look was
+   before the final fix.
+4. **Alignment leftovers of the frame change:** the 3D preview mesh and the upload paths (LAZ, ASC, GML) still use
+   the old mapping; the sweep's areas re-fetched on the new frame.
+5. **Tiles step 2 leftovers:** previews masked to the footprint, a masked minimap, the edge skirt.
+6. **Release page:** in-game pictures, a road mode picture, the final fix list; then publish it.
+
+Known and not blocking 0.3.6 (say so on the page):
+
+7. **Long tunnels and bridges across pieces of a chunked level:** planned per piece; a plan made once for the whole
+   level is the fix. A street on a lid over a tunnel trench on a join can dip.
+8. **Per-tile asset export from tiles** (the old batch jobs' purpose); then the batch code and its texts removed.
+9. **Desktop Generate runs out of memory at 8192 on 16 GB;** big-city exports on the website.
+10. **Sidewalk drift, jagged terrain from our own steps, sawtooth on steep roads, the sea-wall branch,** and
+    Fizz_Mechanic's held list.
+
+Waiting on the user: the three lines to remove from mapng.env, a second update key pair, a look at mapng.com/admin.
+
 ## State of the branches
 
 As of 2026-11-23:
@@ -65,7 +92,8 @@ As of 2026-11-23:
     tile's), and "No road picked" before a pick.
     Left of step 3: export assets per tile from the tiles workflow (the batch job's old purpose: today step 3 exports
     the whole shape as one); the batch code, its texts and tests removed once that exists; the About and help texts
-    that still name Batch mode (`locales/*`: about lists, tech stack); the stats page's batch counters.
+    (done 2026-11-23: the About window's batch section is now "Tiles and Road mode", and the help, tech and data
+    page texts no longer name Batch mode); the stats page's batch counters.
   - Then step 4 (speed for big shapes).
 
 ## Now: review of last week's work (2026-11-23), before 0.3.6
@@ -206,15 +234,14 @@ As of 2026-11-23:
 
 ## Now: a Reset button (desktop and web)
 
-- **The desktop app's Refresh became Reset, and the website has the same button** (user, 2026-11-23). Done on dev
+- **Reset replaces the desktop's Refresh, and the website has the same button** (user, 2026-11-23). On dev and main
   2026-11-23: `services/resetApp.js`, the button and its question in `components/layout/AppSidebar.vue`, 7
-  languages. It clears every `mapng_` setting (place, tiles, road, masks, sizes, export options), asks for the
-  location, and loads the page again at that place (refused or unknown: Flagstaff), in Tile mode with one 1024 tile.
-  Kept, my choice since the question went unanswered: the GPXZ key, the user's own Overpass server, the language,
-  light or dark, the two sharing choices. The button is off while a job runs. Checked in the browser
-  (`scratch/verify-pw/e2e_reset.mjs`): location granted and refused. Open: the user to say if keys should go too;
-  a look in the packaged desktop app (Electron usually has no location service: it should land on Flagstaff after
-  at most 8 s). The desktop's plain reload is still View > Reload / Ctrl+R.
+  languages. It clears every `mapng_` setting (tiles, road, masks, sizes, export options) and loads the page again
+  in Tile mode with one 1024 tile. Decided by the user the same day: keys, language, theme and sharing choices are
+  never cleared; the question shows once a week at most; a checkbox "Keep the map where it is", on by default and
+  remembered, keeps the place and zoom (unticked: the location is asked for, else Flagstaff). Off while a job runs.
+  Checked in the browser (`scratch/verify-pw/e2e_reset_week.mjs`, `e2e_reset_keep.mjs`). Open: a look in the packed
+  desktop app.
 
 ## Now: Fizz_Mechanic's 0.3.3 list (2026-11-19; on hold until after the 0.3.5 release, user 2026-11-20)
 

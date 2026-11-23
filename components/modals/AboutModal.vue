@@ -72,13 +72,13 @@
         <div class="space-y-2">
             <h4 class="font-bold text-gray-900 dark:text-white text-xs uppercase tracking-wider flex items-center gap-2">
               <Grid3X3 :size="14" class="text-brand" />
-            {{ t('about.batchTitle') }}
+            {{ t('about.shapesTitle') }}
           </h4>
           <p class="text-xs bg-gray-100 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
-            {{ t('about.batchIntro') }}
+            {{ t('about.shapesIntro') }}
           </p>
           <ul class="space-y-1 list-disc list-inside marker:text-brand text-xs">
-            <li v-for="item in tm('about.batchItems')" :key="item">{{ item }}</li>
+            <li v-for="item in tm('about.shapesItems')" :key="item">{{ item }}</li>
           </ul>
         </div>
 
