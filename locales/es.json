@@ -808,6 +808,7 @@
       "memory_fits": "La exportación necesita unos {gb} GB de memoria en su punto más alto; este ordenador tiene {total} GB.",
       "memory_tight": "La exportación necesita unos {gb} GB de memoria en su punto más alto, cerca de los {total} GB de este ordenador: cierra antes otros programas.",
       "memory_tooMuch": "La exportación necesita unos {gb} GB de memoria en su punto más alto, más de lo que dan los {total} GB de este ordenador: probablemente se quedará sin memoria. Prueba un mapa más pequeño o desactiva los edificios.",
+      "webHeavy": "Este mapa tiene {roads} carreteras. Una pestaña del navegador puede quedarse sin memoria al construir uno tan denso: la aplicación de escritorio no tiene ese límite.",
       "farEdge": "Sus esquinas están a {km} km del centro. A partir de unos {limit} km BeamNG pierde precisión y los objetos empiezan a vibrar: elige una zona más pequeña o menos m/px.",
       "nearEdge": "Sus esquinas están a {km} km del centro, cerca de los {limit} km donde BeamNG pierde precisión y los objetos vibran.",
       "bigTerrain": "Un terreno de {px} px usa mucha memoria y tarda más en cargar.",

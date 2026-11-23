@@ -808,6 +808,7 @@
       "memory_fits": "Der Export braucht in der Spitze etwa {gb} GB Arbeitsspeicher; dieser Computer hat {total} GB.",
       "memory_tight": "Der Export braucht in der Spitze etwa {gb} GB Arbeitsspeicher, knapp an den {total} GB dieses Computers: Schließe vorher andere Programme.",
       "memory_tooMuch": "Der Export braucht in der Spitze etwa {gb} GB Arbeitsspeicher, mehr als die {total} GB dieses Computers hergeben: Der Speicher reicht wahrscheinlich nicht. Versuche eine kleinere Karte oder schalte Gebäude aus.",
+      "webHeavy": "Diese Karte hat {roads} Straßen. Einem Browser-Tab kann beim Bauen einer so dichten Karte der Speicher ausgehen: Die Desktop-App hat diese Grenze nicht.",
       "farEdge": "Die Ecken liegen {km} km vom Zentrum. Ab etwa {limit} km reicht BeamNGs Genauigkeit nicht mehr und Objekte beginnen zu zittern: wähle ein kleineres Gebiet oder weniger m/px.",
       "nearEdge": "Die Ecken liegen {km} km vom Zentrum, nahe an den {limit} km, ab denen BeamNGs Genauigkeit nicht mehr reicht und Objekte zittern.",
       "bigTerrain": "Ein Gelände mit {px} px braucht viel Speicher und lädt länger.",

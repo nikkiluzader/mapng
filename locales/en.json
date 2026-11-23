@@ -813,6 +813,7 @@
       "memory_fits": "Exporting needs about {gb} GB of memory at its peak; this computer has {total} GB.",
       "memory_tight": "Exporting needs about {gb} GB of memory at its peak, close to this computer's {total} GB: close other programs first.",
       "memory_tooMuch": "Exporting needs about {gb} GB of memory at its peak, more than this computer's {total} GB can give: it will likely run out. Try a smaller map, or turn buildings off.",
+      "webHeavy": "This map has {roads} roads. A browser tab can run out of memory building one this dense: the desktop app has no such limit.",
       "farEdge": "Its corners are {km} km from the centre. Past about {limit} km BeamNG runs out of precision and objects start to jitter: pick a smaller area or a lower m/px.",
       "nearEdge": "Its corners are {km} km from the centre, close to the {limit} km where BeamNG runs out of precision and objects start to jitter.",
       "bigTerrain": "A {px} px terrain uses a lot of memory and takes longer to load.",

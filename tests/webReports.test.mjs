@@ -46,6 +46,11 @@ test('a job that never ended leaves a note; one that ends, or a page closed the 
   markJobStart('export', { code: 'mapng:1:abc', build: 'abc1234' });
   const note = unfinishedJob();
   assert.equal(note.kind, 'export'); assert.equal(note.code, 'mapng:1:abc'); assert.equal(note.build, 'abc1234');
+  assert.equal(note.area, null);                                  // (no place given: none noted)
+  // the place the job was at is kept with the note, as plain numbers (a report from the note said "area: null")
+  markJobStart('export', { code: 'mapng:1:abc', area: { lat: 47.3, lng: -122.3, resolution: '16384', metersPerPixel: 1, extra: 'x' } });
+  assert.deepEqual(unfinishedJob().area, { lat: 47.3, lng: -122.3, resolution: 16384, metersPerPixel: 1 });
+  markJobStart('export', { area: { lat: 'north', lng: 3 } }); assert.equal(unfinishedJob().area, null);
   markJobEnd(); assert.equal(unfinishedJob(), null);
   // an ordinary close
   const handlers = {}; watchOrdinaryClose({ addEventListener: (name, fn) => { handlers[name] = fn; } });

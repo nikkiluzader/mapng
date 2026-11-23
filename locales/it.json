@@ -808,6 +808,7 @@
       "memory_fits": "L'esportazione richiede circa {gb} GB di memoria nel momento di picco; questo computer ne ha {total} GB.",
       "memory_tight": "L'esportazione richiede circa {gb} GB di memoria nel momento di picco, vicino ai {total} GB di questo computer: chiudi prima gli altri programmi.",
       "memory_tooMuch": "L'esportazione richiede circa {gb} GB di memoria nel momento di picco, più di quanto possano dare i {total} GB di questo computer: probabilmente esaurirà la memoria. Prova una mappa più piccola o disattiva gli edifici.",
+      "webHeavy": "Questa mappa ha {roads} strade. Una scheda del browser può esaurire la memoria costruendone una così densa: l’app desktop non ha questo limite.",
       "farEdge": "I suoi angoli sono a {km} km dal centro. Oltre circa {limit} km BeamNG perde precisione e gli oggetti iniziano a tremare: scegli un'area più piccola o meno m/px.",
       "nearEdge": "I suoi angoli sono a {km} km dal centro, vicino ai {limit} km dove BeamNG perde precisione e gli oggetti tremano.",
       "bigTerrain": "Un terreno da {px} px usa molta memoria e si carica più lentamente.",

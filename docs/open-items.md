@@ -96,9 +96,11 @@ Known and not blocking 0.3.6 (say so on the page):
    tabs ... or use the desktop app"). New in step 1 on desktop: a line when Generate's need (a table from the probe
    runs, `estimateGenerateMemory`) is close to the computer's memory, past it, or more than is free right now (the
    report had 5.5 of 15.2 GB free). The runner's memory reports carry typed-array bytes too.
-   Not done: the website's big-city exports (MR-A7KRF8 and others: a warning before the export from the road and
-   rail load) and closed-page reports with no area. Generate's floor before the textures is 4.8 GB at 8192; the
-   game texture's own painting adds 1 GB.
+   Also 2026-11-24: on the website the export panel says so when a map has 15,000 roads or more (the reports that
+   ended with the page gone had 26,000 and 35,000); a job's place is kept with its note, so a report made after
+   the page closed says where it was (they said "area: null").
+   Not done: the website export's own peak has not been measured on a dense city, so the 15,000 is from the
+   reports alone; Generate's floor before the textures is 4.8 GB at 8192 and the game texture's painting adds 1 GB.
 10. **Sidewalk drift, jagged terrain from our own steps, sawtooth on steep roads, the sea-wall branch,** and
     Fizz_Mechanic's held list.
 

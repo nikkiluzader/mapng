@@ -808,6 +808,7 @@
       "memory_fits": "Eksport potrzebuje w szczycie około {gb} GB pamięci; ten komputer ma {total} GB.",
       "memory_tight": "Eksport potrzebuje w szczycie około {gb} GB pamięci, blisko {total} GB tego komputera: najpierw zamknij inne programy.",
       "memory_tooMuch": "Eksport potrzebuje w szczycie około {gb} GB pamięci, więcej niż może dać {total} GB tego komputera: prawdopodobnie zabraknie pamięci. Spróbuj mniejszej mapy albo wyłącz budynki.",
+      "webHeavy": "Ta mapa ma {roads} dróg. Karcie przeglądarki może zabraknąć pamięci przy budowaniu tak gęstej mapy: aplikacja na komputer nie ma tego ograniczenia.",
       "farEdge": "Jego narożniki są {km} km od środka. Powyżej około {limit} km BeamNG traci precyzję i obiekty zaczynają drgać: wybierz mniejszy obszar albo mniej m/px.",
       "nearEdge": "Jego narożniki są {km} km od środka, blisko {limit} km, gdzie BeamNG traci precyzję i obiekty drgają.",
       "bigTerrain": "Teren {px} px zajmuje dużo pamięci i dłużej się wczytuje.",

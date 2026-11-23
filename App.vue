@@ -1086,7 +1086,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
       // (the desktop app fetches and processes in a Node process: no 4 GB
       // window limit; the website does it here)
       // (a note that a Generate is running: services/sessionGuard.js)
-      markJobStart('generate', { code: await currentSessionCode(), build: typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : '' });
+      markJobStart('generate', { code: await currentSessionCode(), build: typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : '', area: { lat: center.value.lat, lng: center.value.lng, resolution: resolution.value, metersPerPixel: Number(processingMpp || 1) } });
       data = desktopApp
         ? await fetchTerrainDataOnDesktop(genCenter, genSize, fetchOSM, useUSGS, useGPXZ, useKRON86, gpxzApiKey, applyLoadingUpdate, signal, generationOptions)
         : await fetchTerrainData(genCenter, genSize, fetchOSM, useUSGS, useGPXZ, useKRON86, gpxzApiKey, undefined, applyLoadingUpdate, signal, generationOptions);

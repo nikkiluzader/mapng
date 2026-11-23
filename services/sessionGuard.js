@@ -23,10 +23,16 @@ const MAX_CODE_CHARS = 1.5 * 1024 * 1024;   // (a code with painted areas is lon
 
 const store = () => { try { return globalThis.localStorage || null; } catch { return null; } };
 
-/** A job starts: { kind: 'generate' | 'export', code: the session code or '', build }. */
-export function markJobStart(kind, { code = '', build = '' } = {}) {
+/**
+ * A job starts: { kind: 'generate' | 'export', code: the session code or '', build, area: { lat, lng, resolution,
+ * metersPerPixel } }. The area is kept in the open: a report made from the note said "area: null", and the code alone
+ * did not tell where the job was.
+ */
+export function markJobStart(kind, { code = '', build = '', area = null } = {}) {
   const s = store(); if (!s) return;
-  const note = { kind: String(kind), at: Date.now(), build: String(build || ''), code: typeof code === 'string' && code.length <= MAX_CODE_CHARS ? code : '' };
+  const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
+  const where = area && num(area.lat) !== null && num(area.lng) !== null ? { lat: num(area.lat), lng: num(area.lng), resolution: num(area.resolution), metersPerPixel: num(area.metersPerPixel) } : null;
+  const note = { kind: String(kind), at: Date.now(), build: String(build || ''), code: typeof code === 'string' && code.length <= MAX_CODE_CHARS ? code : '', area: where };
   try { s.setItem(KEY, JSON.stringify(note)); }
   catch { try { s.setItem(KEY, JSON.stringify({ ...note, code: '' })); } catch { /* storage full: no note */ } }
   if (logTimer) clearInterval(logTimer);

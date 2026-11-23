@@ -194,6 +194,8 @@
               :class="memoryNeed.fit === 'tooMuch' ? 'text-red-700 dark:text-red-300 font-semibold' : memoryNeed.fit === 'tight' ? 'text-amber-700 dark:text-amber-300' : 'text-gray-600 dark:text-gray-300'"
               data-testid="weight-memory"
             >{{ t(`exportPanel.weight.memory_${memoryNeed.fit}`, { gb: memoryNeed.gb, total: memoryNeed.total }) }}</p>
+            <!-- (website) a map with so many roads that a browser tab has run out of memory building one like it -->
+            <p v-if="webHeavy" class="text-caption leading-snug text-amber-700 dark:text-amber-300" data-testid="weight-web-heavy">{{ t('exportPanel.weight.webHeavy', { roads: webHeavy.roads.toLocaleString() }) }}</p>
             <!-- (the top rating has a line of its own) -->
             <p v-if="levelWeight.rating === 'extreme'" class="text-caption italic leading-snug text-red-700 dark:text-red-300" data-testid="weight-serious">{{ t('exportPanel.weight.areYouSerious') }}</p>
             <!-- a terrain that is not a power-of-two square is cut to one (services/squareCrop.js) -->
@@ -1107,6 +1109,15 @@ const memoryNeed = computed(() => {
   });
   const fit = memoryFit(gb, machineMemory.value);
   return fit ? { fit, gb: Math.ceil(gb), total: Math.round(machineMemory.value / 2 ** 30) } : null;
+});
+// (website) Exports that ended with the page gone had 26,000 and 35,000 roads (reports MR-A7KRF8, MR-FYTC2E,
+// MR-BY8N7H: the tab's memory, in the bridge models and the terrain shaping). Past WEB_HEAVY_ROADS the panel says so
+// before the export; the desktop app builds such maps in its own process.
+const WEB_HEAVY_ROADS = 15000;
+const webHeavy = computed(() => {
+  if (desktopApp || !hasOsmData.value || !built('roadSurfaces')) return null;
+  let roads = 0; for (const f of props.terrainData?.osmFeatures || []) if (f?.type === 'road') roads++;
+  return roads >= WEB_HEAVY_ROADS ? { roads } : null;
 });
 const squareCrop = computed(() => squareCropNotice(props.terrainData?.width, props.terrainData?.height, resolveProcessingMetersPerPixel(props.terrainData)));
 const isCustomUploadTerrain = computed(() => !!props.terrainData?.elevationUnitApplied);
@@ -2384,7 +2395,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
   // (the 3D preview stops drawing while the export runs in this page; the desktop app exports in its own process)
   heavyJobRunning.value = !desktopApp;
   // (a note that an export is running, with the settings as they are: services/sessionGuard.js)
-  currentSessionCode().then((code) => { if (isExportingBeamNGLevel.value) markJobStart('export', { code, build: typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : '' }); }).catch(() => {});
+  currentSessionCode().then((code) => { if (isExportingBeamNGLevel.value) markJobStart('export', { code, build: typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : '', area: { lat: props.center?.lat, lng: props.center?.lng, resolution: props.terrainData?.width, metersPerPixel: resolveProcessingMetersPerPixel(props.terrainData) } }); }).catch(() => {});
   let exportSucceeded = false;
   let doneInfo = null;   // (what the "done" window says: set where the level is written)
   beamNGProgressStep.value = `${t('progressStages.export.prepare')}…`;

@@ -808,6 +808,7 @@
       "memory_fits": "L'export a besoin d'environ {gb} Go de mémoire au plus fort ; cet ordinateur en a {total} Go.",
       "memory_tight": "L'export a besoin d'environ {gb} Go de mémoire au plus fort, près des {total} Go de cet ordinateur : fermez d'abord les autres programmes.",
       "memory_tooMuch": "L'export a besoin d'environ {gb} Go de mémoire au plus fort, plus que ce que les {total} Go de cet ordinateur peuvent donner : il risque fort de manquer de mémoire. Essayez une carte plus petite ou désactivez les bâtiments.",
+      "webHeavy": "Cette carte compte {roads} routes. Un onglet de navigateur peut manquer de mémoire en construisant une carte aussi dense : l’application de bureau n’a pas cette limite.",
       "farEdge": "Ses coins sont à {km} km du centre. Au-delà d'environ {limit} km, BeamNG manque de précision et les objets se mettent à trembler : choisissez une zone plus petite ou moins de m/px.",
       "nearEdge": "Ses coins sont à {km} km du centre, près des {limit} km où BeamNG manque de précision et les objets tremblent.",
       "bigTerrain": "Un terrain de {px} px utilise beaucoup de mémoire et se charge plus lentement.",

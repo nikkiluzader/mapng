@@ -47,6 +47,8 @@ function report() {
     error: `${job.value.kind === 'export' ? 'An export' : 'A Generate'} was still running when ${desktopApp ? 'the app' : 'the page'} closed (build ${job.value.build || 'unknown'}).`,
     config: job.value.code || '',
     jobLog: job.value.log || '',
+    // (where the job was: kept with the note since 2026-11-24; older notes have none)
+    area: job.value.area || null,
   });
   job.value = null;
 }
