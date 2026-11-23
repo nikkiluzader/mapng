@@ -58,24 +58,37 @@ export function seamBlendFor(chunk, finished, ease = SEAM_EASE_PX) {
  * cache: the export never downloads); exportChunk(terrainData, center, options) -> the export's result (blob,
  * finalHeights, finalMinHeight); options: the export's options for every chunk.
  */
-export async function exportChunked({ JSZip, footprint, W, H, center, mpp, levelName, generateChunk, exportChunk, options = {}, size = CHUNK_PX, overlap = OVERLAP_PX, levelInfo = null, onProgress = () => {}, log = () => {} }) {
+export async function exportChunked({ JSZip, footprint, W, H, center, mpp, levelName, generateChunk, exportChunk, options = {}, size = CHUNK_PX, overlap = OVERLAP_PX, levelInfo = null, onProgress = () => {}, log = () => {}, signal = null }) {
   const L = levelLattice(center, mpp, W, H);
   const chunks = chunkLayout(footprint, W, H, { size, overlap });
   log(`${chunks.length} chunk(s) of ${size} px (overlap ${overlap}) over a ${W} x ${H} footprint grid`);
-  const finished = []; const parts = []; const times = [];
+  const finished = []; const parts = []; const times = []; const reports = []; const lines = [];
+  const say = (m) => { lines.push(m); log(m); };
+  // (a failure says which chunk it was in, and at which step: one of many, each minutes long)
+  const inChunk = async (c, k, what, run) => {
+    try { return await run(); } catch (e) {
+      if (e?.name === 'AbortError') throw e;
+      const err = new Error(`Chunk ${c.key} (${k + 1} of ${chunks.length}), ${what}: ${e?.message || e}`); err.cause = e; err.chunk = c.key; throw err;
+    }
+  };
   for (let k = 0; k < chunks.length; k++) {
     const c = chunks[k]; const t0 = Date.now();
+    signal?.throwIfAborted?.();
     onProgress({ chunk: k + 1, of: chunks.length, step: 'generate' });
-    const td = await generateChunk(c, { bounds: L.chunkBounds(c), center: L.chunkCenter(c) });
+    const td = await inChunk(c, k, 'generating it from the cache', () => generateChunk(c, { bounds: L.chunkBounds(c), center: L.chunkCenter(c) }));
     const seamBlend = seamBlendFor(c, finished);
+    signal?.throwIfAborted?.();
     onProgress({ chunk: k + 1, of: chunks.length, step: 'export' });
     const chunkLevel = `${levelName}_c${c.key}`;
-    const res = await exportChunk(td, L.chunkCenter(c), {
+    const res = await inChunk(c, k, 'exporting it', () => exportChunk(td, L.chunkCenter(c), {
       ...options, levelName: chunkLevel, groundAsModels: true,
       groundShape: { size: c.size, runs: c.runs },
       chunkCore: [c.core[0] - c.x0, c.core[1] - c.y0, c.core[2] - c.x0, c.core[3] - c.y0],
       seamBlend, keepFinalHeights: true,
-    });
+    }));
+    // (the merge sets every chunk at its own height from this: without it a chunk would sit hundreds of metres off)
+    if (!Number.isFinite(Number(res?.finalMinHeight))) throw new Error(`Chunk ${c.key} (${k + 1} of ${chunks.length}): the export gave no lowest height for it; the chunks cannot be set at their heights.`);
+    if (typeof res.report === 'string' && res.report) reports.push({ key: c.key, text: res.report });
     finished.push({ key: c.key, x0: c.x0, y0: c.y0, size: c.size, core: c.core, runs: c.runs, heights: res.finalHeights });
     // (a finished chunk's heights are needed only while a later chunk can still touch it: rows two chunks back drop)
     for (let i = finished.length - 1; i >= 0; i--) if (finished[i].y0 + finished[i].size < c.y0 - overlap) finished.splice(i, 1);
@@ -83,10 +96,25 @@ export async function exportChunked({ JSZip, footprint, W, H, center, mpp, level
     const bytes = typeof res.blob?.arrayBuffer === 'function' ? await res.blob.arrayBuffer() : res.blob;
     parts.push({ zip: await JSZip.loadAsync(bytes), key: c.key, levelName: chunkLevel, offsetM: L.chunkOffsetM(c), minHeight: res.finalMinHeight });
     times.push({ key: c.key, ms: Date.now() - t0 });
-    log(`chunk ${c.key} (${k + 1}/${chunks.length}): ${((Date.now() - t0) / 1000).toFixed(1)} s${seamBlend ? ', seam blended toward finished neighbours' : ''}`);
+    say(`chunk ${c.key} (${k + 1}/${chunks.length}): ${((Date.now() - t0) / 1000).toFixed(1)} s${seamBlend ? ', seam blended toward finished neighbours' : ''}`);
   }
+  signal?.throwIfAborted?.();
   onProgress({ step: 'merge' });
   const bounds = { north: L.latOf(0), south: L.latOf(H), west: L.lngOf(0), east: L.lngOf(W) };
-  const zip = await mergeChunks(JSZip, parts, levelName, { log, bounds, levelInfo });
-  return { zip, chunks: times };
+  const zip = await mergeChunks(JSZip, parts, levelName, { log: say, bounds, levelInfo });
+  // The level's own report: what the level is, how it was put together (the lines above), then every chunk's report.
+  // (The merged zip used to hold the first chunk's report as if it were the level's.)
+  const report = [
+    `# MapNG export report: ${levelName} (built in ${chunks.length} chunks)`,
+    '',
+    `A level of ${W} x ${H} squares at ${mpp} m, built as ${chunks.length} chunks of ${size} squares (${overlap} shared with each neighbour) and merged. Each chunk's own report follows; the map data bundled in this level (mapng_source) is the first chunk's.`,
+    '',
+    '## How the chunks were put together',
+    '',
+    ...lines.map((l) => `- ${l}`),
+    '',
+    ...reports.flatMap((r) => [`## Chunk ${r.key}`, '', r.text.replace(/^# /gm, '### ').replace(/^## /gm, '#### '), '']),
+  ].join('\n');
+  zip.file(`levels/${levelName}/export_report.md`, report);
+  return { zip, chunks: times, report };
 }

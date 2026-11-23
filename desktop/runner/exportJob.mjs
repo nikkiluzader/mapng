@@ -34,6 +34,8 @@ async function main() {
   // step, desktop/runner/prefetchJob.mjs, into the cache it reads here; what
   // it still has to download is logged, refused under MAPNG_STRICT_NO_DOWNLOAD)
   const sources = installSourceRecorder({ ...(job.sources || { dir: path.join(jobDir, 'export-sources'), mode: 'record' }) });
+  // (the export builds the map that was generated: what the cache holds for it is never too old)
+  sources.pinned = true;
   const terrainData = await reviveJobValue(job.terrainData, jobDir);
   const started = Date.now();
   // (the zip written to the file as it is made, beside the final name; the

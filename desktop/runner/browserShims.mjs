@@ -362,7 +362,8 @@ export function installSourceRecorder({ dir, mode = 'record', fallback = true, r
   const refresh = mode === 'replay' && (refreshOsm === true || (refreshOsm === 'ifBackup' && savedFromBackupMapData(dir)));
   // (downloaded: misses that went online; missedUrls: the first few, for the log)
   // (stats.strict may be switched on later: the export job, after its data step)
-  const stats = { recorded: 0, replayed: 0, missed: 0, downloaded: 0, missedUrls: [], downloadedUrls: [], strict: !!strict, refreshOsm: refresh, refreshed: 0 };
+  // (pinned: set by the export job; the cache's ages are not looked at while it is on)
+  const stats = { recorded: 0, replayed: 0, missed: 0, downloaded: 0, missedUrls: [], downloadedUrls: [], strict: !!strict, refreshOsm: refresh, refreshed: 0, pinned: false };
   // (services/terrain.js skips the GPXZ request pacing while replaying)
   if (mode === 'replay') globalThis.__mapngReplayingSources = true;
   const inner = globalThis.fetch;
@@ -381,7 +382,10 @@ export function installSourceRecorder({ dir, mode = 'record', fallback = true, r
       // stayed open, so a list corrected on the server never reached an app left running: a tester's map went
       // on falling back to Overture hours after the list was fixed, 2026-11-13.)
       const age = Date.now() - (meta?.savedAt || 0);
-      const stale = meta && ((OSM_REQUEST.test(normalized) && !(age < CACHE_OSM_MS)) || (MANIFEST_REQUEST.test(normalized) && !(age < CACHE_MANIFEST_MS)));
+      // (an export reads the map as it was generated: nothing in the cache is too old for it. A chunked level
+      // generates every chunk again from the cache at export; half an hour after Generate the later chunks asked the
+      // servers for today's roads while the earlier ones had kept the old: roads that no longer met at the seams.)
+      const stale = !stats.pinned && meta && ((OSM_REQUEST.test(normalized) && !(age < CACHE_OSM_MS)) || (MANIFEST_REQUEST.test(normalized) && !(age < CACHE_MANIFEST_MS)));
       if (meta && !stale) {
         stats.replayed++;
         // (recently used: the app trims the cache by this, desktop/main.js)

@@ -117,8 +117,13 @@ As of 2026-11-23:
   it backwards"; checked: 5.21 km dragged back to 3.02 km). An area already read is not read again. No picking
   while a job runs; a slow answer no longer overwrites a Clear; Generate is off until a road is picked; one shared
   corridor computation, the width slider settles first. Not done: routing in a worker (3 ms: not needed).
-  **Next, in order:** share codes for roads (the stretch only, limits), tile gaps (64 cap in the window, Free to
-  Together), then road picking's leftovers
+  **Also 2026-11-23:** share codes carry a road's stretch with its ends exact and refuse hostile roads; 64 tiles
+  at most in the window, Together re-places free tiles, stored road and tiles checked. Chunked export: the cache's
+  map data is never "too old" for an export (the desktop cache aged it out after 30 minutes and later chunks got
+  today's roads), an error names its chunk and step, a cancel stops between chunks, a missing lowest height stops
+  the merge, the level's report is the merge's own lines plus every chunk's report (it was the first chunk's),
+  the three progress lines are in 7 languages. Checked: the Oslo level again, 109 s, no downloads.
+  **Next, in order:** the sweep on today's export changes; the seam conditions for shaped chunks (above)
   (roads-only read, no picking while generating, follow rules, routing off the main thread); chunked export
   (cache-only, cancel, translated progress, merged report); user reports since 2026-11-22 (user, 2026-11-23: "go
   through any reports sent by users and make sure to fix those too"); tiles step 2 C/E/F; the Single tile / Batch

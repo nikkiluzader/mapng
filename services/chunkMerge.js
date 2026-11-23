@@ -158,12 +158,13 @@ export function moveObject(o, dx, dy, dz, key) {
  */
 export async function mergeChunks(JSZip, chunks, levelName, { log = () => {}, bounds = null, levelInfo = null } = {}) {
   const out = new JSZip();
-  const levelMin = Math.min(...chunks.map((c) => Number(c.minHeight) || 0));
+  for (const c of chunks) if (!Number.isFinite(Number(c.minHeight))) throw new Error(`chunk ${c.key} has no lowest height: it cannot be set at its height in the level`);
+  const levelMin = Math.min(...chunks.map((c) => Number(c.minHeight)));
   const gathered = new Map();   // path -> lines (items, forest) or decal instances
   const materials = new Map();  // path -> merged object
   let first = true; let joined = null; let n = 0;
   for (const c of chunks) {
-    const dx = c.offsetM.x; const dy = c.offsetM.y; const dz = (Number(c.minHeight) || 0) - levelMin;
+    const dx = c.offsetM.x; const dy = c.offsetM.y; const dz = Number(c.minHeight) - levelMin;
     const from = `levels/${c.levelName}/`;
     let objects = 0; let assets = 0;
     for (const name of Object.keys(c.zip.files)) {
