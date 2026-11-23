@@ -87,7 +87,14 @@ Known and not blocking 0.3.6 (say so on the page):
    two files of 512 x 512, each exactly its half of the whole map's. Not per tile: the 3D models (they have their
    own tiling), the GeoJSON (it is the whole map's data), a chunked level (its overview is too coarse). Left: the
    batch code and its texts removed (the old panel still opens for an unfinished saved job).
-9. **Desktop Generate runs out of memory at 8192 on 16 GB;** big-city exports on the website.
+9. **Desktop Generate runs out of memory at 8192 on 16 GB;** big-city exports on the website. Started 2026-11-23,
+   not fixed. Found so far: report MR-PM849Z's own error is the satellite picture's fitting step ("could not be
+   fitted to a 8192 x 8192 map (Worker error)", `services/resamplerClient.js` resampleHeightAndImage), and its
+   wording still says "close other tabs ... or use the desktop app" inside the desktop app. Past probes
+   (`scratch/memprobe/samples`): a desktop Generate at 8192 peaks at 6.7 to 7.8 GB, nearly all in the runner. Next:
+   measure that step's own peak at 8192 x 2 m (Essex, 51.627, 0.256), lower it (the picture goes to the worker and
+   comes back: two full copies), say the right thing on desktop, and a memory estimate before Generate as the
+   export has. Then the website's big-city exports and reports with no area.
 10. **Sidewalk drift, jagged terrain from our own steps, sawtooth on steep roads, the sea-wall branch,** and
     Fizz_Mechanic's held list.
 
