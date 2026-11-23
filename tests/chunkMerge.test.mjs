@@ -59,6 +59,37 @@ test('road ends a few cm apart at a seam are joined at their midpoint', () => {
   const b = { o: { class: 'DecalRoad', material: 'm', nodes: [[10, 0.16, 0, 6], [20, 0, 0, 6]] }, chunk: 'b' };
   assert.equal(joinSeamRoads([a, b]).joins, 1); assert.deepEqual(a.o.nodes[1].slice(0, 2), [10, 0.08]); assert.equal(a.o.nodes.length, 3);
 });
+test('a road over two seams, its pieces a few cm apart, becomes one road whatever order they come in', () => {
+  const piece = (x0, x1, y, ch) => ({ o: { class: 'DecalRoad', material: 'm', nodes: [[x0, y, 0, 6], [(x0 + x1) / 2, y, 0, 6], [x1, y, 0, 6]] }, chunk: ch });
+  for (const order of [[0, 1, 2], [1, 0, 2], [2, 1, 0], [1, 2, 0]]) {
+    const pieces = [piece(0, 10, 0, 'a'), piece(10.1, 20, 0.05, 'b'), piece(20.1, 30, 0, 'c')];
+    const list = order.map((i) => pieces[i]);
+    const { joins, removed } = joinSeamRoads(list);
+    assert.equal(joins, 2, `order ${order}`); assert.equal(removed.size, 2);
+    const kept = list.find((r) => !removed.has(r.o));
+    const xs = kept.o.nodes.map((n) => n[0]); const sorted = xs[0] < xs[xs.length - 1] ? xs : [...xs].reverse();
+    assert.equal(xs.length, 7); assert.ok(sorted[0] === 0 && sorted[6] === 30, `order ${order}: ${xs}`);
+    for (let i = 1; i < sorted.length; i++) assert.ok(sorted[i] > sorted[i - 1]);
+  }
+  // five pieces in a row
+  const five = Array.from({ length: 5 }, (_, i) => piece(i * 10, i * 10 + 9.95, 0, `c${i}`));
+  assert.equal(joinSeamRoads(five).joins, 4);
+});
+test('a street and the viaduct over it, cut at the same seam point, are each joined to their own other half', () => {
+  const at = (x0, x1, z, ch) => ({ o: { class: 'DecalRoad', material: 'm', nodes: [[x0, 0, z, 6], [x1, 0, z, 6]] }, chunk: ch });
+  const streetA = at(0, 10, 0, 'a'); const streetB = at(10, 20, 0, 'b'); const deckA = at(0, 10, 8, 'a'); const deckB = at(10, 20, 8, 'b');
+  const { joins } = joinSeamRoads([streetA, deckB, deckA, streetB]);
+  assert.equal(joins, 2);
+  for (const r of [streetA, streetB, deckA, deckB]) if (r.o.nodes.length === 3) assert.equal(new Set(r.o.nodes.map((n) => n[2])).size, 1, 'a joined road keeps one height');
+  // a ramp ending 4 m above a street is never joined to it
+  assert.equal(joinSeamRoads([at(0, 10, 0, 'a'), at(10, 20, 4, 'b')]).joins, 0);
+});
+test('a junction on a seam is left as the chunks built it', () => {
+  const r = (pts, ch) => ({ o: { class: 'DecalRoad', material: 'm', nodes: pts.map(([x, y]) => [x, y, 0, 6]) }, chunk: ch });
+  // one road arriving from chunk a, two branches leaving in chunk b, all at (10, 0)
+  const res = joinSeamRoads([r([[0, 0], [10, 0]], 'a'), r([[10, 0], [20, 5]], 'b'), r([[10, 0.1], [20, -5]], 'b')]);
+  assert.equal(res.joins, 0); assert.ok(res.ambiguous >= 1);
+});
 test('seam blend reads only the neighbour footprint (outside it Generate only fills)', () => {
   const size = 16; const f = { x0: 0, y0: 0, size, core: [0, 0, 12, 16], heights: new Float32Array(size * size).fill(5), runs: [[0, 0, 16]] };
   const b = seamBlendFor({ x0: 8, y0: 0, size }, [f], 4);

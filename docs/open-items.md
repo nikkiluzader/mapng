@@ -100,7 +100,16 @@ As of 2026-11-23:
   In game the same day (untouched terrain, level removed after): 961 points of the game's own terrain height are
   0.0 cm rms from the source at their real positions (worst 0.1 cm), and 473 road points lie on OpenStreetMap's
   lines (median 0 cm, worst 6 cm; a square off would read 62 cm).
-  **Next, in order:** seam rejoin (height check, three or more pieces) and blend before build; road picking
+  **Seams, 2026-11-23:** the rejoin now needs the two ends at one height (0.5 m), joins only a unique pair (a
+  junction on a seam stays) and runs until nothing is left (a road over several seams becomes one). A chunk now
+  starts on its finished neighbours' ground before anything is built. Measured on a new test level (a 5 km corridor
+  through Oslo at latitude 60, scratch/frame/road60.mjs, 5 chunks, no downloads at export): with the terrain
+  untouched the later blend moves nothing; **with shaping on it still moves points by up to 10.9 m (22,659 over 5 cm
+  in one chunk)**: each chunk's structure solver sees its own cut of the road network and grades bridge and tunnel
+  approaches differently from its neighbour. Sidewalk and rail models built before that blend stay on the earlier
+  ground. Open: the neighbour's finished ground and road heights as fixed conditions for the next chunk's solver
+  and shaping (not a late blend). Until then a chunked level in a city with structures near a seam is not right.
+  **Next, in order:** road picking
   (roads-only read, no picking while generating, follow rules, routing off the main thread); chunked export
   (cache-only, cancel, translated progress, merged report); user reports since 2026-11-22 (user, 2026-11-23: "go
   through any reports sent by users and make sure to fix those too"); tiles step 2 C/E/F; the Single tile / Batch
@@ -311,6 +320,18 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
   - o5m: a compact binary sibling of .osm; a decoder is moderate work;
   - o5c, osc, osh: change and history files, not map snapshots; poor fit for a one-off level import;
   - Shapefile, obf (OsmAnd): other data models; most work.
+
+## Now: reports since 2026-11-22 (user, 2026-11-23: go through them and fix them)
+
+- **MR-QWXXKH (desktop 0.3.5, 2026-11-22): "Generate does not start"** with a custom elevation file and a custom
+  road file (Zwickau, 4 km). Fixed 2026-11-23: with an uploaded elevation file the panel always offered Generate,
+  whose key then matched the map on screen, so the click did nothing; and a map data file loaded after a Generate
+  was not in the key at all. The panel now asks App.vue's own key builder (`generationKeyFor`), the loaded file is
+  in the key, and the "settings changed" notice follows it (it did not know tiles or a road either). Checked in the
+  browser: Generate, load a file, the notice appears, Generate runs again. Copies: scratch/reports/r1123.
+- **MR-SGQTD6 (desktop 0.3.5, 2026-11-22): the window ran out of memory** (31 GB machine, crash dump only, no
+  area or log). Same family as MR-WNMAMX below; nothing to reproduce from. Open with the items below.
+- No reports on 2026-11-23 so far.
 
 ## Now: crash reports 2026-11-20 to 2026-11-22
 

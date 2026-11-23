@@ -13862,6 +13862,25 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   let exportTerrainData = includeBuildings && shapeExtras
     ? await gradeGarageFootprints(foundationInput, isGarageFeature, { yieldFn: yield_ })
     : foundationInput;
+  // A chunk beside finished neighbours starts on their ground: its heights are eased toward the neighbours' final
+  // heights along the shared edges before anything is built, so its roads, sidewalks, buildings and every other
+  // generated model are made on the ground the seam will have. (The blend after the terrain steps, below, then only
+  // takes out what this chunk's own shaping changed again near the seam: millimetres. Until 2026-11-23 that later
+  // blend did all of it, up to 0.25 m measured, and generated models near a seam stayed on the ground from before it.)
+  if (seamBlend?.target && seamBlend?.weight) {
+    if (exportTerrainData.heightMap.length === seamBlend.target.length) {
+      const hm = Float32Array.from(exportTerrainData.heightMap); const T = seamBlend.target; const Wt = seamBlend.weight;
+      let moved = 0; let maxD = 0;
+      for (let k = 0; k < hm.length; k++) {
+        const w = Wt[k]; if (!(w > 0) || !Number.isFinite(T[k])) continue;
+        const d = (T[k] - hm[k]) * w; hm[k] += d; moved++; if (Math.abs(d) > maxD) maxD = Math.abs(d);
+      }
+      exportTerrainData = { ...exportTerrainData, heightMap: hm };
+      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunk: starting on the finished neighbours' ground: ${moved} grid point(s) eased toward their final heights before anything is built, at most ${maxD.toFixed(2)} m.`);
+    } else {
+      console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Chunk: the neighbours' heights are ${seamBlend.target.length} points, this chunk's ${exportTerrainData.heightMap.length}: the seam is NOT blended (the chunks will not meet exactly).`);
+    }
+  }
   const lat = center.lat.toFixed(4);
   const lng = center.lng.toFixed(4);
   const fallbackLevelName = `mapng_${lat}_${lng}`.replace(/-/g, '_').replace(/\./g, '_');
@@ -15088,10 +15107,10 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // exactly; dz kept for what stands on that ground (roads, objects, trees: toNDJSON and the forest)
   if (seamBlend?.target && seamBlend?.weight && exportTerrainData.heightMap.length === seamBlend.target.length) {
     const hm = exportTerrainData.heightMap; const T = seamBlend.target; const Wt = seamBlend.weight; const N = exportTerrainData.width;
-    const delta = new Float32Array(hm.length); let moved = 0; let maxD = 0;
+    const delta = new Float32Array(hm.length); let moved = 0; let maxD = 0; let over5 = 0;
     for (let k = 0; k < hm.length; k++) {
       const w = Wt[k]; if (!(w > 0) || !Number.isFinite(T[k])) continue;
-      const d = (T[k] - hm[k]) * w; hm[k] += d; delta[k] = d; moved++; if (Math.abs(d) > maxD) maxD = Math.abs(d);
+      const d = (T[k] - hm[k]) * w; hm[k] += d; delta[k] = d; moved++; if (Math.abs(d) > maxD) maxD = Math.abs(d); if (Math.abs(d) > 0.05) over5++;
     }
     const sqC = squareSize;
     chunkZAdjustActive = (x, y) => {
@@ -15099,7 +15118,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       const c0 = Math.floor(fx); const r0 = Math.floor(fy); const tx = fx - c0; const ty = fy - r0;
       return delta[r0 * N + c0] * (1 - tx) * (1 - ty) + delta[r0 * N + c0 + 1] * tx * (1 - ty) + delta[(r0 + 1) * N + c0] * (1 - tx) * ty + delta[(r0 + 1) * N + c0 + 1] * tx * ty;
     };
-    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunk: seam blend toward finished neighbours: ${moved} grid point(s) eased, at most ${maxD.toFixed(2)} m; roads, objects and trees on them move with the ground.`);
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunk: seam blend after the terrain steps: ${moved} grid point(s) brought exactly onto the finished neighbours' heights, at most ${maxD.toFixed(3)} m, ${over5} of them by more than 5 cm (what this chunk's own terrain steps changed near the seam after it started on the neighbours' ground); roads, objects and trees on them move with the ground, sidewalk and rail models built before this step do not.`);
   }
   if (groundAsModels) {
     beginStep('ground', 'Building the ground as models…');

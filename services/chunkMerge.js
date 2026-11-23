@@ -50,65 +50,76 @@ export function mergeLevelData(data, part, dx, dy, dz, key, n) {
 }
 
 /**
- * Roads cut at a seam joined back into one: two DecalRoads from different chunks with an end at the same point
- * (within `tol` m), the same material, width, one-way and drivability, become one road (the first's name and group),
- * so the game's road graph runs across the seam. A second pass joins ends up to `near` m apart when each is the
- * other's nearest (the two chunks can place a road a few cm apart); the joint is their midpoint. roads:
- * [{ o (the object), chunk }]; returns { removed (objects), joins }.
+ * Roads cut at a seam joined back into one: two DecalRoads with an end at the same place, cut there by two different
+ * chunks, with the same material, width, one-way and drivability, become one road (the first's name and group), so
+ * the game's road graph runs across the seam.
+ *
+ * Two ends are one cut when they lie within `near` m of each other on the map AND within `dzMax` m in height (a
+ * street and the viaduct over it, cut at the same seam point, are two cuts, each joined to its own other half), and
+ * when each is the other's only such end: where three or more meet (a junction on the seam), nothing is joined and
+ * the junction stays as the chunks built it. The joint is the two ends' midpoint. Joining runs until nothing is left
+ * to join, so a road crossing several seams becomes one road again whatever order its pieces come in (until
+ * 2026-11-23 the ends were read once, and the middle piece of three left the third unjoined).
+ * roads: [{ o (the object), chunk }]; returns { removed (objects), joins, ambiguous (ends left because more than one
+ * end could be their other half) }.
  */
-export function joinSeamRoads(roads, tol = 0.05, near = 0.3) {
+export function joinSeamRoads(roads, near = 0.3, dzMax = 0.5) {
   const removed = new Set();
-  const endOf = (r, at) => (at === 'first' ? r.o.nodes[0] : r.o.nodes.at(-1));
+  // which chunk cut each end (a joined road's far end is the far piece's)
+  for (const r of roads) r.ends = { first: r.chunk, last: r.chunk };
+  const endOf = (r, at) => (at === 'first' ? r.o.nodes[0] : r.o.nodes[r.o.nodes.length - 1]);
   const same = (a, b) => a.material === b.material && !!a.oneWay === !!b.oneWay && (a.drivability ?? 1) === (b.drivability ?? 1);
-  let joins = 0;
-  const join = (a, b) => {
-    if (a.r.chunk === b.r.chunk || a.r === b.r || removed.has(a.r.o) || removed.has(b.r.o) || !same(a.r.o, b.r.o)) return false;
-    const pa = endOf(a.r, a.at); const pb = endOf(b.r, b.at);
+  let joins = 0; let ambiguous = 0;
+  const fits = (e, f) => {
+    if (e.r === f.r || e.r.ends[e.at] === f.r.ends[f.at] || !same(e.r.o, f.r.o)) return false;
+    const pa = e.p; const pb = f.p;
+    const dx = pa[0] - pb[0]; const dy = pa[1] - pb[1];
+    if (dx * dx + dy * dy > near * near) return false;
+    if (Math.abs((pa[2] ?? 0) - (pb[2] ?? 0)) > dzMax) return false;
     if (Math.abs((pa[3] ?? 0) - (pb[3] ?? 0)) > 0.05) return false;
-    let A = a; let B = b;
-    if (A.at === 'first' && B.at === 'last') { A = b; B = a; }
-    if ((A.at === 'first' || B.at === 'last') && A.r.o.oneWay) return false;   // (a one-way road is never reversed)
-    const na = A.at === 'last' ? A.r.o.nodes : [...A.r.o.nodes].reverse();
-    const nb = B.at === 'first' ? B.r.o.nodes : [...B.r.o.nodes].reverse();
-    const j = na.at(-1).map((v, i) => (i < 3 ? (v + nb[0][i]) / 2 : v));
-    A.r.o.nodes = [...na.slice(0, -1), j, ...nb.slice(1)];
-    if (Array.isArray(A.r.o.position)) A.r.o.position = A.r.o.nodes[0].slice(0, 3);
-    removed.add(B.r.o); joins++;
-    // (B's other end is now A's last; A's ends are re-read from its nodes)
-    B.r.joinedInto = A.r;
+    // (a one-way road is never turned round: its pieces only join head to tail)
+    if (e.r.o.oneWay && e.at === f.at) return false;
     return true;
   };
-  const live = (e) => { let r = e.r; while (r.joinedInto) r = r.joinedInto; return r; };
-  const endsList = () => {
-    const out = [];
-    for (const r of roads) if (!removed.has(r.o) && !r.joinedInto) for (const at of ['first', 'last']) out.push({ r, at, p: endOf(r, at) });
-    return out;
+  const join = (a, b) => {
+    let A = a; let B = b;
+    if (A.at === 'first' && B.at === 'last') { A = b; B = a; }
+    const na = A.at === 'last' ? A.r.o.nodes : [...A.r.o.nodes].reverse();
+    const nb = B.at === 'first' ? B.r.o.nodes : [...B.r.o.nodes].reverse();
+    const endA = na[na.length - 1]; const j = endA.map((v, i) => (i < 3 ? (v + nb[0][i]) / 2 : v));
+    // (A's ends after the join: its own far end, then B's far end)
+    const farA = A.at === 'last' ? A.r.ends.first : A.r.ends.last; const farB = B.at === 'first' ? B.r.ends.last : B.r.ends.first;
+    A.r.o.nodes = [...na.slice(0, -1), j, ...nb.slice(1)];
+    A.r.ends = { first: farA, last: farB };
+    if (Array.isArray(A.r.o.position)) A.r.o.position = A.r.o.nodes[0].slice(0, 3);
+    removed.add(B.r.o); B.r.gone = true; joins++;
   };
-  // pass 1: exact meetings, per material (a road's surface and its painted lines meet at the same points); only a
-  // plain meeting of two ends of one material, a junction on the seam stays as it is
-  const k = (p) => `${Math.round(p[0] / tol)},${Math.round(p[1] / tol)}|`;
-  const buckets = new Map();
-  for (const e of endsList()) { const key = k(e.p) + e.r.o.material; if (!buckets.has(key)) buckets.set(key, []); buckets.get(key).push(e); }
-  for (const g of buckets.values()) if (g.length === 2) join({ r: live(g[0]), at: g[0].at }, { r: live(g[1]), at: g[1].at });
-  // pass 2: near meetings, mutual nearest of the same material from another chunk
-  const rest = endsList();
   const cell = (p) => `${Math.floor(p[0] / near)},${Math.floor(p[1] / near)}`;
-  const grid = new Map();
-  for (const e of rest) { const c = cell(e.p); if (!grid.has(c)) grid.set(c, []); grid.get(c).push(e); }
-  const nearest = (e) => {
-    let best = null; let bd = near; const [cx, cy] = cell(e.p).split(',').map(Number);
-    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (const f of grid.get(`${cx + dx},${cy + dy}`) || []) {
-      if (f.r === e.r || f.r.chunk === e.r.chunk || f.r.o.material !== e.r.o.material) continue;
-      const d = Math.hypot(f.p[0] - e.p[0], f.p[1] - e.p[1]); if (d < bd) { bd = d; best = f; }
+  // (each round reads the ends as they are now; a round with no join ends it. A road of k pieces takes at most
+  // about log2 k rounds, since every piece may join one neighbour a round)
+  for (let round = 0; round < 64; round++) {
+    const ends = [];
+    for (const r of roads) if (!r.gone) for (const at of ['first', 'last']) ends.push({ r, at, p: endOf(r, at) });
+    const grid = new Map();
+    for (const e of ends) { const c = cell(e.p); let g = grid.get(c); if (!g) { g = []; grid.set(c, g); } g.push(e); }
+    const others = (e) => {
+      const out = []; const cx = Math.floor(e.p[0] / near); const cy = Math.floor(e.p[1] / near);
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) { const g = grid.get(`${cx + dx},${cy + dy}`); if (g) for (const f of g) if (fits(e, f)) out.push(f); }
+      return out;
+    };
+    let joined = 0; ambiguous = 0; const used = new Set();
+    for (const e of ends) {
+      if (used.has(e.r) || e.r.gone) continue;
+      const mine = others(e); if (!mine.length) continue;
+      if (mine.length > 1) { ambiguous++; continue; }
+      const f = mine[0]; if (used.has(f.r) || f.r.gone) continue;
+      const theirs = others(f); if (theirs.length !== 1 || theirs[0].r !== e.r || theirs[0].at !== e.at) { ambiguous++; continue; }
+      join(e, f); used.add(e.r); used.add(f.r); joined++;
     }
-    return best;
-  };
-  for (const e of rest) {
-    if (removed.has(e.r.o) || e.r.joinedInto) continue;
-    const f = nearest(e); if (!f || removed.has(f.r.o) || f.r.joinedInto || nearest(f) !== e) continue;
-    join(e, f);
+    if (!joined) break;
   }
-  return { removed, joins };
+  for (const r of roads) { delete r.ends; delete r.gone; }
+  return { removed, joins, ambiguous };
 }
 
 /** At most `max` spots, spread: every k-th (the exporter's own sampler keeps neighbourhoods; this keeps its order). */
@@ -239,10 +250,10 @@ export async function mergeChunks(JSZip, chunks, levelName, { log = () => {}, bo
       if (path === 'decals' || !path.endsWith('items.level.json')) continue;
       lines.forEach((l, i) => { if (l.includes('"DecalRoad"')) { const o = JSON.parse(l); if (Array.isArray(o.nodes) && o.nodes.length >= 2) roads.push({ o, chunk: String(o.name).split('_c').at(-1), path, i }); } });
     }
-    const { removed, joins } = joinSeamRoads(roads);
+    const { removed, joins, ambiguous } = joinSeamRoads(roads);
     for (const r of roads) { const list = gathered.get(r.path); list[r.i] = removed.has(r.o) ? null : JSON.stringify(r.o); }
     for (const [path, lines] of gathered) if (path !== 'decals') gathered.set(path, lines.filter((l) => l !== null));
-    log(`roads: ${joins} piece pair(s) cut at a seam joined back into one road`);
+    log(`roads: ${roads.length} road piece(s) looked at; ${joins} pair(s) cut at a seam joined back into one road${ambiguous ? `; ${ambiguous} end(s) left as built, where more than two pieces meet (a junction on a seam)` : ''}`);
   }
   for (const [path, lines] of gathered) {
     if (path === 'decals') out.file(`levels/${levelName}/main.decals.json`, JSON.stringify(lines, null, 2));

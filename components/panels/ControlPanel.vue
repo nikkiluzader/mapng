@@ -499,7 +499,7 @@ import { reloadContentSettings } from '../../composables/useBuildContent.js';
 
 const { t } = useI18n({ useScope: 'global' });
 
-const props = defineProps(['center', 'zoom', 'resolution', 'devMode', 'isGenerating', 'terrainData', 'generationCacheKey', 'uploadedElevationFile', 'uploadedElevationMeta', 'uploadedAscCoordinateSystem', 'uploadedNoDataOverride', 'uploadedLayerOrder', 'elevationLayerSlots', 'maxElevationSlots', 'uploadedAreaMode', 'processingMetersPerPixel']);
+const props = defineProps(['center', 'zoom', 'resolution', 'devMode', 'isGenerating', 'terrainData', 'generationCacheKey', 'generationKeyFor', 'uploadedElevationFile', 'uploadedElevationMeta', 'uploadedAscCoordinateSystem', 'uploadedNoDataOverride', 'uploadedLayerOrder', 'elevationLayerSlots', 'maxElevationSlots', 'uploadedAreaMode', 'processingMetersPerPixel']);
 
 const emit = defineEmits(['locationChange', 'resolutionChange', 'zoomChange', 'generate', 'fetchOsm', 'surroundingTilesChange', 'elevationFileSelected', 'elevationFileClear', 'elevationSlotSelected', 'elevationSlotRemoved', 'showSupport', 'exportSuccess', 'update:uploadedAscCoordinateSystem', 'update:uploadedNoDataOverride', 'update:uploadedLayerOrder', 'update:uploadedAreaMode', 'update:processingMetersPerPixel', 'update:previewStale']);
 
@@ -669,7 +669,7 @@ const wizardSteps = computed(() => [
 ]);
 // (the terrain on screen was made from other settings than these: an export now
 // would use it as it is, e.g. still from the old elevation source)
-const exportStale = computed(() => !!props.terrainData && !props.isGenerating && !isCached.value && !props.uploadedElevationFile);
+const exportStale = computed(() => !!props.terrainData && !props.isGenerating && !isCached.value);
 watch(() => props.isGenerating, (now, before) => {
   if (before && !now && props.terrainData) step.value = 4;
 });
@@ -810,29 +810,12 @@ const signatureForKey = (key) => {
 
 // True when the current UI params exactly match the last successful generation,
 // so the user can skip re-fetching and go straight to export.
-// Whether the terrain shown was made from these settings: the fields of
-// App.vue's generation key this panel knows, compared one by one (a copy of
-// the whole key here never matched it, so this always said "changed").
+// Whether the terrain shown was made from these settings.
 const isCached = computed(() => {
-  if (props.uploadedElevationFile) return false; // always re-generate when custom file is active
-  if (!props.generationCacheKey || !props.terrainData) return false;
-  let made;
-  try { made = JSON.parse(props.generationCacheKey); } catch { return false; }
-  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-  return made.lat === props.center.lat
-    && made.lng === props.center.lng
-    && Number(made.resolution) === Number(props.resolution)
-    && Number(made.processingMetersPerPixel) === Number(metersPerPixel.value)
-    && made.osm === fetchOSM.value
-    && made.elevationSource === elevationSource.value
-    && made.gpxzKeySig === (elevationSource.value === 'gpxz' ? signatureForKey(gpxzApiKey.value) : '')
-    && (made.gapFillSource === undefined || made.gapFillSource === gapFillSource.value)
-    && (made.fallbackSource === undefined || made.fallbackSource === normalizeFallbackSource(fallbackSource.value, elevationSource.value))
-    && !!made.rawTerrain === !!store.rawTerrainActive
-    && (made.measureWidths === undefined || made.measureWidths === (!!fetchOSM.value && measureRoadWidths.value))
-    && (made.generationEdits === undefined || same(made.generationEdits, terrainGenerationOptions(store.advancedMode)))
-    // (background and No smoothing areas change what is fetched and how roads are smoothed: App.vue's key has them)
-    && (made.backgroundMask === undefined || same(made.backgroundMask, store.backgroundActive ? store.backgroundMask : null));
+  if (!props.generationCacheKey || !props.terrainData || typeof props.generationKeyFor !== 'function') return false;
+  // (the key App.vue would make for a Generate with these choices, by App.vue's own builder: equal means the map on
+  // screen is that map)
+  return props.generationKeyFor(fetchOSM.value, elevationSource.value, gpxzApiKey.value, elevationUnitOverride.value, metersPerPixel.value, gapFillSource.value, normalizeFallbackSource(fallbackSource.value, elevationSource.value)) === props.generationCacheKey;
 });
 
 // GPXZ has a 10 km² per-request limit; warn when the selected area exceeds it.

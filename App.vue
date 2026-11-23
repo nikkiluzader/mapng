@@ -30,6 +30,7 @@
         :terrain-data="terrainData"
         :is-generating="isLoading"
         :generation-cache-key="lastGenerationKey"
+        :generation-key-for="generationKeyFor"
         :uploaded-elevation-file="uploadedElevationFile"
         :uploaded-elevation-meta="uploadedElevationMeta"
         :uploaded-asc-coordinate-system="uploadedAscCoordinateSystem"
@@ -235,7 +236,8 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, shallowRef, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
+import { getLoadedOsmFile, onOsmFileChange } from './services/osmFile.js';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from './stores/mainStore';
@@ -646,6 +648,9 @@ const signatureForKey = (key) => {
 // Build a cache key from the parameters that affect terrain generation.
 // If this key matches the last generation, we can skip re-fetching.
 const { on: measureRoadWidthsOn } = useMeasureRoadWidths();
+// (the map data file loaded in Map data, kept here so the generation key follows it)
+const loadedOsmFile = shallowRef(getLoadedOsmFile());
+onOsmFileChange((f) => { loadedOsmFile.value = f; });
 const buildGenerationKey = (c, res, osm, elevationSource, gpxzKey, uploadedElevationFile = null, elevationUnitOverride = 'auto', processingMpp = 1, gapFillSource = DEFAULT_GAP_FILL_SOURCE, fallbackSource = 'standard') => {
   const uploadSignature = Array.isArray(uploadedElevationFile)
     ? uploadedElevationFile
@@ -684,10 +689,21 @@ const buildGenerationKey = (c, res, osm, elevationSource, gpxzKey, uploadedEleva
     generationEdits: terrainGenerationOptions(store.advancedMode),
     // Include file identity so changing uploads always invalidates cached terrain.
     uploadedElevation: uploadSignature,
+    // (a map data file loaded in Map data: another file, or the same one loaded again, is other map data)
+    osmFile: osm && loadedOsmFile.value ? [loadedOsmFile.value.name, loadedOsmFile.value.size, loadedOsmFile.value.loadedAt] : null,
     // (background areas change what is fetched and kept)
     backgroundMask: store.backgroundActive ? store.backgroundMask : null,
   });
 };
+
+// The key of what the panel's current choices would generate: the panel compares it with the key of the map on
+// screen to say whether that map is current. One builder for both, so the two can never disagree. (They did: the
+// panel held its own copy of some of the key's fields. With an uploaded elevation file it always offered Generate,
+// which then found the key unchanged and did nothing: report MR-QWXXKH; and it knew nothing of tiles or a road.)
+const generationKeyFor = (fetchOSM, elevationSource, gpxzApiKey, elevationUnitOverride, processingMpp, gapFillSource, fallbackSource) => buildGenerationKey(
+  center.value, resolution.value, fetchOSM, String(elevationSource || 'default').toLowerCase(), gpxzApiKey, uploadedElevationFile.value,
+  elevationUnitOverride, processingMpp, gapFillSource, fallbackSource,
+);
 
 // ── Elevation layer slots ───────────────────────────────────────────────────
 // Slot 0 is the base upload; each slot after it is a fallback the user added,
