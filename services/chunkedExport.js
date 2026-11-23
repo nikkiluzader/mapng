@@ -18,7 +18,8 @@ function runsByRow(runs, size) {
 /**
  * A chunk's seam blend: { target, weight } (Float32Array size x size, rows from the north) from its finished
  * neighbours, or null when none touches it. A pixel's weight is 1 inside a neighbour's core and falls to 0 at
- * SEAM_EASE_PX from it; its target is the neighbours' final heights there, weighted the same.
+ * SEAM_EASE_PX from it; its target is the neighbours' final heights there, the nearer a neighbour's core the more
+ * it counts (at its core's edge it alone).
  */
 export function seamBlendFor(chunk, finished, ease = SEAM_EASE_PX) {
   const N = chunk.size; const near = [];
@@ -45,7 +46,11 @@ export function seamBlendFor(chunk, finished, ease = SEAM_EASE_PX) {
         const w = Math.max(0, 1 - Math.max(0, d - 1) / ease); if (!(w > 0)) continue;
         if (!inFoot(gx - f.x0, gy - f.y0)) continue;
         const h = f.heights[(gy - f.y0) * f.size + (gx - f.x0)]; if (!Number.isFinite(h)) continue;
-        const k = r * N + c; sum[k] += h * w; wsum[k] += w; if (w > weight[k]) weight[k] = w;
+        // (where several finished chunks reach a point, the one nearest its own kept part counts for most, and at
+        // its kept part's edge for all: an even mix let a neighbour's margin copy pull the ground off the keeper's
+        // at a corner of four chunks, 0.6 to 2 m)
+        const share = w / (1 - w + 1e-4);
+        const k = r * N + c; sum[k] += h * share; wsum[k] += share; if (w > weight[k]) weight[k] = w;
       }
     }
   }
@@ -80,7 +85,7 @@ export async function exportChunked({ JSZip, footprint, W, H, center, mpp, level
     const seamBlend = seamBlendFor(c, finished);
     // (the finished chunks' solved road heights, in this chunk's own metres: held in the seam's band)
     const off = L.chunkOffsetM(c);
-    const seamRoads = seamBlend && options.seamRoadPins !== false ? seamRoadLookup(finished.filter((f) => f.roads?.length).map((f) => ({ key: f.key, roads: f.roads, dx: f.off.x - off.x, dy: f.off.y - off.y }))) : null;
+    const seamRoads = seamBlend && options.seamRoadPins !== false ? seamRoadLookup(finished.filter((f) => f.roads?.length).map((f) => ({ key: f.key, roads: f.roads, owns: (x, y) => { const gx = c.x0 + c.size / 2 + x / mpp; const gy = c.y0 + c.size / 2 - y / mpp; return gx >= f.core[0] && gx <= f.core[2] && gy >= f.core[1] && gy <= f.core[3]; }, dx: f.off.x - off.x, dy: f.off.y - off.y }))) : null;
     signal?.throwIfAborted?.();
     onProgress({ chunk: k + 1, of: chunks.length, step: 'export' });
     const chunkLevel = `${levelName}_c${c.key}`;

@@ -13,6 +13,8 @@ const CELL_M = 8;
 // to follow).
 export const SEAM_SAY = 0.999;
 export const SEAM_ROAD_REACH_M = 1.5;
+export const SEAM_HELD_REACH_M = 10;     // a road's lines and gutters lie this near its middle line
+export const SEAM_HELD_DZ_M = 0.3;
 
 /**
  * Whether a neighbour's height for a road binds at a point where its say is `weight`: in the part it keeps, always;
@@ -41,8 +43,9 @@ export function seamRoadsOut(graph, minHeight, tunnelKind = () => '') {
 }
 
 /**
- * The finished neighbours' road heights as this chunk sees them: { at(wayId, x, y) -> { z, tunnel, from (the neighbour's key) } | null, roads,
- * stations }, or null when no finished chunk hands any on. neighbours: [{ key, roads (seamRoadsOut), dx, dy (the
+ * The finished neighbours' road heights as this chunk sees them: { at(wayId, x, y) -> { z, tunnel, from (the neighbour's key) } | null, heldAt(x, y, z), roads,
+ * stations }, or null when no finished chunk hands any on. neighbours: [{ key, roads (seamRoadsOut), owns(x, y) (whether that neighbour keeps the ground at a point of this
+ * chunk), dx, dy (the
  * neighbour's centre from this chunk's, metres) }]. A road's height at a point is read between the neighbour's two
  * stations on the same OSM way nearest it, within `reach` in plan.
  */
@@ -52,7 +55,7 @@ export function seamRoadLookup(neighbours, reach = SEAM_ROAD_REACH_M) {
   for (const nb of neighbours) {
     for (const r of nb.roads || []) {
       roads++;
-      const road = { wayId: r.wayId, tunnel: r.tunnel, from: nb.key ?? '', z: r.z, x: Float64Array.from(r.x, (v) => v + nb.dx), y: Float64Array.from(r.y, (v) => v + nb.dy) };
+      const road = { wayId: r.wayId, tunnel: r.tunnel, from: nb.key ?? '', owns: nb.owns || null, z: r.z, x: Float64Array.from(r.x, (v) => v + nb.dx), y: Float64Array.from(r.y, (v) => v + nb.dy) };
       for (let i = 0; i < road.x.length; i++) {
         const k = key(Math.floor(road.x[i] / CELL_M), Math.floor(road.y[i] / CELL_M));
         let l = grid.get(k); if (!l) { l = []; grid.set(k, l); }
@@ -72,19 +75,42 @@ export function seamRoadLookup(neighbours, reach = SEAM_ROAD_REACH_M) {
   const at = (wayId, x, y) => {
     if (wayId == null) return null;
     const cx = Math.floor(x / CELL_M); const cy = Math.floor(y / CELL_M);
-    let best = reach * reach; let hit = null;
+    // (several finished chunks can hold the same stretch: each saw it, most of them in their margin only. The one
+    // that keeps the ground at this point has the say; a copy from another's margin is taken only when the keeper
+    // hands on no such road. Any copy was taken, whichever came last: 4.2 m off at a join of three chunks.)
+    let best = reach * reach; let hit = null; let bestOwn = reach * reach; let own = null;
     for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
       const l = grid.get(key(cx + dx, cy + dy)); if (!l) continue;
       for (let j = 0; j < l.length; j += 2) {
         const road = l[j]; if (road.wayId !== wayId) continue;
         const i = l[j + 1];
-        if (i > 0) { const [d, z] = onPiece(road, i - 1, x, y); if (d <= best) { best = d; hit = { z, tunnel: road.tunnel, from: road.from }; } }
-        if (i + 1 < road.x.length) { const [d, z] = onPiece(road, i, x, y); if (d <= best) { best = d; hit = { z, tunnel: road.tunnel, from: road.from }; } }
+        const keeper = !!road.owns && road.owns(x, y);
+        for (const k of [i - 1, i]) {
+          if (k < 0 || k + 1 >= road.x.length) continue;
+          const [d, z] = onPiece(road, k, x, y);
+          if (keeper) { if (d <= bestOwn) { bestOwn = d; own = { z, tunnel: road.tunnel, from: road.from }; } }
+          else if (d <= best) { best = d; hit = { z, tunnel: road.tunnel, from: road.from }; }
+        }
       }
     }
-    return hit;
+    return own || hit;
   };
-  return { at, roads, stations };
+  /**
+   * Whether a neighbour's road stands at height z (absolute) within `within` metres of (x, y) in plan: what is
+   * there is then already at the neighbour's height (a solved road, the gutter along it), and is not moved again.
+   */
+  const heldAt = (x, y, z, within = SEAM_HELD_REACH_M, dz = SEAM_HELD_DZ_M) => {
+    const cx = Math.floor(x / CELL_M); const cy = Math.floor(y / CELL_M); const r = Math.ceil(within / CELL_M);
+    for (let ax = -r; ax <= r; ax++) for (let ay = -r; ay <= r; ay++) {
+      const l = grid.get(key(cx + ax, cy + ay)); if (!l) continue;
+      for (let j = 0; j < l.length; j += 2) {
+        const road = l[j]; const i = l[j + 1];
+        if (Math.abs(road.z[i] - z) <= dz && (road.x[i] - x) ** 2 + (road.y[i] - y) ** 2 <= within * within) return true;
+      }
+    }
+    return false;
+  };
+  return { at, heldAt, roads, stations };
 }
 
 /**

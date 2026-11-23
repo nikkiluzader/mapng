@@ -15190,9 +15190,13 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       const off = Math.abs(z - (at(hm) - d - zBase));
       let f = off <= SEAM_ON_GROUND_M ? 1 : Math.max(0, 1 - (off - SEAM_ON_GROUND_M) / SEAM_OFF_GROUND_M);
       // (with the neighbours' road heights handed on, a road is already at the neighbour's height where the neighbour
-      // has the say: not moved there, the move fading in over the first quarter of the band. A street on a lid over
+      // has the say: not moved there. A street on a lid over
       // the neighbour's tunnel trench was taken 1.5 to 4.8 m down into the trench at the seam.)
-      if (roadsHeld) f *= Math.max(0, Math.min(1, (1 - at(Wt)) / 0.25));
+      // (only what is at a neighbour's road height there: a path or a gutter laid on this chunk's own ground follows
+      // the ground, as before; held all the same they stepped up to 2 m where four chunks meet)
+      // (... and not moved at all, anywhere in the band: a tunnel road in its open cutting, 17 m from a join, was
+      // lifted 4.3 m onto the neighbour's ground over the tunnel for 12 m)
+      if (roadsHeld && seamRoads.heldAt(x, y, z + zBase)) f = 0;
       if (Math.abs(d) > 0.05) { if (f >= 1) moves.ground++; else if (f > 0) moves.part++; else moves.off++; }
       return d * f;
     };

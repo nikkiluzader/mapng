@@ -48,3 +48,12 @@ test('the merge counts road ends that meet in plan and not in height', () => {
   const ok = joinSeamRoads([c, d]);
   assert.equal(ok.joins, 1); assert.equal(ok.stepped, 0);
 });
+
+test('where several finished chunks hold a stretch, the one that keeps the ground there has the say', () => {
+  const road = (z0) => seamRoadsOut(graphOf([edge(7, 0, 50)], () => z0), 0);
+  // chunk A keeps x < 100, chunk B saw the same stretch in its margin only (and solved it 4 m higher)
+  const look = seamRoadLookup([{ key: 'B', roads: road(14), owns: () => false, dx: 0, dy: 0 }, { key: 'A', roads: road(10), owns: (x) => x < 100, dx: 0, dy: 0 }, { key: 'C', roads: road(14), owns: () => false, dx: 0, dy: 0 }]);
+  assert.equal(look.at(7, 50, 0).z, 10); assert.equal(look.at(7, 50, 0).from, 'A');
+  // past what any of them keeps: a copy is still handed on (a tunnel's tube runs on there)
+  assert.equal(look.at(7, 150, 0).z, 14);
+});

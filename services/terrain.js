@@ -1994,6 +1994,8 @@ export const fetchTerrainData = async (
     const td = await generateChunked({
       fetch: (c, size, o) => fetchTerrainData(c, size, includeOSM, useUSGS, useGPXZ, useKRON86, gpxzApiKey, baseColor, o?.chunkPrefetch ? chunkLine : onProgress, signal, o),
       center, W: chunked.W, H: chunked.H, mpp: Number(chunked.mpp) || 1, footprint: rest.footprint, generationOptions: rest,
+      // (tests: small chunks, so a seam can be looked at on a small level)
+      ...(Number(chunked.size) > 0 ? { size: Number(chunked.size), overlap: Number(chunked.overlap) || 0 } : {}),
       onStatus: (st) => {
         current = st.overview ? null : st;
         onProgress?.(st.overview ? 'Chunked level: making the overview for the previews…' : `Chunk ${st.chunk} of ${st.of}: starting…`);

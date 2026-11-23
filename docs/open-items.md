@@ -22,7 +22,7 @@ Before the 0.3.6 desktop release:
    ran it for the first time: both builds, `sign-manifest` and `publish-test-build` succeeded; the pre-release
    carries `latest.yml.sig` and `latest-linux.yml.sig`, and both verify with the app's own key (a changed copy does
    not). Left: the user installs the test build (the signed Windows installer has not been run here); an update
-   from dev.2 to dev.3 through the app (download and install have never been run end to end).
+   from dev.2 to dev.3 through the app: done by the user 2026-11-23, no issues.
 3. **Seams in game on a small level** (only the target area): the tunnel and the street at a join. The last look was
    before the final fix.
 4. **Alignment leftovers of the frame change:** the 3D preview mesh and the upload paths (LAZ, ASC, GML) still use
