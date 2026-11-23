@@ -6,7 +6,7 @@
     variant="primary"
     size="lg"
     prominent
-    :disabled="isGenerating || (useGPXZ && !gpxzApiKey)"
+    :disabled="isGenerating || (useGPXZ && !gpxzApiKey) || nothingToGenerate"
     @click="isCached ? $emit('ready') : $emit('generate', false)"
   >
     <span v-if="isGenerating" class="animate-pulse text-xs">{{ t('generateActions.processing') }}</span>
@@ -40,6 +40,8 @@ defineProps({
   useGPXZ: { type: Boolean, default: false },
   gpxzApiKey: { type: String, default: '' },
   hasCustomElevation: { type: Boolean, default: false },
+  // (road mode with no road picked yet: there is nothing to generate)
+  nothingToGenerate: { type: Boolean, default: false },
 });
 
 // ready: the data is made already (the wizard goes to Export)

@@ -109,7 +109,16 @@ As of 2026-11-23:
   approaches differently from its neighbour. Sidewalk and rail models built before that blend stay on the earlier
   ground. Open: the neighbour's finished ground and road heights as fixed conditions for the next chunk's solver
   and shaping (not a late blend). Until then a chunked level in a city with structures near a seam is not right.
-  **Next, in order:** road picking
+  **Road mode, 2026-11-23:** picking reads the roads alone (`fetchRoadFeatures`), not Generate's whole pull: a
+  2.4 km click box in 220 ms, a 4 km route read in about 90 ms, the route itself 3 ms (I-95, browser). Following
+  matches the picked road (no drift through a shared number), never turns back (FOLLOW_MAX_TURN 100 degrees) and
+  passes through roundabouts. A handle now routes from where it was (it started at the far end of the whole
+  followed road: a line out and back) and slides back along the line at any zoom (user, 2026-11-23: "i cannot drag
+  it backwards"; checked: 5.21 km dragged back to 3.02 km). An area already read is not read again. No picking
+  while a job runs; a slow answer no longer overwrites a Clear; Generate is off until a road is picked; one shared
+  corridor computation, the width slider settles first. Not done: routing in a worker (3 ms: not needed).
+  **Next, in order:** share codes for roads (the stretch only, limits), tile gaps (64 cap in the window, Free to
+  Together), then road picking's leftovers
   (roads-only read, no picking while generating, follow rules, routing off the main thread); chunked export
   (cache-only, cancel, translated progress, merged report); user reports since 2026-11-22 (user, 2026-11-23: "go
   through any reports sent by users and make sure to fix those too"); tiles step 2 C/E/F; the Single tile / Batch

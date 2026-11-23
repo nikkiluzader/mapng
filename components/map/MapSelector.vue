@@ -605,7 +605,9 @@ const corridorPx = computed(() => {
 });
 const dropRoadHandle = async (which, event) => {
   const ll = event?.target?.getLatLng?.(); if (!ll) return;
-  await roadApi.setHandle(which, { lat: ll.lat, lng: ll.lng });
+  // ("on the line" is what looks on it at this zoom: 18 pixels either side)
+  const mPerPx = (156543.03392 * Math.cos((ll.lat * Math.PI) / 180)) / 2 ** (currentZoom.value || 13);
+  await roadApi.setHandle(which, { lat: ll.lat, lng: ll.lng }, 18 * mPerPx);
   const marker = event.target;
   nextTick(() => { const h = roadHandles.value.find((x) => x.which === which); if (h) marker.setLatLng(h.at); });
 };

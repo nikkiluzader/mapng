@@ -400,6 +400,7 @@
           :useGPXZ="useGPXZ"
           :gpxz-api-key="gpxzApiKey"
           :has-custom-elevation="!!uploadedElevationFile"
+          :nothing-to-generate="store.areaMode === 'road' && !store.batchMode && !store.road"
           @generate="(preview) => $emit('generate', preview, fetchOSM, elevationSource, gpxzApiKey, elevationUnitOverride, metersPerPixel, gapFillSource, normalizeFallbackSource(fallbackSource, elevationSource))"
           @ready="step = 4; if (store.viewMode === 'location' && terrainData) store.viewMode = 'preview2d'"
         />

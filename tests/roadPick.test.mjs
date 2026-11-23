@@ -73,3 +73,58 @@ test('a dropped handle is reached along the roads, keeping to the picked road ov
   assert.ok(xs.some((x, i) => x === 1000 && ys[i] === 0), JSON.stringify(xs.map((x, i) => [x, ys[i]])));
   assert.equal(routeAlongRoads(roads, P(0, 0), P(5000, 5000), { ref: 'I 95' }), null, 'too far from any road');
 });
+
+// The follow keeps to the road that was picked.
+test('the road does not drift onto another road through a shared number', () => {
+  const roads = drivableRoads([
+    way('i1', '', 'I 95', 'motorway', [0, 0], [1000, 0]),
+    way('i2', '', 'I 95;US 1', 'motorway', [1000, 0], [2000, 0]),
+    way('u1', '', 'US 1', 'primary', [2000, 0], [3000, 0]),
+    way('i3', '', 'I-95', 'motorway', [2000, 0], [2000, 1000]),
+  ]);
+  const f = followRoad(roads, roads[0]);
+  // I 95 through its shared stretch and on as I-95 (a left turn of 90 degrees); never onto US 1 alone
+  assert.deepEqual(f.ids.sort(), ['i1', 'i2', 'i3']);
+});
+
+test('at the end of a dual carriageway the road does not turn back along the other side', () => {
+  const roads = drivableRoads([
+    way('east', 'Ring Road', '', 'trunk', [0, 0], [1000, 0], [1500, 5]),
+    // the other carriageway, drawn back west from the same end point
+    way('west', 'Ring Road', '', 'trunk', [1500, 5], [1000, 10], [0, 10]),
+    way('on', 'Station Road', '', 'trunk', [1500, 5], [2500, 5]),
+  ]);
+  const f = followRoad(roads, roads[0]);
+  assert.deepEqual(f.ids, ['east']);
+  // and where the same road does go on, it is followed, not the carriageway back
+  const more = drivableRoads([
+    way('east', 'Ring Road', '', 'trunk', [0, 0], [1000, 0], [1500, 5]),
+    way('west', 'Ring Road', '', 'trunk', [1500, 5], [1000, 10], [0, 10]),
+    way('single', 'Ring Road', '', 'trunk', [1500, 5], [2500, 5]),
+  ]);
+  assert.deepEqual(followRoad(more, more[0]).ids.sort(), ['east', 'single']);
+});
+
+test('a roundabout is passed through to the exit that carries the road on', () => {
+  // a ring of radius 20 round (1000, 0), one closed way; Main St arrives from the west, leaves to the east; a side
+  // road leaves north
+  const ring = Array.from({ length: 13 }, (_, k) => { const a = Math.PI + (k / 12) * 2 * Math.PI; return [1000 + 20 * Math.cos(a), 20 * Math.sin(a)]; });
+  ring[12] = ring[0];
+  const rb = way('rb', '', '', 'secondary', ...ring); rb.tags.junction = 'roundabout';
+  const roads = drivableRoads([
+    way('in', 'Main St', '', 'secondary', [0, 0], [980, 0]),
+    rb,
+    way('out', 'Main St', '', 'secondary', [1020, 0], [2000, 0]),
+    way('north', 'Mill Lane', '', 'residential', [1000, 20], [1000, 500]),
+  ]);
+  assert.ok(roads.find((r) => r.id === 'rb').roundabout);
+  const f = followRoad(roads, roads.find((r) => r.id === 'in'));
+  assert.deepEqual(f.ids.sort(), ['in', 'out', 'rb']);
+  const len = cumulative(f.pts).at(-1);
+  // 980 m in, half the ring (about 63 m), 980 m out
+  assert.ok(len > 2010 && len < 2040, `length ${len}`);
+  // one line, in order: every step under 600 m, no jump back
+  for (let i = 1; i < f.pts.length; i++) assert.ok(f.pts[i].lng >= f.pts[i - 1].lng - 25 * D);
+  // picked from the far side, the same road comes out
+  assert.deepEqual(followRoad(roads, roads.find((r) => r.id === 'out')).ids.sort(), ['in', 'out', 'rb']);
+});

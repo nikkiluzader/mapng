@@ -1,9 +1,8 @@
 // Road mode (refs/output/road-mode-plan.md): pick the road nearest a click and follow it both ways along connected ways
-// with the same name or road number (ref). The roads come from the map data Generate reads (services/osm.js
-// fetchOSMData: MapNG's planet tiles first, cached by services/dataCache.js), one small read per click or Extend.
+// with the same name or road number (ref) as the road picked. The roads come from a roads-only read of the map data
+// (services/osm.js fetchRoadFeatures: MapNG's planet tiles first), one small read per click.
 //
-// A stretch is one polyline [{ lat, lng }...] with the names and refs it went through; "more" at an end says the read
-// area ran out there (Extend reads round that end and follows on).
+// A stretch is one polyline [{ lat, lng }...] with the names and refs it went through.
 
 const DRIVABLE = new Set(['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'unclassified', 'residential',
   'motorway_link', 'trunk_link', 'primary_link', 'secondary_link', 'tertiary_link', 'living_street', 'service', 'road', 'track']);
@@ -11,6 +10,9 @@ export const PICK_RADIUS_M = 1200;     // the box read round a click (half its s
 export const JOIN_M = 3;               // ways whose ends are this close are joined
 export const MAX_PICK_M = 60;          // a click farther than this from any road picks nothing
 export const ROAD_MAX_POINTS = 6000;   // a followed road kept to this many points
+export const FOLLOW_MAX_TURN = (100 * Math.PI) / 180;   // a continuation turning more than this is not the road going on
+/** The road classes road mode reads (services/osm.js fetchRoadFeatures `classes`). */
+export const PICK_CLASSES = 'motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|road|track|service|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link';
 
 const R = 6371008.8; const rad = Math.PI / 180;
 const metres = (a, b) => { const x = (b.lng - a.lng) * rad * Math.cos(((a.lat + b.lat) / 2) * rad); const y = (b.lat - a.lat) * rad; return Math.sqrt(x * x + y * y) * R; };
@@ -34,7 +36,7 @@ function toSegment(p, a, b) {
 /** The drivable roads among map features: [{ id, name, ref, highway, pts }]. */
 export function drivableRoads(features) {
   return (features || []).filter((f) => f?.type === 'road' && DRIVABLE.has(f.tags?.highway) && Array.isArray(f.geometry) && f.geometry.length >= 2)
-    .map((f) => ({ id: String(f.id), name: f.tags?.name || '', ref: f.tags?.ref || '', highway: f.tags.highway, pts: f.geometry.map((g) => ({ lat: g.lat, lng: g.lng })) }));
+    .map((f) => ({ id: String(f.id), name: f.tags?.name || '', ref: f.tags?.ref || '', highway: f.tags.highway, ...(f.tags?.junction === 'roundabout' || f.tags?.junction === 'circular' ? { roundabout: true } : {}), pts: f.geometry.map((g) => ({ lat: g.lat, lng: g.lng })) }));
 }
 
 /** The road nearest p within MAX_PICK_M, or null. */
@@ -60,43 +62,87 @@ export const sameRoad = (a, b) => {
 const heading = (a, b) => Math.atan2(b.lat - a.lat, (b.lng - a.lng) * Math.cos(a.lat * rad));
 
 /**
- * The road followed from `start` both ways: { pts, ids, names, refs, moreAtStart, moreAtEnd }. `box`: the area read
- * (an end reaching within JOIN_M * 20 of its edge is "more there").
+ * The road followed from `start` both ways: { pts, ids, names, refs, highway }.
+ *
+ * A way continues the road when it is the same road as the one PICKED (sameRoad with `start`, not with the last way
+ * followed: comparing with the last way let the road drift, "I 95" to "I 95;US 1" to "US 1"), it starts or ends at the
+ * road's end, and it does not turn back (FOLLOW_MAX_TURN: at the end of a dual carriageway the other carriageway is
+ * the same road, starting at the same point, heading home). A roundabout is passed through: its ring is followed to
+ * the exit that carries the picked road on, the one most nearly straight across.
  */
-export function followRoad(roads, start, box = null) {
+export function followRoad(roads, start) {
   const used = new Set([start.id]);
   let pts = start.pts.slice();
   const names = new Set([start.name].filter(Boolean)); const refs = new Set([start.ref].filter(Boolean));
+  const turnOf = (h0, a, b) => { let t = Math.abs(heading(a, b) - h0); if (t > Math.PI) t = 2 * Math.PI - t; return t; };
+  // the way that carries the picked road on from `end` (heading h0), or null: { r, rev, turn }
+  const nextFrom = (end, h0, okRoad) => {
+    let best = null;
+    for (const r of roads) {
+      if (used.has(r.id) || !okRoad(r)) continue;
+      const n = r.pts.length;
+      if (metres(r.pts[0], end) <= JOIN_M) { const turn = turnOf(h0, end, r.pts[1]); if (turn <= FOLLOW_MAX_TURN && (!best || turn < best.turn)) best = { r, rev: false, turn }; }
+      if (metres(r.pts[n - 1], end) <= JOIN_M) { const turn = turnOf(h0, end, r.pts[n - 2]); if (turn <= FOLLOW_MAX_TURN && (!best || turn < best.turn)) best = { r, rev: true, turn }; }
+    }
+    return best;
+  };
+  // across a roundabout whose ring passes `end`: the ring's points to the exit that carries the picked road on, and
+  // that exit: { ring: [points after end ... the exit's point], next: { r, rev } }, or null
+  const across = (end, h0) => {
+    let best = null;
+    for (const q of roads) {
+      if (!q.roundabout || used.has(q.id)) continue;
+      const closed = metres(q.pts[0], q.pts[q.pts.length - 1]) <= JOIN_M;
+      const ring = closed ? q.pts.slice(0, -1) : q.pts; const n = ring.length; if (n < 3) continue;
+      let i = -1; for (let k = 0; k < n; k++) if (metres(ring[k], end) <= JOIN_M) { i = k; break; }
+      if (i < 0) continue;
+      for (let j = 0; j < n; j++) {
+        if (j === i) continue;
+        for (const r of roads) {
+          if (used.has(r.id) || r.roundabout || !sameRoad(start, r)) continue;
+          const m = r.pts.length;
+          for (const rev of [false, true]) {
+            const first = rev ? r.pts[m - 1] : r.pts[0]; if (metres(first, ring[j]) > JOIN_M) continue;
+            // (straight across: the exit's own direction against the way we came in)
+            const turn = turnOf(h0, first, rev ? r.pts[m - 2] : r.pts[1]);
+            if (turn > FOLLOW_MAX_TURN || (best && turn >= best.turn)) continue;
+            // the ring from i to j, the shorter way round (an open arc: the only way)
+            const fwd = []; for (let k = i; k !== j;) { k = (k + 1) % n; if (!closed && k === 0 && j !== 0) { fwd.length = 0; break; } fwd.push(ring[k]); }
+            const back = []; for (let k = i; k !== j;) { k = (k - 1 + n) % n; if (!closed && k === n - 1 && j !== n - 1) { back.length = 0; break; } back.push(ring[k]); }
+            const len = (a) => (a.length ? cumulative([end, ...a]).at(-1) : Infinity);
+            const arc = len(fwd) <= len(back) ? fwd : back; if (!arc.length) continue;
+            best = { turn, ring: arc, q, next: { r, rev } };
+          }
+        }
+      }
+    }
+    return best;
+  };
   const grow = (atEnd) => {
-    let cur = start;
     for (let guard = 0; guard < 5000; guard++) {
       const end = atEnd ? pts[pts.length - 1] : pts[0];
       const prev = atEnd ? pts[pts.length - 2] : pts[1];
       const h0 = heading(prev, end);
-      let best = null;
-      for (const r of roads) {
-        if (used.has(r.id) || !sameRoad(cur, r)) continue;
-        for (const [first, rev] of [[r.pts[0], false], [r.pts[r.pts.length - 1], true]]) {
-          if (metres(first, end) > JOIN_M) continue;
-          const next = rev ? r.pts[r.pts.length - 2] : r.pts[1];
-          let turn = Math.abs(heading(end, next) - h0); if (turn > Math.PI) turn = 2 * Math.PI - turn;
-          if (!best || turn < best.turn) best = { r, rev, turn };
-        }
+      let add = null;
+      const best = nextFrom(end, h0, (r) => !r.roundabout && sameRoad(start, r));
+      if (best) {
+        used.add(best.r.id);
+        add = best.rev ? best.r.pts.slice().reverse() : best.r.pts;
+        if (best.r.name) names.add(best.r.name); if (best.r.ref) refs.add(best.r.ref);
+      } else {
+        const x = across(end, h0); if (!x) return;
+        used.add(x.q.id); used.add(x.next.r.id);
+        const out = x.next.rev ? x.next.r.pts.slice().reverse() : x.next.r.pts;
+        add = [end, ...x.ring, ...out.slice(1)];
+        if (x.next.r.name) names.add(x.next.r.name); if (x.next.r.ref) refs.add(x.next.r.ref);
       }
-      if (!best) return;
-      used.add(best.r.id);
-      const add = best.rev ? best.r.pts.slice().reverse() : best.r.pts;
-      if (best.r.name) names.add(best.r.name); if (best.r.ref) refs.add(best.r.ref);
       // (`add` runs from the joined end outward: appended after the end, or reversed in front of the start)
       pts = atEnd ? pts.concat(add.slice(1)) : add.slice(1).reverse().concat(pts);
-      cur = best.r;
       if (pts.length > ROAD_MAX_POINTS) return;
     }
   };
   grow(true); grow(false);
-  const nearEdge = (p) => !!box && (metres(p, { lat: box.north, lng: p.lng }) < JOIN_M * 20 || metres(p, { lat: box.south, lng: p.lng }) < JOIN_M * 20
-    || metres(p, { lat: p.lat, lng: box.east }) < JOIN_M * 20 || metres(p, { lat: p.lat, lng: box.west }) < JOIN_M * 20);
-  return { pts, ids: [...used], names: [...names], refs: [...refs], highway: start.highway, moreAtStart: nearEdge(pts[0]), moreAtEnd: nearEdge(pts[pts.length - 1]) };
+  return { pts, ids: [...used], names: [...names], refs: [...refs], highway: start.highway };
 }
 
 /** A polyline's cumulative distances (m). */

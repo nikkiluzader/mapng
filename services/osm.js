@@ -1280,7 +1280,7 @@ export const fetchOSMData = async (bounds, { onStatus, signal, skipBox = null, k
 // The drivable roads only, for "Keep road" in the background-areas editor
 // (before generating: a light query, not the full pull). Ways sharing a name or
 // ref become one choice. -> [{ id, name, lines: [[[lat, lng], ...], ...] }]
-const KEEPABLE_ROADS = "motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|road|track|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link";
+export const KEEPABLE_ROADS = "motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|road|track|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link";
 /**
  * The standing and running water around a map (the export's data step: lakes,
  * ponds, reservoirs, wide rivers' outlines, rivers and streams, coastlines),
@@ -1310,7 +1310,13 @@ export const fetchOsmWater = async (bounds, { signal } = {}) => {
     .map((f) => ({ id: f.id, type: f.type, tags: f.tags || {}, geometry: f.geometry, ...(f.holes?.length ? { holes: f.holes } : {}) }));
 };
 
-export const fetchOsmRoads = async (bounds, { signal } = {}) => {
+/**
+ * The roads of an area as map features (id, tags, full geometry): the map data read for roads alone. MapNG's own
+ * tiles or a loaded file first, as everywhere; when only the public servers can answer, they are asked for the roads
+ * and nothing else (not the whole area's buildings, land use and the rest, as Generate's own read asks). Used where
+ * the app only needs to know where roads are: road mode's picking, the background areas' road list.
+ */
+export const fetchRoadFeatures = async (bounds, { signal, classes = KEEPABLE_ROADS } = {}) => {
   const bbox = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`;
   let data = null;
   const file = getLoadedOsmFile();
@@ -1324,11 +1330,15 @@ export const fetchOsmRoads = async (bounds, { signal } = {}) => {
     }
   }
   if (!data) {
-    const query = `[out:json][timeout:30];\nway["highway"~"^(${KEEPABLE_ROADS})$"](${bbox});\nout body geom;`;
+    const query = `[out:json][timeout:30];\nway["highway"~"^(${classes})$"](${bbox});\nout body geom;`;
     data = (await fetchOverpassOrOverture({ query, bounds }, { signal })).data;
   }
-  const keep = new RegExp(`^(${KEEPABLE_ROADS})$`);
-  const roads = parseOverpassResponse(data, bounds).filter((f) => f.type === "road" && keep.test(f.tags?.highway || ""));
+  const keep = new RegExp(`^(${classes})$`);
+  return parseOverpassResponse(data, bounds).filter((f) => f.type === "road" && keep.test(f.tags?.highway || ""));
+};
+
+export const fetchOsmRoads = async (bounds, { signal } = {}) => {
+  const roads = await fetchRoadFeatures(bounds, { signal });
   const groups = new Map();
   for (const r of roads) {
     const name = r.tags.name || r.tags.ref || "";
