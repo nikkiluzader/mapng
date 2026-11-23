@@ -90,6 +90,12 @@ As of 2026-11-23:
   services/mapFrame.js; plan and what is left in refs/output/map-frame-plan.md (in-game centimetre check, the 3D
   preview's mesh, the upload paths' local bases, sweep areas re-fetched). Found on the way: every map's bounds were
   8 m wider than the game drew it (1.5 % small at 512 m), and a chunk's ground squares were assigned one row off.
+  Also fixed 2026-11-23: the footprint clipper walks every segment (crossings kept, gaps cut, roundabouts whole).
+  **Next, in order:** seam rejoin (height check, three or more pieces) and blend before build; road picking
+  (roads-only read, no picking while generating, follow rules, routing off the main thread); chunked export
+  (cache-only, cancel, translated progress, merged report); user reports since 2026-11-22 (user, 2026-11-23: "go
+  through any reports sent by users and make sure to fix those too"); tiles step 2 C/E/F; the Single tile / Batch
+  job tabs retired (user's decision of 2026-11-20, repeated 2026-11-23); the 0.3.6 release page.
   Done when: each alignment item has a test that fails before the fix; a chunked level and a road level at
   latitude 60 line up with the map data to the pixel; the sweep is unchanged.
 
