@@ -254,8 +254,14 @@ export function buildGroundTiles({ width: W, height: H, heightMap, minHeight }, 
           const za = hAt(ia, ja); const zb = hAt(ib, jb);
           pos.push(ax, ay, za, ax, ay, za - skirtM, bx, by, zb - skirtM, ax, ay, za, bx, by, zb - skirtM, bx, by, zb);
           for (let k = 0; k < 6; k++) nrm.push(nx, ny, 0);
-          // (the ground's own colour at the edge, straight down)
-          uv.push(ia / W, ja / H, ia / W, ja / H, ib / W, jb / H, ia / W, ja / H, ib / W, jb / H, ib / W, jb / H);
+          // (its colour: the base texture a square and a half outside the edge, where a shaped level's texture is
+          // painted an even dark (exportBeamNGLevel.js paintTextureOutsideShape). At the edge itself every column of
+          // the wall took the ground's own colour there: fine vertical streaks, seen in game. Past the map's own rim
+          // there is no texture: the edge's colour, as before.)
+          const ua = (ia + nx * 1.5) / W; const va = (ja + ny * 1.5) / H; const ub = (ib + nx * 1.5) / W; const vb = (jb + ny * 1.5) / H;
+          const off = ua >= 0 && ua <= 1 && va >= 0 && va <= 1 && ub >= 0 && ub <= 1 && vb >= 0 && vb <= 1;
+          const [u0, v0, u1, v1] = off ? [ua, va, ub, vb] : [ia / W, ja / H, ib / W, jb / H];
+          uv.push(u0, v0, u0, v0, u1, v1, u0, v0, u1, v1, u1, v1);
         };
         for (let b = 0; b < T; b++) {
           for (let a = 0; a < T; a++) {

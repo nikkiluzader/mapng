@@ -57,7 +57,11 @@ Before the 0.3.6 desktop release:
    building is kept only when every side of its outline is over ground (`services/footprintClip.js`: 34 of them on
    the test L); the base texture, which is the minimap's picture too, painted out outside the shape. Test level:
    `scratch/frame/shapesmall.mjs` (an L of 512 m in Oslo, 46 MB), texture `scratch/frame/shape_texture.png`.
-   **Owed: the look in game** (the edge from outside at 35 degrees, the minimap): the game held the user's own level.
+   In game 2026-11-23 (the L test level, loaded in 10 s, removed after): the edge reads as a clean dark wall from
+   outside and no building stands over it. The first look showed fine vertical streaks (each column of the wall took
+   the ground's colour at the edge); the wall now takes the texture's dark tone just outside the shape. Not looked
+   at: the big map's picture in the game's own map view; a plain square ground-model level's rim (it keeps the
+   edge's colours, there being no texture past it).
 6. **Release page.** 2026-11-23 evening: a road mode picture (US 129), the shape in the 2D and 3D previews, the
    edge wall, the buildings rule and the minimap, the load-time fix, the 3D alignment and upload fixes are on the
    draft. Left: in-game pictures (a tiled level and a road level with the edge wall, the thumbnail in the level
