@@ -29,6 +29,21 @@ files:
   - networkActivity.js
   - networkGuard.js
   - package.json
+# Switches built into the app's own program file (Electron's "fuses"), so the signed MapNG program cannot be
+# turned into something else from outside:
+#  - runAsNode off: ELECTRON_RUN_AS_NODE no longer makes MapNG.exe a plain Node (the export runs in the Node
+#    that ships beside it, resources/node, never in the app's own program);
+#  - NODE_OPTIONS ignored: no script slipped in through the environment;
+#  - only the packed app (app.asar) is loaded, never a loose "app" folder put beside it;
+#  - file:// pages get no extra rights (the app's page is app://mapng/, not a file).
+# Left as they are, on purpose: the --inspect arguments (the packaged-build checks drive the app through them:
+# scratch/verify-pw/e2e_desktop_packed.mjs), and the check of app.asar's contents (it needs a mark in the
+# program file that a Windows build made on Linux, pack:win, cannot write: such a build would not start).
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  onlyLoadAppFromAsar: true
+  grantFileProtocolExtraPrivileges: false
 extraResources:
   - from: ../dist
     to: dist

@@ -5,14 +5,16 @@
   Permissions-Policy: geolocation=(self), microphone=(), camera=()
   Strict-Transport-Security: max-age=15552000
 
-/crash-reports.html
-  X-Robots-Tag: noindex, nofollow
-
+# (the dashboard's page also gets a content policy, from the worker: worker/index.js adminContentPolicy)
 /admin.html
   X-Robots-Tag: noindex, nofollow
   Cache-Control: no-store
 
 /admin
+  X-Robots-Tag: noindex, nofollow
+  Cache-Control: no-store
+
+/admin.js
   X-Robots-Tag: noindex, nofollow
   Cache-Control: no-store
 

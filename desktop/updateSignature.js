@@ -1,8 +1,8 @@
 // Is an update really MapNG's? (desktop/updater.js asks before it downloads one.)
 //
-// The Windows build is not code-signed, so the updater's own check is only that
-// the installer matches the checksum in the release's latest.yml, and both of
-// those sit on the same GitHub release: whoever could replace one could
+// The updater's own check is that the installer matches the checksum in the
+// release's latest.yml (and, on Windows, that its publisher is the same), and
+// both files sit on the same GitHub release: whoever could replace one could
 // replace the other. So every release's latest*.yml is signed when it is built
 // (.github/workflows/desktop-release.yml, desktop/scripts/signManifest.mjs)
 // with a key that is not in the repository, and the app refuses an update
@@ -55,10 +55,13 @@ export const manifestName = (platform = process.platform) => (platform === 'linu
  * Fetch the release's latest.yml and its signature and check them against `info` (what the
  * updater found): { ok: true } or { ok: false, why }. fetchImpl: (url) => Response.
  */
-export async function verifyUpdate(info, fetchImpl, { platform = process.platform, keys = UPDATE_KEYS, repo = 'nikkiluzader/mapng' } = {}) {
+export async function verifyUpdate(info, fetchImpl, { platform = process.platform, keys = UPDATE_KEYS, repo = 'nikkiluzader/mapng', allowTestBuilds = true } = {}) {
   try {
     const version = String(info?.version || '');
     if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$/.test(version)) return { ok: false, why: 'version' };
+    // (one key signs releases and test builds alike: a test build marked as the latest release on GitHub is
+    // still a test build, and goes only to an install with Help > Get Test Builds on)
+    if (version.includes('-') && !allowTestBuilds) return { ok: false, why: 'a test build, and test builds are off' };
     const base = `https://github.com/${repo}/releases/download/v${version}/${manifestName(platform)}`;
     const [yml, sig] = await Promise.all([fetchImpl(base), fetchImpl(`${base}.sig`)]);
     if (!yml.ok) return { ok: false, why: `manifest ${yml.status}` };

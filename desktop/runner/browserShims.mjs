@@ -174,6 +174,46 @@ export function installBrowserShims({ assetsDir, apiOrigin = 'https://mapng.com'
   globalThis.location = { protocol: 'app:', host: 'mapng', hostname: 'mapng', origin: 'app://mapng', href: 'app://mapng/', pathname: '/', search: '', hash: '' };
 
   const originalFetch = globalThis.fetch;
+  // A request to another machine while the guard is on: sent without following redirects, and each address it
+  // is sent on to is judged like the first (a listed server must not be able to pass the app on to one that is
+  // not on the list). A key or sign-in header goes no further than the server it was meant for.
+  const MAX_REDIRECTS = 10;
+  const guardedFetch = async (input, init = {}) => {
+    if (process.env.MAPNG_NET_GUARD !== '1') return originalFetch(input, init);
+    const first = input instanceof Request ? input : null;
+    let url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    let method = String(init.method || first?.method || 'GET').toUpperCase();
+    let headers = new Headers(init.headers || first?.headers || undefined);
+    // (a body that can be sent again: text, bytes, form fields. A stream cannot, and is only sent once)
+    let body = init.body ?? null;
+    if (body == null && first && !['GET', 'HEAD'].includes(method)) body = Buffer.from(await first.clone().arrayBuffer());
+    const replayable = body == null || typeof body === 'string' || body instanceof URLSearchParams || body instanceof ArrayBuffer || ArrayBuffer.isView(body) || body instanceof Blob;
+    for (let hop = 0; ; hop++) {
+      const response = await originalFetch(url, { ...init, method, headers, body: ['GET', 'HEAD'].includes(method) ? undefined : body, redirect: 'manual', signal: init.signal ?? first?.signal });
+      const to = [301, 302, 303, 307, 308].includes(response.status) ? response.headers.get('location') : null;
+      if (!to || init.redirect === 'manual') return response;
+      if (init.redirect === 'error' || hop >= MAX_REDIRECTS) throw new TypeError(`MapNG stopped following redirects at ${new URL(url).hostname}`);
+      const next = new URL(to, url);
+      if (/^https?:$/.test(next.protocol)) {
+        const verdict = allowedUrl(next.href);
+        if (!verdict.ok) {
+          if (process.send) process.send({ type: 'net-refused', host: verdict.host });
+          throw new TypeError(`MapNG did not connect to ${verdict.host} (${new URL(url).hostname} sent the request on to it): it is not on MapNG's list of addresses (mapng.com/data.html#addresses)`);
+        }
+        if (process.send) { try { process.send({ type: 'net-host', host: next.hostname }); } catch { /* no channel */ } }
+      } else throw new TypeError(`MapNG did not follow a redirect to a ${next.protocol} address`);
+      try { await response.body?.cancel(); } catch { /* already closed */ }
+      // (as a browser does: a POST answered 301, 302 or 303 is asked again as a GET without its body)
+      if (response.status === 303 || ((response.status === 301 || response.status === 302) && method === 'POST')) {
+        method = 'GET'; body = null;
+        headers = new Headers(headers); for (const h of ['content-type', 'content-length', 'content-encoding']) headers.delete(h);
+      } else if (!replayable) throw new TypeError(`MapNG could not send the request on to ${next.hostname}: its body can only be sent once`);
+      if (next.origin !== new URL(url).origin) {
+        headers = new Headers(headers); for (const h of ['authorization', 'cookie', 'x-api-key', 'proxy-authorization']) headers.delete(h);
+      }
+      url = next.href;
+    }
+  };
   globalThis.fetch = (input, init) => {
     let url = typeof input === 'string' ? input : input instanceof URL ? input.href : input?.url;
     if (url?.startsWith('app://mapng/')) { url = url.slice('app://mapng'.length); input = url; }
@@ -216,7 +256,7 @@ export function installBrowserShims({ assetsDir, apiOrigin = 'https://mapng.com'
     if (/^https?:/.test(url || '')) {
       const headers = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
       if (!headers.has('user-agent')) headers.set('user-agent', USER_AGENT);
-      return originalFetch(input, { ...init, headers });
+      return guardedFetch(input, { ...init, headers });
     }
     return originalFetch(input, init);
   };

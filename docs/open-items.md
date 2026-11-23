@@ -1,6 +1,6 @@
 # MapNG open items
 
-Last reviewed: 2026-11-21 (crash reports to-do added)
+Last reviewed: 2026-11-23 (security pass: fixed on dev, the user's part listed)
 
 The short "now" board: current work, what waits on someone, and checks owed on shipped work. The other tracking
 files: `refs/output/backlog.md` holds everything wanted later, by area; `refs/output/releases.md` what shipped;
@@ -253,6 +253,37 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
     peak at bridge models on such an area; warn before the export when the road/rail load is past what a tab holds.
   - **Closed-page reports have no area (area null).** Decode the session code into lat/lng/size when the report is
     made.
+
+## Now: security pass 2026-11-23
+
+- **Third security pass: fixed on dev, waiting on main and on the user's part** (user, 2026-11-23: "fix all of the
+  issues in your recommended order"). Fixed and tested (1,442 tests; packaged Linux app generated and exported;
+  the dashboard page driven under its policy):
+  - updater: the first look's checked result is awaited before a second look; the download refuses anything but
+    the update that was checked and offered; a test build is refused where test builds are off;
+  - Electron 44.11.5, bundled Node 26.13.1, their checksums and the runner packages' recorded in `stage.mjs`;
+  - release workflow: read-only by default, token not left in the checkout, Azure secrets only on a tag's Windows
+    leg, an unsigned Windows tag build fails, the manifest is signed in a job of its own (`sign-manifest`),
+    environments `release` (v* tags only) and `manual-build`;
+  - desktop: fuses (run-as-Node off, NODE_OPTIONS ignored, asar only), so the runner starts with `spawn` + a
+    message channel, not `fork`; permission handler; the runner's guard judges every redirect;
+  - worker: report body read with a cap; a sender's reports a day (20) and stored Mapterhorn tiles a day (40,000),
+    counted in the Durable Object's memory only; rate limit on `/api/terrarium` and `/api/worldcover`;
+    `crash-reports.html` and `/api/crash/list|file` removed (the alert email links to `/admin.html#<id>`);
+  - dashboard: its script is `public/admin.js`, the page is answered by the worker with `adminContentPolicy`;
+  - data.html and security.html say the GPXZ key goes by way of mapng.com;
+  - GitHub: ruleset "main and dev: admins only" (27899025), Dependabot alerts and security updates on.
+- **Left for the user:**
+  - move the four secrets from the repository into the `release` environment, then delete the repository ones
+    (until then a branch workflow can still read them);
+  - take `UPDATE_SIGNING_KEY` out of mapng.env (keep it offline), and make a second key pair so the first can be
+    retired (its public half into `UPDATE_KEYS`);
+  - after main deploys: delete the `CRASH_ADMIN_TOKEN` worker secret (both workers) and its line in mapng.env;
+  - decide on GitHub's immutable releases (a published release could then not be rebuilt in place);
+  - look at: Workers Builds settings (which branches build), the Access apps, the Azure identity's role.
+- **Checks owed:** the new workflow has not run (first tag: watch `sign-manifest`, and that both `.sig` files are
+  on the release before a test build is published); the Windows build with fuses has not been started on Windows;
+  on mapng.com after main: `/admin` carries the policy and Cloudflare's injected script takes its nonce.
 
 ## Waiting on someone
 

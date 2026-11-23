@@ -15,8 +15,8 @@
  * /api/share keeps a session config for 24 hours under a short send code
  * (see shareCodes.js).
  *
- * /api/crash takes the desktop app's crash and problem reports (sent only
- * when the user agrees) into private storage (see crashReports.js).
+ * /api/crash takes the app's crash and problem reports (sent only when the
+ * user agrees) into private storage (see crashReports.js).
  *
  * /api/hotspots counts opt-in export locations (coarse cells) and serves
  * them for the 2D map's hotspot overlay (see hotspots.js).
@@ -304,14 +304,34 @@ export function appContentPolicy(nonce) {
     "frame-ancestors 'none'",
   ].join('; ');
 }
-/** The app's page with its content policy (wrangler.json sends "/" and "/index.html" here first). */
-async function appPage(request, env) {
+/**
+ * What the dashboard's page (public/admin.html) may load and run: its own script file and nothing written
+ * into the page. It shows reports, whose every word is written by whoever sent them, to the one person
+ * signed in: nothing in a report may run there or send anything anywhere. Data comes from this site and from
+ * GitHub's public API (releases, issues, build checks). The nonce is for Cloudflare's own injected script.
+ */
+export function adminContentPolicy(nonce) {
+  return [
+    "default-src 'none'",
+    `script-src 'self' 'nonce-${nonce}' https://static.cloudflareinsights.com`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data:",
+    "font-src 'self' data:",
+    "connect-src 'self' https://api.github.com https://cloudflareinsights.com",
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'none'",
+    "frame-ancestors 'none'",
+  ].join('; ');
+}
+/** A page of the site with a content policy made for this answer (wrangler.json sends these paths here first). */
+async function pageWithPolicy(request, env, policy) {
   const page = await env.ASSETS.fetch(request);
   try {
     if (!String(page.headers.get('Content-Type') || '').includes('text/html')) return page;
     const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
     const headers = new Headers(page.headers);
-    headers.set('Content-Security-Policy', appContentPolicy(nonce));
+    headers.set('Content-Security-Policy', policy(nonce));
     return new Response(page.body, { status: page.status, statusText: page.statusText, headers });
   } catch { return page; }
 }
@@ -319,7 +339,8 @@ async function appPage(request, env) {
 const app = {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    if (url.pathname === '/' || url.pathname === '/index.html') return appPage(request, env);
+    if (url.pathname === '/' || url.pathname === '/index.html') return pageWithPolicy(request, env, appContentPolicy);
+    if (url.pathname === '/admin' || url.pathname === '/admin.html') return pageWithPolicy(request, env, adminContentPolicy);
 
     if (/^\/updates\/?(latest\/?)?$/.test(url.pathname)) {
       return new Response(null, { status: 302, headers: { Location: `/updates/${LATEST_UPDATE}/`, 'Cache-Control': 'no-cache' } });
@@ -363,7 +384,7 @@ const app = {
     if (url.pathname.startsWith('/api/asset-page/')) return handleAssetPage(request, url, env);
 
     if (url.pathname.startsWith('/api/terrarium/')) {
-      return handleTerrariumTiles(request, url);
+      return handleTerrariumTiles(request, url, { env });
     }
 
     if (url.pathname.startsWith('/api/mapterhorn/')) {
@@ -379,6 +400,8 @@ const app = {
       if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: { ...cors, 'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS', 'Access-Control-Max-Age': '86400' } });
       if (!/^ESA_WorldCover_10m_2021_v200_[NS]\d{2}[EW]\d{3}_Map\.tif$/.test(file)) return new Response('Not Found', { status: 404, headers: cors });
       if (request.method !== 'GET' && request.method !== 'HEAD') return new Response('Method Not Allowed', { status: 405, headers: cors });
+      // (per sender: a map reads a few dozen ranges of one or two of these files)
+      if (await overRate(env, 'RL_TILES', request, 'worldcover')) return new Response('Too Many Requests', { status: 429, headers: { ...cors, 'Retry-After': '60' } });
       const range = request.headers.get('Range');
       const upstream = await fetch(`https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/${file}`, {
         method: request.method,

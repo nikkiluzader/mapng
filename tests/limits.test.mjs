@@ -1,7 +1,7 @@
 // worker/limits.js: who a sender is, and that a missing binding limits nothing.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DAILY, overBudget, overRate, senderKey } from '../worker/limits.js';
+import { DAILY, overBudget, overRate, overSenderBudget, senderKey } from '../worker/limits.js';
 import { ExportHotspots } from '../worker/hotspots.js';
 
 const from = (ip) => new Request('https://mapng.com/', { headers: ip ? { 'CF-Connecting-IP': ip } : {} });
@@ -53,6 +53,30 @@ test("a day's total is taken until it is used up, then refused", async () => {
   assert.equal(await overBudget(env, 'mapterhornTiles', 100, 50), true);
   // (a name that is not a plain word is refused, not stored)
   assert.equal(object.takeBudget("x'; DROP", 5), false);
+});
+
+test("one sender's total for a day is its own, kept in memory only", async () => {
+  const sql = fakeSql();
+  const object = new ExportHotspots({ storage: { sql } });
+  const env = { HOTSPOTS: { idFromName: () => 'id', get: () => ({ fetch: (url, init) => object.fetch(new Request(url, init)) }) } };
+  const a = from('203.0.113.9'); const b = from('203.0.113.10');
+  assert.equal(await overSenderBudget(env, 'reports', a, 2), false);
+  assert.equal(await overSenderBudget(env, 'reports', a, 2), false);
+  assert.equal(await overSenderBudget(env, 'reports', a, 2), true);
+  // (another sender, and another total of the same sender, are untouched)
+  assert.equal(await overSenderBudget(env, 'reports', b, 2), false);
+  assert.equal(await overSenderBudget(env, 'mapterhornTiles', a, 100, 50), false);
+  // (an IPv6 sender is its /64)
+  assert.equal(await overSenderBudget(env, 'reports', from('2001:db8:aa:bb:1:2:3:4'), 1), false);
+  assert.equal(await overSenderBudget(env, 'reports', from('2001:db8:aa:bb:9:9:9:9'), 1), true);
+  // nothing about a sender reaches the object's storage, and no address is in its memory
+  assert.equal(sql.rows.size, 0);
+  assert.ok([...object.senderBudgets.keys()].every((k) => /^[A-Za-z]+:[0-9a-f]{16}$/.test(k)));
+  // (a sender that is not a hash, or a name that is not a word, is refused)
+  assert.equal(object.takeSenderBudget('reports', '203.0.113.9', 5), false);
+  assert.equal(object.takeSenderBudget("x'; DROP", '0123456789abcdef', 5), false);
+  // without the object nothing is limited
+  assert.equal(await overSenderBudget({}, 'reports', a, 1), false);
 });
 
 // ---- desktop: keys and private addresses stay out of what is written down ----

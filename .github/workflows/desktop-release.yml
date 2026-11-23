@@ -12,14 +12,21 @@ on:
     tags: ['v*.*.*']
   workflow_dispatch:
 
+# (each job asks for what it needs: nothing may write by default)
 permissions:
-  contents: write
-  # (build provenance: GitHub signs a statement that these files were built by this workflow from this commit)
-  id-token: write
-  attestations: write
+  contents: read
 
 jobs:
   build:
+    # The signing secrets belong to the "release" environment, which only v* tags may use (and only an
+    # admin may push a v* tag: the "Release tags: admins only" ruleset). A manual run, from any branch,
+    # gets the "manual-build" environment, which holds no secrets: it builds unsigned files to try.
+    environment: ${{ startsWith(github.ref, 'refs/tags/') && 'release' || 'manual-build' }}
+    permissions:
+      contents: write
+      # (build provenance: GitHub signs a statement that these files were built by this workflow from this commit)
+      id-token: write
+      attestations: write
     strategy:
       fail-fast: false
       matrix:
@@ -32,7 +39,11 @@ jobs:
             builder: --linux
     runs-on: ${{ matrix.os }}
     steps:
+      # (the job's token is not left in the checkout for the installs and builds below to find: the steps
+      # that upload are handed it by name)
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -69,13 +80,20 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          # (only the Windows build of a tag signs: the Linux build and a manual run never see these)
+          AZURE_TENANT_ID: ${{ matrix.platform == 'win32' && startsWith(github.ref, 'refs/tags/') && secrets.AZURE_TENANT_ID || '' }}
+          AZURE_CLIENT_ID: ${{ matrix.platform == 'win32' && startsWith(github.ref, 'refs/tags/') && secrets.AZURE_CLIENT_ID || '' }}
+          AZURE_CLIENT_SECRET: ${{ matrix.platform == 'win32' && startsWith(github.ref, 'refs/tags/') && secrets.AZURE_CLIENT_SECRET || '' }}
           SIGNING_PROFILE: ${{ vars.WINDOWS_SIGNING_PROFILE }}
+          IS_TAG: ${{ startsWith(github.ref, 'refs/tags/') }}
         # (a manual run builds without publishing: artifacts below)
         run: |
           sign=()
+          # (a tag's Windows build is signed or it is not built: an unsigned installer must never reach a release)
+          if [ "${{ matrix.platform }}" = "win32" ] && [ "$IS_TAG" = "true" ] && { [ -z "$AZURE_CLIENT_ID" ] || [ -z "$SIGNING_PROFILE" ]; }; then
+            echo "::error::Windows code signing is off (no AZURE_CLIENT_ID secret in the release environment, or no WINDOWS_SIGNING_PROFILE variable): a release is not built unsigned"
+            exit 1
+          fi
           if [ "${{ matrix.platform }}" = "win32" ] && [ -n "$AZURE_CLIENT_ID" ] && [ -n "$SIGNING_PROFILE" ]; then
             echo "Windows code signing: on (profile $SIGNING_PROFILE)"
             sign=(
@@ -85,7 +103,7 @@ jobs:
               "-c.win.azureSignOptions.certificateProfileName=$SIGNING_PROFILE"
             )
           else
-            echo "Windows code signing: off (no AZURE_CLIENT_ID secret or no WINDOWS_SIGNING_PROFILE variable)"
+            echo "Windows code signing: off (a manual run, or not the Windows build)"
           fi
           npx electron-builder ${{ matrix.builder }} --x64 "${sign[@]}" --publish ${{ startsWith(github.ref, 'refs/tags/') && 'always' || 'never' }}
 
@@ -93,7 +111,7 @@ jobs:
         if: matrix.platform == 'win32'
         shell: pwsh
         env:
-          SIGNING_ON: ${{ secrets.AZURE_CLIENT_ID != '' && vars.WINDOWS_SIGNING_PROFILE != '' }}
+          SIGNING_ON: ${{ startsWith(github.ref, 'refs/tags/') }}
         run: |
           $files = @(Get-ChildItem desktop/release/*.exe) + @(Get-Item desktop/release/win-unpacked/MapNG.exe)
           $bad = 0
@@ -104,24 +122,12 @@ jobs:
           }
           if ($bad -gt 0) { throw "$bad file(s) are not validly signed although signing is on" }
 
-      # The app takes an update only when the release's latest*.yml carries MapNG's signature
-      # (desktop/updateSignature.js). The key is a repository secret; without it the build fails
-      # here, before anyone could be offered a release their install would refuse.
-      - name: Sign the update manifest
-        if: startsWith(github.ref, 'refs/tags/')
-        shell: bash
-        env:
-          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          node desktop/scripts/signManifest.mjs desktop/release/latest*.yml
-          gh release upload "${GITHUB_REF_NAME}" desktop/release/latest*.yml.sig --clobber
-
       # Anyone can check a download against what was built here: the SHA-256 of every file is attached to the
       # release, and GitHub's build provenance says which commit and workflow run produced it
       # (gh attestation verify <file> --repo nikkiluzader/mapng). Neither may hold a release back: a failure
       # here is reported and the build goes on.
       - name: Checksums
+        id: checksums
         if: startsWith(github.ref, 'refs/tags/')
         continue-on-error: true
         shell: bash
@@ -135,6 +141,7 @@ jobs:
           gh release upload "${GITHUB_REF_NAME}" "SHA256SUMS-${{ matrix.platform }}.txt" --clobber
 
       - name: Build provenance
+        id: provenance
         if: startsWith(github.ref, 'refs/tags/')
         continue-on-error: true
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
@@ -144,6 +151,15 @@ jobs:
             desktop/release/*.zip
             desktop/release/*.AppImage
 
+      # (neither holds the release back, so a failure is said where it is seen: on the run's own page)
+      - name: Say so when the checksums or the provenance failed
+        if: startsWith(github.ref, 'refs/tags/') && (steps.checksums.outcome == 'failure' || steps.provenance.outcome == 'failure')
+        shell: bash
+        run: |
+          echo "::warning::${{ matrix.platform }}: checksums ${{ steps.checksums.outcome }}, build provenance ${{ steps.provenance.outcome }}"
+          echo "### ${{ matrix.platform }}: checksums ${{ steps.checksums.outcome }}, build provenance ${{ steps.provenance.outcome }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "The release's files are attached, but this check of them is missing. Run the job again, or attach it by hand, before publishing." >> "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: mapng-${{ matrix.platform }}
@@ -152,18 +168,54 @@ jobs:
             desktop/release/*.zip
             desktop/release/*.AppImage
             desktop/release/latest*.yml
-            desktop/release/latest*.yml.sig
           if-no-files-found: error
+
+  # The app takes an update only when the release's latest*.yml carries MapNG's signature
+  # (desktop/updateSignature.js). Signed here, in a job of its own that installs nothing and builds nothing:
+  # the key never shares a machine with the packages the build installs. It takes the two lists the builds
+  # attached to the draft release, signs them, and attaches the signatures. Without the key it fails, before
+  # anyone could be offered a release their install would refuse (a release stays a draft, and a test build
+  # is published only after this job).
+  sign-manifest:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            desktop/scripts/signManifest.mjs
+            desktop/updateSignature.js
+          sparse-checkout-cone-mode: false
+      - name: Sign the update manifests
+        shell: bash
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir manifests
+          gh release download "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --dir manifests --pattern 'latest.yml' --pattern 'latest-linux.yml'
+          ls -l manifests
+          [ -f manifests/latest.yml ] && [ -f manifests/latest-linux.yml ] || { echo "::error::the release does not hold both latest.yml and latest-linux.yml"; exit 1; }
+          node desktop/scripts/signManifest.mjs manifests/latest.yml manifests/latest-linux.yml
+          gh release upload "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" manifests/latest.yml.sig manifests/latest-linux.yml.sig --clobber
 
   # A test build (a tag like v0.3.1-dev.4): once both platforms are attached, the draft becomes a pre-release.
   publish-test-build:
-    needs: build
+    needs: [build, sign-manifest]
     if: startsWith(github.ref, 'refs/tags/') && contains(github.ref_name, '-')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Publish as a pre-release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

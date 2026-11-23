@@ -8,7 +8,7 @@
 // The coarse base layer (z0-z11) is not served here: the app never asks for it through MapNG. Fresh upstream fetches are
 // capped per address so nobody can fill the bucket by crawling the route.
 
-import { DAILY, overBudget, overRate } from './limits.js';
+import { DAILY, DAILY_PER_SENDER, overBudget, overRate, overSenderBudget, senderKey } from './limits.js';
 
 const UPSTREAM = 'https://tiles.mapterhorn.com';
 const MIN_Z = 12;   // z12: Copernicus GLO-30 outside lidar (the ground filter's second 30 m), z13+: lidar
@@ -27,9 +27,19 @@ const USER_AGENT = 'MapNG tile cache (https://mapng.com; one request per tile, t
 // The day's total of stored tiles is asked of the Durable Object once per STORE_BATCH tiles, not per tile.
 const STORE_BATCH = 50;
 let storeLeft = 0; let storeDay = '';
-async function mayStore(env) {
+// (and each sender's own share of the day, asked the same way: one address cannot use up everyone's total)
+const senderLeft = new Map();   // sender -> tiles left of the batch it last took
+async function mayStore(env, request) {
   const day = new Date().toISOString().slice(0, 10);
-  if (day !== storeDay) { storeDay = day; storeLeft = 0; }
+  if (day !== storeDay) { storeDay = day; storeLeft = 0; senderLeft.clear(); }
+  const sender = senderKey(request);
+  const mine = senderLeft.get(sender) || 0;
+  if (mine > 0) senderLeft.set(sender, mine - 1);
+  else {
+    if (await overSenderBudget(env, 'mapterhornTiles', request, DAILY_PER_SENDER.mapterhornTiles, STORE_BATCH)) return false;
+    if (senderLeft.size > 5000) senderLeft.clear();
+    senderLeft.set(sender, STORE_BATCH - 1);
+  }
   if (storeLeft > 0) { storeLeft -= 1; return true; }
   if (await overBudget(env, 'mapterhornTiles', DAILY.mapterhornTiles, STORE_BATCH)) return false;
   storeLeft = STORE_BATCH - 1;
@@ -96,7 +106,7 @@ export async function handleMapterhornTiles(request, env, ctx, url, { fetchImpl 
   if (!upstream.ok) return new Response('Upstream error', { status: 502, headers: cors });
   const body = await upstream.arrayBuffer();
   // (kept for good only within the day's total for everyone: past it the tile is still served, not stored)
-  if (env.OSM_TILES && await mayStore(env)) {
+  if (env.OSM_TILES && await mayStore(env, request)) {
     ctx.waitUntil(env.OSM_TILES.put(tile.key, body, {
       httpMetadata: { contentType: 'image/webp' },
       customMetadata: { fetchedAt: new Date().toISOString(), source: 'tiles.mapterhorn.com' },

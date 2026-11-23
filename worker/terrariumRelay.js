@@ -3,6 +3,8 @@
 // storage. A report from the website (2026-11-14): a 1 km Generate failed with "elevation terrain tiles (6/6
 // failed)" while all 144 satellite tiles of the same map arrived. The app asks here only after a direct
 // download fails (services/terrain.js). Only tile addresses are served: not an open proxy.
+import { overRate } from './limits.js';
+
 const UPSTREAM = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium';
 const cors = { 'Access-Control-Allow-Origin': '*' };
 const MAX_ZOOM = 15;
@@ -16,11 +18,13 @@ export function parseTerrariumPath(pathname) {
   return { z, x, y };
 }
 
-export async function handleTerrariumTiles(request, url, { fetchImpl = fetch } = {}) {
+export async function handleTerrariumTiles(request, url, { fetchImpl = fetch, env = null } = {}) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: { ...cors, 'Access-Control-Allow-Methods': 'GET, OPTIONS' } });
   if (request.method !== 'GET') return new Response('Method Not Allowed', { status: 405, headers: cors });
   const tile = parseTerrariumPath(url.pathname);
   if (!tile) return new Response('Not Found', { status: 404, headers: cors });
+  // (per sender, as for the other tile route: a map asks a few hundred of these, a crawler far more)
+  if (await overRate(env, 'RL_TILES', request, 'terrarium')) return new Response('Too Many Requests', { status: 429, headers: { ...cors, 'Retry-After': '60' } });
   let upstream;
   try {
     // (kept at Cloudflare's edge for a month: the tiles do not change)

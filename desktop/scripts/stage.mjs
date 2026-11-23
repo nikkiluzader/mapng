@@ -25,11 +25,29 @@ const platform = arg('platform', process.platform);
 const arch = arg('arch', 'x64');
 
 // the Node release the export runs in: the latest LTS line (26, "Lithium"),
-// pinned to a release at least two weeks old (26.12.0 is that line just
-// before its LTS label; move to 26.13.x once one is). Against Node 22 a
-// dense 2 km export ran 10% faster in a third less memory, and Node 22's V8
-// now and then crashed compiling an 8 km one ("unreachable code").
-const NODE_VERSION = 'v26.12.0';
+// pinned to a release at least two weeks old, or the newest security release
+// of the line when that is younger (26.13.1, 2026-11-10, is one). Against
+// Node 22 a dense 2 km export ran 10% faster in a third less memory, and
+// Node 22's V8 now and then crashed compiling an 8 km one ("unreachable code").
+const NODE_VERSION = 'v26.13.1';
+// The archives' SHA-256, written down here from nodejs.org's SHASUMS256.txt when the version was chosen: the
+// download is checked against these, not against a list fetched from the same server at build time. A new
+// NODE_VERSION needs new lines (curl https://nodejs.org/dist/<version>/SHASUMS256.txt).
+const NODE_SHA256 = {
+  'node-v26.13.1-linux-x64.tar.xz': '5c063e46bab0fbc1c17cc445d7ff129cbdcd0471be6ed83b6ab864f8143bc864',
+  'node-v26.13.1-win-x64.zip': 'e2edda75bfb089654705cf65a13b58933bfd5f57148e8ebda916f58a2474f1f7',
+};
+// The runner's packages as npm's registry published them (name@version: the tarball's checksum). They are
+// installed without a lock file (one folder serves either platform), so what arrived is checked against this
+// list afterwards: a package or a version not on it stops the build. A new version needs its line
+// (npm view <name>@<version> dist.integrity).
+const RUNNER_PACKAGES = {
+  '@napi-rs/canvas@1.0.11': 'sha512-vt5tog1cr+QKadIddGe+3LrcX0EmjEd0izF717Uwf92mBmgYfq2XRmL2r4bZU40spB69exxhrBn9I91HYEr/7w==',
+  '@napi-rs/canvas-win32-x64-msvc@1.0.11': 'sha512-DFYp/ZQRdKunI/LPc0UkRXG1vlNjJKOJf8O8Ctb8+wm2Nt2ELg9Eamc31D2VoakkfGo8L+z0Iejz6WtFbQwyGw==',
+  '@napi-rs/canvas-linux-x64-gnu@1.0.11': 'sha512-iDapw7nFSE5tsmQxcH2+KotJhyfVPmHd6vUOQN/Em+8WNbkZJwJ/rDowlJMFnMl0SYSDSfgKCNUGi6Sn5++Smg==',
+  '@napi-rs/canvas-linux-x64-musl@1.0.11': 'sha512-26q26AyITo3CGZX4HWFIMgBMA1lu3YN07gxzBm4tW6Hglq/OVyTP50kDrmWuKybCX6dh3m8Ly+c7YhI+sqCgCQ==',
+  'laz-perf@0.0.7': 'sha512-2xRqm/f/2UqDS5qqkjOyDb6uVIjkVw6SGmQlMoTQliVWkZhPfIbUJTubUl3mTloaWqKcjlS/urmP1CYoxelsEg==',
+};
 const CANVAS_VERSION = JSON.parse(fs.readFileSync(path.join(DESKTOP, 'package.json'), 'utf8')).devDependencies['@napi-rs/canvas'];
 // (left out of the bundle: native or loaded at run time)
 const RUNNER_EXTERNAL = ['@napi-rs/canvas', 'laz-perf'];
@@ -76,6 +94,16 @@ async function stageRunner() {
   // the native canvas for the target platform (npm picks its prebuilt binary by --os/--cpu)
   execFileSync('npm', ['install', '--no-save', '--no-package-lock', '--omit=dev', `--os=${platform}`, `--cpu=${arch}`,
     `@napi-rs/canvas@${CANVAS_VERSION}`, `laz-perf@${LAZ_PERF_VERSION}`], { cwd: out, stdio: 'inherit', shell: process.platform === 'win32' });
+  // (what npm installed, by its own record of each tarball's checksum, against the list above)
+  const installed = JSON.parse(fs.readFileSync(path.join(out, 'node_modules', '.package-lock.json'), 'utf8')).packages || {};
+  const names = Object.keys(installed);
+  if (!names.length) throw new Error('the runner\'s packages: npm recorded none');
+  for (const at of names) {
+    const id = `${at.replace(/^.*node_modules\//, '')}@${installed[at].version}`;
+    if (!RUNNER_PACKAGES[id]) throw new Error(`the runner's packages: ${id} is not on the list in desktop/scripts/stage.mjs (RUNNER_PACKAGES)`);
+    if (installed[at].integrity !== RUNNER_PACKAGES[id]) throw new Error(`the runner's packages: ${id} does not match its recorded checksum`);
+  }
+  console.log(`runner packages checked: ${names.length} match their recorded checksums`);
 }
 
 async function download(url) {
@@ -93,8 +121,8 @@ async function stageNode() {
   fs.mkdirSync(cache, { recursive: true });
   const archive = path.join(cache, name);
   if (!fs.existsSync(archive)) fs.writeFileSync(archive, await download(`https://nodejs.org/dist/${NODE_VERSION}/${name}`));
-  const sums = (await download(`https://nodejs.org/dist/${NODE_VERSION}/SHASUMS256.txt`)).toString();
-  const want = sums.split('\n').find((l) => l.endsWith(`  ${name}`))?.split(/\s+/)[0];
+  const want = NODE_SHA256[name];
+  if (!want) throw new Error(`${name}: no checksum recorded in desktop/scripts/stage.mjs (NODE_SHA256)`);
   const got = crypto.createHash('sha256').update(fs.readFileSync(archive)).digest('hex');
   if (!want || want !== got) { fs.rmSync(archive); throw new Error(`${name}: checksum mismatch`); }
   const base = name.replace(/\.(zip|tar\.xz)$/, '');

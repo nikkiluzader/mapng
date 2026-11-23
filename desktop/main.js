@@ -5,7 +5,7 @@ import { missingParts, incompleteMessage, inArchiveTemp, softwareGraphics } from
 import { menuText, updaterText, networkText, startText } from './menuText.js';
 import { activityHtml, activityRows, noteHost, watchSession } from './networkActivity.js';
 import { allowedUrl, setOwnServer } from './networkGuard.js';
-import { fork } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -332,12 +332,18 @@ const jobDirOf = (jobId) => {
 const running = new Map();
 const linkedFiles = new Map();   // jobId → names linked from a generated terrain
 
+/** The bundled Node with a message channel to this process: spawnNode((execArgv) => args, { execArgv, env, stdio }). */
+const spawnNode = (argsOf, { execArgv = [], ...options }) => spawn(NODE, argsOf(execArgv), { ...options, serialization: 'json', windowsHide: true });
+
 /** A runner script in the bundled Node, its output logged to export.log in dir. */
 function spawnRunner(script, dir) {
   // (three quarters of the machine's memory for the JS heap)
   const heapMB = Math.max(4096, Math.floor(os.totalmem() / 2 ** 20 * 0.75));
-  const child = fork(script, [dir], {
-    execPath: NODE,
+  // (started with spawn and a message channel, which is what fork does underneath: Electron refuses fork()
+  // itself once the app can no longer be run as a plain Node, electron-builder.yml electronFuses, although
+  // the program started here is the Node that ships beside the app, never the app's own)
+  const nodeArgs = (execArgv) => [...execArgv, script, dir];
+  const child = spawnNode(nodeArgs, {
     // (a bigger young generation: the export's short-lived geometry is swept
     // there cheaply instead of promoted, where each sweep walks gigabytes;
     // a dense 4 km export spent 29% of its time collecting garbage, 19% so)
@@ -1432,6 +1438,15 @@ app.whenReady().then(() => {
     if (!verdict.ok) refusedAddress(verdict.host);
     callback({ cancel: !verdict.ok });
   });
+  // What the page may ask the system for: its place ("my location" in the coordinates box), the clipboard (copying
+  // and pasting configs and coordinates), full screen and the pointer (the 3D preview). Electron grants every
+  // request unless told otherwise; here anything else (camera, microphone, notifications, devices, opening other
+  // programs) is refused, and so is every request that does not come from the app's own page.
+  const PAGE_MAY = new Set(['geolocation', 'clipboard-read', 'clipboard-sanitized-write', 'fullscreen', 'pointerLock']);
+  electronSession.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) => {
+    callback(PAGE_MAY.has(permission) && isAppUrl(details?.requestingUrl || contents?.getURL()));
+  });
+  electronSession.defaultSession.setPermissionCheckHandler((_contents, permission, requestingOrigin) => PAGE_MAY.has(permission) && isAppUrl(String(requestingOrigin || '').replace(/\/$/, '')));
   // (Windows: notifications name the app by this)
   if (process.platform === 'win32') app.setAppUserModelId('com.mapng.desktop');
   // (started from inside the zip, or with files missing: say so now, not at the first Generate)

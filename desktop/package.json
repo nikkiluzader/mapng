@@ -10,7 +10,7 @@
   "main": "main.js",
   "devDependencies": {
     "@napi-rs/canvas": "1.0.11",
-    "electron": "44.9.0",
+    "electron": "44.11.5",
     "electron-builder": "26.17.0",
     "esbuild": "0.28.2"
   },

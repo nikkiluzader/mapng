@@ -1,0 +1,558 @@
+// The dashboard's script (public/admin.html). A file of its own so that the page's content policy
+// (worker/index.js adminContentPolicy) can refuse every script written into the page: a report's text is
+// written by whoever sent it, and must never be able to run here.
+(() => {
+  'use strict';
+  const REPO = 'nikkiluzader/mapng';
+  const $ = (id) => document.getElementById(id);
+  // (a report's kind is the sender's word: only the known ones pick a colour)
+  const kindClass = (k) => (['crash', 'export', 'generate', 'rebuild', 'level', 'manual'].includes(k) ? k : '');
+  const el = (tag, props = {}, ...kids) => {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(props)) {
+      if (k === 'class') n.className = v; else if (k === 'text') n.textContent = v; else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+      else if (k === 'style') n.style.cssText = v; else if (v !== null && v !== undefined && v !== false) n.setAttribute(k, v === true ? '' : v);
+    }
+    for (const kid of kids.flat()) if (kid !== null && kid !== undefined && kid !== false) n.append(kid);
+    return n;
+  };
+  const fmt = (n) => (Number.isFinite(Number(n)) ? Number(n).toLocaleString('en-US') : '–');
+  const bytes = (b) => { const u = ['B', 'KB', 'MB', 'GB', 'TB']; let i = 0; let v = Number(b) || 0; while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; } return `${v.toFixed(v < 10 && i ? 1 : 0)} ${u[i]}`; };
+  const gb = (mb) => (mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.max(Math.round(mb), 0)} MB`);
+  const ago = (iso) => {
+    const min = Math.round((Date.now() - Date.parse(iso)) / 60000);
+    if (!Number.isFinite(min)) return '';
+    if (min < 1) return 'just now'; if (min < 60) return `${min} min ago`; if (min < 48 * 60) return `${Math.round(min / 60)} h ago`;
+    return `${Math.round(min / 1440)} days ago`;
+  };
+  const when = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? String(iso || '') : d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+  const api = async (path, init) => {
+    const r = await fetch(`/api/admin${path}`, { credentials: 'same-origin', cache: 'no-store', ...init });
+    if (!r.ok) { const e = new Error(`${r.status}`); e.status = r.status; try { e.body = await r.json(); } catch { /* not JSON */ } throw e; }
+    return r;
+  };
+  const getJson = async (url) => { const r = await fetch(url, { cache: 'no-store' }); if (!r.ok) throw new Error(String(r.status)); return r.json(); };
+  const table = (heads, rows, { empty = 'Nothing to show.' } = {}) => {
+    if (!rows.length) return el('p', { class: 'muted', text: empty });
+    return el('table', {},
+      el('thead', {}, el('tr', {}, heads.map((h) => el('th', { class: h.num ? 'num' : '', text: h.label })))),
+      el('tbody', {}, rows.map((r) => el('tr', {}, r.map((c, i) => el('td', { class: `${heads[i].num ? 'num' : ''} ${heads[i].mono ? 'mono' : ''}`.trim() }, c instanceof Node ? c : document.createTextNode(String(c ?? ''))))))));
+  };
+  const put = (id, node) => { const host = $(id); host.textContent = ''; host.append(node); };
+  const fail = (id, msg) => put(id, el('p', { class: 'muted', text: msg }));
+  const bars = (values, labels, { alt = false, title = (v) => fmt(v) } = {}) => {
+    const max = Math.max(1, ...values);
+    return el('div', {},
+      el('div', { class: 'bars', style: values.length > 60 ? 'gap:1px' : '', role: 'img', 'aria-label': values.map((v, i) => `${labels[i]}: ${title(v)}`).join(', ') },
+        values.map((v, i) => el('div', { class: `b${alt ? ' alt' : ''}`, style: `height:${Math.max(2, (v / max) * 100)}%`, title: `${labels[i]}: ${title(v)}` }))),
+      el('div', { class: 'axis' }, el('span', { text: labels[0] || '' }), el('span', { text: `peak ${title(max)}` }), el('span', { text: labels[labels.length - 1] || '' })));
+  };
+
+  // ── a chart of days: bars, a line or an area; hover a day for its numbers, click it for what stands out ──
+  const CHART_TYPES = [['bars', 'Bars'], ['line', 'Line'], ['area', 'Area']];
+  const SVG = 'http://www.w3.org/2000/svg';
+  const svgEl = (tag, attrs = {}) => { const n = document.createElementNS(SVG, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
+  let chartType = 'bars';
+  try { const t = localStorage.getItem('mapng_admin_chart'); if (CHART_TYPES.some(([k]) => k === t)) chartType = t; } catch { /* fine without */ }
+  const charts = [];      // every day chart on the page, redrawn together when the type or the chosen day changes
+  let chosenDay = null;
+  /**
+   * rows: one per day, oldest first. metrics: [{ key, label, value(row), format(n), color }]; the first is drawn
+   * unless another is picked. tip(row): lines for the hover box. insight(row, rows): what to say about a clicked day.
+   */
+  function dayChart(hostId, rows, { metrics, tip, insight, table }) {
+    const host = $(hostId); host.textContent = '';
+    const me = { metric: metrics[0].key };
+    try { const m = localStorage.getItem(`mapng_admin_metric_${hostId}`); if (metrics.some((x) => x.key === m)) me.metric = m; } catch { /* fine without */ }
+    const tools = el('div', { class: 'chart-tools' });
+    const typeSel = el('select', { 'aria-label': 'Chart type' }, CHART_TYPES.map(([k, label]) => el('option', { value: k, text: label })));
+    const metricSel = el('select', { 'aria-label': 'What to chart' }, metrics.map((m) => el('option', { value: m.key, text: m.label })));
+    tools.append(el('label', {}, 'Show ', metricSel), el('label', {}, 'as ', typeSel));
+    const box = el('div', { class: 'chart' }); const axis = el('div', { class: 'axis' }); const note = el('div', { class: 'insight', hidden: true });
+    const tableHost = el('div', { class: 'daytable scroll' });
+    host.append(tools, box, axis, note, tableHost);
+    const W = 1000; const H = 170; const PAD = 4;
+    me.draw = () => {
+      typeSel.value = chartType; metricSel.value = me.metric;
+      const metric = metrics.find((m) => m.key === me.metric);
+      const vals = rows.map((r) => Number(metric.value(r)) || 0); const max = Math.max(1, ...vals);
+      const n = rows.length; const step = W / n; const y = (v) => H - PAD - (v / max) * (H - 2 * PAD);
+      box.textContent = '';
+      const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'none', role: 'img', 'aria-label': `${metric.label} per day, ${rows[0]?.dimensions.date} to ${rows[n - 1]?.dimensions.date}; the table below has every day` });
+      if (chartType === 'bars') {
+        const gap = n > 60 ? 0.12 : 0.18;
+        vals.forEach((v, i) => svg.append(svgEl('rect', { x: i * step + step * gap / 2, y: y(v), width: step * (1 - gap), height: Math.max(1, H - PAD - y(v)), fill: metric.color, rx: n > 60 ? 0 : 2 })));
+      } else {
+        const pts = vals.map((v, i) => `${(i + 0.5) * step},${y(v)}`);
+        if (chartType === 'area') svg.append(svgEl('path', { d: `M${0.5 * step},${H - PAD} L${pts.join(' L')} L${(n - 0.5) * step},${H - PAD} Z`, fill: metric.color, opacity: 0.28 }));
+        svg.append(svgEl('path', { d: `M${pts.join(' L')}`, fill: 'none', stroke: metric.color, 'stroke-width': 2, 'vector-effect': 'non-scaling-stroke', 'stroke-linejoin': 'round' }));
+        if (n <= 60) vals.forEach((v, i) => svg.append(svgEl('circle', { cx: (i + 0.5) * step, cy: y(v), r: 2.5, fill: metric.color, 'vector-effect': 'non-scaling-stroke' })));
+      }
+      const tipBox = el('div', { class: 'tip', hidden: true });
+      rows.forEach((r, i) => {
+        const hit = svgEl('rect', { class: `hit${chosenDay === r.dimensions.date ? ' on' : ''}`, x: i * step, y: 0, width: step, height: H });
+        hit.addEventListener('mouseenter', () => {
+          tipBox.hidden = false; tipBox.textContent = '';
+          for (const line of tip(r)) tipBox.append(el('div', line.bold ? { style: 'font-weight:700' } : {}, line.text));
+          const left = ((i + 0.5) / n) * box.clientWidth; const half = tipBox.offsetWidth / 2;
+          tipBox.style.left = `${Math.min(Math.max(left - half, 0), Math.max(0, box.clientWidth - tipBox.offsetWidth))}px`;
+        });
+        hit.addEventListener('mouseleave', () => { tipBox.hidden = true; });
+        hit.addEventListener('click', () => { chosenDay = chosenDay === r.dimensions.date ? null : r.dimensions.date; for (const c of charts) c.draw(); });
+        svg.append(hit);
+      });
+      box.append(svg, tipBox);
+      axis.textContent = ''; axis.append(el('span', { text: rows[0]?.dimensions.date || '' }), el('span', { text: `peak ${metric.format(max)} · click a day for more` }), el('span', { text: rows[n - 1]?.dimensions.date || '' }));
+      const picked = rows.find((r) => r.dimensions.date === chosenDay);
+      note.hidden = !picked; note.textContent = '';
+      if (picked) for (const line of insight(picked, rows)) note.append(el('div', {}, line.bold ? el('b', { text: line.text }) : document.createTextNode(line.text)));
+      tableHost.textContent = '';
+      const t = table(rows);
+      tableHost.append(el('table', {},
+        el('thead', {}, el('tr', {}, t.heads.map((h, i) => el('th', { class: i ? 'num' : '', text: h })))),
+        el('tbody', {}, [...rows].reverse().map((r) => el('tr', { class: `row${r.dimensions.date === chosenDay ? ' on' : ''}`, onclick: () => { chosenDay = chosenDay === r.dimensions.date ? null : r.dimensions.date; for (const c of charts) c.draw(); } }, t.cells(r).map((c, i) => el('td', { class: i ? 'num' : '', text: c })))))));
+    };
+    typeSel.addEventListener('change', () => { chartType = typeSel.value; try { localStorage.setItem('mapng_admin_chart', chartType); } catch { /* fine without */ } for (const c of charts) c.draw(); });
+    metricSel.addEventListener('change', () => { me.metric = metricSel.value; try { localStorage.setItem(`mapng_admin_metric_${hostId}`, me.metric); } catch { /* fine without */ } me.draw(); });
+    const at = charts.findIndex((c) => c.hostId === hostId); me.hostId = hostId;
+    if (at >= 0) charts[at] = me; else charts.push(me);
+    me.draw();
+  }
+  const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const dayName = (date) => { const d = new Date(`${date}T00:00:00Z`); return `${WEEKDAYS[d.getUTCDay()]} ${d.getUTCDate()} ${d.toLocaleString('en', { month: 'short', timeZone: 'UTC' })} ${d.getUTCFullYear()}`; };
+  const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
+  // what stands out about one day against the rest of the period
+  function dayInsight(row, rows) {
+    const whole = rows.slice(0, -1).length ? rows.slice(0, -1) : rows;      // (today's row is still filling: left out of the averages)
+    const mean = (f) => whole.reduce((a, r) => a + f(r), 0) / Math.max(1, whole.length);
+    const rank = (f) => [...rows].sort((a, b) => f(b) - f(a)).findIndex((r) => r === row) + 1;
+    const cmp = (v, avg) => (avg ? `${v >= avg ? '+' : '−'}${Math.abs(Math.round(((v - avg) / avg) * 100))}% against the period's average of ${fmt(Math.round(avg))}` : '');
+    const req = (r) => r.sum.requests; const vis = (r) => r.uniq.uniques;
+    const isToday = row === rows[rows.length - 1];
+    const lines = [{ bold: true, text: `${dayName(row.dimensions.date)}${isToday ? ' (today so far)' : ''}` },
+      { text: `${fmt(req(row))} requests: ${cmp(req(row), mean(req))}; day ${rank(req)} of ${rows.length} by requests.` },
+      { text: `${fmt(vis(row))} visitors: ${cmp(vis(row), mean(vis))}; ${(req(row) / Math.max(1, vis(row))).toFixed(0)} requests per visitor (average ${(mean(req) / Math.max(1, mean(vis))).toFixed(0)}).` },
+      { text: `${bytes(row.sum.bytes)} served, ${pct(row.sum.cachedRequests, req(row))}% of requests from Cloudflare's cache, ${fmt(row.sum.pageViews)} pages viewed, ${fmt(row.sum.threats)} threats stopped.` }];
+    const perVisitor = req(row) / Math.max(1, vis(row)); const usual = mean(req) / Math.max(1, mean(vis));
+    if (!isToday && perVisitor > usual * 1.6) lines.push({ text: 'Far more requests per visitor than usual: a few people doing heavy work (big exports, many map tiles), or something automated.' });
+    if (!isToday && vis(row) > mean(vis) * 1.4) lines.push({ text: 'Many more visitors than usual: a release, a post or a video sending people over.' });
+    return lines;
+  }
+  const dayTip = (r) => [{ bold: true, text: dayName(r.dimensions.date) }, { text: `${fmt(r.sum.requests)} requests · ${pct(r.sum.cachedRequests, r.sum.requests)}% cached` }, { text: `${fmt(r.uniq.uniques)} visitors · ${fmt(r.sum.pageViews)} pages` }, { text: `${bytes(r.sum.bytes)} · ${fmt(r.sum.threats)} threats` }];
+
+  // ── state ──
+  const state = { reports: [], total: 0, selected: null, overview: null, cf: null, releases: null, days: 1 };
+
+  // ── tiles ──
+  const tiles = new Map();
+  const tile = (key, value, label, sub = '') => { tiles.set(key, { value, label, sub }); drawTiles(); };
+  // (the Overview shows four; the rest of the numbers live on their own pages)
+  const TILE_ORDER = ['visitors', 'latest', 'security', 'planet'];
+
+  // ── what needs the developer today: each loader adds or clears its own lines ──
+  const attention = new Map();
+  const TODO_ORDER = ['reports', 'builds', 'rules', 'mail', 'retry', 'servers', 'cloudflare'];
+  function need(key, item) { if (item) attention.set(key, item); else attention.delete(key); drawAttention(); }
+  function drawAttention() {
+    const items = TODO_ORDER.filter((k) => attention.has(k)).map((k) => attention.get(k));
+    const urgent = items.filter((i) => !i.info).length;
+    $('lead-title').textContent = urgent ? `${urgent} thing${urgent === 1 ? '' : 's'} need${urgent === 1 ? 's' : ''} you today.` : 'Nothing needs you right now.';
+    $('lead-sub').textContent = urgent ? 'The rest is below, and on its own page in the menu.' : (items.length ? 'A couple of things worth knowing are below.' : 'No open reports, the builds passed and the rules are on.');
+    put('todo', el('div', { style: 'display:contents' }, items.map((i) => el('div', { class: `item${i.info ? ' info' : ''}` },
+      el('div', { class: 'mark', 'aria-hidden': 'true', text: i.mark }),
+      el('div', { class: 'body' }, el('b', { text: i.title }), el('span', { text: i.text })),
+      el('button', { type: 'button', text: i.action, onclick: () => goTo(i.tab) })))));
+  }
+  const system = new Map();
+  const SYS_ORDER = ['main', 'dev', 'rules', 'mail', 'reportsToday', 'planet'];
+  function sys(key, label, value) { system.set(key, [label, value]); put('ov-system', el('div', { style: 'display:contents' }, SYS_ORDER.filter((k) => system.has(k)).flatMap((k) => [el('dt', { text: system.get(k)[0] }), el('dd', {}, system.get(k)[1] instanceof Node ? system.get(k)[1] : document.createTextNode(system.get(k)[1]))]))); }
+  const TITLES = { overview: 'Overview', reports: 'Reports', traffic: 'Traffic', security: 'Security', app: 'Desktop app', usage: 'Exports and settings', system: 'Builds and planet' };
+  function goTo(tab) { const b = $('tabs').querySelector(`button[data-tab="${CSS.escape(tab)}"]`); if (b) b.click(); window.scrollTo({ top: 0 }); }
+  function drawTiles() {
+    put('tiles', el('div', { style: 'display:contents' }, TILE_ORDER.filter((k) => tiles.has(k)).map((k) => {
+      const t = tiles.get(k);
+      return el('div', { class: 'tile' }, el('div', { class: 'v', text: t.value }), el('div', { class: 'k', text: t.label }), t.sub ? el('div', { class: 's', text: t.sub }) : null);
+    })));
+  }
+
+  // ── reports ──
+  const placeOf = (r) => {
+    const a = r.area; if (!a || !Number.isFinite(Number(a.lat))) return '';
+    const km = Number(a.resolution) && Number(a.metersPerPixel) ? ` · ${((a.resolution * a.metersPerPixel) / 1000).toFixed(1)} km` : '';
+    return `${Number(a.lat).toFixed(3)}, ${Number(a.lng).toFixed(3)}${km}`;
+  };
+  const whatOf = (r) => r.error || r.description || (r.level ? `Level report: ${r.level}` : '') || '(no message)';
+  // (the same error from different places and times: numbers, paths and ids taken out)
+  const errorKey = (r) => String(r.error || r.kind || '').replace(/[0-9a-f]{8,}/gi, '#').replace(/\d+(\.\d+)?/g, '#').replace(/[A-Za-z]:\\[^\s'"]+|\/[^\s'"]+/g, '<path>').slice(0, 160);
+  function fillSelect(id, values, first) {
+    const sel = $(id); const keep = sel.value;
+    sel.textContent = ''; sel.append(el('option', { value: '', text: first }), ...values.map((v) => el('option', { value: v, text: v })));
+    if ([...sel.options].some((o) => o.value === keep)) sel.value = keep;
+  }
+  // (an alert email's link names its report: /admin.html#MR-XXXXXX shows that one)
+  { const m = /^#(MR-[A-Z0-9]{6})$/.exec(location.hash); if (m && $('f-text')) $('f-text').value = m[1]; }
+  function filtered() {
+    const text = $('f-text').value.trim().toLowerCase(); const kind = $('f-kind').value; const version = $('f-version').value; const st = $('f-state').value;
+    return state.reports.filter((r) => {
+      if (kind && r.kind !== kind) return false;
+      if (version && r.appVersion !== version) return false;
+      if (st === 'open' && r.admin?.handled) return false;
+      if (st === 'handled' && !r.admin?.handled) return false;
+      if (text && !`${r.id} ${r.kind} ${r.appVersion} ${r.error} ${r.description} ${r.level} ${r.os} ${placeOf(r)} ${r.admin?.note || ''}`.toLowerCase().includes(text)) return false;
+      return true;
+    });
+  }
+  function drawReports() {
+    const list = filtered();
+    const open = state.reports.filter((r) => !r.admin?.handled).length;
+    $('reports-sub').textContent = `${fmt(state.total)} stored, ${fmt(state.reports.length)} loaded (newest), ${fmt(open)} open. Showing ${fmt(list.length)}.`;
+    const body = $('report-rows'); body.textContent = '';
+    if (!list.length) { body.append(el('tr', {}, el('td', { colspan: '5', class: 'muted', text: state.reports.length ? 'No report matches the filters.' : 'No reports yet.' }))); return; }
+    const rowOf = (r, count = 0) => el('tr', { class: `row${r.admin?.handled ? ' handled' : ''}${state.selected === r.key ? ' sel' : ''}`, tabindex: '0', onclick: () => select(r.key), onkeydown: (e) => { if (e.key === 'Enter') select(r.key); } },
+      el('td', {}, el('div', { text: when(r.receivedAt) }), el('div', { class: 'muted mono', text: r.id })),
+      el('td', {}, el('span', { class: `pill ${kindClass(r.kind)}`, text: r.kind }), r.admin?.handled ? el('div', {}, el('span', { class: 'pill ok', text: 'handled' })) : null),
+      el('td', { text: r.appVersion || '' }),
+      el('td', {}, el('div', { text: whatOf(r).slice(0, 180) }), count > 1 ? el('div', { class: 'muted', text: `${count} reports with this error` }) : null, r.admin?.note ? el('div', { class: 'muted', text: `Note: ${r.admin.note.slice(0, 120)}` }) : null),
+      el('td', { class: 'mono', text: placeOf(r) }));
+    if ($('f-group').checked) {
+      const groups = new Map();
+      for (const r of list) { const k = errorKey(r); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(r); }
+      for (const g of [...groups.values()].sort((a, b) => b.length - a.length || (a[0].receivedAt < b[0].receivedAt ? 1 : -1))) body.append(rowOf(g[0], g.length));
+    } else for (const r of list) body.append(rowOf(r));
+  }
+  async function showFile(key, name, host) {
+    host.textContent = 'Loading…';
+    try {
+      const r = await api(`/reports/file?key=${encodeURIComponent(key + name)}`);
+      const text = await r.text();
+      host.textContent = text.length > 600000 ? `${text.slice(0, 300000)}\n\n… (${fmt(text.length - 600000)} characters left out) …\n\n${text.slice(-300000)}` : text;
+    } catch (e) { host.textContent = `Could not load ${name} (${e.message}).`; }
+  }
+  function select(key) {
+    state.selected = key; drawReports();
+    const r = state.reports.find((x) => x.key === key); if (!r) return;
+    const host = $('detail'); host.textContent = '';
+    const file = el('pre', { class: 'file', hidden: true });
+    const open = (name) => { file.hidden = false; showFile(r.key, name, file); };
+    const note = el('textarea', { placeholder: 'A note to yourself: what it was, the fix, who to tell…', 'aria-label': 'Note' }); note.value = r.admin?.note || '';
+    const saved = el('span', { class: 'muted' });
+    const save = async (handled) => {
+      saved.textContent = 'Saving…';
+      try {
+        const res = await (await api('/reports/state', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: r.key, handled, note: note.value }) })).json();
+        r.admin = res.admin; saved.textContent = 'Saved.'; drawReports(); countOpen();
+        select(r.key);
+      } catch (e) { saved.textContent = `Could not save (${e.message}).`; }
+    };
+    const o = r.options || {};
+    const settings = Object.entries(o).filter(([k, v]) => !['sessionCode', 'points'].includes(k) && typeof v !== 'object').map(([k, v]) => `${k}: ${v}`).join('  ·  ');
+    const mapLink = r.area && Number.isFinite(Number(r.area.lat)) ? el('a', { href: `https://www.openstreetmap.org/?mlat=${encodeURIComponent(r.area.lat)}&mlon=${encodeURIComponent(r.area.lng)}#map=13/${encodeURIComponent(r.area.lat)}/${encodeURIComponent(r.area.lng)}`, target: '_blank', rel: 'noopener noreferrer', text: 'open the place on a map' }) : null;
+    host.append(...[
+      el('h2', {}, document.createTextNode(`${r.id} `), el('span', { class: `pill ${kindClass(r.kind)}`, text: r.kind })),
+      el('p', { class: 'sub', text: `${when(r.receivedAt)} (${ago(r.receivedAt)})` }),
+      r.error ? el('div', { class: 'err mono', text: r.error }) : null,
+      r.description ? el('p', {}, el('b', { text: 'They wrote: ' }), document.createTextNode(r.description)) : null,
+      el('dl', {},
+        el('dt', { text: 'App' }), el('dd', { text: `${r.appVersion || '?'} (${r.build || '?'}) on ${r.os || r.platform || '?'}` }),
+        r.memory ? [el('dt', { text: 'Machine' }), el('dd', { text: `${r.memory.totalGB ?? '?'} GB RAM (${r.memory.freeGB ?? '?'} free), ${r.memory.cpus ?? '?'} cores` })] : null,
+        r.level ? [el('dt', { text: 'Level' }), el('dd', { text: r.level })] : null,
+        placeOf(r) ? [el('dt', { text: 'Area' }), el('dd', {}, document.createTextNode(`${placeOf(r)}${r.area.resolution ? ` · ${r.area.resolution} px at ${r.area.metersPerPixel} m` : ''}  `), mapLink)] : null,
+        settings ? [el('dt', { text: 'Settings' }), el('dd', { class: 'mono', text: settings })] : null),
+      el('div', { class: 'acts' },
+        r.hasLog ? el('button', { type: 'button', text: 'Log', onclick: () => open('log.txt') }) : null,
+        r.hasExportReport ? el('button', { type: 'button', text: 'Export report', onclick: () => open('export_report.txt') }) : null,
+        el('button', { type: 'button', text: 'Raw report', onclick: () => open('report.json') }),
+        r.config ? el('button', { type: 'button', text: `Copy session code (${fmt(r.config.length)} characters)`, onclick: async (e) => { try { await navigator.clipboard.writeText(r.config); e.target.textContent = 'Copied'; } catch { e.target.textContent = 'Copy failed'; } } }) : null,
+        r.hasDump ? el('span', { class: 'muted', text: 'Has a crash dump (crash.dmp in storage).' }) : null),
+      r.config && r.config.length === 8000 ? el('p', { class: 'muted', text: 'This code is exactly 8,000 characters: it was cut short by an older version and will not paste back.' }) : null,
+      note,
+      el('div', { class: 'acts' },
+        r.admin?.handled
+          ? el('button', { type: 'button', text: 'Reopen', onclick: () => save(false) })
+          : el('button', { type: 'button', class: 'primary', text: 'Mark handled', onclick: () => save(true) }),
+        el('button', { type: 'button', text: 'Save note', onclick: () => save(!!r.admin?.handled) }), saved),
+      file].filter(Boolean));
+  }
+  function countOpen() {
+    const open = state.reports.filter((r) => !r.admin?.handled).length;
+    const badge = $('nav-open'); badge.hidden = !open; badge.textContent = String(open);
+    const newest = state.reports.find((r) => !r.admin?.handled);
+    need('reports', open ? { mark: String(open), title: `Open problem report${open === 1 ? '' : 's'}`, text: newest ? `Newest: ${whatOf(newest).slice(0, 140)} (${newest.kind}, ${newest.appVersion || '?'}, ${ago(newest.receivedAt)}).` : '', action: 'Open reports', tab: 'reports' } : null);
+    const top = state.reports.slice(0, 4);
+    put('ov-reports', top.length ? el('div', {}, top.map((r) => el('div', { style: 'display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)' },
+      el('span', { class: `pill ${r.admin?.handled ? 'ok' : kindClass(r.kind)}`, style: 'align-self:flex-start', text: r.admin?.handled ? 'handled' : r.kind }),
+      el('div', { style: 'min-width:0' }, el('div', { style: r.admin?.handled ? 'color:var(--muted)' : 'font-weight:600', text: whatOf(r).slice(0, 120) }), el('div', { class: 'muted', style: 'font-size:13px', text: `${r.appVersion || '?'} · ${ago(r.receivedAt)}` }))))) : el('p', { class: 'muted', text: 'No reports yet.' }));
+  }
+  async function loadReports() {
+    const d = await (await api('/reports?limit=200')).json();
+    state.reports = d.reports || []; state.total = d.total || 0;
+    fillSelect('f-kind', [...new Set(state.reports.map((r) => r.kind).filter(Boolean))].sort(), 'All kinds');
+    fillSelect('f-version', [...new Set(state.reports.map((r) => r.appVersion).filter(Boolean))].sort().reverse(), 'All versions');
+    drawReports(); countOpen();
+    const by = new Map();
+    for (const r of state.reports) by.set(r.appVersion || '?', (by.get(r.appVersion || '?') || 0) + 1);
+    put('report-versions', table([{ label: 'Version' }, { label: 'Reports', num: true }], [...by].sort((a, b) => b[1] - a[1]).map(([v, n]) => [v, fmt(n)])));
+    if (state.selected) select(state.selected);
+  }
+
+  // ── overview: counters and caps ──
+  async function loadOverview() {
+    const o = await (await api('/overview')).json(); state.overview = o;
+    sys('reportsToday', 'Reports today', `${fmt(o.today.reports)} (cap ${fmt(o.caps.reportsPerDay)})`);
+    sys('mail', 'Alert emails', o.mailOn ? `${fmt(o.today.mails)} of ${fmt(o.caps.mailPerDay)} today` : 'off');
+    need('mail', o.today.mails >= o.caps.mailPerDay * 0.8 ? { mark: '!', title: 'Alert emails are close to today\'s cap', text: `${fmt(o.today.mails)} of ${fmt(o.caps.mailPerDay)} sent. Past the cap, new reports still arrive here but no longer by email.`, action: 'See the limits', tab: 'system' } : null);
+    const meter = (n, cap) => el('div', { class: 'meter' }, el('span', { style: `width:${Math.min(100, (n / Math.max(1, cap)) * 100)}%` }));
+    put('caps', el('div', {},
+      el('div', { text: `Alert emails today: ${fmt(o.today.mails)} of ${fmt(o.caps.mailPerDay)}` }), meter(o.today.mails, o.caps.mailPerDay),
+      el('div', { style: 'margin-top:8px', text: `Alert emails this hour: ${fmt(o.today.mailsThisHour)} of ${fmt(o.caps.mailPerHour)}` }), meter(o.today.mailsThisHour, o.caps.mailPerHour),
+      el('div', { style: 'margin-top:8px', text: `Reports stored today: ${fmt(o.today.reports)} of ${fmt(o.caps.reportsPerDay)}` }), meter(o.today.reports, o.caps.reportsPerDay)));
+    const days = [...o.days].reverse();
+    put('report-days', el('div', {}, el('div', { class: 'muted', text: 'Reports per day, last 14 days' }), bars(days.map((d) => d.reports), days.map((d) => d.day.slice(5)))));
+  }
+
+  // ── Cloudflare: traffic and security ──
+  const section = (name) => state.cf?.sections?.[name];
+  function drawSection(name, id, draw, empty) {
+    const s = section(name);
+    if (!s) return fail(id, 'Not loaded.');
+    if (s.error) return fail(id, `Cloudflare did not answer this one: ${s.error}`);
+    if (!s.rows.length) return fail(id, empty || 'Nothing in this period.');
+    try { put(id, draw(s.rows)); } catch (e) { fail(id, `Could not draw this (${e.message}).`); }
+  }
+  async function loadCloudflare() {
+    try { state.cf = await (await api(`/cloudflare?days=${encodeURIComponent(state.days)}`)).json(); $('cf-setup').hidden = true; need('cloudflare', null); } catch (e) {
+      state.cf = null;
+      const box = $('cf-setup'); box.hidden = false;
+      box.textContent = e.status === 503
+        ? 'Cloudflare\'s traffic and security numbers are not connected yet. They need a read-only analytics token (the CF_ANALYTICS_TOKEN secret) and the zone id (CF_ZONE_ID).'
+        : `Could not load Cloudflare's numbers (${e.message}).`;
+      need('cloudflare', { info: true, mark: 'i', title: 'Cloudflare\'s numbers are not loading', text: box.textContent, action: 'Open traffic', tab: 'traffic' });
+      for (const id of ['ov-requests', 'cf-upstream', 'cf-traffic', 'cf-visitors', 'cf-sec-action', 'cf-sec-path', 'cf-sec-country', 'cf-sec-agent', 'cf-status', 'cf-paths', 'cf-versions', 'cf-404', 'cf-429', 'cf-5xx', 'cf-rules']) fail(id, 'Not connected.');
+      return;
+    }
+    {
+      // what the chosen period really covers: Cloudflare keeps each kind of number for a different time
+      const w = state.cf.windows || { asked: 1, trafficDays: 14, requestDays: 1, securityDays: 1 };
+      const span = (d) => (d === 1 ? 'the last 24 hours' : `the last ${d} days`);
+      const notes = [`Per-day charts: ${w.trafficDays} days.`, `Responses and paths: ${span(w.requestDays)}${w.asked > w.requestDays ? ' (Cloudflare keeps 30)' : ''}.`, `Security events: ${span(w.securityDays)}${w.asked > w.securityDays ? ' (Cloudflare keeps 3)' : ''}.`];
+      for (const n of document.querySelectorAll('.cf-window')) n.textContent = notes.join(' ');
+    }
+    drawSection('traffic', 'cf-traffic', (rows) => {
+      const total = rows.reduce((a, r) => a + r.sum.requests, 0); const cached = rows.reduce((a, r) => a + r.sum.cachedRequests, 0);
+      const last = rows[rows.length - 1];
+      // (the newest whole day: today's row is still filling)
+      const day = rows.length > 1 ? rows[rows.length - 2] : last; const before = rows.length > 2 ? rows[rows.length - 3] : null;
+      const recent = rows.slice(-14);
+      const change = before && before.uniq.uniques ? Math.round(((day.uniq.uniques - before.uniq.uniques) / before.uniq.uniques) * 100) : null;
+      tile('visitors', fmt(day.uniq.uniques), `visitors on ${day.dimensions.date.slice(5)}`, `${fmt(day.sum.requests)} requests${change === null ? '' : ` · ${change >= 0 ? 'up' : 'down'} ${Math.abs(change)}% on the day before`}`);
+      $('ov-requests-sub').textContent = `${fmt(recent.reduce((a, r) => a + r.sum.requests, 0))} requests in ${recent.length} days. The last bar is today so far.`;
+      put('ov-requests', bars(recent.map((r) => r.sum.requests), recent.map((r) => r.dimensions.date.slice(5))));
+      $('cf-traffic-sub').textContent = `${fmt(total)} requests in ${rows.length} days; ${Math.round((cached / Math.max(1, total)) * 100)}% served from Cloudflare's cache.`;
+      return el('div', { id: 'cf-traffic-chart' });
+    });
+    if (section('traffic')?.rows?.length) {
+      const rows = section('traffic').rows;
+      dayChart('cf-traffic-chart', rows, {
+        metrics: [
+          { key: 'requests', label: 'Requests', value: (r) => r.sum.requests, format: fmt, color: 'var(--brand)' },
+          { key: 'cached', label: 'Requests from cache', value: (r) => r.sum.cachedRequests, format: fmt, color: 'var(--good)' },
+          { key: 'data', label: 'Data served', value: (r) => r.sum.bytes, format: bytes, color: 'var(--warn)' },
+          { key: 'threats', label: 'Threats stopped', value: (r) => r.sum.threats, format: fmt, color: 'var(--bad)' },
+        ],
+        tip: dayTip, insight: dayInsight,
+        table: () => ({ heads: ['Day', 'Requests', 'From cache', 'Data', 'Threats'], cells: (r) => [r.dimensions.date, fmt(r.sum.requests), `${pct(r.sum.cachedRequests, r.sum.requests)}%`, bytes(r.sum.bytes), fmt(r.sum.threats)] }),
+      });
+    }
+    drawSection('traffic', 'cf-visitors', () => el('div', { id: 'cf-visitors-chart' }));
+    if (section('traffic')?.rows?.length) {
+      dayChart('cf-visitors-chart', section('traffic').rows, {
+        metrics: [
+          { key: 'visitors', label: 'Visitors', value: (r) => r.uniq.uniques, format: fmt, color: 'var(--info)' },
+          { key: 'pages', label: 'Pages viewed', value: (r) => r.sum.pageViews, format: fmt, color: 'var(--brand)' },
+          { key: 'perVisitor', label: 'Requests per visitor', value: (r) => Math.round(r.sum.requests / Math.max(1, r.uniq.uniques)), format: fmt, color: 'var(--warn)' },
+        ],
+        tip: dayTip, insight: dayInsight,
+        table: () => ({ heads: ['Day', 'Visitors', 'Pages viewed', 'Requests each'], cells: (r) => [r.dimensions.date, fmt(r.uniq.uniques), fmt(r.sum.pageViews), fmt(Math.round(r.sum.requests / Math.max(1, r.uniq.uniques)))] }),
+      });
+    }
+    drawSection('securityByAction', 'cf-sec-action', (rows) => {
+      const stopped = rows.filter((r) => /challenge|block/.test(r.dimensions.action)).reduce((a, r) => a + r.count, 0);
+      const blocked = rows.filter((r) => r.dimensions.action === 'block').reduce((a, r) => a + r.count, 0);
+      const sd = state.cf.windows?.securityDays || 1;
+      tile('security', fmt(stopped), `challenged or blocked, ${sd === 1 ? '24 hours' : `${sd} days`}`, `${fmt(blocked)} blocked outright`);
+      return table([{ label: 'Action' }, { label: 'By' }, { label: 'Events', num: true }], rows.map((r) => [r.dimensions.action, r.dimensions.source, fmt(r.count)]));
+    }, 'No security events in this period.');
+    drawSection('securityByPath', 'cf-sec-path', (rows) => table([{ label: 'Path', mono: true }, { label: 'Action' }, { label: 'Events', num: true }], rows.map((r) => [r.dimensions.clientRequestPath, r.dimensions.action, fmt(r.count)])), 'No security events in this period.');
+    drawSection('securityByCountry', 'cf-sec-country', (rows) => table([{ label: 'Country' }, { label: 'Events', num: true }], rows.map((r) => [r.dimensions.clientCountryName, fmt(r.count)])), 'No security events in this period.');
+    drawSection('securityByAgent', 'cf-sec-agent', (rows) => table([{ label: 'User agent', mono: true }, { label: 'Action' }, { label: 'Events', num: true }], rows.map((r) => [String(r.dimensions.userAgent || '(none)').slice(0, 110), r.dimensions.action, fmt(r.count)])), 'No security events in this period.');
+    drawSection('statusCodes', 'cf-status', (rows) => table([{ label: 'Status' }, { label: 'Requests', num: true }], rows.map((r) => [r.dimensions.edgeResponseStatus, fmt(r.count)])));
+    drawSection('topPaths', 'cf-paths', (rows) => table([{ label: 'Path', mono: true }, { label: 'Requests', num: true }], rows.map((r) => [String(r.dimensions.clientRequestPath).slice(0, 90), fmt(r.count)])));
+    // (a path's part of the site: its first two segments, tiles and the like counted together)
+    const part = (path) => String(path).split('/').slice(0, 3).join('/') || '/';
+    const byPart = (rows) => { const m = new Map(); for (const r of rows) m.set(part(r.dimensions.clientRequestPath), (m.get(part(r.dimensions.clientRequestPath)) || 0) + r.count); return [...m].sort((a, b) => b[1] - a[1]); };
+    const pathTables = (rows) => el('div', {},
+      table([{ label: 'Part of the site', mono: true }, { label: 'Among the top paths', num: true }], byPart(rows).map(([k, n]) => [k, fmt(n)])),
+      el('div', { style: 'margin-top:10px' }, table([{ label: 'Path', mono: true }, { label: 'Requests', num: true }], rows.slice(0, 8).map((r) => [String(r.dimensions.clientRequestPath).slice(0, 80), fmt(r.count)]))));
+    drawSection('upstream', 'cf-upstream', (rows) => {
+      const by = new Map();
+      for (const r of rows) { const h = r.dimensions.clientRequestHTTPHost; const e = by.get(h) || { total: 0, bad: 0 }; e.total += r.count; if (r.dimensions.edgeResponseStatus >= 400) e.bad += r.count; by.set(h, e); }
+      return table([{ label: 'Server', mono: true }, { label: 'Requests', num: true }, { label: 'Refused or failed', num: true }], [...by].sort((a, b) => b[1].total - a[1].total).map(([h, e]) => [h, fmt(e.total), e.bad ? `${fmt(e.bad)} (${Math.round((e.bad / e.total) * 100)}%)` : '0']));
+    }, 'None in this period.');
+    drawSection('notFoundPaths', 'cf-404', pathTables, 'No 404 answers in this period.');
+    {
+      const worst = (section('notFoundPaths')?.rows || [])[0];
+      need('retry', worst && worst.count >= 500 ? { info: true, mark: '!', title: `One missing address was asked for ${fmt(worst.count)} times`, text: `${String(worst.dimensions.clientRequestPath).slice(0, 80)} answered "not found" every time: something is retrying it.`, action: 'See the 404s', tab: 'traffic' } : null);
+      const down = (section('serverErrorPaths')?.rows || []).reduce((a, r) => a + r.count, 0);
+      need('servers', down >= 1000 ? { info: true, mark: '!', title: `${fmt(down)} requests failed behind the site`, text: 'Mostly the public map servers not answering. People get the backup map data when that happens.', action: 'See the errors', tab: 'traffic' } : null);
+    }
+    drawSection('limitedPaths', 'cf-429', pathTables, 'No 429 answers in this period.');
+    drawSection('serverErrorPaths', 'cf-5xx', (rows) => table([{ label: 'Path', mono: true }, { label: 'Status' }, { label: 'Requests', num: true }], rows.map((r) => [String(r.dimensions.clientRequestPath).slice(0, 70), r.dimensions.edgeResponseStatus, fmt(r.count)])), 'None in this period.');
+    const rules = state.cf.rules;
+    if (!rules || rules.error) fail('cf-rules', `Cloudflare did not list the rules${rules?.error ? `: ${rules.error}` : '.'}`);
+    else {
+      const off = rules.rows.filter((r) => !r.enabled);
+      sys('rules', 'Security rules', `${rules.rows.length - off.length} of ${rules.rows.length} on`);
+      need('rules', off.length ? { mark: '!', title: `${off.length} security rule${off.length === 1 ? ' is' : 's are'} switched off`, text: `${off.map((r) => r.name).join(', ')}. If that was not on purpose, switch it back on in Cloudflare (the desktop app's rule keeps apps from being challenged).`, action: 'Open security', tab: 'security' } : null);
+      put('cf-rules', table([{ label: 'Rule' }, { label: 'Action' }, { label: 'State' }], rules.rows.map((r) => [r.name, r.action, el('span', { class: `pill ${r.enabled ? 'ok' : 'crash'}`, text: r.enabled ? 'on' : 'OFF' })]), { empty: 'No custom rules.' }));
+    }
+    drawSection('appVersions', 'cf-versions', (rows) => {
+      const by = new Map();
+      for (const r of rows) { const v = (/MapNG-Desktop\/([0-9][^\s;)]*)/.exec(r.dimensions.userAgent) || [])[1] || r.dimensions.userAgent; by.set(v, (by.get(v) || 0) + r.count); }
+      const total = [...by.values()].reduce((a, b) => a + b, 0);
+      return table([{ label: 'Version' }, { label: 'Requests', num: true }, { label: 'Share', num: true }], [...by].sort((a, b) => b[1] - a[1]).map(([v, n]) => [v, fmt(n), `${Math.round((n / Math.max(1, total)) * 100)}%`]));
+    }, 'No desktop app requests seen in the last 7 days.');
+  }
+
+  // ── GitHub: releases and branches (public API, asked from this browser) ──
+  async function loadGitHub() {
+    try {
+      const rel = await getJson(`https://api.github.com/repos/${REPO}/releases?per_page=12`);
+      const rows = rel.map((r) => {
+        const sum = (re) => r.assets.filter((a) => re.test(a.name)).reduce((n, a) => n + a.download_count, 0);
+        return { tag: r.tag_name, day: (r.published_at || '').slice(0, 10), draft: r.draft, win: sum(/Setup.*\.exe$/i), zip: sum(/portable\.zip$/i), linux: sum(/\.AppImage$/i), checks: sum(/^latest.*\.yml$/i) };
+      });
+      const total = rows.reduce((n, r) => n + r.win + r.zip + r.linux, 0);
+      const latest = rows.find((r) => !r.draft);
+      if (latest) tile('latest', fmt(latest.win + latest.zip + latest.linux), `downloads of ${latest.tag}`, `${fmt(total)} across the last ${rows.length} releases`);
+      put('gh-releases', table([{ label: 'Release' }, { label: 'Published' }, { label: 'Windows installer', num: true }, { label: 'Portable', num: true }, { label: 'Linux', num: true }, { label: 'Update checks', num: true }],
+        rows.map((r) => [r.draft ? `${r.tag} (draft)` : r.tag, r.day, fmt(r.win), fmt(r.zip), fmt(r.linux), fmt(r.checks)])));
+    } catch (e) { fail('gh-releases', `GitHub did not answer (${e.message}). It allows 60 questions an hour from one address.`); }
+    try {
+      const repo = await getJson(`https://api.github.com/repos/${REPO}`);
+      put('gh-repo', el('p', {}, `${fmt(repo.stargazers_count)} stars, ${fmt(repo.forks_count)} forks, ${fmt(repo.subscribers_count)} watching. Last push ${ago(repo.pushed_at)}.`));
+      const issues = await getJson(`https://api.github.com/repos/${REPO}/issues?state=open&per_page=20`);
+      put('gh-issues', table([{ label: 'Open' }, { label: 'Title' }, { label: 'Opened' }, { label: 'Comments', num: true }],
+        issues.map((i) => [el('a', { href: i.html_url, target: '_blank', rel: 'noopener noreferrer', text: `${i.pull_request ? 'PR' : 'Issue'} #${i.number}` }), String(i.title).slice(0, 90), ago(i.created_at), fmt(i.comments)]), { empty: 'No open issues or pull requests.' }));
+    } catch (e) { fail('gh-repo', `GitHub did not answer (${e.message}).`); }
+    try {
+      const rows = []; const failedBuilds = [];
+      for (const branch of ['main', 'dev']) {
+        const c = await getJson(`https://api.github.com/repos/${REPO}/commits/${branch}`);
+        let checks = '';
+        try {
+          const cr = await getJson(`https://api.github.com/repos/${REPO}/commits/${c.sha}/check-runs`);
+          checks = cr.check_runs.map((x) => `${x.name.replace('Workers Builds: ', '')}: ${x.status === 'completed' ? x.conclusion : x.status}`).join(', ');
+        } catch { checks = '(checks not available)'; }
+        rows.push([branch, c.sha.slice(0, 7), c.commit.message.split('\n')[0].slice(0, 90), ago(c.commit.committer.date), checks]);
+        sys(branch, branch, `${c.sha.slice(0, 7)} · ${checks.includes('failure') ? 'a build FAILED' : checks.includes('in_progress') || checks.includes('queued') ? 'building' : 'built'} · ${ago(c.commit.committer.date)}`);
+        if (checks.includes('failure')) failedBuilds.push(branch);
+      }
+      need('builds', failedBuilds.length ? { mark: '!', title: `The build of ${failedBuilds.join(' and ')} failed`, text: 'The site keeps serving the last build that worked until this is fixed.', action: 'Open builds', tab: 'system' } : null);
+      put('gh-branches', table([{ label: 'Branch' }, { label: 'Commit', mono: true }, { label: 'Message' }, { label: 'When' }, { label: 'Builds' }], rows));
+    } catch (e) { fail('gh-branches', `GitHub did not answer (${e.message}).`); }
+  }
+
+  // ── the site's own public numbers ──
+  async function loadUsage() {
+    try {
+      const h = await getJson('/api/hotspots');
+      const cells = h.cells || [];
+      const exports = (h.totals?.web || 0) + (h.totals?.desktop || 0);
+      put('hot-summary', el('p', {}, `${fmt(exports)} exports in ${fmt(cells.length)} cells: ${fmt(h.totals?.web || 0)} from the website, ${fmt(h.totals?.desktop || 0)} from the desktop app.`));
+      const top = [...cells].sort((a, b) => (b[2] + b[3]) - (a[2] + a[3])).slice(0, 15);
+      put('hot-top', table([{ label: 'Cell centre', mono: true }, { label: 'Web', num: true }, { label: 'Desktop', num: true }, { label: 'Last day' }], top.map(([y, x, web, desktop, last]) => {
+        const lat = -90 + (y + 0.5) * 0.05; const lng = -180 + (x + 0.5) * 0.05;
+        return [el('a', { href: `https://www.openstreetmap.org/#map=11/${lat.toFixed(3)}/${lng.toFixed(3)}`, target: '_blank', rel: 'noopener noreferrer', text: `${lat.toFixed(2)}, ${lng.toFixed(2)}` }), fmt(web), fmt(desktop), String(last ?? '')];
+      })));
+    } catch (e) { fail('hot-top', `Could not load the hotspots (${e.message}).`); }
+    try {
+      const u = await getJson('/api/usage');
+      const rows = u.rows || []; const totals = new Map();
+      for (const [setting, , count] of rows) totals.set(setting, (totals.get(setting) || 0) + count);
+      $('usage-sub').textContent = `Opt-in counts from ${fmt(u.exports)} exports, no locations.`;
+      const draw = () => {
+        const q = $('usage-filter').value.trim().toLowerCase();
+        const list = rows.filter(([s, v]) => !q || `${s} ${v}`.toLowerCase().includes(q)).sort((a, b) => (a[0] === b[0] ? b[2] - a[2] : a[0] < b[0] ? -1 : 1));
+        put('usage-rows', table([{ label: 'Setting' }, { label: 'Value' }, { label: 'Exports', num: true }, { label: 'Share', num: true }], list.map(([s, v, n]) => [s, String(v), fmt(n), `${Math.round((n / Math.max(1, totals.get(s))) * 100)}%`])));
+      };
+      $('usage-filter').oninput = draw; draw();
+    } catch (e) { fail('usage-rows', `Could not load the settings counts (${e.message}).`); }
+  }
+  async function loadPlanet() {
+    try {
+      const p = await getJson('/api/osm-tiles/progress');
+      const built = p.blocks.filter((b) => b[3] === 'b').length; const real = p.blocks.filter((b) => b[3] !== 'e').length;
+      const up = p.upload;
+      const sent = up ? up.groups.filter((g) => g[2] === 'u').length : 0;
+      tile('planet', up ? `${fmt(sent)} / ${fmt(up.groups.length)}` : (p.phase === 'done' ? 'Built' : p.phase), up ? 'planet archives uploaded' : 'planet build', up ? `${gb(up.done_mb)} of ${gb(up.total_mb)}` : `${fmt(built)} of ${fmt(real)} blocks`);
+      sys('planet', 'Planet', up ? `built · upload ${fmt(sent)} of ${fmt(up.groups.length)} archives` : `${p.phase}, ${fmt(built)} of ${fmt(real)} blocks`);
+      put('planet', el('div', {},
+        el('div', { text: `Build: ${p.phase === 'done' ? 'done' : p.phase}, ${fmt(built)} of ${fmt(real)} blocks, ${gb(p.done_mb)} of ${gb(p.total_mb)} of source data.` }),
+        el('div', { class: 'meter' }, el('span', { style: `width:${Math.min(100, (p.done_mb / Math.max(1, p.total_mb)) * 100)}%` })),
+        up ? el('div', { style: 'margin-top:10px', text: `Upload: ${fmt(sent)} of ${fmt(up.groups.length)} archives, ${gb(up.done_mb)} of ${gb(up.total_mb)}.` }) : el('div', { style: 'margin-top:10px', class: 'muted', text: 'No upload reported.' }),
+        up ? el('div', { class: 'meter' }, el('span', { style: `width:${Math.min(100, (up.done_mb / Math.max(1, up.total_mb)) * 100)}%;background:var(--info)` })) : null,
+        el('div', { class: 'muted', style: 'margin-top:8px', text: `Last report ${ago(p.updated)}.` })));
+    } catch (e) { fail('planet', `Could not load the planet progress (${e.message}).`); }
+  }
+
+  // ── tabs, refresh, start ──
+  $('tabs').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-tab]'); if (!b) return;
+    for (const t of $('tabs').querySelectorAll('button')) t.setAttribute('aria-selected', String(t === b));
+    for (const p of document.querySelectorAll('[data-panel]')) p.hidden = p.dataset.panel !== b.dataset.tab;
+    $('page-title').textContent = TITLES[b.dataset.tab] || '';
+    try { localStorage.setItem('mapng_admin_tab', b.dataset.tab); } catch { /* fine without */ }
+  });
+  document.addEventListener('click', (e) => { const g = e.target.closest('button[data-goto]'); if (g) goTo(g.dataset.goto); });
+  for (const id of ['f-text', 'f-kind', 'f-version', 'f-state', 'f-group']) $(id).addEventListener('input', drawReports);
+
+  async function refresh() {
+    $('updated').textContent = 'Loading…';
+    const jobs = [loadReports(), loadOverview(), loadCloudflare(), loadGitHub(), loadUsage(), loadPlanet()];
+    const results = await Promise.allSettled(jobs);
+    const failed = results.filter((r) => r.status === 'rejected').length;
+    $('updated').textContent = `Updated ${new Date().toLocaleTimeString()}${failed ? ` · ${failed} part(s) did not load` : ''}`;
+  }
+  $('refresh').addEventListener('click', refresh);
+  // (one period for the Traffic and Security pages: both selectors show it)
+  try { const d = Number(localStorage.getItem('mapng_admin_days')); if ([1, 7, 30, 90, 365].includes(d)) state.days = d; } catch { /* fine without */ }
+  for (const sel of document.querySelectorAll('.cf-range')) {
+    sel.value = String(state.days);
+    sel.addEventListener('change', async () => {
+      state.days = Number(sel.value) || 1;
+      for (const other of document.querySelectorAll('.cf-range')) other.value = sel.value;
+      try { localStorage.setItem('mapng_admin_days', String(state.days)); } catch { /* fine without */ }
+      for (const n of document.querySelectorAll('.cf-window')) n.textContent = 'Loading…';
+      await loadCloudflare();
+    });
+  }
+
+  (async () => {
+    const gate = $('gate');
+    try {
+      const me = await (await api('/me')).json();
+      $('who').textContent = `Signed in as ${me.email}`;
+      drawAttention();
+      $('app').hidden = false;
+      try { const t = localStorage.getItem('mapng_admin_tab'); const b = t && $('tabs').querySelector(`button[data-tab="${CSS.escape(t)}"]`); if (b) b.click(); } catch { /* fine without */ }
+      await refresh();
+    } catch (e) {
+      gate.hidden = false;
+      gate.textContent = e.status === 503
+        ? 'The dashboard is not set up on this site yet: it needs the Cloudflare Access application and its settings (ACCESS_TEAM_DOMAIN, ACCESS_AUD) and the owner\'s address.'
+        : e.status === 401
+          ? 'You are not signed in. This page works only behind Cloudflare Access, for the developer.'
+          : `Could not reach the dashboard (${e.message}).`;
+    }
+  })();
+})();

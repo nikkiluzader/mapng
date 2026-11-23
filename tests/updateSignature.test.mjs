@@ -63,3 +63,17 @@ test('the app ships with a key, and everything the main process imports is packa
   }
   for (const f of seen) assert.ok(packaged.has(f), `${f} is imported by the main process but not in electron-builder.yml files: the packaged app would not start`);
 });
+
+test('a test build is refused where test builds are off, however well it is signed', async () => {
+  const text = yml('0.3.6-dev.2');
+  const good = { 'latest.yml': text, 'latest.yml.sig': sign(text) };
+  const i = info('0.3.6-dev.2');
+  assert.deepEqual(await verifyUpdate(i, release(good), { platform: 'win32', keys }), { ok: true });
+  assert.deepEqual(await verifyUpdate(i, release(good), { platform: 'win32', keys, allowTestBuilds: true }), { ok: true });
+  const off = await verifyUpdate(i, release(good), { platform: 'win32', keys, allowTestBuilds: false });
+  assert.equal(off.ok, false);
+  assert.match(off.why, /test build/);
+  // (a finished release is taken either way)
+  const rel = { 'latest.yml': yml(), 'latest.yml.sig': sign(yml()) };
+  assert.deepEqual(await verifyUpdate(info(), release(rel), { platform: 'win32', keys, allowTestBuilds: false }), { ok: true });
+});

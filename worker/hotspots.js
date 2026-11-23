@@ -35,6 +35,22 @@ export class ExportHotspots {
       PRIMARY KEY (day, name))`);
     this.recent = new Map();   // address hash -> { hour, count }
     this.recentUsage = new Map();
+    this.senderBudgets = new Map();   // "name:sender hash" -> { day, count }: memory only, never stored
+  }
+
+  /** Take `n` from this sender's total for `name` today unless it is used up: true when taken (memory only). */
+  takeSenderBudget(name, sender, max, n = 1) {
+    if (typeof name !== 'string' || !/^[A-Za-z]{1,40}$/.test(name) || typeof sender !== 'string' || !/^[0-9a-f]{16}$/.test(sender) || !(max > 0) || !(n > 0)) return false;
+    const day = new Date().toISOString().slice(0, 10);
+    const key = `${name}:${sender}`;
+    const seen = this.senderBudgets.get(key);
+    const used = seen?.day === day ? seen.count : 0;
+    if (used >= max) return false;
+    this.senderBudgets.set(key, { day, count: used + n });
+    if (this.senderBudgets.size > 50000) for (const [k, v] of this.senderBudgets) if (v.day !== day) this.senderBudgets.delete(k);
+    // (still too many, all of today: the oldest go, an attacker's own entries among them at worst)
+    if (this.senderBudgets.size > 50000) { let drop = this.senderBudgets.size - 40000; for (const k of this.senderBudgets.keys()) { if (drop-- <= 0) break; this.senderBudgets.delete(k); } }
+    return true;
   }
 
   /** Add one export's settings to the totals. */
@@ -112,6 +128,10 @@ export class ExportHotspots {
     if (pathname === '/budget') {
       const { name, max, n } = await request.json();
       return Response.json({ ok: this.takeBudget(name, Number(max), Number(n) || 1) });
+    }
+    if (pathname === '/sender-budget') {
+      const { name, sender, max, n } = await request.json();
+      return Response.json({ ok: this.takeSenderBudget(name, sender, Number(max), Number(n) || 1) });
     }
     if (pathname === '/usage-report') {
       const { settings, sender } = await request.json();

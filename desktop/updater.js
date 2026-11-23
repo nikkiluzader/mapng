@@ -49,7 +49,12 @@ export function startUpdater({ settings, busy, ready = () => true }) {
   const testBuilds = () => settings.read().testBuilds === true;
   const onTestBuild = () => /-/.test(app.getVersion());
   let quiet = false;        // a first look that says nothing when it finds nothing (a second one follows)
-  let found = false;        // an update was offered by the check that is running
+  // What the look that is running found, once it has been checked: the library tells of an update while its
+  // check is still being awaited, and the signature check takes a moment longer, so the answer is a promise
+  // check() waits for. (A flag set after that wait was read too early: the second look below always ran, and
+  // the download then fetched what the second look found, not what was checked and offered.)
+  let verdict = null;       // Promise<{ ok, why? }> | null
+  let offered = null;       // the checked update the user was offered: the only one downloadUpdate() may fetch
 
   let manual = false;       // the user asked: tell them the outcome either way
   let state = 'idle';       // idle | checking | downloading | ready
@@ -88,19 +93,22 @@ export function startUpdater({ settings, busy, ready = () => true }) {
     else if (!(await consent())) return;
     manual = byUser;
     state = 'checking';
-    found = false;
     try {
       const tests = testBuilds();
       // On a test build, the finished release first: the library only looks among test builds from one
       // (0.3.1-dev.5 would never be offered 0.3.1), so the latest release is asked for by itself.
       if (tests && onTestBuild()) {
-        autoUpdater.allowPrerelease = false; quiet = true;
+        autoUpdater.allowPrerelease = false; quiet = true; verdict = null;
         try { await autoUpdater.checkForUpdates(); } catch { /* the look among test builds reports */ }
+        // (a checked update was found and is being offered: no second look, which would put another
+        // release in the place the download reads from)
+        const first = await verdict;
         quiet = false;
-        if (found) return;
+        if (first?.ok) return;
         state = 'checking';
       }
       autoUpdater.allowPrerelease = tests;
+      verdict = null;
       try {
         await autoUpdater.checkForUpdates();
       } catch (error) {
@@ -126,13 +134,15 @@ export function startUpdater({ settings, busy, ready = () => true }) {
   autoUpdater.on('update-available', async (info) => {
     // Is it MapNG's own? The release's signed list of files is checked before anything is offered
     // (desktop/updateSignature.js). One that fails is not offered and not downloaded.
-    const checked = await verifyUpdate(info, (url) => net.fetch(url, { redirect: 'follow' }));
+    // (a test build is only for an install that asked for test builds, whatever a release is marked as)
+    verdict = verifyUpdate(info, (url) => net.fetch(url, { redirect: 'follow' }), { allowTestBuilds: testBuilds() });
+    const checked = await verdict;
     if (!checked.ok) {
       state = 'idle';
       if (manual && !quiet) await ask({ type: 'warning', message: u().unverified, detail: `${fill(u().unverifiedDetail, { new: info.version })}\n\n(${checked.why})` });
       return;
     }
-    found = true;
+    offered = info;
     const s = settings.read();
     if (!manual && s.skipVersion === info.version) { state = 'idle'; return; }
     const notes = typeof info.releaseNotes === 'string'
@@ -152,6 +162,9 @@ export function startUpdater({ settings, busy, ready = () => true }) {
     if (portable) { state = 'idle'; shell.openExternal(/-/.test(String(info.version)) ? `https://github.com/nikkiluzader/mapng/releases/tag/v${info.version}` : 'https://github.com/nikkiluzader/mapng/releases/latest'); return; }
     state = 'downloading';
     try {
+      // (the download reads the library's last find: it must still be the update that was checked and offered)
+      const current = autoUpdater.updateInfoAndProvider?.info;
+      if (offered !== info || (current && current !== info)) throw new Error('another update was found since this one was checked; check for updates again');
       await autoUpdater.downloadUpdate();
     } catch (error) {
       state = 'idle';

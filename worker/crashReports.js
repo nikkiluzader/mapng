@@ -3,10 +3,12 @@
 // Stored privately in the R2 bucket under crash-reports/ (the bucket has no
 // public access and the tile route serves only osm/*.pmtiles); an email to
 // the developer when the CRASH_MAIL send_email binding is configured; read
-// back only with the CRASH_ADMIN_TOKEN secret (public/crash-reports.html).
+// back only through the dashboard (worker/admin.js, public/admin.html), which
+// sits behind the developer's own sign-in. (Until 2026-11 there was a second
+// way in, a page that took a long-lived token: gone, with its routes.)
 import { countReport } from './publicStats.js';
 import { hideSecretsInText } from '../services/personalKeys.js';
-import { DAILY, overBudget, overRate } from './limits.js';
+import { DAILY, DAILY_PER_SENDER, overBudget, overRate, overSenderBudget, readCapped } from './limits.js';
 
 const PREFIX = 'crash-reports/';
 const MAX_BODY_BYTES = 28 * 1024 * 1024;      // a report with its log, crash dump and a level's JSON report
@@ -135,16 +137,6 @@ async function notify(env, summary, viewerUrl) {
   }
 }
 
-const authorized = (request, env) => {
-  const token = env.CRASH_ADMIN_TOKEN;
-  if (!token) return false;
-  const given = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
-  if (given.length !== token.length) return false;
-  let diff = 0;
-  for (let i = 0; i < token.length; i++) diff |= given.charCodeAt(i) ^ token.charCodeAt(i);
-  return diff === 0;
-};
-
 /** The newest `limit` reports with their summaries: { total, reports: [{ key, ...summary }] } (newest days first). */
 export async function listReports(env, limit = 50) {
   const keys = [];
@@ -175,7 +167,7 @@ export async function reportFile(env, key) {
   return new Response(o.body, { headers: { 'Content-Type': o.httpMetadata?.contentType || 'application/octet-stream', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Content-Disposition': 'attachment' } });
 }
 
-/** POST /api/crash (a report), GET /api/crash/list and /api/crash/file (the developer, with the token). */
+/** POST /api/crash: a report. (Reading them back: /api/admin/reports, worker/admin.js.) */
 export async function handleCrashReports(request, env, ctx, url, json) {
   if (!env.OSM_TILES) return json({ error: 'Reports are not set up here' }, 503);
   const sub = url.pathname.slice('/api/crash'.length);
@@ -191,12 +183,13 @@ export async function handleCrashReports(request, env, ctx, url, json) {
     if (seen && seen.hour === hour && seen.count >= LIMIT_PER_HOUR) return json({ error: 'Too many reports' }, 429);
     recent.set(sender, { hour, count: seen?.hour === hour ? seen.count + 1 : 1 });
     if (recent.size > 5000) for (const [k, v] of recent) if (v.hour !== hour) recent.delete(k);
+    // (one sender's reports a day, so no single address can use up the day's places for everyone)
+    if (await overSenderBudget(env, 'reports', request, DAILY_PER_SENDER.reports)) return json({ error: 'Too many reports' }, 429);
     let body;
-    try {
-      const text = await request.text();
-      if (text.length > MAX_BODY_BYTES) return json({ error: 'Report too large' }, 413);
-      body = JSON.parse(text);
-    } catch { return json({ error: 'Bad request' }, 400); }
+    // (read in pieces and stopped at the limit: a body sent without a length is not taken in whole first)
+    const text = await readCapped(request, MAX_BODY_BYTES);
+    if (text == null) return json({ error: 'Report too large' }, 413);
+    try { body = JSON.parse(text); } catch { return json({ error: 'Bad request' }, 400); }
     if (!body || typeof body !== 'object' || !body.kind) return json({ error: 'Bad request' }, 400);
 
     const id = reportId();
@@ -232,19 +225,8 @@ export async function handleCrashReports(request, env, ctx, url, json) {
     await Promise.all(writes);
     // (the public stats page counts it: its kind, system and cause from fixed lists, nothing else)
     ctx.waitUntil(countReport(env, summary).catch(() => {}));
-    ctx.waitUntil(notify(env, summary, new URL(`/crash-reports.html#${id}`, url.origin).toString()));
+    ctx.waitUntil(notify(env, summary, new URL(`/admin.html#${id}`, url.origin).toString()));
     return json({ ok: true, id }, 200);
-  }
-
-  if (!authorized(request, env)) return json({ error: env.CRASH_ADMIN_TOKEN ? 'Unauthorized' : 'Report viewing is not set up' }, env.CRASH_ADMIN_TOKEN ? 401 : 503);
-
-  if (sub === '/list' && request.method === 'GET') {
-    const limit = Math.min(200, Math.max(1, Number(url.searchParams.get('limit')) || 50));
-    return json(await listReports(env, limit), 200, { 'Cache-Control': 'no-store' });
-  }
-
-  if (sub === '/file' && request.method === 'GET') {
-    return (await reportFile(env, url.searchParams.get('key') || '')) || json({ error: 'Not found' }, 404);
   }
 
   return json({ error: 'Not found' }, 404);

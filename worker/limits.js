@@ -10,6 +10,13 @@
 //    what stops a sender with thousands of addresses: writing to storage,
 //    sending mail and adding to the public counts all have a ceiling a day.
 //
+//  - overSenderBudget: a day's total for one sender, kept in the Durable
+//    Object's memory only (never written to its storage: nothing about who
+//    sent what is kept). The object is one for the whole site, so the count
+//    holds across every copy of the worker; it starts again when the object
+//    has been idle long enough to be put away, which a sender who keeps
+//    sending never lets happen.
+//
 // Where a binding is missing (tests, a local run), nothing is limited here:
 // each route keeps its own in-memory limit as well.
 
@@ -57,6 +64,51 @@ export async function overBudget(env, name, max, n = 1) {
     return ok === false;
   } catch { return false; }
 }
+
+/** A hash of the sender (the address, or an IPv6 /64) for a limit's key: never the address itself. */
+export async function senderHash(request, scope) {
+  const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`mapng-${scope}:${senderKey(request)}`));
+  return [...new Uint8Array(bytes).slice(0, 8)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** True when this sender's total for `name` today is used up; otherwise `n` is taken from it. */
+export async function overSenderBudget(env, name, request, max, n = 1) {
+  if (!env?.HOTSPOTS) return false;
+  try {
+    const stub = env.HOTSPOTS.get(env.HOTSPOTS.idFromName('global'));
+    const { ok } = await (await stub.fetch('https://hotspots/sender-budget', { method: 'POST', body: JSON.stringify({ name, sender: await senderHash(request, name), max, n }) })).json();
+    return ok === false;
+  } catch { return false; }
+}
+
+/**
+ * A request's body as text, read in pieces and given up on past `maxBytes` whatever the sender says its
+ * length is (a body sent in pieces names no length): the text, or null when it is too long or unreadable.
+ */
+export async function readCapped(request, maxBytes) {
+  try {
+    if (Number(request.headers.get('Content-Length') || 0) > maxBytes) return null;
+    const reader = request.body?.getReader();
+    if (!reader) return '';
+    const parts = []; let size = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > maxBytes) { try { await reader.cancel(); } catch { /* closed */ } return null; }
+      parts.push(value);
+    }
+    const all = new Uint8Array(size); let at = 0;
+    for (const p of parts) { all.set(p, at); at += p.byteLength; }
+    return new TextDecoder().decode(all);
+  } catch { return null; }
+}
+
+// One sender's totals a day (overSenderBudget). Far above what one person does.
+export const DAILY_PER_SENDER = {
+  reports: 20,               // problem reports from one address (a person sends one to three)
+  mapterhornTiles: 40000,    // elevation tiles one address has stored for good (ten 16 km maps)
+};
 
 // A day's totals, everyone together. Each is far above real use (noted beside it), so nobody
 // who uses MapNG meets one; a script that got past the per-sender limits stops here.

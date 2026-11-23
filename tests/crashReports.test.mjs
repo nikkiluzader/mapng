@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { handleCrashReports, reportSummary } from '../worker/crashReports.js';
+import { handleCrashReports, listReports, reportFile, reportSummary } from '../worker/crashReports.js';
+import { readCapped } from '../worker/limits.js';
 
 // an in-memory stand-in for the R2 bucket binding
 function fakeBucket() {
@@ -21,9 +22,9 @@ const ctx = { waitUntil: (p) => p };
 const call = (env, path, init = {}) => handleCrashReports(new Request(`https://mapng.com${path}`, init), env, ctx, new URL(`https://mapng.com${path}`), json);
 const post = (env, body, ip = '1.2.3.4') => call(env, '/api/crash', { method: 'POST', headers: { 'content-type': 'application/json', 'CF-Connecting-IP': ip }, body: JSON.stringify(body) });
 
-test('a report is stored privately with its log and dump, and read back only with the token', async () => {
+test('a report is stored privately with its log and dump, and read back only by the dashboard', async () => {
   const mails = [];
-  const env = { OSM_TILES: fakeBucket(), CRASH_ADMIN_TOKEN: 'secret-token', CRASH_MAIL: { send: async (m) => mails.push(m) }, CRASH_MAIL_TO: 'dev@example.com', CRASH_MAIL_FROM: 'reports@mapng.com' };
+  const env = { OSM_TILES: fakeBucket(), CRASH_MAIL: { send: async (m) => mails.push(m) }, CRASH_MAIL_TO: 'dev@example.com', CRASH_MAIL_FROM: 'reports@mapng.com' };
   const r = await post(env, { kind: 'export', appVersion: '0.2.4', error: 'out of memory', log: 'a\nb', minidump: Buffer.from('MDMP').toString('base64'), area: { lat: 1, lng: 2 } }, '9.9.9.1');
   const { id } = await r.json();
   assert.match(id, /^MR-[A-Z0-9]{6}$/);
@@ -39,21 +40,30 @@ test('a report is stored privately with its log and dump, and read back only wit
   assert.match(mails[0].subject, new RegExp(id));
   assert.equal(mails[0].to, 'dev@example.com');
 
-  assert.equal((await call(env, '/api/crash/list')).status, 401);
-  assert.equal((await call(env, '/api/crash/list', { headers: { Authorization: 'Bearer wrong-token!' } })).status, 401);
-  const list = await (await call(env, '/api/crash/list', { headers: { Authorization: 'Bearer secret-token' } })).json();
+  // (this route takes reports and gives none back: the old token routes are gone, whatever is sent with them)
+  env.CRASH_ADMIN_TOKEN = 'secret-token';
+  assert.equal((await call(env, '/api/crash/list')).status, 404);
+  assert.equal((await call(env, '/api/crash/list', { headers: { Authorization: 'Bearer secret-token' } })).status, 404);
+  assert.equal((await call(env, '/api/crash/file?key=x', { headers: { Authorization: 'Bearer secret-token' } })).status, 404);
+  const list = await listReports(env, 50);
   assert.equal(list.total, 1);
   assert.equal(list.reports[0].id, id);
   assert.equal(list.reports[0].hasDump, true);
-  const log = await call(env, `/api/crash/file?key=${encodeURIComponent(`${list.reports[0].key}log.txt`)}`, { headers: { Authorization: 'Bearer secret-token' } });
+  const log = await reportFile(env, `${list.reports[0].key}log.txt`);
   assert.equal(await log.text(), 'a\nb');
   // nothing outside crash-reports/ is readable through it
-  assert.equal((await call(env, '/api/crash/file?key=osm/manifest.json', { headers: { Authorization: 'Bearer secret-token' } })).status, 404);
+  assert.equal(await reportFile(env, 'osm/manifest.json'), null);
 });
 
-test('without a token secret nobody can read reports; bad input is refused', async () => {
+test('bad input is refused, and a body past the limit is not read to its end', async () => {
   const env = { OSM_TILES: fakeBucket() };
-  assert.equal((await call(env, '/api/crash/list', { headers: { Authorization: 'Bearer ' } })).status, 503);
+  // (a body sent in pieces, with no length named: given up on at the limit)
+  let pulled = 0;
+  const endless = new ReadableStream({ pull(c) { pulled++; c.enqueue(new Uint8Array(1024)); } });
+  assert.equal(await readCapped(new Request('https://mapng.com/api/crash', { method: 'POST', body: endless, duplex: 'half' }), 8 * 1024), null);
+  assert.ok(pulled < 64);
+  assert.equal(await readCapped(new Request('https://mapng.com/api/crash', { method: 'POST', body: 'abc' }), 8), 'abc');
+  assert.equal(await readCapped(new Request('https://mapng.com/api/crash', { method: 'POST', body: 'abcdefghi' }), 8), null);
   assert.equal((await call(env, '/api/crash')).status, 405);
   assert.equal((await call(env, '/api/crash', { method: 'POST', body: 'not json', headers: { 'CF-Connecting-IP': '9.9.9.2' } })).status, 400);
   assert.equal((await post(env, { appVersion: 'no kind' }, '9.9.9.2')).status, 400);
@@ -94,25 +104,25 @@ test('a report keeps a session code, and only a session code, in config', () => 
   assert.equal(reportSummary({ kind: 'export', config: long }, 'MR-AAAAAA', 't').config, long);
 });
 
-test('a level report keeps the level\'s export report as its own file, read back only with the token', async () => {
-  const env = { OSM_TILES: fakeBucket(), CRASH_ADMIN_TOKEN: 'secret-token' };
+test('a level report keeps the level\'s export report as its own file, read back only by the dashboard', async () => {
+  const env = { OSM_TILES: fakeBucket() };
   const r = await post(env, { kind: 'level', appVersion: '0.2.18', level: 'Aerotie', description: 'two bridges at different heights', exportReport: 'MapNG BeamNG Level Export Report\n- Bridge decks: 30' }, '7.7.7.7');
   const { id } = await r.json();
   const key = [...env.OSM_TILES.store.keys()].find((k) => k.endsWith('export_report.txt'));
   assert.ok(key && key.includes(id));
-  const list = await (await call(env, '/api/crash/list', { headers: { Authorization: 'Bearer secret-token' } })).json();
+  const list = await listReports(env, 50);
   assert.equal(list.reports[0].hasExportReport, true);
   assert.equal(list.reports[0].level, 'Aerotie');
   assert.equal(list.reports[0].exportReport, undefined);          // (the text is its own file, not in the summary)
-  assert.equal((await call(env, `/api/crash/file?key=${encodeURIComponent(key)}`)).status, 401);
-  const got = await call(env, `/api/crash/file?key=${encodeURIComponent(key)}`, { headers: { Authorization: 'Bearer secret-token' } });
+  assert.equal((await call(env, `/api/crash/file?key=${encodeURIComponent(key)}`)).status, 404);
+  const got = await reportFile(env, key);
   assert.match(await got.text(), /Bridge decks: 30/);
 });
 
 test('alert emails are capped an hour and a day whoever sends; reports are still stored', async () => {
   const { MAIL_PER_HOUR, MAIL_PER_DAY, mailAllowance } = await import('../worker/crashReports.js');
   const mails = [];
-  const env = { OSM_TILES: fakeBucket(), CRASH_ADMIN_TOKEN: 't', CRASH_MAIL: { send: async (m) => mails.push(m) }, CRASH_MAIL_TO: 'dev@example.com', CRASH_MAIL_FROM: 'reports@mapng.com' };
+  const env = { OSM_TILES: fakeBucket(), CRASH_MAIL: { send: async (m) => mails.push(m) }, CRASH_MAIL_TO: 'dev@example.com', CRASH_MAIL_FROM: 'reports@mapng.com' };
   // 30 reports within the hour, each from another address (the per-address limit does not help here)
   for (let i = 0; i < 30; i++) assert.equal((await post(env, { kind: 'manual', description: `spam ${i}` }, `10.0.${i}.1`)).status, 200);
   assert.equal(mails.length, MAIL_PER_HOUR);
@@ -121,7 +131,7 @@ test('alert emails are capped an hour and a day whoever sends; reports are still
   const stored = [...env.OSM_TILES.store.keys()].filter((k) => k.endsWith('report.json')).length;
   assert.equal(stored, 30);
   // the counters are not readable as report files, and not listed as reports
-  const list = await (await call(env, '/api/crash/list', { headers: { Authorization: 'Bearer t' } })).json();
+  const list = await listReports(env, 50);
   assert.equal(list.total, 30);
   // the day's cap, over the hours
   assert.deepEqual(mailAllowance({ mails: MAIL_PER_DAY, hours: {} }, '09'), { send: false, note: '' });
@@ -140,23 +150,23 @@ test('at most a set number of reports are stored a day in all', async () => {
 });
 
 // A level report also carries the level's JSON report (map data included), gzipped by the app, stored as its own file.
-test('a level report keeps its JSON report gzipped, read back only with the token; not gzip is dropped', async () => {
+test('a level report keeps its JSON report gzipped, read back only by the dashboard; not gzip is dropped', async () => {
   const zlib = await import('node:zlib');
-  const env = { OSM_TILES: fakeBucket(), CRASH_ADMIN_TOKEN: 'secret-token' };
+  const env = { OSM_TILES: fakeBucket() };
   const json = JSON.stringify({ format: 'mapng-export-report', mapData: { features: [{ id: '1' }] } });
   const r = await post(env, { kind: 'level', appVersion: '0.3.5', level: 'T', exportReport: '# r', exportReportJsonGz: zlib.gzipSync(json).toString('base64') }, '7.7.7.8');
   const { id } = await r.json();
   const key = [...env.OSM_TILES.store.keys()].find((k) => k.endsWith('export_report.json.gz'));
   assert.ok(key && key.includes(id));
-  const list = await (await call(env, '/api/crash/list', { headers: { Authorization: 'Bearer secret-token' } })).json();
+  const list = await listReports(env, 50);
   assert.equal(list.reports[0].hasExportJson, true);
   assert.equal(list.reports[0].exportReportJsonGz, undefined);
-  assert.equal((await call(env, `/api/crash/file?key=${encodeURIComponent(key)}`)).status, 401);
-  const got = await call(env, `/api/crash/file?key=${encodeURIComponent(key)}`, { headers: { Authorization: 'Bearer secret-token' } });
+  assert.equal((await call(env, `/api/crash/file?key=${encodeURIComponent(key)}`)).status, 404);
+  const got = await reportFile(env, key);
   assert.equal(got.status, 200);
   // (the fake bucket keeps bytes as a latin1 string: read them from it)
   assert.equal(zlib.gunzipSync(Buffer.from(env.OSM_TILES.store.get(key).value, 'latin1')).toString(), json);
-  const env2 = { OSM_TILES: fakeBucket(), CRASH_ADMIN_TOKEN: 'secret-token' };
+  const env2 = { OSM_TILES: fakeBucket() };
   await post(env2, { kind: 'level', appVersion: '0.3.5', level: 'T', exportReport: '# r', exportReportJsonGz: Buffer.from('not gzip').toString('base64') }, '7.7.7.9');
   assert.ok(![...env2.OSM_TILES.store.keys()].some((k) => k.endsWith('.gz')));
 });
