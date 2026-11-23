@@ -161,8 +161,13 @@ As of 2026-11-23:
 
 ## Now: the user's dev notes (docs/dev-notes.md, 2026-11-23)
 
-- **Progress windows cut text off.** Redesign them so every line of the verbose text shows on any screen size.
-  Status: not started. Where: StageLoader and the export / Generate progress cards.
+- **Progress windows cut text off.** Done on dev 2026-11-23 for the progress card both Generate and the export use
+  (`components/ui/StageLoader.vue`): the stage's name and every line wrap; all finished lines are kept in a list
+  that scrolls and stays on its newest line (it showed the last 4, each cut to one line); the card is up to 40rem
+  wide, never wider or taller than the window; the settings list is one column in a narrow window. Checked with
+  long lines at 1440, 800 and 420 px wide (`scratch/verify-pw/stage.html`, `stage_shots.mjs`): no element cut off.
+  Open: a look during a real export in the desktop app; the "export complete" window and the report dialog were
+  not part of this.
 - **The level's thumbnail is a MapNG logo and text,** no more satellite image. Done on dev 2026-11-23:
   `generatePreviewBlob` in `exportBeamNGLevel.js` draws a dark 1024 x 576 card (the logo, "MapNG", the level's own
   name, one line under it) in the app's display font; the desktop runner registers the same font file

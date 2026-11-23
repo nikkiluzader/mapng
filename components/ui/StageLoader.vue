@@ -2,8 +2,11 @@
   <!-- A progress card that feels like BeamNG.drive's level loading screen: a
        row of stage tiles (done and current filled orange, the rest outlined),
        one slanted bar that runs start to finish for each stage, the stage's
-       name in big italics, and the latest lines underneath. -->
-  <div class="stage-loader w-[min(30rem,calc(100vw-2rem))] rounded-2xl bg-white border border-gray-200 dark:bg-gray-950/95 dark:border-white/10 shadow-2xl p-6 text-left text-gray-900 dark:text-white">
+       name in big italics, and the lines underneath.
+       Nothing is cut off (user, 2026-11-23): the stage's name and every line wrap, whatever the window's width; the
+       finished lines are all kept in a list that scrolls and stays on its newest line; the card is as wide as the
+       window allows up to 40rem and never taller than the window (it scrolls inside). -->
+  <div class="stage-loader w-[min(40rem,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl bg-white border border-gray-200 dark:bg-gray-950/95 dark:border-white/10 shadow-2xl p-4 sm:p-6 text-left text-gray-900 dark:text-white">
     <div class="flex items-center justify-between gap-3 mb-4">
       <span class="font-display text-caption font-semibold uppercase tracking-[0.12em] text-gray-500 dark:text-white/50">{{ title }}</span>
       <span class="font-mono text-caption text-brand dark:text-brand-300 tabular-nums">{{ shownPct }}%</span>
@@ -30,19 +33,21 @@
     </div>
 
     <!-- Stage name -->
-    <div class="mt-3 h-11 flex items-center">
-      <!-- (line height with room for descenders: truncate clips the g, p, y otherwise) -->
-      <span class="text-[28px] leading-[1.3] pr-1 font-bold italic text-gray-800 dark:text-white/90 truncate">{{ activeStep?.label }}</span>
+    <div class="mt-3 min-h-11 flex items-center">
+      <!-- (smaller in a narrow window, and on two lines when it has to be) -->
+      <span class="text-[clamp(1.25rem,4.2vw,1.75rem)] leading-[1.3] pr-1 font-bold italic text-gray-800 dark:text-white/90 break-words min-w-0" data-testid="stage-name">{{ activeStep?.label }}</span>
     </div>
 
-    <!-- Latest lines: finished steps, then what is running now -->
-    <div class="mt-3 h-[88px] flex flex-col justify-end gap-0.5 overflow-hidden text-xs leading-snug">
-      <div v-for="(line, i) in doneLines" :key="i" class="flex justify-between gap-3 text-gray-400 dark:text-white/45">
-        <span class="min-w-0 flex-1 truncate" :title="tidy(line.step)">{{ tidy(line.step) }}</span>
+    <!-- The lines: every finished step (the list scrolls, newest at the bottom), then what is running now, whole -->
+    <div ref="linesBox" class="mt-3 h-[88px] sm:h-[104px] overflow-y-auto overscroll-contain pr-1 flex flex-col gap-0.5 text-xs leading-snug" data-testid="stage-lines" tabindex="0" :aria-label="title" @scroll="onLinesScroll">
+      <!-- (a short list sits at the bottom of the box, as the last lines always did) -->
+      <div class="mt-auto"></div>
+      <div v-for="(line, i) in doneLines" :key="i" class="flex items-start justify-between gap-3 text-gray-400 dark:text-white/45">
+        <span class="min-w-0 flex-1 break-words">{{ tidy(line.step) }}</span>
         <span class="font-mono shrink-0">{{ formatDuration(line.durationMs) }}</span>
       </div>
-      <div class="text-gray-700 dark:text-white/80 truncate" :title="tidy(status)">{{ tidy(status) }}</div>
     </div>
+    <div class="mt-1 min-h-[2.2em] text-xs leading-snug text-gray-700 dark:text-white/80 break-words" data-testid="stage-status" aria-live="polite">{{ tidy(status) }}</div>
 
     <!-- The settings this run uses (export): closed until opened -->
     <details v-if="settings?.length" class="stage-loader__settings mt-4 pt-3 border-t border-gray-200 dark:border-white/10" @toggle="settingsOpen = $event.target.open">
@@ -50,12 +55,12 @@
         <span>{{ settingsLabel }} ({{ settingCount }})</span>
         <ChevronRight :size="14" class="transition-transform" :class="settingsOpen ? 'rotate-90' : ''" />
       </summary>
-      <div class="mt-2 grid grid-cols-2 gap-x-4 max-h-60 overflow-y-auto pr-1">
+      <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4 max-h-60 overflow-y-auto pr-1">
         <div v-for="group in settings" :key="group.title" class="min-w-0">
           <div class="mt-2 mb-0.5 font-display text-nano font-semibold uppercase tracking-[0.14em] text-brand dark:text-brand-300">{{ group.title }}</div>
           <div v-for="row in group.rows" :key="row.label" class="flex justify-between gap-2 py-0.5 border-b border-dashed border-gray-200 dark:border-white/10 text-micro">
-            <span class="text-gray-500 dark:text-white/50 truncate" :title="row.label">{{ row.label }}</span>
-            <span class="text-right truncate" :class="row.off ? 'text-gray-400 dark:text-white/35' : 'text-gray-800 dark:text-white/85'" :title="row.value">{{ row.value }}</span>
+            <span class="min-w-0 text-gray-500 dark:text-white/50 break-words">{{ row.label }}</span>
+            <span class="min-w-0 text-right break-words" :class="row.off ? 'text-gray-400 dark:text-white/35' : 'text-gray-800 dark:text-white/85'">{{ row.value }}</span>
           </div>
         </div>
       </div>
@@ -76,7 +81,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import '@fontsource-variable/noto-sans/wght-italic.css';
 import { ChevronRight } from 'lucide-vue-next';
 import { useI18n } from 'vue-i18n';
@@ -113,7 +118,15 @@ const activeIndex = computed(() => {
   return i < 0 ? 0 : i;
 });
 const activeStep = computed(() => visibleSteps.value[activeIndex.value]);
-const doneLines = computed(() => props.done.slice(-4));
+// (every finished line of this run; a very long run keeps its last LINES_KEPT)
+const LINES_KEPT = 400;
+const doneLines = computed(() => props.done.slice(-LINES_KEPT));
+// the list stays on its newest line, unless the reader has scrolled up to read
+const linesBox = ref(null);
+let atBottom = true;
+const onLinesScroll = () => { const el = linesBox.value; if (el) atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 8; };
+const stick = () => { const el = linesBox.value; if (el && atBottom) el.scrollTop = el.scrollHeight; };
+watch(() => props.done.length, () => nextTick(stick), { flush: 'post' });
 const settingsOpen = ref(false);
 const settingCount = computed(() => props.settings.reduce((n, g) => n + (g.rows?.length || 0), 0));
 
@@ -168,7 +181,8 @@ const animate = () => {
   shownStage.value = Math.max(shownStage.value, shownStage.value + (targetStage - shownStage.value) * k);
   frame = requestAnimationFrame(animate);
 };
-onMounted(() => { frame = requestAnimationFrame(animate); });
+// (and again once the fonts are in: the lines wrap differently in them)
+onMounted(() => { frame = requestAnimationFrame(animate); stick(); globalThis.document?.fonts?.ready?.then(() => nextTick(stick)).catch(() => {}); });
 onBeforeUnmount(() => cancelAnimationFrame(frame));
 // (a report jumps the targets at once; the frame loop eases toward them)
 watch(() => [props.activeStage, props.activeFraction, props.pct, props.finished], recompute);
