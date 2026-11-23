@@ -1,6 +1,6 @@
 # MapNG open items
 
-Last reviewed: 2026-11-23, evening (dev 28c4af8: the 0.3.6 fixes; main still at 0340d20, waiting on the user's word)
+Last reviewed: 2026-11-23, evening (main = dev at b9f6667, pushed on the user's word)
 
 The short "now" board: current work, what waits on someone, and checks owed on shipped work. The other tracking
 files: `refs/output/backlog.md` holds everything wanted later, by area; `refs/output/releases.md` what shipped;
@@ -38,15 +38,15 @@ Waiting on the user: the three lines to remove from mapng.env, a second update k
 
 As of 2026-11-23:
 
-- `dev` is at 28c4af8, `main` at 0340d20 (the security pass and last week's features, pushed 2026-11-23). Not on
-  main yet, all from 2026-11-23: the exact map frame and the Mapterhorn half pixel, the footprint clipper, the seam
+- `main` = `dev` at b9f6667 (pushed 2026-11-23 evening on the user's word: "go ahead and get main up to date").
+  On mapng.com with it, all from 2026-11-23: the exact map frame and the Mapterhorn half pixel, the footprint clipper, the seam
   work (roads rejoined by height, a chunk starting on its neighbours' ground, the neighbours' road heights as fixed
   conditions), road mode's roads-only reads and handles, share codes, the chunked export's hardening, the Reset
   button, the one workflow (tabs gone), the level's thumbnail card, the tiles' anchor, the progress card, the 0.3.6
   page draft. Checked on dev: 1,473 unit tests; the smoke matrix on 9c4df69 (135 cells identical to the
   security-pass sweep) and 18 cells of two tunnel areas again on the seam work (identical); the browser checks
-  named under each item. Owed before main: the user's word; a web end-to-end run on the production build; the
-  packed desktop app end to end (none since the security pass).
+  named under each item; a browser end-to-end run on the dev server (two tiles, Generate, export). Not run before
+  the push: the production build end to end, the packed desktop app (the desktop release is separate: priority 1).
 - Earlier the same day: `main` = `dev` at e6ee91e (pushed 2026-11-23 on the user's word, after a sweep). mapng.com now carries tiles in
   step 1, road mode, chunked levels and the security pass (worker, pages). The desktop app on users' machines is
   still 0.3.5: the desktop security fixes (updater, switches, permission handler, redirect guard, Electron 44.11.5,
