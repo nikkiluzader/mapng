@@ -51,8 +51,13 @@ Before the 0.3.6 desktop release:
    and the 3D preview draws only the shape (tiles, a road's corridor, a chunked level's overview; one shared test,
    `footprintTest` in `services/batchShape.js`). Checked in the browser on an L of three tiles
    (`scratch/verify-pw/e2e_shape_previews.mjs`, pictures `shape_2D.png`, `shape_3D.png`). Left of C: a thin wall
-   along the shape's edge in 3D, the surroundings switched off for shaped maps. Left, part F: the edge skirt in the
-   level, buildings kept only when wholly inside, the minimap and base texture masked outside.
+   along the shape's edge in 3D, the surroundings switched off for shaped maps.
+   Part F done on dev 2026-11-23: a wall 15 m down from the ground's cut edge on every ground-model level (shaped or
+   plain; drawn only, no collision; none where a chunk hands over to its neighbour) (`services/groundMesh.js`); a
+   building is kept only when every side of its outline is over ground (`services/footprintClip.js`: 34 of them on
+   the test L); the base texture, which is the minimap's picture too, painted out outside the shape. Test level:
+   `scratch/frame/shapesmall.mjs` (an L of 512 m in Oslo, 46 MB), texture `scratch/frame/shape_texture.png`.
+   **Owed: the look in game** (the edge from outside at 35 degrees, the minimap): the game held the user's own level.
 6. **Release page:** in-game pictures, a road mode picture, the final fix list; then publish it.
 
 Known and not blocking 0.3.6 (say so on the page):

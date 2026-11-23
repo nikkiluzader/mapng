@@ -4,7 +4,7 @@
 //   walked square by square, so a line crossing the footprint between two of its points keeps its crossing, and one
 //   passing over a gap is cut at the gap. Each stretch becomes its own feature (`id` + `~k`), with a point added where
 //   it crosses the edge; a ring split only at its first point is joined back;
-// - buildings are kept when their centre is inside;
+// - buildings are kept when they stand wholly over ground (every side of the outline);
 // - areas (water, forests, land use, parks) are kept when their bounding box touches the footprint (the trees and the
 //   ground they paint are kept inside it later);
 // - point features are kept when inside.
@@ -82,8 +82,15 @@ export function footprintClipper(bounds, shape) {
         continue;
       }
       if (f.type === 'building') {
-        let la = 0; let ln = 0; for (const p of g) { la += p.lat; ln += p.lng; }
-        if (inside(la / g.length, ln / g.length)) { out.push(f); stats.kept++; } else stats.dropped++;
+        // (wholly over ground: every side of its outline. By its centre, as it was, a building stood half over the
+        // level's edge, with nothing under it.)
+        let whole = true;
+        for (let i = 0; i < g.length && whole; i++) {
+          const a = g[i]; const b = g[(i + 1) % g.length];
+          const on = segmentOnGround((a.lng - bounds.west) * sx, (bounds.north - a.lat) * sy, (b.lng - bounds.west) * sx, (bounds.north - b.lat) * sy);
+          if (on !== null) whole = false;
+        }
+        if (whole) { out.push(f); stats.kept++; } else { stats.dropped++; stats.buildingsOverEdge = (stats.buildingsOverEdge || 0) + 1; }
         continue;
       }
       const closed = g.length > 3 && g[0].lat === g[g.length - 1].lat && g[0].lng === g[g.length - 1].lng;

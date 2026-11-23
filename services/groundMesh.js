@@ -17,6 +17,10 @@
 // ((i - W/2) sq, (j - H/2) sq); heightMap rows run from the north (row r = H - 1 - j); the layer map is in terrain
 // space (0, 0 = SW), 255 a hole. A square (i, j) is the square whose south-west corner is grid point (i, j).
 
+// The level's edge: a wall from the ground's cut edge down, so a shaped level (tiles, a road's corridor) and a
+// ground-model level's own rim read as a clean cut and not as a floating sheet (refs/output/tiles-step2-plan.md F).
+// A clean shape running into the ground, as every generated structure; drawn only, no collision.
+export const EDGE_SKIRT_M = 15;
 export const GROUND_TILE = 256;             // grid squares a side per ground model (a power of two, for RTIN)
 export const GROUND_MAX_ERROR_M = 0.05;     // the most the simplified ground may be off the grid between kept points (measured in game on a 1 km
                                             // lidar town: 3 cm 1.31 M triangles, 24 s of collision at load; 10 cm 0.76 M, 9 s)
@@ -119,7 +123,8 @@ export function triangleOff(h, T, pa, pc, pb, maxError) {
 }
 
 /**
- * The ground models: [{ key, i0, j0, groups: [{ groundModel, positions: Float32Array, normals, uvs }], triangles,
+ * The ground models: [{ key, i0, j0, groups: [{ groundModel, positions: Float32Array, normals, uvs }], skirt (the
+ * edge wall's triangles in the same form, or null: drawn, never collided with), triangles,
  * fullTriangles }] per tile with ground in it, and a summary for the log.
  *
  * terrain: { width: W, height: H, heightMap (rows from the north), minHeight }; sq: metres per grid square;
@@ -128,6 +133,10 @@ export function triangleOff(h, T, pa, pc, pb, maxError) {
  */
 export function buildGroundTiles({ width: W, height: H, heightMap, minHeight }, sq, {
   layerMap = null, groundModelOf = () => 'GRASS', keepSquare = null, tile = GROUND_TILE, maxError = GROUND_MAX_ERROR_M,
+  // the edge wall: isLevelEdge(i, j) says whether a square that is not kept lies outside the level's ground (true) or
+  // is only another part's to build (a chunk's neighbour: no wall there); null: every square not kept is outside.
+  // skirtM 0: no wall.
+  skirtM = EDGE_SKIRT_M, isLevelEdge = null,
 } = {}) {
   const T = tile; const g = T + 1;
   const ok = (v) => (Number.isFinite(v) && v > -10000 ? v : minHeight);
@@ -155,7 +164,10 @@ export function buildGroundTiles({ width: W, height: H, heightMap, minHeight }, 
   const h = new Float32Array(g * g); const force = new Uint8Array(g * g); const errors = new Float32Array(g * g);
   const kind = new Int16Array((T + 2) * (T + 2));   // square kinds of the tile plus a one-square ring
   const out = [];
-  let triangles = 0; let full = 0; let holes = 0; let outside = 0; let refinePasses = 0;
+  let triangles = 0; let full = 0; let holes = 0; let outside = 0; let refinePasses = 0; let skirtTriangles = 0;
+  // (a square beside a kept one that is outside the level: past the grid, or not kept and not another part's)
+  const beyond = (i, j) => (i < 0 || j < 0 || i >= W - 1 || j >= H - 1 ? (isLevelEdge ? isLevelEdge(i, j) : true)
+    : !!keepSquare && !keepSquare(i, j) && (isLevelEdge ? isLevelEdge(i, j) : true));
   for (let ty = 0; ty < tilesY; ty++) {
     for (let tx = 0; tx < tilesX; tx++) {
       const i0 = tx * T; const j0 = ty * T;
@@ -232,8 +244,33 @@ export function buildGroundTiles({ width: W, height: H, heightMap, minHeight }, 
       }
       triangles += n;
       full += 2 * Math.min(T, W - 1 - i0) * Math.min(T, H - 1 - j0);
-      out.push({ key: `${tx}_${ty}`, i0, j0, groups, triangles: n });
+      // the edge wall: under every side of a kept square (a hole is no ground) that faces outside the level. Each
+      // side is walked with the outside on its right, so the two triangles face outward.
+      let skirt = null;
+      if (skirtM > 0) {
+        const pos = []; const nrm = []; const uv = [];
+        const wall = (ia, ja, ib, jb, nx, ny) => {
+          const ax = (ia - W / 2) * sq; const ay = (ja - H / 2) * sq; const bx = (ib - W / 2) * sq; const by = (jb - H / 2) * sq;
+          const za = hAt(ia, ja); const zb = hAt(ib, jb);
+          pos.push(ax, ay, za, ax, ay, za - skirtM, bx, by, zb - skirtM, ax, ay, za, bx, by, zb - skirtM, bx, by, zb);
+          for (let k = 0; k < 6; k++) nrm.push(nx, ny, 0);
+          // (the ground's own colour at the edge, straight down)
+          uv.push(ia / W, ja / H, ia / W, ja / H, ib / W, jb / H, ia / W, ja / H, ib / W, jb / H, ib / W, jb / H);
+        };
+        for (let b = 0; b < T; b++) {
+          for (let a = 0; a < T; a++) {
+            if (kind[(b + 1) * (T + 2) + (a + 1)] < 0) continue;
+            const i = i0 + a; const j = j0 + b;
+            if (beyond(i, j - 1)) wall(i, j, i + 1, j, 0, -1);
+            if (beyond(i + 1, j)) wall(i + 1, j, i + 1, j + 1, 1, 0);
+            if (beyond(i, j + 1)) wall(i + 1, j + 1, i, j + 1, 0, 1);
+            if (beyond(i - 1, j)) wall(i, j + 1, i, j, -1, 0);
+          }
+        }
+        if (pos.length) { skirt = { positions: Float32Array.from(pos), normals: Float32Array.from(nrm), uvs: Float32Array.from(uv), groundModel: groups[0].groundModel }; skirtTriangles += pos.length / 9; }
+      }
+      out.push({ key: `${tx}_${ty}`, i0, j0, groups, skirt, triangles: n });
     }
   }
-  return { tiles: out, groundModels: gmNames, summary: { tiles: out.length, triangles, fullTriangles: full, holeTriangles: holes, outsideTriangles: outside, refinePasses, maxError, tile: T } };
+  return { tiles: out, groundModels: gmNames, summary: { tiles: out.length, triangles, fullTriangles: full, holeTriangles: holes, outsideTriangles: outside, skirtTriangles, skirtM, refinePasses, maxError, tile: T } };
 }

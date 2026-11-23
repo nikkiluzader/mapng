@@ -87,3 +87,14 @@ test('a line wholly outside, or only touching a corner, is dropped', () => {
   const c = footprintClipper(bounds, shape);
   assert.equal(c.clip([{ id: 'x', type: 'road', geometry: [P(60, 10), P(90, 90)] }]).features.length, 0);
 });
+
+test('a building is kept only when it stands wholly over the ground', async () => {
+  const { footprintClipper } = await import('../services/footprintClip.js');
+  // a 100 x 100 grid over one degree each way; ground: the west half
+  const bounds = { north: 1, south: 0, west: 0, east: 1 };
+  const fc = footprintClipper(bounds, { size: 100, rects: [[0, 0, 50, 100]] });
+  const box = (x0, x1) => ({ type: 'building', geometry: [[0.4, x0], [0.4, x1], [0.5, x1], [0.5, x0]].map(([lat, lng]) => ({ lat, lng })) });
+  const { features, stats } = fc.clip([box(0.10, 0.20), box(0.42, 0.52), box(0.60, 0.70)]);
+  // inside: kept; its centre inside but its east end over the edge: dropped (it was kept by its centre); outside: dropped
+  assert.equal(features.length, 1); assert.equal(stats.kept, 1); assert.equal(stats.dropped, 2); assert.equal(stats.buildingsOverEdge, 2);
+});

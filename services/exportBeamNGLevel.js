@@ -594,6 +594,37 @@ async function fitBaseTexture(blob, gridSize, { allowFiner = true } = {}) {
 }
 
 /**
+ * A shaped level's base texture with everything outside the footprint painted out (a dark neutral): the texture is
+ * the minimap's picture too, and the map should show the level's shape, not the box round it. rows: the footprint's
+ * runs per grid row from the north (services/batchShape.js shapeRows), on a grid of `grid` squares; the texture may
+ * be finer. Returns { blob, painted (texture pixels) } or null when left as it was (too big to redraw in one canvas).
+ */
+const SHAPE_MASK_MAX_PX = 8192;
+const SHAPE_MASK_COLOUR = '#1c1f25';
+async function paintTextureOutsideShape(blob, texSize, rows, grid) {
+  if (!blob || !rows || texSize > SHAPE_MASK_MAX_PX) return null;
+  const bmp = await createImageBitmap(blob);
+  const canvas = document.createElement('canvas'); canvas.width = texSize; canvas.height = texSize;
+  const ctx = canvas.getContext('2d');
+  if (typeof ctx?.fillRect !== 'function' || typeof ctx?.drawImage !== 'function') { bmp.close?.(); return null; }
+  ctx.drawImage(bmp, 0, 0, texSize, texSize); bmp.close?.();
+  ctx.fillStyle = SHAPE_MASK_COLOUR;
+  const k = texSize / grid; let painted = 0;
+  // (rows with the same runs are painted as one band)
+  const same = (a, b) => (!a && !b) || (!!a && !!b && a.length === b.length && a.every((r, i) => r[0] === b[i][0] && r[1] === b[i][1]));
+  for (let y = 0; y < grid;) {
+    let y1 = y + 1; while (y1 < grid && same(rows[y], rows[y1])) y1++;
+    const top = Math.round(y * k); const h = Math.round(y1 * k) - top;
+    let x = 0;
+    for (const [a, b] of rows[y] || []) { if (a > x) { const x0 = Math.round(x * k); const w = Math.round(a * k) - x0; ctx.fillRect(x0, top, w, h); painted += w * h; } x = Math.max(x, b); }
+    if (x < grid) { const x0 = Math.round(x * k); const w = texSize - x0; ctx.fillRect(x0, top, w, h); painted += w * h; }
+    y = y1;
+  }
+  if (!painted) return null;
+  return { blob: await new Promise((r) => canvas.toBlob(r, 'image/png')), painted };
+}
+
+/**
  * Vegetation mask (north-up, ≤ VEGETATION_MASK_MAX px a side) from a
  * satellite-based texture blob, for the OSM material painter: unmapped ground
  * that is green there gets Grass (osmTerrainMaterials isVegetationColor).
@@ -1028,10 +1059,10 @@ export function groundModelMaterialDefs(levelName, surfaces, terrainDefs, worldS
  * ({ width, height, heightMap, minHeight }: z is height - minHeight, as the TerrainBlock's); layerMap and the terrain
  * materials say each square's surface and holes; keepSquare(i, j) false leaves a square out (a batch shape).
  */
-async function generateGroundModelDAEs(terrain, sq, { layerMap, materialNames, materialDefs, keepSquare = null, maxError = undefined }) {
+async function generateGroundModelDAEs(terrain, sq, { layerMap, materialNames, materialDefs, keepSquare = null, isLevelEdge = null, maxError = undefined }) {
   // (a square's surface: its terrain material, so each keeps its own ground model and detail)
   const groundModelOf = (L) => (materialNames || [])[L] || 'DefaultMaterial';
-  const { tiles, groundModels, summary } = buildGroundTiles(terrain, sq, { layerMap, groundModelOf, keepSquare, ...(maxError > 0 ? { maxError } : {}) });
+  const { tiles, groundModels, summary } = buildGroundTiles(terrain, sq, { layerMap, groundModelOf, keepSquare, isLevelEdge, ...(maxError > 0 ? { maxError } : {}) });
   const roots = [];
   for (const t of tiles) {
     const base00 = new THREE.Group(); base00.name = 'base00';
@@ -1047,9 +1078,18 @@ async function generateGroundModelDAEs(terrain, sq, { layerMap, materialNames, m
       materials.push(new THREE.MeshStandardMaterial({ name: groundMaterialName(g.groundModel) }));
       at += count;
     }
-    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    geo.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
-    geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    // (the edge wall, services/groundMesh.js: drawn with the ground, as one more group in its first surface's
+    // material; the collision mesh below is the ground alone, so a car still drives off the edge)
+    const sk = t.skirt; const skN = sk ? sk.positions.length / 3 : 0;
+    const allPos = skN ? new Float32Array((n + skN) * 3) : pos; const allNrm = skN ? new Float32Array((n + skN) * 3) : nrm; const allUv = skN ? new Float32Array((n + skN) * 2) : uv;
+    if (skN) {
+      allPos.set(pos); allPos.set(sk.positions, n * 3); allNrm.set(nrm); allNrm.set(sk.normals, n * 3); allUv.set(uv); allUv.set(sk.uvs, n * 2);
+      const mi = Math.max(0, materials.findIndex((m) => m.name === groundMaterialName(sk.groundModel)));
+      geo.addGroup(n, skN, mi);
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(allPos, 3));
+    geo.setAttribute('normal', new THREE.BufferAttribute(allNrm, 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(allUv, 2));
     const mesh = new THREE.Mesh(geo, materials);
     // (a mesh name ending in a number is read as its detail size: "ground_0_0" was size 0, an invalid detail level,
     // and the game drew none of the ground; "_a" as the sidewalk tiles' "sidewalks_a")
@@ -1060,7 +1100,7 @@ async function generateGroundModelDAEs(terrain, sq, { layerMap, materialNames, m
     // material's ground model.
     const colGeo = new THREE.BufferGeometry();
     colGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    for (const gr of geo.groups) colGeo.addGroup(gr.start, gr.count, gr.materialIndex);
+    for (const gr of geo.groups) if (gr.start < n) colGeo.addGroup(gr.start, gr.count, gr.materialIndex);
     colGeo.name = 'Colmesh-1';
     const collision = new THREE.Mesh(colGeo, materials);
     collision.name = 'Colmesh-1';
@@ -14701,6 +14741,14 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   });
   texBlob = fittedTexture.blob;
   const terrainBaseTexSize = fittedTexture.size;
+  // (a shaped level: outside its footprint the texture, which is the minimap's picture too, is painted out)
+  if (footprint?.rows && texBlob) {
+    try {
+      const masked = await paintTextureOutsideShape(texBlob, terrainBaseTexSize, footprint.rows, footprint.size);
+      if (masked?.blob) { texBlob = masked.blob; console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Shape: the base texture (and with it the minimap) painted out outside the footprint, ${formatNumber((100 * masked.painted) / (terrainBaseTexSize * terrainBaseTexSize), 1)}% of it.`); }
+      else console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Shape: the base texture left as it is outside the footprint (${terrainBaseTexSize > SHAPE_MASK_MAX_PX ? `at ${terrainBaseTexSize} px it is too big to redraw` : 'nothing lies outside it, or this canvas cannot draw'}).`);
+    } catch (e) { console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Shape: the base texture could not be painted out outside the footprint: ${e?.message || e}`); }
+  }
 
   // Legacy image-based inference is no longer generated and now falls back to OSM.
   const imageCanvas = null;
@@ -15210,8 +15258,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     const t0 = performance.now();
     groundModels = await generateGroundModelDAEs(exportTerrainData, squareSize, {
       layerMap: terLayerMap, materialNames: pbrResult?.materialNames, materialDefs: pbrResult?.materialDefs, keepSquare: chunkSquareFilter(footprint?.keepSquare || groundKeepSquare), maxError: groundMaxError,
+      // (the edge wall stands where the level's ground ends, not where a chunk hands over to its neighbour)
+      isLevelEdge: (i, j) => { const keep = footprint?.keepSquare || groundKeepSquare; return !keep || !keep(i, j); },
     });
     const gs = groundModels.summary;
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Ground edge: ${gs.skirtTriangles ? `${formatNumber(gs.skirtTriangles, 0)} triangles of wall, ${gs.skirtM} m down from the ground's cut edge (drawn only, no collision)` : 'no edge to wall in (none of this part\'s ground ends at the level\'s edge)'}.`);
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Ground models: ${groundModels.tiles.length} tiles of ${gs.tile} squares, ${formatNumber(gs.triangles, 0)} triangles (${formatNumber((100 * gs.triangles) / Math.max(1, gs.fullTriangles), 1)}% of the full grid's ${formatNumber(gs.fullTriangles, 0)}), within ${gs.maxError} m of every grid point; full resolution kept at tile edges, holes and surface changes; ${gs.refinePasses} re-split pass(es) to hold the bound; ${gs.holeTriangles} triangle(s) left open at holes, ${gs.outsideTriangles} outside the grid or the shape; surfaces: ${groundModels.groundModels.join(', ') || 'none'}; ${formatNumber((performance.now() - t0) / 1000, 1)} s.`);
     for (const t of groundModels.tiles) console.log(`${BEAMNG_EXPORT_SERVICE_LOG}   ground_${t.key}: ${formatNumber(t.triangles, 0)} triangles, ${formatNumber((t.data.size ?? t.data.length ?? 0) / 1e6, 1)} MB.`);
   }

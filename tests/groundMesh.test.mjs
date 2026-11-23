@@ -63,3 +63,35 @@ test('squares outside the kept area are left out', () => {
   assert.ok(Math.abs(a - 64 * 128) < 1e-6, `${a}`);
   assert.equal(res.tiles.length, 2);
 });
+
+test('the edge wall: under every side of the ground that faces outside the level, facing outward, and nowhere else', async () => {
+  const { EDGE_SKIRT_M } = await import('../services/groundMesh.js');
+  const W = 9; const H = 9; const hm = new Float32Array(W * H).fill(100);
+  const ter = { width: W, height: H, heightMap: hm, minHeight: 90 };
+  // a plain 8 x 8 square of ground: 4 sides of 8 squares, two triangles each
+  const plain = buildGroundTiles(ter, 1, { tile: 8 });
+  assert.equal(plain.summary.skirtTriangles, 4 * 8 * 2);
+  const sk = plain.tiles[0].skirt;
+  let zMin = Infinity; let zMax = -Infinity; for (let k = 2; k < sk.positions.length; k += 3) { zMin = Math.min(zMin, sk.positions[k]); zMax = Math.max(zMax, sk.positions[k]); }
+  assert.equal(zMax, 10); assert.equal(zMin, 10 - EDGE_SKIRT_M);
+  // each triangle faces the way its normal says, and that is away from the middle of the map
+  for (let t = 0; t < sk.positions.length; t += 9) {
+    const p = (k) => [sk.positions[t + k * 3], sk.positions[t + k * 3 + 1], sk.positions[t + k * 3 + 2]];
+    const [a, b, c] = [p(0), p(1), p(2)]; const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]; const v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2]];
+    const given = [sk.normals[t], sk.normals[t + 1]];
+    assert.ok(n[0] * given[0] + n[1] * given[1] > 0, 'winding and normal agree');
+    const mid = [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3];
+    assert.ok(mid[0] * given[0] + mid[1] * given[1] > 0, 'faces outward');
+  }
+  // an L (the north-east quarter missing): the cut gets a wall too
+  const keepL = (i, j) => !(i >= 4 && j >= 4);
+  const L = buildGroundTiles(ter, 1, { tile: 8, keepSquare: keepL });
+  assert.equal(L.summary.skirtTriangles, (8 + 8 + 4 + 4 + 4 + 4) * 2);
+  // a chunk's hand-over to its neighbour is no edge: the same cut, said to be another part's, has no wall
+  const chunk = buildGroundTiles(ter, 1, { tile: 8, keepSquare: keepL, isLevelEdge: (i, j) => i < 0 || j < 0 || i >= W - 1 || j >= H - 1 });
+  assert.equal(chunk.summary.skirtTriangles, (8 + 8 + 4 + 4) * 2);
+  // switched off
+  assert.equal(buildGroundTiles(ter, 1, { tile: 8, skirtM: 0 }).summary.skirtTriangles, 0);
+  assert.equal(buildGroundTiles(ter, 1, { tile: 8, skirtM: 0 }).tiles[0].skirt, null);
+});

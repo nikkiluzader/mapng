@@ -2665,7 +2665,7 @@ export const fetchTerrainData = async (
   // builds: roads cut at its edge, buildings by their centre, areas by overlap: services/footprintClip.js)
   if (fp && osmFeatures.length) {
     const { features, stats } = footprintClipper(finalBounds, { width, height, ...shapeOf(fp) }).clip(osmFeatures);
-    console.log(`[Footprint] map data kept to the footprint: ${osmFeatures.length} feature(s) in, ${stats.kept} kept whole, ${stats.cut} line(s) cut at its edge into ${stats.pieces} piece(s), ${stats.dropped} outside dropped.`);
+    console.log(`[Footprint] map data kept to the footprint: ${osmFeatures.length} feature(s) in, ${stats.kept} kept whole, ${stats.cut} line(s) cut at its edge into ${stats.pieces} piece(s), ${stats.dropped} outside dropped${stats.buildingsOverEdge ? ` (${stats.buildingsOverEdge} of them building(s) standing partly over the edge)` : ''}.`);
     osmFeatures = features;
   }
 
