@@ -58,7 +58,10 @@ Before the 0.3.6 desktop release:
    the test L); the base texture, which is the minimap's picture too, painted out outside the shape. Test level:
    `scratch/frame/shapesmall.mjs` (an L of 512 m in Oslo, 46 MB), texture `scratch/frame/shape_texture.png`.
    **Owed: the look in game** (the edge from outside at 35 degrees, the minimap): the game held the user's own level.
-6. **Release page:** in-game pictures, a road mode picture, the final fix list; then publish it.
+6. **Release page.** 2026-11-23 evening: a road mode picture (US 129), the shape in the 2D and 3D previews, the
+   edge wall, the buildings rule and the minimap, the load-time fix, the 3D alignment and upload fixes are on the
+   draft. Left: in-game pictures (a tiled level and a road level with the edge wall, the thumbnail in the level
+   list), the final fix list; then publish it.
 
 Known and not blocking 0.3.6 (say so on the page):
 

@@ -166,9 +166,9 @@
     <a class="btn" href="/updates/0.3.5/">What came in 0.3.5</a>
   </div>
 
-  <!-- DRAFT (remove before release): this page is a preview and is not indexed. Still to add: a picture of road
-       mode; a picture of a tiled level and a road level in game (Game texture); the level thumbnail as the game's
-       list shows it; the final list of fixes. Sections marked "in progress" describe work that is
+  <!-- DRAFT (remove before release): this page is a preview and is not indexed. Still to add: a picture of a tiled
+       level and a road level in game (Game texture), with the edge wall; the level thumbnail as the game's list shows
+       it; the final list of fixes. Sections marked "in progress" describe work that is
        not finished. -->
   <p class="note"><b>Preview.</b> This page is being written while 0.3.6 is being finished. Parts marked "in progress" are not done yet.</p>
 
@@ -183,6 +183,16 @@
       <li><b>Shared and saved.</b> A share code, saved settings and the desktop app's Modify all carry the tiles. Up to 64 tiles.</li>
     </ul>
     <p>A shape that is not one full square is built with the ground as models (introduced in 0.3.5), so the level has no terrain outside your tiles.</p>
+    <h3>You see the shape before you build it</h3>
+    <p>The 2D preview dims everything outside your shape, and the 3D preview draws only the shape, with a wall along its edge. The same goes for a level along a road.</p>
+    <figure><img src="images/shape-2d.jpg" alt="The 2D preview of three tiles in an L: three quarters of the box show streets and buildings, the missing quarter is dark." loading="lazy"><figcaption>Three tiles in an L in the 2D preview: the quarter with no tile is dimmed.</figcaption></figure>
+    <figure><img src="images/shape-3d.jpg" alt="The same map in the 3D preview: an L-shaped slab of city with a corner missing and a brown wall along its edge." loading="lazy"><figcaption>The same map in 3D: only the shape is drawn.</figcaption></figure>
+    <h3>A clean edge in the game</h3>
+    <ul>
+      <li><b>An edge wall.</b> The ground of a shaped level ends in a wall running 15 m down, so from outside it reads as a clean cut and not as a floating sheet. You can still drive off it.</li>
+      <li><b>No building over the edge.</b> A building is kept only when all of it stands on the level's ground. Before, one whose middle was inside could hang half over the edge.</li>
+      <li><b>The minimap shows the shape.</b> Outside your tiles or your road's corridor the map picture is dark.</li>
+    </ul>
     <h3>Pick the anchor with one click</h3>
     <p>With more than one tile, an <b>Anchor</b> row lists every tile and <b>Centre</b>. The anchor is the point that sits on the location you typed or searched for. Click another tile, or Centre, and the anchor moves there. The tiles themselves stay exactly where they are on the map: the location follows the anchor. The same holds when you add, drag or remove a tile.</p>
     <figure><img src="images/tiles-anchor.jpg" alt="The Tiles controls with three tiles in a row. The Anchor row shows Tile 1, Tile 2, Tile 3 and Centre; Tile 3 is picked, and on the map the crosshair sits in the middle of the third tile." loading="lazy"><figcaption>Three tiles with the anchor on tile 3: the crosshair marks the anchor, and the chips above Generate show the whole map's size.</figcaption></figure>
@@ -194,6 +204,7 @@
     <div class="kicker">Step 1: Location</div>
     <h2>Road mode: a level along a road</h2>
     <p>Switch Area &amp; detail to <b>Road mode</b> and click a road on the map. MapNG follows it both ways by its name or number, and you get a stretch with a handle at each end and a width either side, from 50 m to 2 km. Generate builds the level over that corridor only.</p>
+    <figure><img src="images/road-mode.jpg" alt="MapNG in Road mode on a topographic map: a winding mountain road drawn in orange between two round handles, with a pale orange band either side of it, and the chips above Generate reading 1.5 by 0.9 km and 1542 by 926 px." loading="lazy"><figcaption>Road mode on US 129: the picked stretch between its two handles, and the corridor the level will cover.</figcaption></figure>
     <ul>
       <li><b>Handles that follow the roads.</b> Drag a handle along the road to shorten the stretch. Drop it farther away, up to 20 km at a time, and the stretch follows the road network to it, keeping to the road you picked. Went the wrong way? Drag the handle back along the line.</li>
       <li><b>It stays on your road.</b> The stretch does not wander onto another road that shares a number, does not turn back along the other side of a dual carriageway, and goes straight through roundabouts.</li>
@@ -210,6 +221,7 @@
       <li>The export builds every piece from what Generate already downloaded. It downloads nothing.</li>
       <li>The level's report now covers the whole level and every piece, and the progress shows which piece is being built, in all seven languages.</li>
       <li>If a piece fails, the message says which one and at which step.</li>
+      <li><b>They load in seconds, not minutes.</b> A level built in pieces listed each of its folders once per piece, and the game loaded them that many times over. A level of six pieces loaded its roads 144 times: eight minutes for a map 768 by 512 m. It now loads like any other level (measured in game: the roads in a tenth of a second).</li>
     </ul>
     <h3>Roads that meet where pieces join</h3>
     <p>Each piece used to work out its road heights from its own part of the road network. A ramp or a tunnel seen whole by one piece and cut short by the next could meet metres apart. A finished piece now hands its road heights to the next one, which starts from them: its roads leave the join at the neighbour's height, and a tunnel continues on the neighbour's line.</p>
@@ -269,6 +281,9 @@
       <li><b>"Generate does nothing" with your own elevation file.</b> With an uploaded elevation file the app always offered Generate, then decided nothing had changed. A map data file loaded after generating was ignored the same way. Both now generate again. (Thanks for the report.)</li>
       <li><b>"Settings changed since generating"</b> now follows everything that changes the map, tiles and a picked road included.</li>
       <li>A shared road comes back with its ends where they were.</li>
+      <li><b>3D preview and 3D model export line up with the map.</b> Their ground was drawn stretched across the map, up to one sample off toward the east and north edges, and the exported model was one sample too narrow. Both now read the ground where the game has it.</li>
+      <li>Uploaded elevation files (LAZ, ASC, GML) are placed with the same real-world measure as everything else. A flat figure made them 0.2 % off at latitude 45.</li>
+      <li>A level built in pieces shows its own name in the game's level list, not the first piece's.</li>
       <li>Switching tiles from free to together puts every tile back on the grid.</li>
       <li>The level built in pieces could download map data again if you exported more than half an hour after generating. It no longer does.</li>
     </ul>
@@ -280,7 +295,6 @@
     <ul>
       <li>Long tunnels and bridges planned once for the whole level, so every piece of a long level agrees on them.</li>
       <li>Exporting heightmaps and textures per tile from the tiles workflow, which the old batch jobs did.</li>
-      <li>Previews that show only the shape you picked, and a minimap to match.</li>
       <li>Streets standing on a narrow ridge with jagged sides in steep towns, walls along tunnel approaches, and the other items carried over from <a href="/updates/0.3.5/#next">0.3.5's list</a>.</li>
     </ul>
   </section>

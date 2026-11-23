@@ -124,9 +124,12 @@
         </p>
 
         <fieldset :disabled="store.boxLocked" :class="store.boxLocked ? 'opacity-60' : ''">
+          <!-- (the "covers ... km" line is one tile's: said per tile with several, left out for a road, whose size
+               is on the road's own line) -->
           <ProcessingResolutionInput
             :model-value="processingMetersPerPixel"
-            :resolution="Number(resolution) || 0"
+            :resolution="store.areaMode === 'road' && !store.batchMode ? 0 : Number(resolution) || 0"
+            :per-tile="store.tiles.length > 1 && store.areaMode !== 'road' && !store.batchMode"
             @update:model-value="(v) => $emit('update:processingMetersPerPixel', v)"
           />
         </fieldset>
