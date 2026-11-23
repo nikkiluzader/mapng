@@ -1,5 +1,6 @@
 import { plantAllowed } from './worldCover.js';
 import * as THREE from "three";
+import { metresPerDegree, heightAtFraction } from "./mapFrame.js";
 import { mergeGeometries, mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 import JSZip from "jszip";
@@ -26,7 +27,7 @@ export const computeMetersPerUnit = (data) => {
     worldSizeMeters = data.width * explicitMpp;
   } else {
     const latRad = (((data.bounds.north + data.bounds.south) / 2) * Math.PI) / 180;
-    const metersPerDegree = 111320 * Math.cos(latRad);
+    const metersPerDegree = metresPerDegree((data.bounds.north + data.bounds.south) / 2).lng;
     worldSizeMeters = (data.bounds.east - data.bounds.west) * metersPerDegree;
   }
   return worldSizeMeters / SCENE_SIZE;
@@ -50,7 +51,7 @@ const _ensureCache = (data) => {
   if (_cachedDataId !== dataId) {
     _cachedDataId = dataId;
     const latRad = (((data.bounds.north + data.bounds.south) / 2) * Math.PI) / 180;
-    const metersPerDegree = 111320 * Math.cos(latRad);
+    const metersPerDegree = metresPerDegree((data.bounds.north + data.bounds.south) / 2).lng;
     const realWidthMeters = (data.bounds.east - data.bounds.west) * metersPerDegree;
     _cachedUnitsPerMeter = SCENE_SIZE / realWidthMeters;
     _cachedMinHeight = data.minHeight;
@@ -101,32 +102,10 @@ const getHeightAtScenePos = (data, x, z) => {
   const u = Math.max(0, Math.min(1, (x + half) / SCENE_SIZE));
   const v = Math.max(0, Math.min(1, (z + half) / SCENE_SIZE));
 
-  const localX = u * (_cachedWidth - 1);
-  const localZ = v * (_cachedHeight - 1);
-
-  const x0 = Math.floor(localX);
-  const x1 = Math.min(x0 + 1, _cachedWidth - 1);
-  const y0 = Math.floor(localZ);
-  const y1 = Math.min(y0 + 1, _cachedHeight - 1);
-
-  const wx = localX - x0;
-  const wy = localZ - y0;
-
-  const hm = _cachedHeightMap;
-  const w = _cachedWidth;
+  // (the samples stand at u = c / W, v = (r + 1) / H, services/mapFrame.js; read as u * (W - 1), what stands on
+  // the ground was placed at the height of ground up to a sample away)
   const minH = _cachedMinHeight;
-
-  const i00 = y0 * w + x0;
-  const i10 = y0 * w + x1;
-  const i01 = y1 * w + x0;
-  const i11 = y1 * w + x1;
-
-  const h00 = hm[i00] < -10000 ? minH : hm[i00];
-  const h10 = hm[i10] < -10000 ? minH : hm[i10];
-  const h01 = hm[i01] < -10000 ? minH : hm[i01];
-  const h11 = hm[i11] < -10000 ? minH : hm[i11];
-
-  const h = (1 - wy) * ((1 - wx) * h00 + wx * h10) + wy * ((1 - wx) * h01 + wx * h11);
+  const h = heightAtFraction(_cachedHeightMap, _cachedWidth, _cachedHeight, u, v, { fallback: minH });
 
   return (h - minH) * _cachedUnitsPerMeter;
 };
@@ -688,7 +667,7 @@ const createTerrainMesh = async (data, maxMeshResolution = 1024, centerTextureTy
       // Calculate scale factor (units per meter)
       const latRad =
         (((data.bounds.north + data.bounds.south) / 2) * Math.PI) / 180;
-      const metersPerDegree = 111320 * Math.cos(latRad);
+      const metersPerDegree = metresPerDegree((data.bounds.north + data.bounds.south) / 2).lng;
       const realWidthMeters =
         (data.bounds.east - data.bounds.west) * metersPerDegree;
       const unitsPerMeter = SCENE_SIZE / realWidthMeters;
@@ -710,8 +689,6 @@ const createTerrainMesh = async (data, maxMeshResolution = 1024, centerTextureTy
           Math.round((row / Math.max(1, segmentsY)) * (data.height - 1)),
         );
 
-        const dataIndex = mapRow * data.width + mapCol;
-
         const u = mapCol / (data.width - 1);
         const v = mapRow / (data.height - 1);
 
@@ -722,8 +699,11 @@ const createTerrainMesh = async (data, maxMeshResolution = 1024, centerTextureTy
 
         // Apply height (Z becomes Y after rotation.x = -PI/2)
         // @ts-ignore
+        // (the mesh spans the whole map; the samples stand at u = c / W, v = (r + 1) / H, services/mapFrame.js:
+        // the height under a vertex is read there. Taken from sample (mapCol, mapRow), the model's ground was
+        // stretched over the map, up to a whole sample off toward its east and north edges.)
         vertices[i * 3 + 2] =
-          (data.heightMap[dataIndex] - data.minHeight) *
+          (heightAtFraction(data.heightMap, data.width, data.height, u, v, { fallback: data.minHeight }) - data.minHeight) *
           unitsPerMeter *
           EXAGGERATION;
       }
@@ -814,7 +794,7 @@ export const createOSMGroup = (data, options = {}) => {
 
   const latRad =
     (((data.bounds.north + data.bounds.south) / 2) * Math.PI) / 180;
-  const metersPerDegree = 111320 * Math.cos(latRad);
+  const metersPerDegree = metresPerDegree((data.bounds.north + data.bounds.south) / 2).lng;
   const realWidthMeters =
     (data.bounds.east - data.bounds.west) * metersPerDegree;
   const unitsPerMeter = SCENE_SIZE / realWidthMeters;
@@ -1592,8 +1572,9 @@ const disposeScene = (scene) => {
 const placeRootInLevelFrame = (root, data, placeMeters = null) => {
   const mpp = [data?.metersPerPixel, data?.processingMetersPerPixel].map(Number).find((v) => Number.isFinite(v) && v > 0) || 1;
   const latRad = (((data.bounds.north + data.bounds.south) / 2) * Math.PI) / 180;
-  const realWidthMeters = (data.bounds.east - data.bounds.west) * 111320 * Math.cos(latRad);
-  const plan = ((data.width - 1) * mpp) / SCENE_SIZE;
+  const realWidthMeters = (data.bounds.east - data.bounds.west) * metresPerDegree((data.bounds.north + data.bounds.south) / 2).lng;
+  // (the model spans the whole map: W samples of mpp, as the game lays the level's grid; it was W - 1)
+  const plan = (data.width * mpp) / SCENE_SIZE;
   const up = realWidthMeters / SCENE_SIZE;   // (heights were put in as metres * SCENE_SIZE / realWidthMeters)
   root.scale.set(plan, up, plan);
   root.position.set(-mpp / 2 + (placeMeters?.x || 0), placeMeters?.y || 0, mpp / 2 + (placeMeters?.z || 0));
@@ -1980,7 +1961,7 @@ export const createSurroundingMeshes = async (data, onProgress, maxMeshResolutio
     const results = await fetchSurroundings(data, onProgress, fetchOptions);
 
     const latRad = ((data.bounds.north + data.bounds.south) / 2 * Math.PI) / 180;
-    const metersPerDegree = 111320 * Math.cos(latRad);
+    const metersPerDegree = metresPerDegree((data.bounds.north + data.bounds.south) / 2).lng;
     const realWidthMeters = (data.bounds.east - data.bounds.west) * metersPerDegree;
     const unitsPerMeter = SCENE_SIZE / realWidthMeters;
     const EXAGGERATION = 1.0;

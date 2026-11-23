@@ -40,8 +40,13 @@ Before the 0.3.6 desktop release:
    list was the first chunk's ("name_c0_0").
    Still seen in the data: paths and service roads laid on the ground jump where one chunk has an open tunnel
    cutting and its neighbour has ground over the tunnel (item 7).
-4. **Alignment leftovers of the frame change:** the 3D preview mesh and the upload paths (LAZ, ASC, GML) still use
-   the old mapping; the sweep's areas re-fetched on the new frame.
+4. **Alignment leftovers of the frame change.** Done on dev 2026-11-23: the 3D preview's mesh, the 3D model export
+   (GLB / DAE) and everything they stand on the ground read heights where the samples are (`heightAtFraction` in
+   `services/mapFrame.js`; they read sample (c, r) at c / (W - 1), up to a sample off); the model export's scale is
+   W samples, not W - 1; the preview, the flag and the upload paths (LAZ, ASC, GML, GeoTIFF metadata) use the
+   ellipsoid's metres per degree, not a flat 111,320 (0.2 % at latitude 45). Checked: unit tests, a browser run
+   through the 3D preview and an export. Left: the sweep's areas re-fetched on the new frame; the retired batch
+   job's tile centres (`services/batchJob.js`) left as they are.
 5. **Tiles step 2 leftovers:** previews masked to the footprint, a masked minimap, the edge skirt.
 6. **Release page:** in-game pictures, a road mode picture, the final fix list; then publish it.
 

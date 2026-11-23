@@ -32,7 +32,9 @@ test('an ASC grid with no location is placed at its real size on the map centre'
   const center = { lat: 45.0, lng: 7.0 };
   const placed = placeAscAtCenter(meta, center);
   assert.equal(placed.placedAtCenter, true);
-  const mLat = 111320; const mLng = 111320 * Math.cos((45 * Math.PI) / 180);
+  // (metres on the ellipsoid, as the map's frame measures them: a flat 111,320 m per degree made the grid 0.2 % off)
+  const { metresPerDegree } = await import('../services/mapFrame.js');
+  const { lat: mLat, lng: mLng } = metresPerDegree(45);
   assert.ok(Math.abs((placed.bounds.east - placed.bounds.west) * mLng - 125) < 0.01);
   assert.ok(Math.abs((placed.bounds.north - placed.bounds.south) * mLat - 62.5) < 0.01);
   assert.ok(Math.abs((placed.bounds.east + placed.bounds.west) / 2 - 7) < 1e-9);

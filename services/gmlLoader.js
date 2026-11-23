@@ -1,3 +1,4 @@
+import { metresPerDegree } from './mapFrame.js';
 import { XMLParser } from 'fast-xml-parser';
 import JSZip from 'jszip';
 import {
@@ -708,8 +709,8 @@ const parseGridCoverageNode = async (coverageNode, fileSize = 0) => {
     };
 
     const midLat = center.lat;
-    const mPerDegLat = 111320;
-    const mPerDegLng = 111320 * Math.cos(midLat * Math.PI / 180);
+    // (metres per degree on the ellipsoid at this latitude, as the map's frame has them: services/mapFrame.js)
+    const { lat: mPerDegLat, lng: mPerDegLng } = metresPerDegree(midLat);
     const coverageWm = Math.abs(bounds.east - bounds.west) * mPerDegLng;
     const coverageHm = Math.abs(bounds.north - bounds.south) * mPerDegLat;
     nativeWidth = Math.max(1, Math.round(coverageWm));

@@ -1,6 +1,7 @@
 <script setup>
 import { computed, shallowRef, reactive, watch, toRaw, markRaw, onUnmounted, ref } from 'vue';
 import * as THREE from 'three';
+import { metresPerDegree, heightAtFraction } from '../../services/mapFrame.js';
 import { useTresContext, useLoop } from '@tresjs/core';
 import { useMainStore } from '../../stores/mainStore';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -135,9 +136,8 @@ waterNormalTexture.value = createWaterNormalTexture();
 const unitsPerMeter = computed(() => {
   const data = toRaw(props.terrainData);
   if (!data?.bounds) return 0;
-  const latRad = ((data.bounds.north + data.bounds.south) / 2) * Math.PI / 180;
-  const metersPerDegree = 111320 * Math.cos(latRad);
-  const realWidthMeters = (data.bounds.east - data.bounds.west) * metersPerDegree;
+  // (the map's real width on the ellipsoid, as the map's frame has it: services/mapFrame.js)
+  const realWidthMeters = (data.bounds.east - data.bounds.west) * metresPerDegree((data.bounds.north + data.bounds.south) / 2).lng;
   if (!Number.isFinite(realWidthMeters) || realWidthMeters <= 0) return 0;
   return SCENE_SIZE / realWidthMeters;
 });
@@ -374,10 +374,10 @@ const buildTerrainNormalTexture = (data, targetSize, meshStride) => {
   // At stride 1 the mesh already carries every sample — no residual detail.
   if (!(meshStride > 1)) return null;
 
-  const latRad = ((data.bounds.north + data.bounds.south) / 2) * Math.PI / 180;
-  const realWidthMeters = (data.bounds.east - data.bounds.west) * 111320 * Math.cos(latRad);
+  const realWidthMeters = (data.bounds.east - data.bounds.west) * metresPerDegree((data.bounds.north + data.bounds.south) / 2).lng;
   if (!Number.isFinite(realWidthMeters) || realWidthMeters <= 0) return null;
-  const metersPerPixel = realWidthMeters / Math.max(1, w - 1);
+  // (a sample every width / W: the map is W samples wide, not W - 1)
+  const metersPerPixel = realWidthMeters / Math.max(1, w);
 
   const outW = Math.min(targetSize, w);
   const outH = Math.min(targetSize, h);
@@ -505,6 +505,11 @@ watch([() => props.terrainData?.heightMap, () => props.quality], () => {
     return v < -10000 ? data.minHeight : v;
   };
 
+  // (the ground's height at a place of the map, u from the west and v from the north, as the mesh draws it)
+  const heightUnder = (u, v) => (stride <= 1
+    ? heightAtFraction(data.heightMap, data.width, data.height, u, v, { fallback: data.minHeight })
+    : sampleFootprintHeight(Math.min(data.width - 1, Math.round(u * data.width)), Math.min(data.height - 1, Math.max(0, Math.round(v * data.height - 1)))));
+
   for (let i = 0; i < vertices.length / 3; i++) {
     const colIndex = i % (widthSteps + 1);
     const rowIndex = Math.floor(i / (widthSteps + 1));
@@ -518,7 +523,10 @@ watch([() => props.terrainData?.heightMap, () => props.quality], () => {
     const globalX = (u * SCENE_SIZE) - (SCENE_SIZE / 2);
     const globalZ = (v * SCENE_SIZE) - (SCENE_SIZE / 2);
 
-    const h = sampleFootprintHeight(mapCol, mapRow);
+    // The mesh spans the whole map; the samples stand at u = c / W, v = (r + 1) / H (services/mapFrame.js). The
+    // height under a vertex is read there: taken from sample (mapCol, mapRow) as it was, the ground was drawn
+    // stretched over the map, up to a whole sample off toward the east and north edges.
+    const h = heightUnder(u, v);
 
     vertices[i * 3] = globalX;
     vertices[i * 3 + 1] = -(globalZ);
@@ -556,7 +564,7 @@ watch([() => props.terrainData?.heightMap, () => props.quality], () => {
     const fr = THREE.MathUtils.clamp(((z + SCENE_SIZE / 2) / SCENE_SIZE) * (data.height - 1) / stride, 0, heightSteps);
     const c0 = Math.min(widthSteps - 1, Math.floor(fc)); const r0 = Math.min(heightSteps - 1, Math.floor(fr));
     const tx = fc - c0; const ty = fr - r0;
-    const at = (c, r) => sampleFootprintHeight(Math.min(c * stride, data.width - 1), Math.min(r * stride, data.height - 1));
+    const at = (c, r) => heightUnder(Math.min(c * stride, data.width - 1) / (data.width - 1), Math.min(r * stride, data.height - 1) / (data.height - 1));
     const h = (at(c0, r0) * (1 - tx) + at(c0 + 1, r0) * tx) * (1 - ty) + (at(c0, r0 + 1) * (1 - tx) + at(c0 + 1, r0 + 1) * tx) * ty;
     return (h - data.minHeight) * upm * EXAGGERATION;
   };

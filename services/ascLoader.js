@@ -1,3 +1,4 @@
+import { metresPerDegree } from './mapFrame.js';
 import {
   computeGeoMetadata,
   detectUnitFromText,
@@ -541,7 +542,6 @@ export const applyAscCoordinateSystem = async (meta, epsgCode) => {
 
 const PLACED_MIN_M = 8;            // a grid smaller than this, or larger than
 const PLACED_MAX_M = 400000;       // this, is not metres on the ground: left to be fitted
-const M_PER_DEG_LAT = 111320;
 
 /** Whether an ASC upload has no location of its own but a size in its own units (taken as metres). */
 export const ascNeedsPlacing = (meta) => !!meta
@@ -583,8 +583,8 @@ export const placeAscAtCenter = (meta, center) => {
   if (!ascNeedsPlacing(meta) || !Number.isFinite(center?.lat) || !Number.isFinite(center?.lng)) return meta;
   const size = ascGroundSize(meta);
   if (!size) return meta;
-  const mLat = M_PER_DEG_LAT;
-  const mLng = M_PER_DEG_LAT * Math.cos((center.lat * Math.PI) / 180);
+  // (metres per degree on the ellipsoid at this latitude, as the map's frame has them: services/mapFrame.js)
+  const { lat: mLat, lng: mLng } = metresPerDegree(center.lat);
   if (!(mLng > 1)) return meta;
   const cx = (size.west + size.east) / 2; const cy = (size.south + size.north) / 2;
   const lng = (x) => center.lng + (x - cx) / mLng;

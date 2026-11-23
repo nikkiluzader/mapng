@@ -68,3 +68,22 @@ export function vertexLatLng(bounds, width, height, c, r) {
 export function gridPosition(bounds, width, height, lat, lng) {
   return { gx: ((lng - bounds.west) / lngSpanOf(bounds)) * width, gy: ((bounds.north - lat) / (bounds.north - bounds.south)) * height };
 }
+
+/**
+ * A height map read at a place given as fractions of the map (u from the west edge, v from the north edge, 0..1):
+ * bilinear between the samples, which stand at u = c / W, v = (r + 1) / H. For anything drawn over the whole map
+ * (the 3D preview's mesh, a 3D model export) whose points are not the samples themselves. Past the outermost
+ * samples the edge value holds. A no-data sample (under noData) is left out of the mix; all four missing: fallback.
+ */
+export function heightAtFraction(heightMap, W, H, u, v, { noData = -10000, fallback = 0 } = {}) {
+  const gx = Math.min(W - 1, Math.max(0, u * W)); const gy = Math.min(H - 1, Math.max(0, v * H - 1));
+  const c0 = Math.min(W - 2, Math.floor(gx)); const r0 = Math.min(H - 2, Math.floor(gy));
+  if (c0 < 0 || r0 < 0) { const h = heightMap[Math.round(gy) * W + Math.round(gx)]; return h > noData ? h : fallback; }
+  const tx = gx - c0; const ty = gy - r0;
+  let sum = 0; let wsum = 0;
+  for (const [c, r, w] of [[c0, r0, (1 - tx) * (1 - ty)], [c0 + 1, r0, tx * (1 - ty)], [c0, r0 + 1, (1 - tx) * ty], [c0 + 1, r0 + 1, tx * ty]]) {
+    const h = heightMap[r * W + c]; if (!(h > noData) || !(w > 0)) continue;
+    sum += h * w; wsum += w;
+  }
+  return wsum > 0 ? sum / wsum : fallback;
+}

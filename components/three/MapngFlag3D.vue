@@ -1,6 +1,7 @@
 <script setup>
 import { shallowRef, watch, toRaw, onUnmounted } from 'vue';
 import * as THREE from 'three';
+import { metresPerDegree } from '../../services/mapFrame.js';
 import JSZip from 'jszip';
 import { ColladaLoader } from 'three/examples/jsm/loaders/ColladaLoader.js';
 import { useTresContext, useLoop } from '@tresjs/core';
@@ -17,9 +18,7 @@ let cachedTemplate = null;
 const SCENE_SIZE = 100;
 
 function getUnitsPerMeter(terrainData) {
-  const latRad = ((terrainData.bounds.north + terrainData.bounds.south) / 2) * Math.PI / 180;
-  const metersPerDegree = 111320 * Math.cos(latRad);
-  const realWidthMeters = (terrainData.bounds.east - terrainData.bounds.west) * metersPerDegree;
+  const realWidthMeters = (terrainData.bounds.east - terrainData.bounds.west) * metresPerDegree((terrainData.bounds.north + terrainData.bounds.south) / 2).lng;
   return SCENE_SIZE / realWidthMeters;
 }
 

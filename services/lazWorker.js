@@ -10,6 +10,7 @@
  *        { id, type:'done', heightMap: Float32Array }
  *        { id, type:'error', error: string }
  */
+import { metresPerDegree } from './mapFrame.js';
 import proj4 from 'proj4';
 // Import the worker-specific build (ENVIRONMENT_IS_WORKER=true).
 // WASM is resolved via locateFile → /laz-perf.wasm in public/.
@@ -129,8 +130,8 @@ const buildGridMapper = ({ epsgCode, center, width, height, minX, maxX, minY, ma
       // 1) non-metric CRS units (e.g. US survey feet), and
       // 2) local axis rotation/shear between geographic EN and projected XY.
       // Using only independent X/Y scales can introduce directional offsets.
-      const mPerDegLat = 111320;
-      const mPerDegLng = 111320 * Math.cos(center.lat * Math.PI / 180);
+      // (metres per degree on the ellipsoid at this latitude, as the map's frame has them: services/mapFrame.js)
+      const { lat: mPerDegLat, lng: mPerDegLng } = metresPerDegree(center.lat);
       const [ex, ey] = toFileCRS.forward([center.lng + 1 / mPerDegLng, center.lat]);
       const [nx, ny] = toFileCRS.forward([center.lng, center.lat + 1 / mPerDegLat]);
 
@@ -186,8 +187,8 @@ const buildGridMapper = ({ epsgCode, center, width, height, minX, maxX, minY, ma
       }
     }
 
-    const mPerDegLat = 111320;
-    const mPerDegLng = 111320 * Math.cos(center.lat * Math.PI / 180);
+    // (metres per degree on the ellipsoid at this latitude, as the map's frame has them: services/mapFrame.js)
+    const { lat: mPerDegLat, lng: mPerDegLng } = metresPerDegree(center.lat);
     return (px, py) => {
       const dx = (px - center.lng) * mPerDegLng;
       const dy = (py - center.lat) * mPerDegLat;

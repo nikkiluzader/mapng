@@ -66,3 +66,20 @@ test('positions in squares and offsets in metres go there and back', () => {
   const [lng, lat] = gridLngLat(b, 500, 200, 500, 200);
   assert.ok(Math.abs(lng - b.east) < 1e-12 && Math.abs(lat - b.south) < 1e-12);
 });
+
+test('a height read by fractions of the map lands on the samples where the game has them', async () => {
+  const { heightAtFraction } = await import('../services/mapFrame.js');
+  const W = 8; const H = 4;
+  // sample (c, r) stands at u = c / W, v = (r + 1) / H; a ground that is a plane in (u, v) is read back exactly
+  const plane = (u, v) => 100 + 40 * u - 24 * v;
+  const hm = new Float32Array(W * H); for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) hm[r * W + c] = plane(c / W, (r + 1) / H);
+  for (const [u, v] of [[0, 0.25], [0.5, 0.5], [0.31, 0.77], [7 / 8, 1]]) assert.ok(Math.abs(heightAtFraction(hm, W, H, u, v) - plane(u, v)) < 1e-4, `${u}, ${v}`);
+  assert.equal(heightAtFraction(hm, W, H, 3 / W, 2 / H), hm[1 * W + 3]);          // on a sample: that sample
+  // past the outermost samples (the east strip, the north strip): the edge value holds
+  assert.equal(heightAtFraction(hm, W, H, 1, 0.5), heightAtFraction(hm, W, H, 7 / 8, 0.5));
+  assert.equal(heightAtFraction(hm, W, H, 0.5, 0), heightAtFraction(hm, W, H, 0.5, 1 / H));
+  // no-data samples are left out; nothing valid: the fallback
+  const holes = Float32Array.from(hm); holes[1 * W + 3] = -32768;
+  assert.ok(Number.isFinite(heightAtFraction(holes, W, H, 3.2 / W, 2.1 / H)) && heightAtFraction(holes, W, H, 3.2 / W, 2.1 / H) > 0);
+  assert.equal(heightAtFraction(new Float32Array(W * H).fill(-32768), W, H, 0.5, 0.5, { fallback: 7 }), 7);
+});
