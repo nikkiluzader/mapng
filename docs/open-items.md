@@ -174,15 +174,15 @@ As of 2026-11-23:
 
 ## Now: a Reset button (desktop and web)
 
-- **The desktop app's Refresh becomes Reset, and the website gets the same button** (user, 2026-11-23: "i really
-  meant for that to be more of a reset button"). Status: not started. One click clears every setting, the location
-  and a picked road (road mode included) and goes back to the defaults: Tile mode, one tile of 1024 x 1024, the
-  location asked for again (the browser's or the app's location permission), Flagstaff AZ when that is refused.
-  Where: the desktop View menu's reload (desktop/main.js buildMenu) and wherever the window offers a refresh; the
-  store's defaults (stores/mainStore.js) and the saved settings (localStorage `mapng_*`); texts in 7 languages.
-  Open point to settle when building it: personal keys (GPXZ key, own Overpass server) are settings too: ask
-  whether Reset clears them or keeps them. Done when: after Reset the window is as on a first start, on the
-  desktop and on the website, and a test checks no `mapng_*` setting is left behind.
+- **The desktop app's Refresh became Reset, and the website has the same button** (user, 2026-11-23). Done on dev
+  2026-11-23: `services/resetApp.js`, the button and its question in `components/layout/AppSidebar.vue`, 7
+  languages. It clears every `mapng_` setting (place, tiles, road, masks, sizes, export options), asks for the
+  location, and loads the page again at that place (refused or unknown: Flagstaff), in Tile mode with one 1024 tile.
+  Kept, my choice since the question went unanswered: the GPXZ key, the user's own Overpass server, the language,
+  light or dark, the two sharing choices. The button is off while a job runs. Checked in the browser
+  (`scratch/verify-pw/e2e_reset.mjs`): location granted and refused. Open: the user to say if keys should go too;
+  a look in the packaged desktop app (Electron usually has no location service: it should land on Flagstaff after
+  at most 8 s). The desktop's plain reload is still View > Reload / Ctrl+R.
 
 ## Now: Fizz_Mechanic's 0.3.3 list (2026-11-19; on hold until after the 0.3.5 release, user 2026-11-20)
 
