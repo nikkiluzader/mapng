@@ -865,7 +865,7 @@ function followLid(straight, g, gLow, st, need, maxGrade) {
   return out;
 }
 
-function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = () => false, squareSize = 1, raw = false, overStreets = [], knownZ = null }, mode, digMax = Infinity) {
+function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = () => false, squareSize = 1, raw = false, overStreets = [], knownZ = null, freeZ = null }, mode, digMax = Infinity) {
   // mode: false a bore, true a cut-and-cover box sunk under the street, 'low' a low box at the road's own level
   // (a railway's own grade where its kind climbs steeper than a road: a funicular's tunnel climbs its mountain at
   // 50 % and more; held to a road's 6 % the Funival's ends, 768 m apart in height over 1.6 km, left it on the surface)
@@ -927,6 +927,10 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
   if (free[0] && free[1]) { endZ[0] = g[0] - need; endZ[1] = g[n - 1] - need; }
   else if (free[0]) endZ[0] = fromOther(0);
   else if (free[1]) endZ[1] = fromOther(1);
+  // A chunked level (services/levelTunnelPlan.js): a free end is where this chunk's grid cuts the tunnel, not where
+  // the tunnel ends, and the level knows the tunnel's whole line from portal to portal. The end takes its height
+  // from that line. ("Under the ground there" put a tunnel under a mountain hundreds of metres over its real line.)
+  for (const e of [0, 1]) if (free[e] && Number.isFinite(freeZ?.[e])) endZ[e] = freeZ[e];
   // No road climbs from one end to the other (mismatched OSM ends, or the
   // elevation data): left on the ground rather than a ramp inside the hill.
   const rise = Math.abs(endZ[1] - endZ[0]);

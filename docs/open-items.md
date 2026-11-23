@@ -69,8 +69,17 @@ Before the 0.3.6 desktop release:
 
 Known and not blocking 0.3.6 (say so on the page):
 
-7. **Long tunnels and bridges across pieces of a chunked level:** planned per piece; a plan made once for the whole
-   level is the fix. A street on a lid over a tunnel trench on a join can dip.
+7. **Long tunnels across pieces of a chunked level.** Done on dev 2026-11-23: every tunnel that lies whole inside
+   the level is planned once from the level's overview (`services/levelTunnelPlan.js`: its ways chained, the ground
+   at its two portals, the straight grade between them), and where a chunk's grid cuts a tunnel that end takes its
+   height from the line (`freeZ` in `beamngTunnels.js`). Before, such an end was "under the ground there": a tunnel
+   under a mountain climbed toward the surface (the unit test: 1015 m and rising where the line says 1004 m). The
+   neighbours' road heights still make the pieces meet exactly. Oslo test level of 16 small chunks along the E18:
+   8 tunnels planned, the cut ends on their lines, no tunnel road steps over 0.72 m (edge lines at one corner).
+   Left: no real mountain tunnel has been built end to end yet (the user's road-mode levels through the Alps would
+   be the test); long bridges are still planned per piece (a deck's profile is held at the join by the neighbours'
+   road heights, its model is cut where the piece ends); a street on a lid over a tunnel trench that lies on a join
+   can still dip.
 8. **Per-tile asset export from tiles** (the old batch jobs' purpose). Done on dev 2026-11-23: with several tiles,
    step 3's assets have a switch "One file per tile": the heightmap, the pictures, the road mask, the GeoTIFF and the
    .ter are made once per tile, named `_tile1`, `_tile2` (`components/panels/ExportPanel.vue` assetExport, the

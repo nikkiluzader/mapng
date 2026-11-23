@@ -8,7 +8,7 @@ import { encode } from 'fast-png';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { exportTer } from './exportTer.js';
 import { buildGroundTiles } from './groundMesh.js';
-import { shapeRows, shapeOf, hasShape, inFootprint, keepSquareFor } from './batchShape.js';
+import { shapeRows, shapeOf, hasShape, inFootprint, keepSquareFor, footprintTest } from './batchShape.js';
 import { footprintClipper } from './footprintClip.js';
 import { padTerrainToSquare } from './padToSquare.js';
 import { buildTerrainMaterials, isVegetationColor } from './osmTerrainMaterials.js';
@@ -73,6 +73,7 @@ import { appendAll, keepInPlace } from './keepInPlace.js';
 import { classifyStructures } from './structures/structureRules.js';
 import { ringPlanePins } from './structures/rings.js';
 import { seamRoadsOut, seamRoadPins, seamHolds } from './chunkSeamRoads.js';
+import { planLevelTunnels } from './levelTunnelPlan.js';
 import { junctionMouthPins, mouthsToRefuse } from './structures/junctionMouths.js';
 import { composeTerrain } from './structures/terrainCompose.js';
 import { addFineGroundDetail } from './terrainDetail.js';
@@ -5400,7 +5401,7 @@ const pathLength = (xy) => xy.reduce((n, p, i) => (i ? n + fastHypot(p[0] - xy[i
  * half width. Bridges are solved first: a bridge meeting a portal sets its
  * height (and gets no cutting).
  */
-function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, halfOf, { done = new Set(), shape = true, seam = null } = {}) {
+function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, halfOf, { done = new Set(), shape = true, seam = null, levelTunnels = null } = {}) {
   const out = { bySeg: new Map(), tunnels: [], skipped: [], holes: [], graded: new Set(), tube: new Set(), mouth: new Map(), inside: new Map() };
   // before the bridges are solved (bridges null): a tunnel meeting a bridge
   // road waits for them
@@ -5630,7 +5631,17 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
       for (const id of ways) { const h = seam.lookup.at(id, x, y); if (seamHolds(h, seam.weightAt(x, y))) { if (seamSeen) { const k = `${h.from}:${h.tunnel || 'open'}`; seamSeen.set(k, (seamSeen.get(k) || 0) + 1); } return h.z - terrainData.minHeight - railLift; } }
       return null;
     } : null;
-    const t = solveTunnel({ xy: bore, half, gallery, ...(railGrade > 0 ? { grade: railGrade } : {}), ...(maxheights.length ? { maxheight: Math.min(...maxheights) } : {}) }, { groundAt, approaches, isFreeEnd, squareSize, streetsOver, overStreets, raw: !shape && !terrainData?.coarseElevation, knownZ });
+    // (a chunked level: where this chunk's grid cuts the tunnel, the height of the level's own line for it,
+    // services/levelTunnelPlan.js)
+    const planZ = (p) => {
+      if (!levelTunnels?.zAt || !isFreeEnd(p[0], p[1])) return null;
+      const ws = terrainData.width * squareSize; const b = terrainData.bounds;
+      const z = levelTunnels.zAt(b.north - (0.5 - p[1] / ws) * (b.north - b.south), b.west + (p[0] / ws + 0.5) * (b.east - b.west));
+      return Number.isFinite(z) ? z - terrainData.minHeight : null;
+    };
+    const freeZ = levelTunnels ? [planZ(bore[0]), planZ(bore[bore.length - 1])] : null;
+    const t = solveTunnel({ xy: bore, half, gallery, ...(railGrade > 0 ? { grade: railGrade } : {}), ...(maxheights.length ? { maxheight: Math.min(...maxheights) } : {}) }, { groundAt, approaches, isFreeEnd, squareSize, streetsOver, overStreets, raw: !shape && !terrainData?.coarseElevation, knownZ, freeZ });
+    if (freeZ && (freeZ[0] !== null || freeZ[1] !== null)) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunk: tunnel ${osm.map((o) => o.name || o.id).filter(Boolean).slice(0, 2).join(' / ') || '(unnamed)'}: ${freeZ.filter((v) => v !== null).length} end(s) cut by this chunk's grid take the level's own line for the tunnel (${freeZ.map((v) => (v === null ? 'its own end' : `${(v + terrainData.minHeight).toFixed(1)} m`)).join(', ')}).`);
     if (knownZ) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunk: tunnel ${osm.map((o) => o.name || o.id).filter(Boolean).slice(0, 2).join(' / ') || '(unnamed)'}: ${t.ok ? (t.seam ? `${t.seam.held} station(s) where the finished neighbours have the say at their heights, its own line moved by up to ${t.seam.shift.toFixed(2)} m to meet them` : 'no station in the seam\'s band on a road the neighbours handed on') : `left on the ground (${t.reason})`}${seamSeen.size ? `; the neighbours have this road as: ${[...seamSeen.keys()].map((k) => { const [from, kind] = k.split(':'); return `chunk ${from} ${kind === 'open' ? 'in the open' : `a ${kind} tunnel`}`; }).join(', ')}` : ''}.`);
     if (!t.ok) { out.skipped.push({ osm, reason: t.reason, length: t.length }); return null; }
     t.osm = osm;
@@ -6575,7 +6586,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   const done = new Set();
   const noTunnels = () => ({ bySeg: new Map(), tunnels: [], skipped: [], holes: [], graded: new Set(), tube: new Set(), mouth: new Map(), inside: new Map() });
   // (railway tunnels too: their bores come from the same builder)
-  const early = includeTunnels ? yield* solveExportTunnels(graphSegments, terrainData, squareSize, null, graphHalfOf, { done, shape: shaping.tunnels, seam: opts.structureSolver === 'v2' ? opts.seam : null }) : noTunnels();
+  const early = includeTunnels ? yield* solveExportTunnels(graphSegments, terrainData, squareSize, null, graphHalfOf, { done, shape: shaping.tunnels, seam: opts.structureSolver === 'v2' ? opts.seam : null, levelTunnels: opts.levelTunnels || null }) : noTunnels();
   yield 'bridges';
   // (structure solver v2: the decks come from the solver after the road
   // layout, so today's bridge passes are skipped)
@@ -6587,7 +6598,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     ? noBridges()
     : solveExportBridges(drivableRoads, terrainData, squareSize, early.tunnels);
   yield 'tunnels';
-  const late = includeTunnels ? yield* solveExportTunnels(graphSegments, terrainData, squareSize, bridges, graphHalfOf, { done, shape: shaping.tunnels, seam: opts.structureSolver === 'v2' ? opts.seam : null }) : noTunnels();
+  const late = includeTunnels ? yield* solveExportTunnels(graphSegments, terrainData, squareSize, bridges, graphHalfOf, { done, shape: shaping.tunnels, seam: opts.structureSolver === 'v2' ? opts.seam : null, levelTunnels: opts.levelTunnels || null }) : noTunnels();
   yield 'heights';
   const tunnels = joinTunnelPhases(early, late);
   // The structure solver's profile and classes (stages C, D), after today's
@@ -13554,6 +13565,8 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
 }
 
 /** A chunked level's export (exportBeamNGLevel with an overview that carries `chunked`). */
+// (a tunnel shorter than a chunk's margin is seen whole by the chunk that keeps it: only longer ones need the level's line)
+const LEVEL_TUNNEL_MIN_M = 100;
 async function exportChunkedFromOverview(overview, center, options) {
   const t0 = performance.now();
   const ch = overview.chunked;
@@ -13565,6 +13578,21 @@ async function exportChunkedFromOverview(overview, center, options) {
   const onProgress = options.onProgress;
   const n = ch.chunks || 1;
   console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunked level ${levelName}: ${n} chunk(s) of ${ch.size} px over a ${ch.W} x ${ch.H} footprint grid at ${ch.mpp} m/px; each generated again from the download cache and exported, then merged.`);
+  // The level's long tunnels, planned once from its overview (services/levelTunnelPlan.js): each tunnel that lies
+  // whole inside the level gets one line from portal to portal, which every chunk's free ends are taken from.
+  let levelTunnels = null;
+  try {
+    const b = overview.bounds; const inShape = footprintTest(overview);
+    const ovMpp = Number(ch.mpp) * (Number(ch.overviewFactor) || 1);
+    const plan = planLevelTunnels(overview.osmFeatures || [], {
+      center: { lat: (b.north + b.south) / 2, lng: (b.east + b.west) / 2 },
+      groundAt: (lat, lng) => { const h = getTerrainHeightWorld(lat, lng, overview); return Number.isFinite(h) ? h + overview.minHeight : null; },
+      inLevel: (lat, lng) => { const u = (lng - b.west) / (b.east - b.west); const v = (b.north - lat) / (b.north - b.south); return u > 0 && u < 1 && v > 0 && v < 1 && (!inShape || inShape(u, v)); },
+      edgeProbeM: 3 * ovMpp, minLength: LEVEL_TUNNEL_MIN_M,
+    });
+    if (plan.tunnels.length) levelTunnels = plan;
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunked: long tunnels: ${plan.tunnels.length ? `${plan.tunnels.length} planned once for the whole level from its overview (${plan.tunnels.slice(0, 8).map((t) => `${Math.round(t.length)} m, ${t.z0.toFixed(0)} to ${t.z1.toFixed(0)} m`).join('; ')}${plan.tunnels.length > 8 ? '; ...' : ''}): each chunk's end of a tunnel that its grid cuts takes its height from that line` : `none over ${LEVEL_TUNNEL_MIN_M} m lies whole inside the level: each chunk plans the tunnels it sees`}.`);
+  } catch (e) { console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Chunked: long tunnels not planned for the whole level (${e?.message || e}); each chunk plans the tunnels it sees.`); }
   const { zip, chunks, report } = await exportChunkedLevel({
     signal: options.signal || null,
     JSZip, chunked: ch, fetch,
@@ -13572,7 +13600,7 @@ async function exportChunkedFromOverview(overview, center, options) {
     // (the view distance from the whole level's width, not a chunk's)
     levelInfo: { visibleDistance: viewDistanceMeters(options.viewDistance, Math.max(ch.W, ch.H) * ch.mpp) },
     // (each chunk's own steps stay in the log; the progress shows the chunk being made)
-    options: { ...options, levelName, zipSink: undefined, stepCache: null, onProgress: undefined },
+    options: { ...options, levelName, levelTunnels, zipSink: undefined, stepCache: null, onProgress: undefined },
     // (the lines the window shows: translated there by services/statusLines.js, statusLines.chunkGenerating / chunkExporting / chunksMerging)
     onProgress: (p) => { if (p?.chunk) onProgress?.({ step: `Chunk ${p.chunk} of ${p.of}: ${p.step === 'generate' ? 'generating from the cache' : 'exporting'}…`, pct: Math.round((100 * (p.chunk - 1)) / p.of * 0.9) }); else onProgress?.({ step: 'Merging the chunks into one level…', pct: 92 }); },
     log: (m) => console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunked: ${m}`),
@@ -13622,6 +13650,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     // a chunk: the finished neighbours' solved road heights (services/chunkSeamRoads.js seamRoadLookup), held in the
     // seam's band; and whether to hand this chunk's own on (finalRoads)
     seamRoads = null,
+    // a chunk: the level's own lines for its long tunnels (services/levelTunnelPlan.js): { zAt(lat, lng) }
+    levelTunnels = null,
     // hand back the final heights (Float32Array, rows from the north) for the neighbours' seams
     keepFinalHeights = false,
     // (tests: the ground models' error bound in metres; groundMesh.js GROUND_MAX_ERROR_M when unset)
@@ -14119,7 +14149,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     return yield_();
   };
   const decalRoads = includeRoads
-    ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_, { onStatus: roadPart, raisedFootways: includeSidewalks, sidewalkStrips, junctionMouths: options.junctionMouths, roadsFollowSurvey: options.roadsFollowSurvey !== false, structureSolver: options.structureSolver, includeBridges, includeTunnels, includeDams: includeBuildings && options.includeDams !== false, includeRailways: options.includeRailways !== false, shaping: shapingOptions, lidar: lidar?.grid ? lidar : null, rawAt: rawAtWorld, keepSeamRoads: keepFinalHeights, seam: seamRoads && seamWeightAt ? { lookup: seamRoads, weightAt: seamWeightAt } : null })
+    ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_, { onStatus: roadPart, raisedFootways: includeSidewalks, sidewalkStrips, junctionMouths: options.junctionMouths, roadsFollowSurvey: options.roadsFollowSurvey !== false, structureSolver: options.structureSolver, includeBridges, includeTunnels, includeDams: includeBuildings && options.includeDams !== false, includeRailways: options.includeRailways !== false, shaping: shapingOptions, lidar: lidar?.grid ? lidar : null, rawAt: rawAtWorld, keepSeamRoads: keepFinalHeights, seam: seamRoads && seamWeightAt ? { lookup: seamRoads, weightAt: seamWeightAt } : null, levelTunnels })
     : [];
   // Bridges: decks for the bridge roads; nothing ground-bound (sidewalks,
   // props, lamps) is built along them, nothing tall stands up into them.

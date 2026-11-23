@@ -741,3 +741,25 @@ test('a low box under a street whose deck the ground data removed: the lid from 
   const without = solveTunnel(path, { ...base, streetsOver: true });
   assert.ok(!without.ok || without.kind === 'cutcover', `${without.kind}`);
 });
+
+test('a chunked level: a tunnel cut by the chunk’s grid takes its end from the level’s own line, and the neighbour’s heights where it has built', () => {
+  // a mountain: the portal's ground at 1000 m in the west, 1800 m of rock over the tunnel where the grid cuts it
+  const mountain = (x) => (x < -180 ? 1000 : Math.min(1800, 1000 + (x + 180) * 4));
+  const groundAt = (x) => mountain(x);
+  const xy = []; for (let x = -200; x <= 200; x += 10) xy.push([x, 0]);
+  const opts = { groundAt, approaches: [{ xy: [[-200, 0], [-400, 0]] }, null], isFreeEnd: (x) => x >= 199, squareSize: 1 };
+  // without the level's line: "under the ground there", as far up as the grade allows from the portal
+  const alone = solveTunnel({ xy, half: 4 }, opts);
+  assert.ok(alone.ok);
+  const zEnd = (t) => t.line[t.line.length - 1].z;
+  assert.ok(zEnd(alone) > 1015, `alone it climbs toward the surface (${zEnd(alone).toFixed(1)} m)`);
+  // with it: the tunnel's line from portal to portal says 1004 m at the cut
+  const planned = solveTunnel({ xy, half: 4 }, { ...opts, freeZ: [null, 1004] });
+  assert.ok(planned.ok);
+  assert.ok(Math.abs(zEnd(planned) - 1004) < 0.05, `on the level's line (${zEnd(planned).toFixed(2)} m)`);
+  // and where a finished neighbour has built the road (x >= 150), exactly its heights
+  const known = solveTunnel({ xy, half: 4 }, { ...opts, freeZ: [null, 1004], knownZ: (x) => (x >= 150 ? 1010 + (x - 150) * 0.02 : null) });
+  assert.ok(known.ok);
+  for (const p of known.line) if (p.x >= 150) assert.ok(Math.abs(p.z - (1010 + (p.x - 150) * 0.02)) < 1e-6, `the neighbour's height at x = ${p.x}`);
+  assert.ok(known.seam && known.seam.held > 0);
+});
