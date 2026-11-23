@@ -23,8 +23,23 @@ Before the 0.3.6 desktop release:
    carries `latest.yml.sig` and `latest-linux.yml.sig`, and both verify with the app's own key (a changed copy does
    not). Left: the user installs the test build (the signed Windows installer has not been run here); an update
    from dev.2 to dev.3 through the app: done by the user 2026-11-23, no issues.
-3. **Seams in game on a small level** (only the target area): the tunnel and the street at a join. The last look was
-   before the final fix.
+3. **Seams in game on a small level** (only the target area). 2026-11-23 evening: `scratch/frame/seamsmall.mjs`
+   builds a 768 x 512 m level of six 512 m chunks round one point of the Oslo corridor in 75 s (small chunks through
+   `chunked.size`). It showed three faults where four chunks meet, fixed on dev be7f530 (the keeping chunk's road
+   heights preferred, the ground target led by the keeping chunk, a held road never moved by the late blend): road
+   ends at different heights 4 -> 0 on it, the big Oslo level unchanged at 2 gutter decals. In game 2026-11-23: the
+   tunnel floor runs through the join with no step (4.56 m, 4.53 m either side, on the road line), a driver's view
+   through it is clean, and the ground either side of the three joins differs no more often than across lines that
+   are not joins. Test levels removed.
+   **Found there and fixed (dev): a chunked level loaded every folder once per chunk that listed it.** The merge kept
+   each chunk's group line for the same folder; the game loads a folder once per line, so six chunks loaded their
+   roads 6 x 6 x 4 times: 135,468 DecalRoads and 228,678 objects for 965 and 1,696, eight minutes for a 768 x 512 m
+   level (the same area as one level: 12 s). `dedupeGroups` in `services/chunkMerge.js`; after it 965 roads in 0.1 s.
+   This is why chunked levels "took forever to load" (user, 2026-11-23). On main and in 0.3.6-dev.3 the fault is
+   still there: wants a push to main and the next test build. Also fixed: a chunked level's name in the game's level
+   list was the first chunk's ("name_c0_0").
+   Still seen in the data: paths and service roads laid on the ground jump where one chunk has an open tunnel
+   cutting and its neighbour has ground over the tunnel (item 7).
 4. **Alignment leftovers of the frame change:** the 3D preview mesh and the upload paths (LAZ, ASC, GML) still use
    the old mapping; the sweep's areas re-fetched on the new frame.
 5. **Tiles step 2 leftovers:** previews masked to the footprint, a masked minimap, the edge skirt.

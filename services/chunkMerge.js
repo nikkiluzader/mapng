@@ -142,6 +142,27 @@ export function joinSeamRoads(roads, near = 0.3, dzMax = 0.5) {
   return { removed, joins, ambiguous, stepped, worstStep, steps };
 }
 
+/**
+ * Every items file's SimGroup lines made unique by name (the first kept). gathered: Map(path -> lines of NDJSON);
+ * changed in place. Returns how many lines were removed.
+ */
+export function dedupeGroups(gathered) {
+  let dropped = 0;
+  for (const [path, lines] of gathered) {
+    if (path === 'decals' || !path.endsWith('items.level.json')) continue;
+    const seen = new Set();
+    const kept = lines.filter((l) => {
+      if (!l.includes('"SimGroup"')) return true;
+      let o; try { o = JSON.parse(l); } catch { return true; }
+      if (o.class !== 'SimGroup' || typeof o.name !== 'string') return true;
+      if (seen.has(o.name)) { dropped++; return false; }
+      seen.add(o.name); return true;
+    });
+    if (kept.length !== lines.length) gathered.set(path, kept);
+  }
+  return dropped;
+}
+
 /** At most `max` spots, spread: every k-th (the exporter's own sampler keeps neighbourhoods; this keeps its order). */
 function capSpots(spots, max = SITES_MAX_SPOTS) {
   if (spots.length <= max) return spots;
@@ -263,6 +284,14 @@ export async function mergeChunks(JSZip, chunks, levelName, { log = () => {}, bo
   if (joined?.probes) {
     if (bounds) joined.probes.geo = { ...(joined.probes.geo || {}), bounds, worldSize: joined.probes.geo?.worldSize };
     out.file(`levels/${levelName}/mapng_probes.json`, JSON.stringify(joined.probes));
+  }
+  // A folder is listed once. Every chunk lists its own groups (MissionGroup's "Decal_Roads", a road's group, a
+  // tunnel's), and the same folder then stood in its parent's list once per chunk: the game loads a folder once for
+  // each line that names it, so a level of six chunks loaded its roads 6 x 6 x 4 times over (135,468 DecalRoads for
+  // 965, eight minutes for a 768 x 512 m level; seen in game 2026-11-23). The first line is kept.
+  {
+    const dropped = dedupeGroups(gathered);
+    log(`groups: ${dropped ? `${dropped} repeated group line(s) removed (each folder is listed once, or the game loads it once per line)` : 'no group is listed twice'}`);
   }
   // roads cut at the seams joined back into one each (the game's road graph then runs across)
   {

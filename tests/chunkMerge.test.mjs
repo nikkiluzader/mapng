@@ -1,7 +1,7 @@
 // chunkMerge.js and chunkedExport.js seamBlendFor: outputs moved into the level's frame, seams taken from neighbours.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { moveObject, rewritePaths } from '../services/chunkMerge.js';
+import { moveObject, rewritePaths, dedupeGroups } from '../services/chunkMerge.js';
 import { seamBlendFor } from '../services/chunkedExport.js';
 
 test('an object and a road move by the chunk offset and get the chunk in their name', () => {
@@ -94,4 +94,18 @@ test('seam blend reads only the neighbour footprint (outside it Generate only fi
   const size = 16; const f = { x0: 0, y0: 0, size, core: [0, 0, 12, 16], heights: new Float32Array(size * size).fill(5), runs: [[0, 0, 16]] };
   const b = seamBlendFor({ x0: 8, y0: 0, size }, [f], 4);
   assert.equal(b.weight[3], 1); assert.equal(b.weight[16 + 3], 0);   // row 1 is outside the neighbour's footprint
+});
+
+test('a folder is listed once in the merged level (the game loads it once per line naming it)', () => {
+  const g = (name) => JSON.stringify({ class: 'SimGroup', name, __parent: 'MissionGroup' });
+  const road = (name) => JSON.stringify({ class: 'DecalRoad', name });
+  const gathered = new Map([
+    ['levels/x/main/MissionGroup/items.level.json', [g('Decal_Roads'), g('tunnels'), g('Decal_Roads'), g('Decal_Roads'), g('tunnels')]],
+    ['levels/x/main/MissionGroup/Decal_Roads/items.level.json', [g('Main_Street'), road('SimGroup_looking_name'), g('Main_Street'), road('dr_a_c0_0'), road('dr_a_c1_0')]],
+    ['decals', ['x', 'x']],
+  ]);
+  assert.equal(dedupeGroups(gathered), 4);
+  assert.deepEqual(gathered.get('levels/x/main/MissionGroup/items.level.json').map((l) => JSON.parse(l).name), ['Decal_Roads', 'tunnels']);
+  assert.equal(gathered.get('levels/x/main/MissionGroup/Decal_Roads/items.level.json').length, 4);     // the roads all stay
+  assert.equal(gathered.get('decals').length, 2);
 });

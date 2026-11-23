@@ -13577,7 +13577,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     seamBlend = null,
     // (tests and plots: called with the post-blend's moves, { levelName, N, delta, weight, core })
     seamDebug = null,
-    // (a chunk: the whole level's name for the thumbnail, not the chunk's own)
+    // (a chunk: the whole level's name for the thumbnail and for info.json's title, not the chunk's own)
     previewTitle = null,
     // a chunk: the finished neighbours' solved road heights (services/chunkSeamRoads.js seamRoadLookup), held in the
     // seam's band; and whether to hand this chunk's own on (finalRoads)
@@ -16229,7 +16229,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     size: [worldSizeMeters, worldSizeMeters],
     // (the default first; without user points, today's single entry)
     spawnPoints: spawnPlan.spawnPoints,
-    title: levelDisplayName,
+    // (a chunk: the whole level's name; the merged level's info.json is the first chunk's, and the game's level list
+    // showed "<name>_c0_0")
+    title: previewTitle || levelDisplayName,
     supportsTraffic,
     supportsTimeOfDay: true,
     defaultDate: skyDate,
