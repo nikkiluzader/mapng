@@ -4,6 +4,7 @@
 // chunks' views of the same overlap), then merged into one level (services/chunkMerge.js).
 import { chunkLayout, levelLattice, CHUNK_PX, OVERLAP_PX } from './chunkLayout.js';
 import { mergeChunks } from './chunkMerge.js';
+import { seamRoadLookup } from './chunkSeamRoads.js';
 
 export const SEAM_EASE_PX = 64;
 
@@ -77,6 +78,9 @@ export async function exportChunked({ JSZip, footprint, W, H, center, mpp, level
     onProgress({ chunk: k + 1, of: chunks.length, step: 'generate' });
     const td = await inChunk(c, k, 'generating it from the cache', () => generateChunk(c, { bounds: L.chunkBounds(c), center: L.chunkCenter(c) }));
     const seamBlend = seamBlendFor(c, finished);
+    // (the finished chunks' solved road heights, in this chunk's own metres: held in the seam's band)
+    const off = L.chunkOffsetM(c);
+    const seamRoads = seamBlend && options.seamRoadPins !== false ? seamRoadLookup(finished.filter((f) => f.roads?.length).map((f) => ({ key: f.key, roads: f.roads, dx: f.off.x - off.x, dy: f.off.y - off.y }))) : null;
     signal?.throwIfAborted?.();
     onProgress({ chunk: k + 1, of: chunks.length, step: 'export' });
     const chunkLevel = `${levelName}_c${c.key}`;
@@ -84,12 +88,12 @@ export async function exportChunked({ JSZip, footprint, W, H, center, mpp, level
       ...options, levelName: chunkLevel, groundAsModels: true,
       groundShape: { size: c.size, runs: c.runs },
       chunkCore: [c.core[0] - c.x0, c.core[1] - c.y0, c.core[2] - c.x0, c.core[3] - c.y0],
-      seamBlend, keepFinalHeights: true,
+      seamBlend, seamRoads, keepFinalHeights: true,
     }));
     // (the merge sets every chunk at its own height from this: without it a chunk would sit hundreds of metres off)
     if (!Number.isFinite(Number(res?.finalMinHeight))) throw new Error(`Chunk ${c.key} (${k + 1} of ${chunks.length}): the export gave no lowest height for it; the chunks cannot be set at their heights.`);
     if (typeof res.report === 'string' && res.report) reports.push({ key: c.key, text: res.report });
-    finished.push({ key: c.key, x0: c.x0, y0: c.y0, size: c.size, core: c.core, runs: c.runs, heights: res.finalHeights });
+    finished.push({ key: c.key, x0: c.x0, y0: c.y0, size: c.size, core: c.core, runs: c.runs, heights: res.finalHeights, roads: res.finalRoads || [], off });
     // (a finished chunk's heights are needed only while a later chunk can still touch it: rows two chunks back drop)
     for (let i = finished.length - 1; i >= 0; i--) if (finished[i].y0 + finished[i].size < c.y0 - overlap) finished.splice(i, 1);
     // (a Blob in the browser; JSZip in Node reads its bytes)

@@ -118,8 +118,28 @@ export function joinSeamRoads(roads, near = 0.3, dzMax = 0.5) {
     }
     if (!joined) break;
   }
+  // what is left: ends of two chunks' pieces at one place in plan and not at one height (the two chunks solved the
+  // road apart: a step in it at the seam)
+  let stepped = 0; let worstStep = 0; const steps = [];
+  {
+    const ends = [];
+    for (const r of roads) if (!r.gone) for (const at of ['first', 'last']) ends.push({ r, at, p: endOf(r, at) });
+    const grid = new Map();
+    for (const e of ends) { const c = cell(e.p); let g = grid.get(c); if (!g) { g = []; grid.set(c, g); } g.push(e); }
+    const seen = new Set();
+    for (const e of ends) {
+      const cx = Math.floor(e.p[0] / near); const cy = Math.floor(e.p[1] / near);
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (const f of grid.get(`${cx + dx},${cy + dy}`) || []) {
+        if (f.r === e.r || seen.has(f) || e.r.ends[e.at] === f.r.ends[f.at] || !same(e.r.o, f.r.o)) continue;
+        const ddx = e.p[0] - f.p[0]; const ddy = e.p[1] - f.p[1]; if (ddx * ddx + ddy * ddy > near * near) continue;
+        const dz = Math.abs((e.p[2] ?? 0) - (f.p[2] ?? 0)); if (dz > dzMax) { stepped++; if (dz > worstStep) worstStep = dz; steps.push({ x: e.p[0], y: e.p[1], dz, a: e.r.o.name, b: f.r.o.name }); }
+      }
+      seen.add(e);
+    }
+  }
   for (const r of roads) { delete r.ends; delete r.gone; }
-  return { removed, joins, ambiguous };
+  steps.sort((a, b) => b.dz - a.dz);
+  return { removed, joins, ambiguous, stepped, worstStep, steps };
 }
 
 /** At most `max` spots, spread: every k-th (the exporter's own sampler keeps neighbourhoods; this keeps its order). */
@@ -251,10 +271,12 @@ export async function mergeChunks(JSZip, chunks, levelName, { log = () => {}, bo
       if (path === 'decals' || !path.endsWith('items.level.json')) continue;
       lines.forEach((l, i) => { if (l.includes('"DecalRoad"')) { const o = JSON.parse(l); if (Array.isArray(o.nodes) && o.nodes.length >= 2) roads.push({ o, chunk: String(o.name).split('_c').at(-1), path, i }); } });
     }
-    const { removed, joins, ambiguous } = joinSeamRoads(roads);
+    const { removed, joins, ambiguous, stepped, worstStep, steps } = joinSeamRoads(roads);
     for (const r of roads) { const list = gathered.get(r.path); list[r.i] = removed.has(r.o) ? null : JSON.stringify(r.o); }
     for (const [path, lines] of gathered) if (path !== 'decals') gathered.set(path, lines.filter((l) => l !== null));
-    log(`roads: ${roads.length} road piece(s) looked at; ${joins} pair(s) cut at a seam joined back into one road${ambiguous ? `; ${ambiguous} end(s) left as built, where more than two pieces meet (a junction on a seam)` : ''}`);
+    log(`roads: ${roads.length} road piece(s) looked at; ${joins} pair(s) cut at a seam joined back into one road${ambiguous ? `; ${ambiguous} end(s) left as built, where more than two pieces meet (a junction on a seam)` : ''}; ${stepped ? `${stepped} pair(s) of ends at one place and NOT at one height (over 0.5 m, the worst ${worstStep.toFixed(2)} m): a step in the road at a seam` : 'no two ends at one place stand at different heights'}`);
+    for (const st of steps.slice(0, 12)) log(`roads: step of ${st.dz.toFixed(2)} m at (${st.x.toFixed(0)}, ${st.y.toFixed(0)}) between ${st.a} and ${st.b}`);
+    if (steps.length > 12) log(`roads: ... and ${steps.length - 12} more step(s)`);
   }
   for (const [path, lines] of gathered) {
     if (path === 'decals') out.file(`levels/${levelName}/main.decals.json`, JSON.stringify(lines, null, 2));

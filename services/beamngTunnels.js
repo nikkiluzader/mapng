@@ -36,6 +36,7 @@ const GALLERY_ROOF_LEAD = 5;             // (stations by the bore left out of th
 const GALLERY_ROOF_RUN_M = 30;           // ... for this long is a gallery's roof: the tube runs on under it
 const DIG_FOR_COVER_M = 0.5;           // a bore's road is lowered under thin ground by this much at most before the cover is made up instead
 const OPEN_RUN_BED_M = 1;             // a stretch too thinly covered to fill stands in the open as a gallery when the ground is this far over the road all along it
+export const SEAM_EASE_MIN_M = 40;     // a chunked level: a tunnel's line eases from its neighbour's to its own over this at least
 export const MIN_TUBE_M = 20;          // a shorter bore is left on the ground
 const SMOOTH_SIGMA_M = 15;             // vertical curves on the profile
 const PORTAL_CURVE_SIGMA_M = 8;        // ... and on the whole road with its approaches (no V at a portal)
@@ -864,7 +865,7 @@ function followLid(straight, g, gLow, st, need, maxGrade) {
   return out;
 }
 
-function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = () => false, squareSize = 1, raw = false, overStreets = [] }, mode, digMax = Infinity) {
+function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = () => false, squareSize = 1, raw = false, overStreets = [], knownZ = null }, mode, digMax = Infinity) {
   // mode: false a bore, true a cut-and-cover box sunk under the street, 'low' a low box at the road's own level
   // (a railway's own grade where its kind climbs steeper than a road: a funicular's tunnel climbs its mountain at
   // 50 % and more; held to a road's 6 % the Funival's ends, 768 m apart in height over 1.6 km, left it on the surface)
@@ -897,6 +898,9 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
   // on the ground, the D 902 1.8 m over it)
   const streetLid = low && overStreets.length ? streetLidOf(path, W, overStreets, groundAt) : null;
   const g = st.map((p) => (low ? Math.max(lidAt(p), streetLid ? streetLid(p) : -Infinity) : groundAt(p.x, p.y)));
+  // (a chunked level: the road's height where a finished neighbouring chunk has already built it, see below)
+  const kz = knownZ ? st.map((p) => knownZ(p.x, p.y)) : null;
+  const known = (i) => !!kz && Number.isFinite(kz[i]);
   const free = [isFreeEnd(st[0].x, st[0].y), isFreeEnd(st[n - 1].x, st[n - 1].y)];
   // (onBridge: a bridge whose deck is solved after the tunnels, its height
   // still unknown: the portal's height from the ground as at a road end)
@@ -984,6 +988,31 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
     }
   }
 
+  // A chunked level (services/chunkSeamRoads.js): where a finished neighbouring chunk has built this road, the road is
+  // at the neighbour's height, exactly; past it this solve's own line, moved by what the two differ where they part
+  // and eased back to its own over a length the grade allows (the far portal stays where this solve has it). Two
+  // chunks each solve their own cut of a long tunnel: its two halves met 7 m apart at the seam.
+  let seamShift = 0;
+  if (kz && kz.some(Number.isFinite)) {
+    const own = z.slice();
+    const diff = (i) => kz[i] - own[i];
+    for (let i = 0; i < n; i++) {
+      if (known(i)) { z[i] = kz[i]; continue; }
+      let a = i - 1; while (a >= 0 && !known(a)) a--;
+      let b = i + 1; while (b < n && !known(b)) b++;
+      let c = 0;
+      if (a >= 0 && b < n) c = diff(a) + ((diff(b) - diff(a)) * (st[i].s - st[a].s)) / (st[b].s - st[a].s || 1);
+      else {
+        const k = a >= 0 ? a : b; const d = diff(k);
+        const room = a >= 0 ? L - st[k].s : st[k].s;
+        const ease = Math.min(Math.max(SEAM_EASE_MIN_M, Math.abs(d) / (MAXG * 0.5)), Math.max(room, 1e-6));
+        c = d * Math.max(0, 1 - Math.abs(st[i].s - st[k].s) / ease);
+      }
+      z[i] = own[i] + c;
+      if (Math.abs(c) > Math.abs(seamShift)) seamShift = c;
+    }
+  }
+
   // Portals: where the ground is first over the bore by the cover, from each
   // end (OSM ends often sit a little out on the approach); at a free end the
   // tube runs on to the map's edge. Where a bridge meets the tunnel the bore
@@ -1005,6 +1034,10 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
     if (fit < crown) { wall = fit - arch; crown = fit; need = crown + LINING_M + LOW_COVER_M; }
   }
   const covered = (i) => g[i] - z[i] >= need - (low ? LOW_FILL_M : 0) - 1e-6;
+  // (a chunked level: an end at the chunk's edge where the neighbour has this road in the open is no free end: the
+  // tube starts where the road is first under cover, as at any portal, not at the chunk's edge)
+  if (free[0] && known(0) && !covered(0)) free[0] = false;
+  if (free[1] && known(n - 1) && !covered(n - 1)) free[1] = false;
   const c0 = z.findIndex((_, i) => covered(i));
   const c1 = n - 1 - [...z].reverse().findIndex((_, k) => covered(n - 1 - k));
   if (c0 < 0 || c1 <= c0) return { ok: false, reason: 'not under ground in the elevation data', length: L };
@@ -1200,8 +1233,12 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
       p.z = tube ? Math.min(zs[k], Math.max(p.z, p.g - need + CURVE_COVER_M)) : zs[k];
     });
   }
+  // (a chunked level: the neighbour's heights again, exactly, after the curves)
+  let seamHeld = 0;
+  if (kz) for (const p of all) { const h = knownZ(p.x, p.y); if (Number.isFinite(h)) { p.z = h; seamHeld++; } }
   const tunnel = {
     ok: true,
+    ...(seamHeld ? { seam: { held: seamHeld, shift: seamShift } } : {}),
     line: all,
     iS: off + iS,
     iN: off + iN,

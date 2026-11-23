@@ -123,6 +123,25 @@ As of 2026-11-23:
   today's roads), an error names its chunk and step, a cancel stops between chunks, a missing lowest height stops
   the merge, the level's report is the merge's own lines plus every chunk's report (it was the first chunk's),
   the three progress lines are in 7 languages. Checked: the Oslo level again, 109 s, no downloads.
+  **Sweep, 2026-11-23 (read the same day):** the 135-cell matrix on dev 9c4df69 gives the same numbers in every cell
+  as the security-pass sweep (`scratch/sweep_frame.json` against `scratch/sweep_secpass.json`: no cell differs; the 10
+  flags against the older baseline are the same 10 in both). What it does and does not show: the sweep's stored areas
+  keep their own bounds, so it shows the export itself did not change; the frame change is covered by the direct
+  checks above, not by the sweep (the areas still need re-fetching on the new frame).
+  **Seams with shaping on, 2026-11-23 (afternoon), not yet committed to main:** a finished chunk hands its solved road
+  heights on (`services/chunkSeamRoads.js`); the next chunk's solver holds its stations at them where the neighbour
+  keeps the ground, the tunnel planner takes them as the tunnel's line there (`knownZ` in `beamngTunnels.js`) and
+  eases its own line to meet them; the late blend moves only what stands on the ground (a tunnel or deck road and a
+  structure's model keep their heights) and never a road where the neighbour has the say. Oslo test level
+  (`scratch/frame/seamdump.mjs`, plots `seam_before.png`, `seam_pins.png`, `seam_sections.png`): road ends at one
+  place and not at one height 23 -> 2 (the worst 7.20 m -> two gutter decals at one spot), the E18 tunnel's 7.2 m
+  step gone, joined pairs 54 -> 77, ground the late blend moves by over 0.5 m in a kept part 3,607 -> 839 points.
+  The merge now reports stepped ends with their places. Open: (1) a street on a lid over a tunnel trench that lies
+  on a seam (Frederiks gate): the two chunks' ground under it differs by 1.5 to 4.8 m and the blend ramps one into the
+  other over 64 m; two gutter decals step there. (2) A chunk that sees only part of a tunnel decides on that part
+  (bored or left on the ground) and the next chunk follows where it must: a plan for long structures made once for
+  the whole level would end that. (3) In-game look at the two seams on a SMALL level (user, 2026-11-23: test levels
+  cover only the target area; the 5 km level took minutes to load).
   **Next, in order:** the sweep on today's export changes; the seam conditions for shaped chunks (above)
   (roads-only read, no picking while generating, follow rules, routing off the main thread); chunked export
   (cache-only, cancel, translated progress, merged report); user reports since 2026-11-22 (user, 2026-11-23: "go
@@ -130,6 +149,16 @@ As of 2026-11-23:
   job tabs retired (user's decision of 2026-11-20, repeated 2026-11-23); the 0.3.6 release page.
   Done when: each alignment item has a test that fails before the fix; a chunked level and a road level at
   latitude 60 line up with the map data to the pixel; the sweep is unchanged.
+
+## Now: the user's dev notes (docs/dev-notes.md, 2026-11-23)
+
+- **Progress windows cut text off.** Redesign them so every line of the verbose text shows on any screen size.
+  Status: not started. Where: StageLoader and the export / Generate progress cards.
+- **The level's thumbnail is a MapNG logo and text,** no more satellite image. Status: not started. Where: the
+  preview step of `exportBeamNGLevel.js` ("Rendering the level preview thumbnail").
+- **An anchor for several tiles.** With more than one tile, a choice of anchor tile or anchor point appears (today
+  always tile 1, the first / leftmost); one-click controls. Status: not started. Where: `services/tileLayout.js`
+  (`tilesFrame` takes an anchor), `composables/useTiles.js`, the Tiles controls in step 1.
 
 ## Now: the 0.3.6 release page
 

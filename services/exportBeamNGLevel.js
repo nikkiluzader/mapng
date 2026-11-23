@@ -72,6 +72,7 @@ import { solveProfilesSteps, gradeLimit } from './structures/profileSolve.js';
 import { appendAll, keepInPlace } from './keepInPlace.js';
 import { classifyStructures } from './structures/structureRules.js';
 import { ringPlanePins } from './structures/rings.js';
+import { seamRoadsOut, seamRoadPins, seamHolds } from './chunkSeamRoads.js';
 import { junctionMouthPins, mouthsToRefuse } from './structures/junctionMouths.js';
 import { composeTerrain } from './structures/terrainCompose.js';
 import { addFineGroundDetail } from './terrainDetail.js';
@@ -5354,7 +5355,7 @@ const pathLength = (xy) => xy.reduce((n, p, i) => (i ? n + fastHypot(p[0] - xy[i
  * half width. Bridges are solved first: a bridge meeting a portal sets its
  * height (and gets no cutting).
  */
-function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, halfOf, { done = new Set(), shape = true } = {}) {
+function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, halfOf, { done = new Set(), shape = true, seam = null } = {}) {
   const out = { bySeg: new Map(), tunnels: [], skipped: [], holes: [], graded: new Set(), tube: new Set(), mouth: new Map(), inside: new Map() };
   // before the bridges are solved (bridges null): a tunnel meeting a bridge
   // road waits for them
@@ -5574,8 +5575,18 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
     // (shaping off on fine elevation: portals at the survey's own portal faces)
     const railGrade = Math.max(...path.idx.map((i) => parts[i].grade ?? 0));
     const maxheights = path.idx.map((i) => parts[i].maxheight).filter(Number.isFinite);
-    const t = solveTunnel({ xy: bore, half, gallery, ...(railGrade > 0 ? { grade: railGrade } : {}), ...(maxheights.length ? { maxheight: Math.min(...maxheights) } : {}) }, { groundAt, approaches, isFreeEnd, squareSize, streetsOver, overStreets, raw: !shape && !terrainData?.coarseElevation });
     const osm = path.idx.map((i) => parts[i].osm);
+    // (a chunk beside finished neighbours: this road's height where they have built it, in the seam's band; a
+    // railway's is its formation, RAIL_DEPTH_M under the solved top of rail)
+    const ways = seam?.lookup ? [...new Set(osm.map((o) => o.id).filter((id) => id != null))] : [];
+    const railLift = path.idx.some((i) => drivableRoads[parts[i].segIndex]?.rail) ? RAIL_DEPTH_M : 0;
+    const seamSeen = ways.length ? new Map() : null;
+    const knownZ = ways.length ? (x, y) => {
+      for (const id of ways) { const h = seam.lookup.at(id, x, y); if (seamHolds(h, seam.weightAt(x, y))) { if (seamSeen) { const k = `${h.from}:${h.tunnel || 'open'}`; seamSeen.set(k, (seamSeen.get(k) || 0) + 1); } return h.z - terrainData.minHeight - railLift; } }
+      return null;
+    } : null;
+    const t = solveTunnel({ xy: bore, half, gallery, ...(railGrade > 0 ? { grade: railGrade } : {}), ...(maxheights.length ? { maxheight: Math.min(...maxheights) } : {}) }, { groundAt, approaches, isFreeEnd, squareSize, streetsOver, overStreets, raw: !shape && !terrainData?.coarseElevation, knownZ });
+    if (knownZ) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunk: tunnel ${osm.map((o) => o.name || o.id).filter(Boolean).slice(0, 2).join(' / ') || '(unnamed)'}: ${t.ok ? (t.seam ? `${t.seam.held} station(s) where the finished neighbours have the say at their heights, its own line moved by up to ${t.seam.shift.toFixed(2)} m to meet them` : 'no station in the seam\'s band on a road the neighbours handed on') : `left on the ground (${t.reason})`}${seamSeen.size ? `; the neighbours have this road as: ${[...seamSeen.keys()].map((k) => { const [from, kind] = k.split(':'); return `chunk ${from} ${kind === 'open' ? 'in the open' : `a ${kind} tunnel`}`; }).join(', ')}` : ''}.`);
     if (!t.ok) { out.skipped.push({ osm, reason: t.reason, length: t.length }); return null; }
     t.osm = osm;
     t.approachKinds = approaches.map((a) => (!a ? null : Number.isFinite(a.deckZ) ? `bridge (${(a.rock || []).length} rock pts)` : a.onBridge ? 'bridge (deck solved later)' : `road ${Math.round(pathLength(a.xy))} m`));
@@ -6467,6 +6478,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   // and skipped, never an export failure.
   yield 'crossings';
   let structureGraph = null;
+  const seamPinned = new Set();
   try {
     // The structure solver's road graph (stage A), built on the untouched
     // ground. Shadow mode: nothing reads it yet but the report.
@@ -6518,7 +6530,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   const done = new Set();
   const noTunnels = () => ({ bySeg: new Map(), tunnels: [], skipped: [], holes: [], graded: new Set(), tube: new Set(), mouth: new Map(), inside: new Map() });
   // (railway tunnels too: their bores come from the same builder)
-  const early = includeTunnels ? yield* solveExportTunnels(graphSegments, terrainData, squareSize, null, graphHalfOf, { done, shape: shaping.tunnels }) : noTunnels();
+  const early = includeTunnels ? yield* solveExportTunnels(graphSegments, terrainData, squareSize, null, graphHalfOf, { done, shape: shaping.tunnels, seam: opts.structureSolver === 'v2' ? opts.seam : null }) : noTunnels();
   yield 'bridges';
   // (structure solver v2: the decks come from the solver after the road
   // layout, so today's bridge passes are skipped)
@@ -6530,7 +6542,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     ? noBridges()
     : solveExportBridges(drivableRoads, terrainData, squareSize, early.tunnels);
   yield 'tunnels';
-  const late = includeTunnels ? yield* solveExportTunnels(graphSegments, terrainData, squareSize, bridges, graphHalfOf, { done, shape: shaping.tunnels }) : noTunnels();
+  const late = includeTunnels ? yield* solveExportTunnels(graphSegments, terrainData, squareSize, bridges, graphHalfOf, { done, shape: shaping.tunnels, seam: opts.structureSolver === 'v2' ? opts.seam : null }) : noTunnels();
   yield 'heights';
   const tunnels = joinTunnelPhases(early, late);
   // The structure solver's profile and classes (stages C, D), after today's
@@ -6542,6 +6554,8 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     try {
       structureGraph.pins = [];
       structureGraph.tunnelsPinned = opts.structureSolver === 'v2';
+      // (stations a finished neighbouring chunk fixes, below: no later rule pins them elsewhere)
+      seamPinned.clear();
       structureGraph.edges.forEach((e, k) => {
         const t = opts.structureSolver === 'v2' ? tunnels.bySeg.get(e.seg) : null;
         if (!t) return;
@@ -6695,6 +6709,22 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
         appendAll(structureGraph.pins, plan.pins);
         Object.defineProperty(structureGraph, 'shaping', { value: plan, enumerable: false });
       }
+      // A chunk beside finished neighbours: its roads' stations in the seam's band take the neighbours' solved heights
+      // (services/chunkSeamRoads.js), over any other rule's pin there, so every road leaves the seam where the
+      // neighbour has it. (Each chunk solved its own cut of the network: metres apart at ramps and tunnels.)
+      if (opts.seam?.lookup && opts.structureSolver === 'v2') {
+        const fit = seamRoadPins(structureGraph, opts.seam.lookup, opts.seam.weightAt, terrainData.minHeight);
+        for (const [k, i] of fit.pins) seamPinned.add(`${k}:${i}`);
+        if (fit.pins.length) {
+          const before = structureGraph.pins.length;
+          structureGraph.pins = structureGraph.pins.filter(([k, i]) => !seamPinned.has(`${k}:${i}`));
+          let worst = 0; for (const [k, i, h] of fit.pins) { const d = Math.abs(h - structureGraph.edges[k].g[i]); if (d > worst) worst = d; }
+          appendAll(structureGraph.pins, fit.pins);
+          console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunk: ${fit.pins.length} road station(s) on ${fit.edges} road piece(s) where the finished neighbours have the say (the part they keep, and their tunnels as far as they built them) held at their solved heights (up to ${worst.toFixed(2)} m from the ground there; ${before + fit.pins.length - structureGraph.pins.length} other pin(s) there replaced); the neighbours handed on ${opts.seam.lookup.roads} road piece(s), ${opts.seam.lookup.stations} station(s).`);
+        } else {
+          console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunk: no road station in the finished neighbours' kept part matches a road the finished neighbours handed on (${opts.seam.lookup.roads} road piece(s)): none held.`);
+        }
+      }
       // stage C: every road's profile in one solve (shadow mode: measured with
       // the same checks as the level's roads, for the report)
       {
@@ -6721,6 +6751,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
           const mouthFit = opts.junctionMouths !== true ? { pins: [], mouths: 0 } : junctionMouthPins(structureGraph, structureGraph.profile.z);
           if (ringFit.pins.length || mouthFit.pins.length) {
             structureGraph.pins = structureGraph.pins || [];
+            if (seamPinned.size) { ringFit.pins = ringFit.pins.filter(([k, i]) => !seamPinned.has(`${k}:${i}`)); mouthFit.pins = mouthFit.pins.filter(([k, i]) => !seamPinned.has(`${k}:${i}`)); }
             appendAll(structureGraph.pins, ringFit.pins);
             // (a station on a ring's plane stays on it)
             const ringed = new Set(ringFit.pins.map(([k, i]) => `${k}:${i}`));
@@ -7231,6 +7262,15 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   Object.defineProperty(groups, 'crosswalkZones', { value: junctionMarkings.zones || [], enumerable: false });
   Object.defineProperty(groups, 'stopBars', { value: junctionMarkings.stops || [], enumerable: false });
   Object.defineProperty(groups, 'structureGraph', { value: structureGraph, enumerable: false });
+  // (a chunk: its solved road heights for the chunks after it, services/chunkSeamRoads.js)
+  // (a tunnel counts as this chunk's where its tube reaches the part the chunk keeps: only then does the chunk keep a
+  // piece of its model, which runs on past the seam. A stub seen in the margin alone binds nobody.)
+  const tubeCore = new Map();
+  const tubeInCore = (t) => {
+    if (!tubeCore.has(t)) tubeCore.set(t, !chunkOwnsActive || (t.line || []).some((p, i) => i >= (t.iS ?? 0) && i <= (t.iN ?? Infinity) && chunkOwnsActive(p.x, p.y)));
+    return tubeCore.get(t);
+  };
+  Object.defineProperty(groups, 'seamRoads', { value: opts.keepSeamRoads && structureGraph?.profile ? seamRoadsOut(structureGraph, terrainData.minHeight, (e) => { const t = tunnels?.bySeg?.get(e.seg); return t && tubeInCore(t) ? t.kind || 'bored' : ''; }) : null, enumerable: false });
   return groups;
 }
 
@@ -7903,6 +7943,8 @@ let groundAsModelsActive = false;
 let chunkOwnsActive = null;
 // (a chunk's seam blend moved its ground near a finished neighbour: what lies on it moves by the same: dz(x, y))
 let chunkZAdjustActive = null;
+const SEAM_ON_GROUND_M = 0.5;    // what stands this near the ground moves with it in the seam blend ...
+const SEAM_OFF_GROUND_M = 1;     // ... and not at all this much farther from it
 // (objects the merge places once for the whole level, never filtered by a chunk)
 const LEVEL_WIDE_CLASSES = new Set(['SimGroup', 'TerrainBlock', 'LevelInfo', 'ScatterSky', 'TimeOfDay', 'CloudLayer', 'SkyBox', 'Sun', 'WaterPlane', 'SpawnSphere', 'CameraBookmark', 'BeamNGWorldIconsRenderer', 'CubemapData', 'Forest', 'ForestWindEmitter', 'GroundCover', 'SFXEmitter', 'Precipitation', 'TerrainMaterialSet']);
 // (meshes in level coordinates at the origin or a tile origin, already cut to the chunk's core where built: ground
@@ -7940,8 +7982,8 @@ function toNDJSON(objects) {
       if (!owns || LEVEL_WIDE_CLASSES.has(rest.class)) return [JSON.stringify(rest)];
       // (on ground the seam blend moved: up or down with it)
       if (dz && rest.class !== 'SimGroup') {
-        if (Array.isArray(rest.position) && rest.position.length >= 3 && !(rest.class === 'TSStatic' && GENERATED_MESH.test(rest.shapeName || ''))) rest.position = [rest.position[0], rest.position[1], rest.position[2] + dz(rest.position[0], rest.position[1])];
-        if (Array.isArray(rest.nodes)) rest.nodes = rest.nodes.map((n) => [n[0], n[1], n[2] + dz(n[0], n[1]), ...n.slice(3)]);
+        if (Array.isArray(rest.position) && rest.position.length >= 3 && !(rest.class === 'TSStatic' && GENERATED_MESH.test(rest.shapeName || ''))) rest.position = [rest.position[0], rest.position[1], rest.position[2] + dz(rest.position[0], rest.position[1], rest.position[2]), ...rest.position.slice(3)];
+        if (Array.isArray(rest.nodes)) rest.nodes = rest.nodes.map((n) => [n[0], n[1], n[2] + dz(n[0], n[1], n[2]), ...n.slice(3)]);
       }
       // a chunk: lines cut at its core's edge, placed objects kept by position, generated meshes as built
       if ((rest.class === 'DecalRoad' || rest.class === 'River' || rest.class === 'MeshRoad') && Array.isArray(rest.nodes)) {
@@ -13528,6 +13570,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     // rows from the north): the final ground blended toward target by weight (1 at the shared edge, 0 EASE pixels in);
     // everything on that ground moves with it
     seamBlend = null,
+    // (tests and plots: called with the post-blend's moves, { levelName, N, delta, weight, core })
+    seamDebug = null,
+    // a chunk: the finished neighbours' solved road heights (services/chunkSeamRoads.js seamRoadLookup), held in the
+    // seam's band; and whether to hand this chunk's own on (finalRoads)
+    seamRoads = null,
     // hand back the final heights (Float32Array, rows from the north) for the neighbours' seams
     keepFinalHeights = false,
     // (tests: the ground models' error bound in metres; groundMesh.js GROUND_MAX_ERROR_M when unset)
@@ -13884,6 +13931,10 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Chunk: the neighbours' heights are ${seamBlend.target.length} points, this chunk's ${exportTerrainData.heightMap.length}: the seam is NOT blended (the chunks will not meet exactly).`);
     }
   }
+  // (the neighbours' say at a point of this chunk: 1 in their kept part, falling to 0 across the seam's band)
+  const seamWeightAt = seamBlend?.weight && exportTerrainData.heightMap.length === seamBlend.weight.length
+    ? (() => { const Nw = exportTerrainData.width; const Wt = seamBlend.weight; return (x, y) => { const c = Math.round(x / squareSize + Nw / 2); const r = Math.round(Nw / 2 - 1 - y / squareSize); return c >= 0 && r >= 0 && c < Nw && r < Nw ? Wt[r * Nw + c] : 0; }; })()
+    : null;
   const lat = center.lat.toFixed(4);
   const lng = center.lng.toFixed(4);
   const fallbackLevelName = `mapng_${lat}_${lng}`.replace(/-/g, '_').replace(/\./g, '_');
@@ -14021,7 +14072,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     return yield_();
   };
   const decalRoads = includeRoads
-    ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_, { onStatus: roadPart, raisedFootways: includeSidewalks, sidewalkStrips, junctionMouths: options.junctionMouths, roadsFollowSurvey: options.roadsFollowSurvey !== false, structureSolver: options.structureSolver, includeBridges, includeTunnels, includeDams: includeBuildings && options.includeDams !== false, includeRailways: options.includeRailways !== false, shaping: shapingOptions, lidar: lidar?.grid ? lidar : null, rawAt: rawAtWorld })
+    ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_, { onStatus: roadPart, raisedFootways: includeSidewalks, sidewalkStrips, junctionMouths: options.junctionMouths, roadsFollowSurvey: options.roadsFollowSurvey !== false, structureSolver: options.structureSolver, includeBridges, includeTunnels, includeDams: includeBuildings && options.includeDams !== false, includeRailways: options.includeRailways !== false, shaping: shapingOptions, lidar: lidar?.grid ? lidar : null, rawAt: rawAtWorld, keepSeamRoads: keepFinalHeights, seam: seamRoads && seamWeightAt ? { lookup: seamRoads, weightAt: seamWeightAt } : null })
     : [];
   // Bridges: decks for the bridge roads; nothing ground-bound (sidewalks,
   // props, lamps) is built along them, nothing tall stands up into them.
@@ -15116,12 +15167,30 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       const d = (T[k] - hm[k]) * w; hm[k] += d; delta[k] = d; moved++; if (Math.abs(d) > maxD) maxD = Math.abs(d); if (Math.abs(d) > 0.05) over5++;
     }
     const sqC = squareSize;
-    chunkZAdjustActive = (x, y) => {
+    // (x, y, z): how far what stands at (x, y) moves with the ground. Given its height z, only what stood ON the
+    // ground moves (within SEAM_ON_GROUND_M of it, fading out over SEAM_OFF_GROUND_M): a road in a tunnel or on a
+    // deck, a bridge's or a tunnel's model keep their heights, which the ground over or under them never set. (Every
+    // road node moved with the ground: a tunnel road held at its neighbour's height stepped 5.9 m at the seam where
+    // the two chunks' ground over it differed.)
+    const zBase = exportTerrainData.minHeight; const moves = { ground: 0, part: 0, off: 0 }; const roadsHeld = !!seamRoads;
+    chunkZAdjustActive = (x, y, z) => {
       const fx = Math.max(0, Math.min(N - 1.001, x / sqC + N / 2)); const fy = Math.max(0, Math.min(N - 1.001, N / 2 - 1 - y / sqC));   // (row r from the north is at (N / 2 - 1 - r) squares: the game's grid)
       const c0 = Math.floor(fx); const r0 = Math.floor(fy); const tx = fx - c0; const ty = fy - r0;
-      return delta[r0 * N + c0] * (1 - tx) * (1 - ty) + delta[r0 * N + c0 + 1] * tx * (1 - ty) + delta[(r0 + 1) * N + c0] * (1 - tx) * ty + delta[(r0 + 1) * N + c0 + 1] * tx * ty;
+      const at = (a) => a[r0 * N + c0] * (1 - tx) * (1 - ty) + a[r0 * N + c0 + 1] * tx * (1 - ty) + a[(r0 + 1) * N + c0] * (1 - tx) * ty + a[(r0 + 1) * N + c0 + 1] * tx * ty;
+      const d = at(delta);
+      if (!Number.isFinite(z) || d === 0) return d;
+      const off = Math.abs(z - (at(hm) - d - zBase));
+      let f = off <= SEAM_ON_GROUND_M ? 1 : Math.max(0, 1 - (off - SEAM_ON_GROUND_M) / SEAM_OFF_GROUND_M);
+      // (with the neighbours' road heights handed on, a road is already at the neighbour's height where the neighbour
+      // has the say: not moved there, the move fading in over the first quarter of the band. A street on a lid over
+      // the neighbour's tunnel trench was taken 1.5 to 4.8 m down into the trench at the seam.)
+      if (roadsHeld) f *= Math.max(0, Math.min(1, (1 - at(Wt)) / 0.25));
+      if (Math.abs(d) > 0.05) { if (f >= 1) moves.ground++; else if (f > 0) moves.part++; else moves.off++; }
+      return d * f;
     };
-    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunk: seam blend after the terrain steps: ${moved} grid point(s) brought exactly onto the finished neighbours' heights, at most ${maxD.toFixed(3)} m, ${over5} of them by more than 5 cm (what this chunk's own terrain steps changed near the seam after it started on the neighbours' ground); roads, objects and trees on them move with the ground, sidewalk and rail models built before this step do not.`);
+    chunkZAdjustActive.moves = moves;
+    seamDebug?.({ levelName: requestedLevelName, N, delta, weight: Wt, target: T, core: chunkCore });
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunk: seam blend after the terrain steps: ${moved} grid point(s) brought exactly onto the finished neighbours' heights, at most ${maxD.toFixed(3)} m, ${over5} of them by more than 5 cm (what this chunk's own terrain steps changed near the seam after it started on the neighbours' ground); roads, objects and trees standing on that ground move with it (a road in a tunnel or on a deck and a structure's model keep their heights), sidewalk and rail models built before this step do not.`);
   }
   if (groundAsModels) {
     beginStep('ground', 'Building the ground as models…');
@@ -15981,7 +16050,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     let dropped = 0;
     for (const [type, list] of forestPlacements) {
       const keep = list.filter((it) => chunkOwnsActive(it.pos[0], it.pos[1]));
-      if (chunkZAdjustActive) for (const it of keep) it.pos = [it.pos[0], it.pos[1], roundTo(it.pos[2] + chunkZAdjustActive(it.pos[0], it.pos[1]), 3)];
+      if (chunkZAdjustActive) for (const it of keep) it.pos = [it.pos[0], it.pos[1], roundTo(it.pos[2] + chunkZAdjustActive(it.pos[0], it.pos[1], it.pos[2]), 3)];
       dropped += list.length - keep.length; forestPlacements.set(type, keep);
     }
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunk: ${dropped} tree(s) and prop(s) outside its core left out.`);
@@ -17568,11 +17637,12 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   finishProcessingLog();
   lastPct = 100;
   onProgress?.({ step: 'Done', pct: 100, elapsedMs: performance.now() - exportT0, completed: processingLog[processingLog.length - 1] ?? null });
+  if (chunkZAdjustActive?.moves) { const m = chunkZAdjustActive.moves; console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunk: where the seam blend moved the ground by over 5 cm, ${m.ground} road node(s) and object(s) on the ground moved with it, ${m.part} near it moved in part, ${m.off} off the ground (tunnels, decks, structures) kept their heights.`); }
   console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Completed exportBeamNGLevel`);
   return {
     blob: zipBlob, filename: `${levelName}.zip`, structureChecks, ingameProbes,
     // (a chunk: its final heights for its neighbours' seams, services/chunkedExport.js)
-    ...(keepFinalHeights ? { finalHeights: Float32Array.from(exportTerrainData.heightMap), finalMinHeight: exportTerrainData.minHeight } : {}),
+    ...(keepFinalHeights ? { finalHeights: Float32Array.from(exportTerrainData.heightMap), finalMinHeight: exportTerrainData.minHeight, finalRoads: decalRoads?.seamRoads || [] } : {}),
     // (the level's reports for the "done" window, read there without opening the zip again: export_report.md, and
     // export_report.json with the map data, for "Save report")
     report: reportMarkdown,
