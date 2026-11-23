@@ -280,7 +280,11 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
     retired (its public half into `UPDATE_KEYS`);
   - after main deploys: delete the `CRASH_ADMIN_TOKEN` worker secret (both workers) and its line in mapng.env;
   - decide on GitHub's immutable releases (a published release could then not be rebuilt in place);
-  - look at: Workers Builds settings (which branches build), the Access apps, the Azure identity's role.
+  - the Azure identity's role and its secret's expiry (two `az` commands, given to the user 2026-11-23).
+- **Checked 2026-11-23 with the user's token:** Workers Builds has one trigger per worker (`main` for mapng, `dev`
+  for dev-mapng), no other branch builds, no build variables; Access: the admin app covers `mapng.com/admin*` and
+  `/api/admin/*` for one address (its cookie now HttpOnly, SameSite Lax), the dev app covers dev.mapng.com for 35
+  addresses; the repo has no webhooks and no deploy keys.
 - **Checks owed:** the new workflow has not run (first tag: watch `sign-manifest`, and that both `.sig` files are
   on the release before a test build is published); the Windows build with fuses has not been started on Windows;
   on mapng.com after main: `/admin` carries the policy and Cloudflare's injected script takes its nonce.
