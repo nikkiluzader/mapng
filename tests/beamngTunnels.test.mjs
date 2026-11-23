@@ -724,6 +724,29 @@ test('a steep railway tunnel (funicular) climbs at its own grade and stays under
   }
 });
 
+// A fine survey that kept a gallery's roof: a level slab 6 m over the road, level across the lanes like the road's
+// own bench. Tignes' Paravalanche des Pigettes (40 m): the roof was read as the road at four stations and the road
+// humped 4.3 m through the gallery, 30 % at its ends. The roof is not the road.
+test('a gallery whose roof is in the survey keeps its road under it, not on it', () => {
+  // the road on a bench cut into a hillside (hill on the left), climbing 4 % along y; the roof over y = -14..16
+  const ground = (x, y) => {
+    const roadZ = 100 + 0.04 * y;
+    if (y > -14 && y < 16 && x > -5.5 && x < 5.5) return roadZ + 6;
+    if (Math.abs(x) <= 5) return roadZ;
+    return x < 0 ? roadZ + 0.6 * (-x - 5) : roadZ - 0.6 * (x - 5);
+  };
+  const t = solveTunnel({ xy: road(-20, 20), half: 3.5, gallery: true }, { groundAt: ground, approaches: [{ xy: road(-20, -80) }, { xy: road(20, 80) }] });
+  assert.equal(t.ok, true, t.reason);
+  assert.equal(t.kind, 'gallery');
+  assert.ok(t.roofSeen > 0, 'the level stretch over the road is taken for the roof');
+  for (const p of t.line) assert.ok(Math.abs(p.z - (100 + 0.04 * p.y)) < 0.3, `road at ${p.z.toFixed(2)} at y ${p.y.toFixed(0)}, the real road ${(100 + 0.04 * p.y).toFixed(2)}`);
+  // a road that really climbs through its gallery, benches all along, is left as surveyed
+  const plain = (x, y) => { const z = 100 + 0.08 * y; return Math.abs(x) <= 5 ? z : x < 0 ? z + 0.6 * (-x - 5) : z - 0.6 * (x - 5); };
+  const u = solveTunnel({ xy: road(-100, 100), half: 3.5, gallery: true }, { groundAt: plain });
+  assert.equal(u.roofSeen, 0);
+  for (const p of u.line) assert.ok(Math.abs(p.z - (100 + 0.08 * p.y)) < 0.3);
+});
+
 // A funicular's tunnel is one steady slope, not a copy of the hillside over it (Tignes' Perce-Neige: 650 m of its
 // line followed the slope's waves at 4 to 52 %, the dips under it filled over the tube into a bulge). The line bends
 // only where the ground comes down to it.

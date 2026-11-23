@@ -468,6 +468,7 @@ const GAL_COLUMN_M = 0.6;
 const GAL_RIB_M = 0.45;                // pilasters and roof beams stand out this far
 const GAL_BENCH_SLOPE = 0.07;           // the survey level across the lanes within this: the road's bench is in it
 const GAL_BENCH_OUT_M = 10;            // ...looked for this far outside each end too
+const GAL_ROOF_SEEN_M = 2.5;           // a level stretch this far over the road carried through: the roof in the survey
 const GAL_VERGE_M = 2;                 // the valley side's verge: level with the road this far out, then falling away
 const GAL_VERGE_FALL = 0.5;            // ...at this slope at most (fill)
 const GAL_VALLEY_CLEAR_M = 3;          // the valley side's ground kept down to the road this far past the columns
@@ -526,13 +527,47 @@ export function solveGallery(path, { groundAt, squareSize = 1 }) {
   const surveyed = level(st[0]) || level(st[n - 1]) || level(outside(st[0], -1)) || level(outside(st[n - 1], 1));
   const bench = st.map((p, i) => !surveyed || i === 0 || i === n - 1 || level(p));
   const zRaw = g.slice();
+  // (a survey that kept the roof: level across the lanes like a bench, GAL_H and more over the road. Tignes'
+  // Paravalanche des Pigettes: the roof read as the road at four stations, a 40 m gallery's road humped 4.3 m at
+  // 30 %. An end standing on it takes the open road's height just outside; inside, a level stretch is the road's
+  // only within GAL_ROOF_SEEN_M of the line carried between the benches already known, nearest ones first)
+  let roofSeen = 0;
+  if (surveyed) {
+    for (const [i, sgn] of [[0, -1], [n - 1, 1]]) {
+      const o = outside(st[i], sgn);
+      const go = groundAt(o.x, o.y);
+      if (level(o) && g[i] - go > GAL_ROOF_SEEN_M) { zRaw[i] = go; roofSeen++; }
+    }
+    const known = st.map((p, i) => i === 0 || i === n - 1);
+    const carriedAt = (i) => {
+      let a = i - 1; while (!known[a]) a--;
+      let b = i + 1; while (!known[b]) b++;
+      return zRaw[a] + ((zRaw[b] - zRaw[a]) * (st[i].s - st[a].s)) / (st[b].s - st[a].s);
+    };
+    // outward from the known stations, a step at a time: a bench next to a known one is judged against it
+    for (let pass = 0, grew = true; grew && pass < n; pass++) {
+      grew = false;
+      for (const dir of [1, -1]) {
+        for (let i = dir > 0 ? 1 : n - 2; i > 0 && i < n - 1; i += dir) {
+          if (known[i] || !bench[i] || !known[i - dir]) continue;
+          if (Math.abs(g[i] - carriedAt(i)) <= GAL_ROOF_SEEN_M) { known[i] = true; grew = true; }
+        }
+      }
+    }
+    // (benches with no known neighbour: judged against the carried line as it stands)
+    for (let i = 1; i < n - 1; i++) {
+      if (known[i] || !bench[i]) continue;
+      if (Math.abs(g[i] - carriedAt(i)) <= GAL_ROOF_SEEN_M) known[i] = true;
+      else { bench[i] = false; roofSeen++; }
+    }
+  }
   let unbenched = 0;
   for (let i = 1; i < n - 1; i++) {
     if (bench[i]) continue;
     unbenched++;
     let a = i - 1; while (!bench[a]) a--;
     let b = i + 1; while (!bench[b]) b++;
-    const carried = g[a] + ((g[b] - g[a]) * (st[i].s - st[a].s)) / (st[b].s - st[a].s);
+    const carried = zRaw[a] + ((zRaw[b] - zRaw[a]) * (st[i].s - st[a].s)) / (st[b].s - st[a].s);
     const [xv, yv] = lateral(st[i], -uphill * (W + GAL_VERGE_M));
     const valley = groundAt(xv, yv);
     zRaw[i] = Math.min(Math.max(carried, Math.min(valley, g[i])), g[i]);
@@ -548,7 +583,7 @@ export function solveGallery(path, { groundAt, squareSize = 1 }) {
     ok: true, kind: 'gallery', line, iS: 0, iN: n - 1, foot,
     portals: [false, false], portalKind: ['edge', 'edge'],
     W, wall: GAL_H, arch: 0, crown: GAL_H, need: GAL_H + GAL_ROOF_M, headTop: GAL_H + GAL_ROOF_M,
-    uphill, unbenched,
+    uphill, unbenched, roofSeen,
     length: L, tubeLength: L, fill: 0, short: 0, dips: [], exposed: [], squareSize,
     headDepth: 0, stepAt: 0, wingT: GAL_WALL_T, wingD: W, headHalf: W + GAL_WALL_T + 1,
     wings: { [-1]: new Map(), [1]: new Map() }, maxExtra: 0, cuts: [],

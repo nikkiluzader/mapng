@@ -351,7 +351,17 @@ As of 2026-11-23:
     a 50 % step became 18 % then 28 %, one bend. Probe and plot: `scratch/fizz035/funi_fetch.mjs`,
     `funi_probe.mjs`, `funi_plot.py`, `funi_section.png`. `fz_funival`'s 97 % is the test area's edge cutting the
     tunnel (the end aims at the ground there), not his map.
-  - **(2), (3): not started.** For later: Mesh Road joins and hairpins, the big tunnel box, water under small bridges.
+  - **(2) gallery heights: the main cause fixed on dev, not seen in game, sweep owed.** The survey here kept the
+    galleries' roofs; a roof is level across the lanes, so it was read as the road's own bench and the road pulled
+    up onto it (Pigettes: a 4.3 m hump in 40 m, 30 % at the ends; his [12], [13], and the join by the bridge of
+    [01]). Now a level stretch counts only within 2.5 m of the road carried between the benches already known
+    (`GAL_ROOF_SEEN_M`, `solveGallery`); the report says per gallery where its road height came from. New area
+    `fz_pigettes` (512): steep stretches on structures 14 to 0. Sections: `scratch/fizz035/pig_before_after.png`.
+    The 12 m bridge beside it is now a road on the ground (it was a deck only because of the hump).
+    - Open: [10] the D 902's gallery stretches round the lake "a little low and deep in the ground" (a bored
+      tunnel's open stretches, another code path: not looked at); [11] "too short" and [14] not matched to a
+      gallery by name yet; the other eight galleries of his map not exported one by one.
+  - **(3) bridge width and spikes: not started.** For later: Mesh Road joins and hairpins, the big tunnel box, water under small bridges.
 
 ## Now: Fizz_Mechanic's 0.3.3 list (2026-11-19; on hold until after the 0.3.5 release, user 2026-11-20)
 
