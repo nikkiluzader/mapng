@@ -274,8 +274,9 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
   - data.html and security.html say the GPXZ key goes by way of mapng.com;
   - GitHub: ruleset "main and dev: admins only" (27899025), Dependabot alerts and security updates on.
 - **Left for the user:**
-  - move the four secrets from the repository into the `release` environment, then delete the repository ones
-    (until then a branch workflow can still read them);
+  - (done 2026-11-23: the four secrets are in the `release` environment only, the repository holds none; the Azure
+    values were checked to sign in and the signing key to match `UPDATE_KEYS` before the old ones were deleted)
+  - remove the `AZURE_CLIENT_SECRET` line from mapng.env;
   - take `UPDATE_SIGNING_KEY` out of mapng.env (keep it offline), and make a second key pair so the first can be
     retired (its public half into `UPDATE_KEYS`);
   - after main deploys: delete the `CRASH_ADMIN_TOKEN` worker secret (both workers) and its line in mapng.env;
