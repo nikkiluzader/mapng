@@ -172,7 +172,12 @@ export async function fetchMapterhornRaw(bounds, opts = {}) {
   }, signal);
   cache.clear();
   if (!lidar) return null;
-  // overlapping chunks in EPSG:3857, pixel-centre origins
+  // overlapping chunks in EPSG:3857. Each origin is the outer corner of the chunk's first pixel, as a GeoTIFF's is: a
+  // pixel's value stands for its area, and the resamplers place the sample at its middle themselves
+  // (services/rasterCells.js sampleOrigin). Until 2026-11-23 the origin given here was already the middle, so the half
+  // pixel was added twice and the whole surface sat half a source pixel north-west of its place: 0.4 m on 1 m lidar,
+  // about 10 m on the 30 m data at zoom 12 (measured: the map's heights matched the tiles read 0.4 m west and north
+  // of where they belong, to 5 mm).
   const res = tileSizeM(z) / TILE;
   const west = -MERC_HALF + r.x0 * tileSizeM(z), north = MERC_HALF - r.y0 * tileSizeM(z);
   const tiles = [];
@@ -186,7 +191,7 @@ export async function fetchMapterhornRaw(bounds, opts = {}) {
       if (!any) for (let i = 0; i < w; i += 16) if (row[i] !== NO_DATA) { any = true; break; }
     }
     if (!any) continue;
-    tiles.push({ raster, width: w, height: h, originX: west + (cx + 0.5) * res, originY: north - (cy + 0.5) * res, resX: res, resY: -res, noData: NO_DATA, epsgCode: 3857 });
+    tiles.push({ raster, width: w, height: h, originX: west + cx * res, originY: north - cy * res, resX: res, resY: -res, noData: NO_DATA, epsgCode: 3857 });
     if (cx + w >= W) break;
   }
   // (zoom and metres per pixel of the deepest data found: tiles from coarser ancestors are upsampled into the mosaic)

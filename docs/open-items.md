@@ -91,6 +91,12 @@ As of 2026-11-23:
   preview's mesh, the upload paths' local bases, sweep areas re-fetched). Found on the way: every map's bounds were
   8 m wider than the game drew it (1.5 % small at 512 m), and a chunk's ground squares were assigned one row off.
   Also fixed 2026-11-23: the footprint clipper walks every segment (crossings kept, gaps cut, roundabouts whole).
+  **Measured 2026-11-23** (scratch/frame: a 512 m Val d'Isère map made by the real Generate, its heights against the
+  source tiles read by separate code, shift_check / offset_check / blocks_check, plot frame_before_after.png): 0.3.5
+  had the terrain up to 5.5 m from where the game draws it (stretched outward: the 8 m of padding, the (W - 1)
+  spans); now 0.000 m everywhere. The check also found the Mapterhorn source (the default) read half a source pixel
+  north-west of its place (its tiles' origins were given as pixel middles and the resampler added the half pixel
+  again: 0.4 m on 1 m lidar, about 10 m on the 30 m data at zoom 12): fixed in services/mapterhorn.js.
   **Next, in order:** seam rejoin (height check, three or more pieces) and blend before build; road picking
   (roads-only read, no picking while generating, follow rules, routing off the main thread); chunked export
   (cache-only, cancel, translated progress, merged report); user reports since 2026-11-22 (user, 2026-11-23: "go
@@ -98,6 +104,18 @@ As of 2026-11-23:
   job tabs retired (user's decision of 2026-11-20, repeated 2026-11-23); the 0.3.6 release page.
   Done when: each alignment item has a test that fails before the fix; a chunked level and a road level at
   latitude 60 line up with the map data to the pixel; the sweep is unchanged.
+
+## Now: a Reset button (desktop and web)
+
+- **The desktop app's Refresh becomes Reset, and the website gets the same button** (user, 2026-11-23: "i really
+  meant for that to be more of a reset button"). Status: not started. One click clears every setting, the location
+  and a picked road (road mode included) and goes back to the defaults: Tile mode, one tile of 1024 x 1024, the
+  location asked for again (the browser's or the app's location permission), Flagstaff AZ when that is refused.
+  Where: the desktop View menu's reload (desktop/main.js buildMenu) and wherever the window offers a refresh; the
+  store's defaults (stores/mainStore.js) and the saved settings (localStorage `mapng_*`); texts in 7 languages.
+  Open point to settle when building it: personal keys (GPXZ key, own Overpass server) are settings too: ask
+  whether Reset clears them or keeps them. Done when: after Reset the window is as on a first start, on the
+  desktop and on the website, and a test checks no `mapng_*` setting is left behind.
 
 ## Now: Fizz_Mechanic's 0.3.3 list (2026-11-19; on hold until after the 0.3.5 release, user 2026-11-20)
 
