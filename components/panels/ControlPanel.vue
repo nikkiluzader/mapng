@@ -139,6 +139,12 @@
           <AlertTriangle :size="11" class="shrink-0 mt-px" />
           <span>{{ t('controlPanel.bigAreaOsm', { km: sideKmText }) }}</span>
         </p>
+        <!-- (desktop) the memory Generate needs at its peak, when it is close to this computer's or past it
+             (services/memoryEstimate.js estimateGenerateMemory) -->
+        <p v-if="generateMemory" class="flex items-start gap-1.5 text-micro leading-snug" :class="generateMemory.fit === 'tooMuch' ? 'font-medium text-red-600 dark:text-red-400' : 'text-amber-700 dark:text-amber-300'" data-testid="generate-memory">
+          <AlertTriangle :size="11" class="shrink-0 mt-px" />
+          <span>{{ t(`controlPanel.generateMemory_${generateMemory.fit}`, { gb: generateMemory.gb, total: generateMemory.total, free: generateMemory.free }) }}</span>
+        </p>
         <p v-if="farShake" class="flex items-start gap-1.5 text-micro leading-snug text-amber-700 dark:text-amber-300">
           <AlertTriangle :size="11" class="shrink-0 mt-px" />
           <span>{{ t('controlPanel.farShake') }}</span>
@@ -468,6 +474,8 @@ import TileLayout from '../controls/TileLayout.vue';
 import RoadMode from '../controls/RoadMode.vue';
 import { useTiles } from '../../composables/useTiles.js';
 import { useRoadMode } from '../../composables/useRoadMode.js';
+import { estimateGenerateMemory, memoryFit } from '../../services/memoryEstimate.js';
+import { CHUNK_PX } from '../../services/chunkLayout.js';
 import ExportPanel from './ExportPanel.vue';
 import { useMainStore } from '../../stores/mainStore';
 import GenerateActions from '../controls/GenerateActions.vue';
@@ -791,6 +799,33 @@ watch(previewStale, (v) => emit('update:previewStale', v), { immediate: true });
 // Area calculations (resolution is in metres because metersPerPixel = 1)
 const totalWidthMeters = computed(() => props.resolution * metersPerPixel.value);
 // (tiles in step 1: the footprint's area, overlaps once; one tile: the square as before)
+// (desktop) Generate's memory need against this computer's: shown only when it is tight or too much
+const machineMemory = ref(0);
+// (what is free right now, to the half GB: other programs can hold most of a computer's memory. The report this
+// came from, MR-PM849Z, had 5.5 of 15.2 GB free.)
+const freeMemoryGb = ref(0);
+if (desktopApp?.onUsage) {
+  const stopUsage = desktopApp.onUsage((u) => {
+    if (u?.memTotal && u.memTotal !== machineMemory.value) machineMemory.value = u.memTotal;
+    const free = Math.round((Number(u?.memFree) || 0) / 2 ** 30 * 2) / 2; if (free !== freeMemoryGb.value) freeMemoryGb.value = free;
+  });
+  onUnmounted(() => stopUsage?.());
+}
+const generateMemory = computed(() => {
+  if (!desktopApp || !machineMemory.value || nativeDims.value || store.batchMode) return null;
+  const g = store.areaMode === 'road' ? roadApi.grid.value : store.tiles.length > 1 ? tileApi.grid.value : null;
+  if (store.areaMode === 'road' && !g) return null;
+  // (a shape built in chunks is generated one chunk at a time)
+  const side = Number(props.resolution) || 0;
+  const [w, h] = g ? (g.chunked ? [CHUNK_PX, CHUNK_PX] : [g.width, g.height]) : [side, side];
+  const gb = estimateGenerateMemory({ widthPx: w, heightPx: h });
+  const fit = memoryFit(gb, machineMemory.value);
+  const total = Math.round(machineMemory.value / 2 ** 30);
+  if (fit && fit !== 'fits') return { fit, gb: Math.ceil(gb), total, free: freeMemoryGb.value };
+  // (it fits this computer, but not what is free at this moment)
+  if (fit === 'fits' && freeMemoryGb.value > 0 && gb > freeMemoryGb.value && !props.isGenerating) return { fit: 'busy', gb: Math.ceil(gb), total, free: freeMemoryGb.value };
+  return null;
+});
 const tileApi = useTiles(() => props.resolution, () => props.processingMetersPerPixel);
 const roadApi = useRoadMode(() => props.processingMetersPerPixel);
 const totalAreaSqM = computed(() => {

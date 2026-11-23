@@ -884,6 +884,9 @@
       "needsOsmOn": "Zuerst „OSM-Features einbeziehen“ einschalten"
     },
     "bigAreaOsm": "Großes Gebiet ({km} km breit). Das Gelände ist in dieser Größe kein Problem, aber viele OpenStreetMap-Daten (Orte, dichte Straßen) führen sehr wahrscheinlich zu Problemen: langsames oder fehlschlagendes Erzeugen und Exportieren und ein schweres Level. Am besten, wo es wenige Kartendaten gibt (Wüsten, Gebirge); sonst OSM-Daten ausschalten oder ein kleineres Gebiet wählen.",
+    "generateMemory_tight": "Das Generieren dieser Karte braucht in der Spitze etwa {gb} GB Arbeitsspeicher, nahe an den {total} GB dieses Computers: Schließe vorher andere Programme.",
+    "generateMemory_tooMuch": "Das Generieren dieser Karte braucht in der Spitze etwa {gb} GB Arbeitsspeicher, mehr als die {total} GB dieses Computers hergeben: Der Speicher wird wahrscheinlich nicht reichen. Wähle eine kleinere Größe oder eine gröbere Verarbeitungsauflösung.",
+    "generateMemory_busy": "Das Generieren dieser Karte braucht in der Spitze etwa {gb} GB Arbeitsspeicher, und im Moment sind nur {free} GB frei: Schließe vorher andere Programme.",
     "farShake": "Teile dieses Levels liegen mehr als 30 km vom Mittelpunkt entfernt: In BeamNG können Objekte so weit draußen zu zittern beginnen.",
     "osmTilesFirst": "Zuerst MapNGs eigene Kopie von OpenStreetMap",
     "osmTilesFirstHint": "Schnell und ohne Anfragelimit: der ganze Planet, von Zeit zu Zeit aus OpenStreetMap kopiert. Ausschalten, um zuerst die Live-Server von OpenStreetMap zu fragen (sie haben die heutigen Änderungen, sind aber langsamer und manchmal nicht erreichbar); MapNGs Kopie ist dann die Reserve.",

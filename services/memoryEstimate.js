@@ -55,3 +55,23 @@ export function memoryFit(gb, totalBytes) {
   if (gb <= total * TIGHT_SHARE) return 'tight';
   return 'tooMuch';
 }
+
+// ── Generate ──────────────────────────────────────────────────────────────────
+// What the desktop app's Generate step needs at its peak, by the map's pixels: its own process measured through
+// whole runs at 2, 4, 8 and 16 km (scratch/memprobe/samples, 2026-11-18: 1.0-1.4, 3.1-4.0, 5.9-7.6 and 8.6-10.4 GB)
+// and alone at 8192 x 2 m in a dense place (scratch/memprobe/gen_peak.mjs, 2026-11-24: 7.0 GB after the textures'
+// canvases are let go; 8.65 GB before, which a 16 GB computer could not give: report MR-PM849Z). The upper figures,
+// read between the measured sizes. A map built in chunks is generated a chunk at a time: one chunk's pixels count.
+const GENERATE_GB = [[0, 0.6], [4.2, 1.4], [16.8, 4.0], [67.1, 7.6], [268.4, 10.5]];
+
+/** @returns {number} GB at the peak of generating a map of widthPx x heightPx. */
+export function estimateGenerateMemory({ widthPx = 0, heightPx = widthPx } = {}) {
+  const mpx = (Math.max(0, Number(widthPx) || 0) * Math.max(0, Number(heightPx) || 0)) / 1e6;
+  for (let i = 1; i < GENERATE_GB.length; i++) {
+    const [m0, g0] = GENERATE_GB[i - 1]; const [m1, g1] = GENERATE_GB[i];
+    if (mpx <= m1) return g0 + ((g1 - g0) * (mpx - m0)) / (m1 - m0);
+  }
+  // (past the largest measured map: its slope carried on)
+  const [ma, ga] = GENERATE_GB[GENERATE_GB.length - 2]; const [mb, gb] = GENERATE_GB[GENERATE_GB.length - 1];
+  return gb + ((gb - ga) / (mb - ma)) * (mpx - mb);
+}

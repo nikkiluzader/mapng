@@ -43,12 +43,13 @@ export function startMemoryReports() {
   const heapLimit = v8.getHeapStatistics().heap_size_limit;
   let cpuBefore = process.cpuUsage(); let at = Date.now();
   setInterval(() => {
-    const { rss, heapUsed } = process.memoryUsage();
+    const { rss, heapUsed, external, arrayBuffers } = process.memoryUsage();
     const cpuNow = process.cpuUsage(); const now = Date.now();
     // (busy cores: CPU time over wall time)
     const cores = ((cpuNow.user - cpuBefore.user) + (cpuNow.system - cpuBefore.system)) / 1000 / Math.max(1, now - at);
     cpuBefore = cpuNow; at = now;
-    send({ type: 'memory', rss, heapUsed, heapLimit, cores });
+    // (external and arrayBuffers: what the job holds outside the JS heap, typed arrays above all)
+    send({ type: 'memory', rss, heapUsed, external, arrayBuffers, heapLimit, cores });
   }, 1000).unref();
 }
 

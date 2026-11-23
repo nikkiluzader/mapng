@@ -1964,6 +1964,8 @@ const canvasToSatelliteBlobUrl = async (srcCanvas) => {
  * @param {object}   [generationOptions]
  * @returns {Promise<object>} TerrainData — heightMap, bounds, satellite/OSM textures, …
  */
+// the map textures' encodes may overlap in the desktop app's own process up to this size (see where it is used)
+const OVERLAP_ENCODES_MAX_PX = 4096;
 export const fetchTerrainData = async (
   center,
   resolution,
@@ -2734,14 +2736,22 @@ export const fetchTerrainData = async (
     // (10 s for an 8 km map) and runs on another thread. In the desktop app's own process the next texture
     // is painted while the last one encodes; in a browser tab they stay one after another, where three
     // pictures of that size encoding at once is memory a tab may not have.
-    const overlapEncodes = typeof window === 'undefined';
+    // (... and only up to OVERLAP_ENCODES_MAX_PX a side there too: at 8192 the three pictures and their encoders
+    // together were the whole Generate's peak, 8.65 GB against 6.8 GB one at a time (measured,
+    // scratch/memprobe/gen_peak.mjs; a 16 GB computer ran out of memory there, report MR-PM849Z))
+    const overlapEncodes = typeof window === 'undefined' && longSide <= OVERLAP_ENCODES_MAX_PX;
     const encoding = [];
     const afterPainting = async (work) => { if (overlapEncodes) encoding.push(work); else await work; };
+    // (a big map in the desktop app's own process: a picture's canvas is let go once its PNG exists. The job keeps
+    // the PNG and never the canvas (desktop/runner/jobFormat.mjs), and held to the end the three canvases and their
+    // PNGs were 3.4 GB of an 8192 map's 8 GB.)
+    const dropCanvas = typeof window === 'undefined' && longSide > OVERLAP_ENCODES_MAX_PX;
+    const kept = (result) => { if (dropCanvas && result.blob && result.canvas) { releaseCanvas(result.canvas); return null; } return result.canvas; };
     if (generateOSMTextureAsset) {
       onProgress?.("Generating OSM texture...");
       await afterPainting(generateOSMTexture(terrainData, options).then((osmResult) => {
         terrainData.osmTextureUrl = osmResult.url;
-        terrainData.osmTextureCanvas = osmResult.canvas;
+        terrainData.osmTextureCanvas = kept(osmResult);
         terrainData.osmTextureBlob = osmResult.blob || null;
       }));
     }
@@ -2753,7 +2763,7 @@ export const fetchTerrainData = async (
         { ...options, satelliteCanvas: hybridSatelliteCanvas },
       ).then((hybridResult) => {
         terrainData.hybridTextureUrl = hybridResult.url;
-        terrainData.hybridTextureCanvas = hybridResult.canvas;
+        terrainData.hybridTextureCanvas = kept(hybridResult);
         terrainData.hybridTextureBlob = hybridResult.blob || null;
       }));
     }
@@ -2762,7 +2772,7 @@ export const fetchTerrainData = async (
       onProgress?.("Generating game map texture...");
       await afterPainting(generateGameTexture(terrainData, { ...options, satelliteCanvas: hybridSatelliteCanvas }).then((gameResult) => {
         terrainData.gameTextureUrl = gameResult.url;
-        terrainData.gameTextureCanvas = gameResult.canvas;
+        terrainData.gameTextureCanvas = kept(gameResult);
         terrainData.gameTextureBlob = gameResult.blob || null;
       }));
     }

@@ -25,9 +25,12 @@ test('a software renderer and WebGL 1 are said; no WebGL at all is said', () => 
 
 test('a satellite picture that could not be fitted is called out of memory, with the size and what to do', async () => {
   const { satelliteFitError } = await import('../services/resamplerClient.js');
-  const said = satelliteFitError(8192, 8192, new Error(''));
+  const said = satelliteFitError(8192, 8192, new Error(''), { inDesktopProcess: false });
   assert.match(said, /^out of memory: the satellite picture could not be fitted to a 8192 × 8192 map\. /);
   assert.match(said, /smaller size, or use the desktop app\.$/);
+  // (in the desktop app's own process: no tabs to close, no desktop app to move to)
+  const desk = satelliteFitError(8192, 8192, new Error(''), { inDesktopProcess: true });
+  assert.match(desk, /Close other programs and try again, or choose a smaller size\.$/); assert.doesNotMatch(desk, /desktop app|tabs/);
   assert.match(satelliteFitError(4096, 4096, new Error('Create skia surface failed')), /\(Create skia surface failed\)/);
   assert.doesNotMatch(satelliteFitError(4096, 4096, new Error('out of memory')), /\(/);
 });

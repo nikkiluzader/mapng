@@ -577,11 +577,12 @@ export const resampleHeightAndImageOffThread = async (
 };
 
 /** What to say when the satellite picture could not be fitted to the map and no copy of it is left. */
-export const satelliteFitError = (width, height, cause) => {
+export const satelliteFitError = (width, height, cause, { inDesktopProcess = typeof window === 'undefined' } = {}) => {
     const why = String(cause instanceof Error ? cause.message : (typeof cause === 'string' ? cause : '')).trim();
     return `out of memory: the satellite picture could not be fitted to a ${width} × ${height} map`
         + `${why && !/out of memory/i.test(why) ? ` (${why.slice(0, 120)})` : ''}. `
-        + 'Close other tabs and try again, choose a smaller size, or use the desktop app.';
+        // (in the desktop app's own process there are no tabs to close and no desktop app to move to)
+        + (inDesktopProcess ? 'Close other programs and try again, or choose a smaller size.' : 'Close other tabs and try again, choose a smaller size, or use the desktop app.');
 };
 
 /**

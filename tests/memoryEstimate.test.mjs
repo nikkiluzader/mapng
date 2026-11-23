@@ -32,3 +32,16 @@ test('fit against the computer: fits, tight, too much', () => {
   assert.equal(memoryFit(30, 32 * GB), 'tooMuch');
   assert.equal(memoryFit(10, 0), null);
 });
+
+test('Generate’s memory need by map size: the measured figures, read between them', async () => {
+  const { estimateGenerateMemory, memoryFit } = await import('../services/memoryEstimate.js');
+  const gb = (px) => estimateGenerateMemory({ widthPx: px });
+  assert.ok(Math.abs(gb(2048) - 1.4) < 0.05); assert.ok(Math.abs(gb(4096) - 4.0) < 0.05); assert.ok(Math.abs(gb(8192) - 7.6) < 0.05); assert.ok(Math.abs(gb(16384) - 10.5) < 0.05);
+  assert.ok(gb(1024) < gb(2048) && gb(6000) > gb(4096) && gb(6000) < gb(8192) && gb(20000) > gb(16384));
+  // a rectangle counts by its pixels
+  assert.ok(Math.abs(estimateGenerateMemory({ widthPx: 8192, heightPx: 2048 }) - gb(4096)) < 0.05);
+  // the report's case: 8192 on a 15.2 GB computer is tight (it failed outright before the peak was lowered)
+  assert.equal(memoryFit(gb(8192), 15.2 * 2 ** 30), 'fits');
+  assert.equal(memoryFit(gb(16384), 15.2 * 2 ** 30), 'tight');
+  assert.equal(memoryFit(gb(8192), 8 * 2 ** 30), 'tooMuch');
+});
