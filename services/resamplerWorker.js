@@ -8,6 +8,7 @@
  *
  * All data is passed as transferable ArrayBuffers where possible.
  */
+import { gridLngLat } from './mapFrame.js';
 import proj4 from 'proj4';
 import { cellIndex, sampleOrigin } from './rasterCells.js';
 import { getBuiltInProj4 } from './uploadGeoMetadata.js';
@@ -60,29 +61,18 @@ const createLocalToWGS84 = (centerLat, centerLng) => {
 
 const normalizeLng = (lng) => ((((lng + 180) % 360) + 360) % 360) - 180;
 
-const getPixelLatLng = (x, y, width, height, toWGS84, targetBounds) => {
+// A position on the map's grid as [lng, lat]: (gx, gy) in squares from the bounds' north-west corner, fractions
+// allowed (services/mapFrame.js). Height sample (column x, row y) is the vertex at (x, y + 1): the game's own grid,
+// where every reader of the heights looks (terrainLookup.js). A picture's texel centre is at its own half square.
+const getPixelLatLng = (gx, gy, width, height, toWGS84, targetBounds) => {
     if (targetBounds && Number.isFinite(targetBounds.north) && Number.isFinite(targetBounds.south)
         && Number.isFinite(targetBounds.east) && Number.isFinite(targetBounds.west)) {
-        // (pixelEdges: the bounds are the edges of the grid's squares, a chunk of the level's lattice
-        // (services/chunkLayout.js): vertex x at x / width of the span, so neighbouring chunks share their pixels;
-        // otherwise the first and last pixels sit on the bounds, as before)
-        const edges = !!targetBounds.pixelEdges;
-        const u = edges ? x / width : width > 1 ? x / (width - 1) : 0.5;
-        const v = edges ? y / height : height > 1 ? y / (height - 1) : 0.5;
-        const lat = targetBounds.north - v * (targetBounds.north - targetBounds.south);
-
-        let lngSpan = targetBounds.east - targetBounds.west;
-        if (lngSpan > 180) lngSpan -= 360;
-        if (lngSpan < -180) lngSpan += 360;
-        const lng = normalizeLng(targetBounds.west + u * lngSpan);
-        return [lng, lat];
+        const [lng, lat] = gridLngLat(targetBounds, width, height, gx, gy);
+        return [normalizeLng(lng), lat];
     }
 
-    const halfWidth = width / 2;
-    const halfHeight = height / 2;
-    const localX = x - halfWidth;
-    const localY = halfHeight - y;
-    return toWGS84.forward([localX, localY]);
+    // (no bounds given: the same grid in a local metric frame round the centre)
+    return toWGS84.forward([gx - width / 2, height / 2 - gy]);
 };
 
 const getOutputBounds = (toWGS84, width, height, targetBounds) => {
@@ -989,7 +979,7 @@ const sampleGapRow = (y, width, height, needed, fillMap, sample, noData, toWGS84
     for (let x = 0; x < width; x++) {
         const idx = row + x;
         if (!needed[idx]) continue;
-        const [lng, lat] = getPixelLatLng(x, y, width, height, toWGS84, targetBounds);
+        const [lng, lat] = getPixelLatLng(x, y + 1, width, height, toWGS84, targetBounds);
         let v = sample(lng, lat);
         if (!Number.isFinite(v) || v <= -200 || v === noData) v = noData;
         fillMap[idx] = v;
@@ -1210,7 +1200,7 @@ const resampleHeight = async ({ id, center, width, height, targetBounds = null, 
     // the two surfaces can be joined smoothly instead of butted together.
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
-            const [lng, lat] = getPixelLatLng(x, y, width, height, toWGS84, targetBounds);
+            const [lng, lat] = getPixelLatLng(x, y + 1, width, height, toWGS84, targetBounds);
 
             let h = sampleHeightAt(lng, lat, preparedGroups, null, NO_DATA);
 
@@ -1266,7 +1256,7 @@ export const sampleHeightBand = async ({ y0, y1 }, shared) => {
     for (let y = y0; y < y1; y++) {
         const rowOffset = y * width;
         for (let x = 0; x < width; x++) {
-            const [lng, lat] = getPixelLatLng(x, y, width, height, toWGS84, targetBounds);
+            const [lng, lat] = getPixelLatLng(x, y + 1, width, height, toWGS84, targetBounds);
             joinedHere = false;
             let h = sampleHeightAt(lng, lat, groups, null, noData);
             if (!Number.isFinite(h) || h <= -200 || h === noData) h = noData;
@@ -1483,7 +1473,7 @@ const resampleHeightAndImage = async ({ id, center, width, height, imageWidth, i
         for (let y = 0; y < height; y++) {
             const rowOffset = y * width;
             for (let x = 0; x < width; x++) {
-                const [lng, lat] = getPixelLatLng(x, y, width, height, toWGS84, targetBounds);
+                const [lng, lat] = getPixelLatLng(x, y + 1, width, height, toWGS84, targetBounds);
                 // Gap-fill is sampled and blended in afterwards, not inline, so
                 // the seam between the two sources can be joined smoothly.
                 joinedHere = false;

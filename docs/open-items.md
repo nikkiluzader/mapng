@@ -86,6 +86,10 @@ As of 2026-11-23:
   - **Unfinished from the plans:** step 2 parts C (previews masked to the footprint), E (drag, desktop, languages,
     game tests), F (edge skirt, buildings at the edge, masked minimap); step 3 (Batch mode retired: its tile grid
     and combined level now duplicate tiles); the chunked list above in "tiles in step 1".
+  **Progress 2026-11-23:** the alignment items are fixed at the root for every map (user's decision): one frame,
+  services/mapFrame.js; plan and what is left in refs/output/map-frame-plan.md (in-game centimetre check, the 3D
+  preview's mesh, the upload paths' local bases, sweep areas re-fetched). Found on the way: every map's bounds were
+  8 m wider than the game drew it (1.5 % small at 512 m), and a chunk's ground squares were assigned one row off.
   Done when: each alignment item has a test that fails before the fix; a chunked level and a road level at
   latitude 60 line up with the map data to the pixel; the sweep is unchanged.
 

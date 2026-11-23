@@ -17,7 +17,7 @@ test('Generate: every chunk fetched (cached), then the overview, which carries w
   const fetch = async (c, size, o) => { calls.push({ size, o }); return { width: typeof size === 'object' ? size.width : size }; };
   const td = await generateChunked({ fetch, center: { lat: 10, lng: 20 }, W: 3000, H: 1000, mpp: 1, footprint: [[0, 0, 3000, 1000]], size: 1024, overlap: 256 });
   const chunkCalls = calls.filter((c) => c.o.targetBounds);
-  assert.ok(chunkCalls.length >= 4); assert.ok(chunkCalls.every((c) => c.o.targetBounds.pixelEdges && c.size === 1024));
+  assert.ok(chunkCalls.length >= 4); assert.ok(chunkCalls.every((c) => c.o.targetBounds && c.size === 1024));
   assert.equal(calls.at(-1).o.targetBounds, undefined);
   assert.equal(td.chunked.W, 3000); assert.equal(td.chunked.size, 1024); assert.ok(td.chunked.footprint.runs.length === 1000);
 });

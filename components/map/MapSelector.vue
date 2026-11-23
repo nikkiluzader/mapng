@@ -421,6 +421,7 @@ import { RELIEF_MODES, createReliefLayer } from '../../services/reliefTileLayer.
 import { daysSince } from '../../services/exportHotspots.js';
 import { WORLD_BOUNDS, minZoomForWidth, formatSelectionSize, formatLatLng, clampLng } from '../../services/mapView.js';
 import { useMainStore } from '../../stores/mainStore';
+import { tilesFrame } from '../../services/tileLayout.js';
 import { useBackgroundEditor } from '../../composables/useBackgroundEditor.js';
 import { attachBackgroundLayer } from './backgroundLayer.js';
 import { attachSpawnPointLayer } from './spawnPointLayer.js';
@@ -572,17 +573,14 @@ const tileAnchor = () => (props.boxLocked ? props.center : currentCenter.value);
 const extraTiles = computed(() => {
   if (store.batchMode || hasBatchGrid.value || store.tiles.length < 2 || showUploadedCoverageBounds.value) return [];
   // (round the selection: the pinned centre while the area is locked, else the map's)
-  const c = tileAnchor(); const mpp = Number(props.processingMetersPerPixel) > 0 ? Number(props.processingMetersPerPixel) : 1;
-  const span = tileApi.R.value * mpp; const mLng = 111320 * Math.cos((c.lat * Math.PI) / 180);
-  return tileApi.tileOffsetsM.value.slice(1).map((o, k) => {
-    const center = { lat: c.lat + o.y / 111320, lng: c.lng + o.x / mLng };
-    return { i: k + 1, center, bounds: computeMetricSelectionBounds(center, span) };
-  });
+  // (each tile where Generate will build it: the tiled map's own frame, services/tileLayout.js tilesFrame)
+  const f = tilesOnMap();
+  return f.boxes.slice(1).map((bounds, k) => ({ i: k + 1, center: f.centers[k + 1], bounds }));
 });
+const tilesOnMap = () => tilesFrame(tileAnchor(), tileApi.tilesPx.value, tileApi.R.value, Number(props.processingMetersPerPixel) > 0 ? Number(props.processingMetersPerPixel) : 1);
 const dropTile = (tile, event) => {
   const ll = event?.target?.getLatLng?.(); if (!ll) return;
-  const c = tileAnchor(); const mLng = 111320 * Math.cos((c.lat * Math.PI) / 180);
-  tileApi.moveTile(tile.i, { x: (ll.lng - c.lng) * mLng, y: (ll.lat - c.lat) * 111320 });
+  tileApi.moveTile(tile.i, tilesOnMap().offsetOf(ll));
   // (the handle moved to the placed spot itself, even when that is where the tile already was: re-creating the marker
   // to redraw it cancelled the map library's queued position updates, one unhandled rejection per drag step)
   const marker = event.target;

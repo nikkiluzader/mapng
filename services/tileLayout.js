@@ -1,3 +1,4 @@
+import { metresPerDegree, frameBounds, gridLngLat, gridPosition } from './mapFrame.js';
 // Tiles in step 1 (refs/output/tiles-plan.md): one map made of several tiles of the same base size, laid out where the
 // user puts them. Tile 0 sits on the map's centre; every tile is an offset from it in whole processing pixels (x east,
 // y north). One tile is today's single square, exactly.
@@ -114,4 +115,31 @@ export function tilesFromTerrain(td) {
     anchor: Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null,
     together: t.together !== false, snap: t.snap !== false,
   };
+}
+
+/**
+ * A tiled map where it is built (services/mapFrame.js): { grid (layoutGrid), center (the map's), bounds (the map's),
+ * boxes: each tile's { north, south, east, west }, centers: each tile's { lat, lng }, offsetOf({ lat, lng }): a point
+ * as metres from tile 0's middle (x east, y north) }. anchor: tile 0's middle; tilesPx: the tiles in pixels; R: a
+ * tile's side in pixels; mpp: metres per pixel. The tiles drawn on the map and the map Generate builds both come from
+ * this, so a tile is drawn exactly where its ground will be.
+ */
+export function tilesFrame(anchor, tilesPx, R, mpp) {
+  const grid = layoutGrid(tilesPx, R); const m = Number(mpp) > 0 ? Number(mpp) : 1;
+  // the map's centre, such that tile 0's middle is the anchor in the map's own frame (its scale is the centre's)
+  let lat = anchor.lat;
+  for (let k = 0; k < 4; k++) lat = anchor.lat + (grid.centerOffset.y * m) / metresPerDegree(lat).lat;
+  const center = { lat, lng: anchor.lng + (grid.centerOffset.x * m) / metresPerDegree(lat).lng };
+  const bounds = frameBounds(center, grid.width * m, grid.height * m);
+  const boxes = grid.rects.map(([x, y, w, h]) => {
+    const [west, north] = gridLngLat(bounds, grid.width, grid.height, x, y); const [east, south] = gridLngLat(bounds, grid.width, grid.height, x + w, y + h);
+    return { north, south, east, west };
+  });
+  const centers = boxes.map((b) => ({ lat: (b.north + b.south) / 2, lng: (b.east + b.west) / 2 }));
+  const r0 = grid.rects[0];
+  const offsetOf = (p) => {
+    const g = gridPosition(bounds, grid.width, grid.height, p.lat, p.lng);
+    return { x: (g.gx - (r0[0] + r0[2] / 2)) * m, y: ((r0[1] + r0[3] / 2) - g.gy) * m };
+  };
+  return { grid, center, bounds, boxes, centers, offsetOf };
 }

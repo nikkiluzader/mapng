@@ -1,17 +1,18 @@
 // Road mode (refs/output/road-mode-plan.md): a stretch of road widened by a distance either side, as one map's grid and
-// footprint. The footprint is row runs (services/batchShape.js shapes): a pixel is in when its centre is within the half
-// width of the road's line (exact; overlapping bends counted once).
+// footprint. The footprint is row runs (services/batchShape.js shapes) of the map's height samples: a sample is in when
+// its place in the world is within the half width of the road's line (overlapping bends counted once).
 //
-// The grid matches Generate's: a local transverse Mercator frame centred on the map (services/geoUtils.js), pixels laid
-// linearly across the fetch box, which is the map's metric extent plus FETCH_PAD_M each side (terrain.js
-// computeMetricFetchBounds and the resampler's targetBounds mapping): pixel x's centre at
-// -spanX/2 + x * spanX / (W - 1) metres, spanX = W * mpp + 2 * FETCH_PAD_M.
-import { createWGS84ToLocal, createLocalToWGS84 } from './geoUtils.js';
+// The grid is Generate's own (services/mapFrame.js): the map's bounds are exactly its size through its centre, positions
+// linear in latitude and longitude across them, sample (x, y) the vertex x squares from the west edge and y + 1 from
+// the north. Distances to the road are measured on the ground, in metres at the latitude where they are measured, so
+// the corridor is the same width at the top of a long map as at its centre. (Until 2026-11-23 it was rasterised in a
+// transverse Mercator frame Generate does not use: 20 m off at latitude 45 on a 16 km map, 122 m at latitude 60 on
+// 30 km, where the road left its own corridor.)
+import { metresPerDegree, frameBounds } from './mapFrame.js';
 
 export const CORRIDOR_MIN_M = 50;
 export const CORRIDOR_MAX_M = 2000;
 export const CORRIDOR_DEFAULT_M = 250;
-const FETCH_PAD_M = 4;
 const GRID_MARGIN_PX = 4;
 
 /** Row y's x-interval [a, b] (metres) within h of segment AB, or null. The capsule is convex: the union of the two end
@@ -40,46 +41,68 @@ function capsuleRow(ax, ay, bx, by, h, Y) {
 }
 
 /**
- * The corridor's grid: { center: { lat, lng }, width, height, runs: [[y, x0, x1]...], lengthM, areaPx }.
+ * The corridor's grid: { center: { lat, lng }, width, height, runs: [[y, x0, x1]...], lengthM, areaPx, halfWidthM }.
  * points: the stretch [{ lat, lng }...] (at least two); halfWidthM: the distance either side; mpp: metres per pixel.
  */
 export function corridorGrid(points, halfWidthM, mpp) {
   const m = Number(mpp) > 0 ? Number(mpp) : 1;
   const h = Math.max(CORRIDOR_MIN_M, Math.min(CORRIDOR_MAX_M, Number(halfWidthM) || CORRIDOR_DEFAULT_M));
-  // a first frame at the points' box middle, then the grid's own centre at the corridor's middle
-  const lats = points.map((p) => p.lat); const lngs = points.map((p) => p.lng);
-  const c0 = { lat: (Math.min(...lats) + Math.max(...lats)) / 2, lng: (Math.min(...lngs) + Math.max(...lngs)) / 2 };
-  const to0 = createWGS84ToLocal(c0.lat, c0.lng);
-  const p0 = points.map((p) => to0.forward([p.lng, p.lat]));
-  const minX = Math.min(...p0.map((p) => p[0])) - h; const maxX = Math.max(...p0.map((p) => p[0])) + h;
-  const minY = Math.min(...p0.map((p) => p[1])) - h; const maxY = Math.max(...p0.map((p) => p[1])) + h;
-  const [clng, clat] = createLocalToWGS84(c0.lat, c0.lng).forward([(minX + maxX) / 2, (minY + maxY) / 2]);
-  const center = { lat: clat, lng: clng };
-  const width = Math.ceil((maxX - minX) / m) + 2 * GRID_MARGIN_PX; const height = Math.ceil((maxY - minY) / m) + 2 * GRID_MARGIN_PX;
-  // the points in the grid's own frame (metres, x east, y north, origin at the centre)
-  const to = createWGS84ToLocal(center.lat, center.lng);
-  const P = points.map((p) => to.forward([p.lng, p.lat]));
-  const spanX = width * m + 2 * FETCH_PAD_M; const spanY = height * m + 2 * FETCH_PAD_M;
-  const sx = spanX / (width - 1); const sy = spanY / (height - 1);
-  const xOf = (X) => (X + spanX / 2) / sx;   // metres -> pixel (fractional)
-  const runs = []; let areaPx = 0; let lengthM = 0;
-  for (let k = 1; k < P.length; k++) lengthM += Math.hypot(P[k][0] - P[k - 1][0], P[k][1] - P[k - 1][1]);
+  const n = points.length;
+  // the box the corridor needs, in degrees: every point with the half width round it, at its own latitude
+  let latMin = Infinity; let latMax = -Infinity; let lngMin = Infinity; let lngMax = -Infinity;
+  for (let i = 0; i < n; i++) {
+    const p = points[i]; const k = metresPerDegree(p.lat); const dLat = h / k.lat;
+    // (the disc is widest, in degrees of longitude, at its edge nearer the pole)
+    const dLng = h / Math.min(metresPerDegree(p.lat + dLat).lng, metresPerDegree(p.lat - dLat).lng);
+    if (p.lat - dLat < latMin) latMin = p.lat - dLat; if (p.lat + dLat > latMax) latMax = p.lat + dLat;
+    if (p.lng - dLng < lngMin) lngMin = p.lng - dLng; if (p.lng + dLng > lngMax) lngMax = p.lng + dLng;
+  }
+  // the map: centred on that box, its size the box's in metres at the centre, a few squares to spare
+  const center = { lat: (latMin + latMax) / 2, lng: (lngMin + lngMax) / 2 };
+  const kc = metresPerDegree(center.lat);
+  const width = Math.ceil(((lngMax - lngMin) * kc.lng) / m) + 2 * GRID_MARGIN_PX; const height = Math.ceil(((latMax - latMin) * kc.lat) / m) + 2 * GRID_MARGIN_PX;
+  const bounds = frameBounds(center, width * m, height * m);
+  const latSpan = bounds.north - bounds.south; const lngSpan = bounds.east - bounds.west;
+  const rowLat = (y) => bounds.north - ((y + 1) / height) * latSpan;        // sample row y
+  const colOf = (lng) => ((lng - bounds.west) / lngSpan) * width;            // a longitude, in squares from the west edge
+  // metres per degree at every row, once (the inner loop below takes no sine or cosine)
+  const rowKx = new Float64Array(height); const rowKy = new Float64Array(height);
+  for (let y = 0; y < height; y++) { const k = metresPerDegree(rowLat(y)); rowKx[y] = k.lng; rowKy[y] = k.lat; }
+  // each segment's reach, row by row: only the rows within the half width of it (no pass over every row per segment)
+  const perRow = new Array(height); let lengthM = 0;
+  for (let i = 1; i < n; i++) {
+    const A = points[i - 1]; const B = points[i];
+    const ks = metresPerDegree((A.lat + B.lat) / 2);
+    lengthM += Math.sqrt(((B.lng - A.lng) * ks.lng) ** 2 + ((B.lat - A.lat) * ks.lat) ** 2);
+    const reach = h / Math.min(metresPerDegree(A.lat).lat, metresPerDegree(B.lat).lat);
+    const top = Math.max(A.lat, B.lat) + reach; const bottom = Math.min(A.lat, B.lat) - reach;
+    const y0 = Math.max(0, Math.floor(((bounds.north - top) / latSpan) * height) - 2); const y1 = Math.min(height - 1, Math.ceil(((bounds.north - bottom) / latSpan) * height) + 1);
+    for (let y = y0; y <= y1; y++) {
+      // the segment in metres round this row: x from A's meridian, y from the row; the scale between the row's and the
+      // segment's latitudes (their mean: exact to the second order over a half width)
+      const lat = rowLat(y); const kx = (rowKx[y] + ks.lng) / 2; const ky = (rowKy[y] + ks.lat) / 2;
+      const iv = capsuleRow(0, (A.lat - lat) * ky, (B.lng - A.lng) * kx, (B.lat - lat) * ky, h, 0);
+      if (!iv) continue;
+      const a = colOf(A.lng + iv[0] / kx); const b = colOf(A.lng + iv[1] / kx);
+      (perRow[y] || (perRow[y] = [])).push(a, b);
+    }
+  }
+  const runs = []; let areaPx = 0;
   for (let y = 0; y < height; y++) {
-    const Y = spanY / 2 - y * sy;
-    const ivs = [];
-    for (let k = 1; k < P.length; k++) {
-      const [ax, ay] = P[k - 1]; const [bx, by] = P[k];
-      if (Math.min(ay, by) - h > Y || Math.max(ay, by) + h < Y) continue;
-      const iv = capsuleRow(ax, ay, bx, by, h, Y); if (iv) ivs.push(iv);
-    }
-    if (!ivs.length) continue;
-    ivs.sort((a, b) => a[0] - b[0]);
-    const merged = []; for (const [a, b] of ivs) { const last = merged[merged.length - 1]; if (last && a <= last[1]) last[1] = Math.max(last[1], b); else merged.push([a, b]); }
-    for (const [a, b] of merged) {
-      // pixels whose centres lie in [a, b]
-      const x0 = Math.max(0, Math.ceil(xOf(a))); const x1 = Math.min(width, Math.floor(xOf(b)) + 1);
+    const flat = perRow[y]; if (!flat) continue;
+    const ivs = []; for (let k = 0; k < flat.length; k += 2) ivs.push([flat[k], flat[k + 1]]);
+    ivs.sort((p, q) => p[0] - q[0]);
+    let lo = ivs[0][0]; let hi = ivs[0][1];
+    const emit = () => {
+      // the samples whose own place lies in [lo, hi]: sample x is exactly x squares from the west edge
+      const x0 = Math.max(0, Math.ceil(lo)); const x1 = Math.min(width, Math.floor(hi) + 1);
       if (x1 > x0) { runs.push([y, x0, x1]); areaPx += x1 - x0; }
+    };
+    for (let k = 1; k < ivs.length; k++) {
+      // (runs that touch or overlap, or leave no sample between them, are one)
+      if (Math.ceil(ivs[k][0]) <= Math.floor(hi) + 1) { if (ivs[k][1] > hi) hi = ivs[k][1]; } else { emit(); lo = ivs[k][0]; hi = ivs[k][1]; }
     }
+    emit();
   }
   return { center, width, height, runs, lengthM, areaPx, halfWidthM: h };
 }

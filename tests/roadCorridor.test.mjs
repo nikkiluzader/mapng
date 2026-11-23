@@ -3,11 +3,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { corridorGrid } from '../services/roadCorridor.js';
 import { shapeArea } from '../services/batchShape.js';
+import { frameBounds, gridPosition, vertexLatLng, offsetLatLng, metresPerDegree } from '../services/mapFrame.js';
 
 const D = 1 / 111320;   // ~1 m of latitude near the equator
 const P = (xm, ym) => ({ lat: ym * D, lng: xm * D });
-// (a pixel of Generate's grid spans the fetch box's metres over W - 1: the map's extent plus 4 m each side)
-const groundM2 = (g, m) => g.areaPx * ((g.width * m + 8) / (g.width - 1)) * ((g.height * m + 8) / (g.height - 1));
+// (a sample of Generate's grid stands for one square of the map: m x m metres)
+const groundM2 = (g, m) => g.areaPx * m * m;
 
 test('a straight 1 km road, 100 m either side: about 1000 x 200 m plus the round ends', () => {
   const g = corridorGrid([P(-500, 0), P(500, 0)], 100, 1);
@@ -37,3 +38,57 @@ test('a coarser processing resolution: fewer pixels, same ground', () => {
   const a = corridorGrid([P(-500, 0), P(500, 0)], 100, 1); const b = corridorGrid([P(-500, 0), P(500, 0)], 100, 2);
   assert.ok(Math.abs(groundM2(b, 2) - groundM2(a, 1)) / groundM2(a, 1) < 0.01, `${groundM2(b, 2)} vs ${groundM2(a, 1)}`);
 });
+
+
+// The corridor's pixels are Generate's own: a height sample of the map's frame (services/mapFrame.js) is in the corridor
+// exactly when its place in the world is within the half width of the road.
+const frameOf = (g, m) => frameBounds(g.center, g.width * m, g.height * m);
+const hasSample = (g, x, y) => g.runs.some(([ry, x0, x1]) => ry === y && x >= x0 && x < x1);
+const metres = (a, b) => { const k = metresPerDegree((a.lat + b.lat) / 2); return Math.hypot((a.lng - b.lng) * k.lng, (a.lat - b.lat) * k.lat); };
+const distToRoad = (p, pts) => {
+  let best = Infinity;
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1]; const b = pts[i]; const k = metresPerDegree((a.lat + b.lat + 2 * p.lat) / 4);
+    const bx = (b.lng - a.lng) * k.lng; const by = (b.lat - a.lat) * k.lat; const px = (p.lng - a.lng) * k.lng; const py = (p.lat - a.lat) * k.lat;
+    const t = Math.max(0, Math.min(1, (px * bx + py * by) / (bx * bx + by * by || 1)));
+    best = Math.min(best, Math.hypot(px - t * bx, py - t * by));
+  }
+  return best;
+};
+
+for (const [lat, km, mpp, half] of [[0, 4, 1, 100], [45, 16, 1, 250], [60, 30, 2, 50], [70, 20, 2, 50], [-52, 12, 1, 2000]]) {
+  test(`at latitude ${lat}, a ${km} km L-shaped road lies in its own corridor (${half} m either side, ${mpp} m/px)`, () => {
+    const c = { lat, lng: 11 }; const L = km * 500;
+    // west leg north-south, then east along the south: the far corners of the box, where a frame error is largest
+    const pts = [offsetLatLng(c, -L, L), offsetLatLng(c, -L, -L), offsetLatLng(c, L, -L)];
+    const g = corridorGrid(pts, half, mpp); const b = frameOf(g, mpp);
+    // every 200 m along the road: the sample nearest the road is in, as are samples well inside the width either side;
+    // samples well outside are not
+    let checked = 0;
+    for (let i = 1; i < pts.length; i++) {
+      const steps = Math.ceil(metres(pts[i - 1], pts[i]) / 200);
+      for (let s = 0; s <= steps; s++) {
+        const p = { lat: pts[i - 1].lat + ((pts[i].lat - pts[i - 1].lat) * s) / steps, lng: pts[i - 1].lng + ((pts[i].lng - pts[i - 1].lng) * s) / steps };
+        const q = gridPosition(b, g.width, g.height, p.lat, p.lng);
+        const x = Math.round(q.gx); const y = Math.round(q.gy) - 1;   // (sample (x, y) is the vertex at (x, y + 1))
+        assert.ok(hasSample(g, x, y), `the road itself at step ${s} of leg ${i} (sample ${x}, ${y}) is outside the corridor`);
+        checked++;
+      }
+    }
+    assert.ok(checked > 20);
+    // every sample of a few rows and columns: in the corridor exactly when within the width (2 px of slack at the edge)
+    const slack = 2 * mpp; let seen = 0;
+    const rows = [5, Math.floor(g.height / 3), Math.floor(g.height / 2), g.height - 6];
+    for (const y of rows) {
+      for (let x = 0; x < g.width; x += 7) {
+        const v = vertexLatLng(b, g.width, g.height, x, y); const d = distToRoad(v, pts); const inRun = hasSample(g, x, y);
+        if (d < half - slack) assert.ok(inRun, `sample ${x}, ${y} is ${d.toFixed(1)} m from the road but not in the corridor`);
+        if (d > half + slack) assert.ok(!inRun, `sample ${x}, ${y} is ${d.toFixed(1)} m from the road but in the corridor`);
+        seen++;
+      }
+    }
+    assert.ok(seen > 100);
+    // nothing outside the grid, runs in order
+    for (const [y, x0, x1] of g.runs) assert.ok(y >= 0 && y < g.height && x0 >= 0 && x1 <= g.width && x1 > x0);
+  });
+}

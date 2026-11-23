@@ -7,6 +7,7 @@
 // Each chunk is generated and exported on its own square grid (the square path works unchanged), with the footprint
 // clipped to it; its core says what it keeps (ground, objects); the overlap round the core gives every edit that
 // reaches the core's edge (road cuts, smoothing) the same ground on both sides.
+import { metresPerDegree } from './mapFrame.js';
 import { shapeRows } from './batchShape.js';
 
 export const CHUNK_PX = 2048;
@@ -49,19 +50,22 @@ export function chunkLayout(footprint, W, H, { size = CHUNK_PX, overlap = OVERLA
 export const chunkOwnerKey = (x, y, size = CHUNK_PX, overlap = OVERLAP_PX) => `${Math.floor(x / (size - overlap))}_${Math.floor(y / (size - overlap))}`;
 
 /**
- * The level's lattice: one linear lat/lng grid for the whole level, vertex (gx, gy) at
- * lat = lat0 + (H / 2 - gy) dlat, lng = lng0 + (gx - W / 2) dlng, with dlat = mpp / 111320 and
- * dlng = mpp / (111320 cos lat0). A chunk's bounds are the edges of its squares (pixelEdges: east is the vertex after its
- * last), so its vertex i is the level's vertex x0 + i exactly, and in the export its map data (placed through the
- * bounds) and its terrain (squares of mpp from the centre) agree to the pixel.
+ * The level's lattice: the level's own frame (services/mapFrame.js), one linear lat/lng grid for the whole level with
+ * the true metres per degree at its centre: the line gy squares south of the level's north edge is at
+ * lat = lat0 + (H / 2 - gy) dlat, the line gx squares east of its west edge at lng = lng0 + (gx - W / 2) dlng. A chunk's
+ * bounds are those lines round its squares, so a chunk is a map in the same frame: its height sample (i, j) is the
+ * level's sample (x0 + i, y0 + j) exactly, and its map data, placed through its bounds, lands on the same squares.
+ * (Until 2026-11-23 the lattice used a flat 111,320 m per degree, up to 0.67 % off, and a chunk's rows were sampled one
+ * square north of where they were read.)
  */
 export function levelLattice(center, mpp, W, H) {
-  const dlat = mpp / 111320; const dlng = mpp / (111320 * Math.cos((center.lat * Math.PI) / 180));
+  const k = metresPerDegree(center.lat);
+  const dlat = mpp / k.lat; const dlng = mpp / k.lng;
   const latOf = (gy) => center.lat + (H / 2 - gy) * dlat; const lngOf = (gx) => center.lng + (gx - W / 2) * dlng;
   return {
     latOf, lngOf, dlat, dlng,
-    /** A chunk's bounds and centre for Generate (fetchTerrainData targetBounds with pixelEdges). */
-    chunkBounds: (c) => ({ north: latOf(c.y0), south: latOf(c.y0 + c.size), west: lngOf(c.x0), east: lngOf(c.x0 + c.size), pixelEdges: true }),
+    /** A chunk's bounds and centre for Generate (fetchTerrainData targetBounds). */
+    chunkBounds: (c) => ({ north: latOf(c.y0), south: latOf(c.y0 + c.size), west: lngOf(c.x0), east: lngOf(c.x0 + c.size) }),
     chunkCenter: (c) => ({ lat: latOf(c.y0 + c.size / 2), lng: lngOf(c.x0 + c.size / 2) }),
     /** A chunk's centre's offset from the level's centre, in metres (x east, y north): where the merge moves its outputs. */
     chunkOffsetM: (c) => ({ x: (c.x0 + c.size / 2 - W / 2) * mpp, y: (H / 2 - (c.y0 + c.size / 2)) * mpp }),

@@ -1,3 +1,4 @@
+import { gridLngLat } from './mapFrame.js';
 import proj4 from 'proj4';
 import { cellIndex, geoTiffCellIsPoint, sampleOrigin } from './rasterCells.js';
 import * as GeoTIFF from 'geotiff';
@@ -7,25 +8,18 @@ import { continuousLngRange } from './lngRange.js';
 
 const normalizeLng = (lng) => ((((lng + 180) % 360) + 360) % 360) - 180;
 
-const getPixelLatLng = (x, y, width, height, toWGS84, targetBounds) => {
+// A position on the map's grid as [lng, lat]: (gx, gy) in squares from the bounds' north-west corner, fractions
+// allowed (services/mapFrame.js). Height sample (column x, row y) is the vertex at (x, y + 1): the game's own grid,
+// where every reader of the heights looks (terrainLookup.js). A picture's texel centre is at its own half square.
+const getPixelLatLng = (gx, gy, width, height, toWGS84, targetBounds) => {
     if (targetBounds && Number.isFinite(targetBounds.north) && Number.isFinite(targetBounds.south)
         && Number.isFinite(targetBounds.east) && Number.isFinite(targetBounds.west)) {
-        const u = width > 1 ? x / (width - 1) : 0.5;
-        const v = height > 1 ? y / (height - 1) : 0.5;
-        const lat = targetBounds.north - v * (targetBounds.north - targetBounds.south);
-
-        let lngSpan = targetBounds.east - targetBounds.west;
-        if (lngSpan > 180) lngSpan -= 360;
-        if (lngSpan < -180) lngSpan += 360;
-        const lng = normalizeLng(targetBounds.west + u * lngSpan);
-        return [lng, lat];
+        const [lng, lat] = gridLngLat(targetBounds, width, height, gx, gy);
+        return [normalizeLng(lng), lat];
     }
 
-    const halfWidth = width / 2;
-    const halfHeight = height / 2;
-    const localX = x - halfWidth;
-    const localY = halfHeight - y;
-    return toWGS84.forward([localX, localY]);
+    // (no bounds given: the same grid in a local metric frame round the centre)
+    return toWGS84.forward([gx - width / 2, height / 2 - gy]);
 };
 
 const getOutputBounds = (toWGS84, width, height, targetBounds) => {
@@ -411,7 +405,7 @@ export const resampleToMeterGrid = async (
     // Iterate over the target grid (1m per pixel)
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
-            const [lng, lat] = getPixelLatLng(x, y, width, height, toWGS84, targetBounds);
+            const [lng, lat] = getPixelLatLng(x, y + 1, width, height, toWGS84, targetBounds);
 
             let h = -99999; // Match terrain.ts NO_DATA_VALUE
 
@@ -578,7 +572,7 @@ export const resampleImageToMeterGrid = async (
 
     for (let y = 0; y < outH; y++) {
         for (let x = 0; x < outW; x++) {
-            const [lng, lat] = getPixelLatLng((x + 0.5) * sx - 0.5, (y + 0.5) * sy - 0.5, width, height, toWGS84, targetBounds);
+            const [lng, lat] = getPixelLatLng((x + 0.5) * sx, (y + 0.5) * sy, width, height, toWGS84, targetBounds);
             
             const color = source.sampler(lat, lng);
             

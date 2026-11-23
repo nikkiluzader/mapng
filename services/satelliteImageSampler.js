@@ -39,7 +39,8 @@ export function sampleSatelliteTexture({ width, height, outWidth, outHeight, mos
   const rgba = out ?? new Uint8ClampedArray(outW * outH * 4);
   const sx = width / outW;
   const sy = height / outH;
-  const at = (ix, iy) => gridToMosaic((ix + 0.5) * sx - 0.5, (iy + 0.5) * sy - 0.5);
+  // (a texel's centre, in the grid's squares from its north-west corner: services/mapFrame.js)
+  const at = (ix, iy) => gridToMosaic((ix + 0.5) * sx, (iy + 0.5) * sy);
 
   // Lattice nodes at multiples of the step, plus the last row/column.
   const step = IMAGE_LATTICE_STEP;

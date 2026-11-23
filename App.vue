@@ -287,7 +287,7 @@ import { mergeElevationSlots } from './services/tifLoader.js';
 import { DEFAULT_GAP_FILL_SOURCE } from './services/gapFillSources.js';
 import { normalizeFallbackSource } from './services/elevationFallback.js';
 import { computeUploadedCropBounds, nativeSquareAt } from './services/uploadBounds';
-import { layoutGrid, WEB_MAX_SIDE, tilesFromTerrain } from './services/tileLayout.js';
+import { layoutGrid, WEB_MAX_SIDE, tilesFromTerrain, tilesFrame } from './services/tileLayout.js';
 import { needsChunks } from './services/chunkedGenerate.js';
 import { corridorGrid } from './services/roadCorridor.js';
 import { stretchBetween, cumulative } from './services/roadPick.js';
@@ -1053,8 +1053,9 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         const mpp = Number(processingMpp || 1);
         const g = layoutGrid(store.tiles.map((t) => ({ dx: Math.round(t.dx * R), dy: Math.round(t.dy * R) })), R);
         if (!desktopApp && !g.webOk) throw new Error(t('tiles.webCap', { km2: Math.round(g.areaPx * mpp * mpp / 1e6), maxKm2: Math.round(WEB_MAX_SIDE * WEB_MAX_SIDE * mpp * mpp / 1e6) }));
-        const mLng = 111320 * Math.cos((center.value.lat * Math.PI) / 180);
-        genCenter = { lat: center.value.lat + (g.centerOffset.y * mpp) / 111320, lng: center.value.lng + (g.centerOffset.x * mpp) / mLng };
+        // (the map's centre in its own frame, tile 0's middle on the chosen centre: services/tileLayout.js tilesFrame,
+        // which the tiles on the map are drawn from too)
+        genCenter = tilesFrame(center.value, store.tiles.map((t) => ({ dx: Math.round(t.dx * R), dy: Math.round(t.dy * R) })), R, mpp).center;
         genSize = g.terrainBlock ? g.width : { width: g.width, height: g.height };
         if (!g.terrainBlock && g.areaPx < g.width * g.height) generationOptions.footprint = g.rects;
         if (g.chunked) { generationOptions.footprint = g.rects; generationOptions.chunked = { W: g.width, H: g.height, mpp }; }

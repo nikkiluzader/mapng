@@ -15077,11 +15077,12 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
 
   // (experimental) the ground as models: from the finished heights and the painted surfaces, holes included
   let groundModels = null;
-  // (a chunk: its core's squares only; square (i, j), j from the south, is in when its middle is)
+  // (a chunk: its core's squares only; square (i, j), j from the south, is in when its middle is: the square lies
+  // between rows j and j + 1 from the south, so its middle is N - j - 0.5 squares from the north edge)
   const chunkSquareFilter = (keep) => {
     if (!Array.isArray(chunkCore)) return keep;
     const N = exportTerrainData.width;
-    return (i, j) => { const px = i + 0.5; const py = N - 1 - j - 0.5; const inCore = px >= chunkCore[0] && px < chunkCore[2] && py >= chunkCore[1] && py < chunkCore[3]; return inCore && (!keep || keep(i, j)); };
+    return (i, j) => { const px = i + 0.5; const py = N - j - 0.5; const inCore = px >= chunkCore[0] && px < chunkCore[2] && py >= chunkCore[1] && py < chunkCore[3]; return inCore && (!keep || keep(i, j)); };
   };
   // a chunk: its ground blended toward its finished neighbours along their shared edges, so the ground models meet
   // exactly; dz kept for what stands on that ground (roads, objects, trees: toNDJSON and the forest)
@@ -15094,7 +15095,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     }
     const sqC = squareSize;
     chunkZAdjustActive = (x, y) => {
-      const fx = Math.max(0, Math.min(N - 1.001, x / sqC + N / 2)); const fy = Math.max(0, Math.min(N - 1.001, N / 2 - y / sqC));
+      const fx = Math.max(0, Math.min(N - 1.001, x / sqC + N / 2)); const fy = Math.max(0, Math.min(N - 1.001, N / 2 - 1 - y / sqC));   // (row r from the north is at (N / 2 - 1 - r) squares: the game's grid)
       const c0 = Math.floor(fx); const r0 = Math.floor(fy); const tx = fx - c0; const ty = fy - r0;
       return delta[r0 * N + c0] * (1 - tx) * (1 - ty) + delta[r0 * N + c0 + 1] * tx * (1 - ty) + delta[(r0 + 1) * N + c0] * (1 - tx) * ty + delta[(r0 + 1) * N + c0 + 1] * tx * ty;
     };

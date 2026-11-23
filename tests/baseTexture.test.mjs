@@ -35,7 +35,7 @@ function mosaicFrom(w, h, fn) {
 }
 
 test('2× texture over a mosaic of the same pixel size reproduces it exactly', () => {
-  // grid point i spans mosaic pixels [2i, 2i + 2); output pixel ix lands on
+  // grid square i spans mosaic pixels [2i, 2i + 2) (positions are in squares from the corner); output pixel ix lands on
   // mosaic pixel centre ix + 0.5. 40 px exercises several lattice cells.
   const grid = 20;
   const mosaic = mosaicFrom(40, 40, (x, y) => [x * 6, y * 6, (x * 7 + y * 3) % 256]);
@@ -45,7 +45,7 @@ test('2× texture over a mosaic of the same pixel size reproduces it exactly', (
     outWidth: 40,
     outHeight: 40,
     mosaic,
-    gridToMosaic: (gx, gy) => [(gx + 0.5) * 2, (gy + 0.5) * 2],
+    gridToMosaic: (gx, gy) => [gx * 2, gy * 2],
   });
   for (let i = 0; i < out.length; i++) {
     assert.ok(Math.abs(out[i] - mosaic.pixels[i]) <= 1, `pixel byte ${i}: ${out[i]} vs ${mosaic.pixels[i]}`);
@@ -62,7 +62,7 @@ test('downsampling averages the footprint instead of point-sampling', () => {
     outWidth: 4,
     outHeight: 4,
     mosaic,
-    gridToMosaic: (gx, gy) => [(gx + 0.5) * 4, (gy + 0.5) * 4],
+    gridToMosaic: (gx, gy) => [gx * 4, gy * 4],
   });
   for (let i = 0; i < out.length; i += 4) {
     assert.ok(out[i] > 110 && out[i] < 145, `expected a grey average, got ${out[i]}`);

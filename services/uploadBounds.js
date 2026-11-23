@@ -1,3 +1,4 @@
+import { frameBounds } from './mapFrame.js';
 export const VALID_SQUARE_EXPORT_RESOLUTIONS = [512, 1024, 2048, 4096, 8192, 16384];
 
 // Upper bound on a native-coverage output edge (px) once the processing
@@ -35,19 +36,9 @@ export const computeMetricSelectionBounds = (center, sizeMeters) => {
   if (!center || !Number.isFinite(center.lat) || !Number.isFinite(center.lng)) return null;
   if (!Number.isFinite(sizeMeters) || sizeMeters <= 0) return null;
 
-  const metersPerDegLat = 111320;
-  const metersPerDegLng = 111320 * Math.cos(center.lat * Math.PI / 180);
-  const latSpan = sizeMeters / metersPerDegLat;
-  const lngSpan = sizeMeters / metersPerDegLng;
-  const halfLat = latSpan / 2;
-  const halfLng = lngSpan / 2;
-
-  return {
-    north: center.lat + halfLat,
-    south: center.lat - halfLat,
-    east: center.lng + halfLng,
-    west: center.lng - halfLng,
-  };
+  // (the map's own bounds, as Generate builds it: services/mapFrame.js. The box drawn on the map, the background
+  // areas and the spawn points placed in it are then exactly where the level has them.)
+  return frameBounds(center, sizeMeters, sizeMeters);
 };
 
 export const clampSelectionToCoverage = (selectionBounds, coverageBounds) => {

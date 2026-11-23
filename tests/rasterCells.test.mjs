@@ -35,10 +35,11 @@ test('a grid tile in degrees is sampled at its cells\' middles, to its edges', a
   // an 8 x 8 output grid over the same box
   const out = await resampleToMeterGrid({ type: 'grid', data: { tiles: [tile] } }, { lat: 49.998, lng: 10.002 }, 8, 8, 'bilinear', false, false, bounds, true);
   const at = (x, y) => out.heightMap[y * 8 + x];
-  // (the output grid's own samples run edge to edge: pixel x is at x / 7 of the box)
-  const expectCol = (x) => Math.min(3, Math.max(0, (x / 7) * 4 - 0.5));     // the cell index at output pixel x
+  // (the output grid's samples are the game's vertices, services/mapFrame.js: column x at x / 8 of the box from the
+  // west, row y at (y + 1) / 8 from the north)
+  const cellAt = (t) => Math.min(3, Math.max(0, t * 4 - 0.5));     // the cell index at a fraction of the box
   for (const [x, y] of [[0, 0], [1, 1], [3, 2], [4, 4], [6, 5], [7, 7]]) {
-    const want = expectCol(x) + 10 * expectCol(y);
+    const want = cellAt(x / 8) + 10 * cellAt((y + 1) / 8);
     assert.ok(Math.abs(at(x, y) - want) < 0.05, `(${x}, ${y}) ${at(x, y)} want ${want}`);
   }
   // nothing along the edges is left without data

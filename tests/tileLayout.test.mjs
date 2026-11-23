@@ -61,3 +61,31 @@ test('a map\'s tiles read back checked; a single map has none', async () => {
   const many = { tiles: { list: Array.from({ length: 200 }, (_, i) => ({ dx: i, dy: 0 })), tilePx: 256 } };
   assert.equal(tilesFromTerrain(many).list.length, MAX_TILES);
 });
+
+// A tiled map where it is built: the tiles drawn on the map come from the same frame as the map Generate makes.
+test('tiles on the map are where the map has them, at any latitude', async () => {
+  const { tilesFrame } = await import('../services/tileLayout.js');
+  const { frameBounds, gridPosition, metresPerDegree } = await import('../services/mapFrame.js');
+  for (const lat of [0, 45, 60, -70]) {
+    const anchor = { lat, lng: 13 }; const R = 4096; const mpp = 1;
+    // tile 0, one beside it, and one seven tiles east and three north (28 km out)
+    const tiles = [{ dx: 0, dy: 0 }, { dx: R, dy: 0 }, { dx: 7 * R, dy: 3 * R }];
+    const f = tilesFrame(anchor, tiles, R, mpp);
+    // the map is Generate's: its bounds exactly its size through its centre
+    assert.deepEqual(f.bounds, frameBounds(f.center, f.grid.width * mpp, f.grid.height * mpp));
+    // tile 0's middle is the chosen centre
+    assert.ok(Math.abs(f.centers[0].lat - anchor.lat) < 1e-9 && Math.abs(f.centers[0].lng - anchor.lng) < 1e-9, `lat ${lat}: tile 0 at ${JSON.stringify(f.centers[0])}`);
+    // every tile's box is its rect on the map's grid, and R squares each way
+    f.grid.rects.forEach(([x, y], i) => {
+      const nw = gridPosition(f.bounds, f.grid.width, f.grid.height, f.boxes[i].north, f.boxes[i].west);
+      const se = gridPosition(f.bounds, f.grid.width, f.grid.height, f.boxes[i].south, f.boxes[i].east);
+      assert.ok(Math.abs(nw.gx - x) < 1e-6 && Math.abs(nw.gy - y) < 1e-6 && Math.abs(se.gx - (x + R)) < 1e-6 && Math.abs(se.gy - (y + R)) < 1e-6);
+    });
+    // a tile's middle read back as an offset from tile 0 is its own offset (a dropped handle lands where it shows)
+    tiles.forEach((t, i) => { const o = f.offsetOf(f.centers[i]); assert.ok(Math.abs(o.x - t.dx * mpp) < 1e-4 && Math.abs(o.y - t.dy * mpp) < 1e-4, `tile ${i}: ${o.x}, ${o.y}`); });
+    // against the flat 111,320 m per degree this replaced: 12 km north at latitude 60, the far tile was drawn metres off
+    const k = metresPerDegree(f.center.lat); const flatLat = anchor.lat + (3 * R * mpp) / 111320;
+    const offM = Math.abs(f.centers[2].lat - flatLat) * k.lat;
+    if (lat === 60) assert.ok(offM > 5, `expected the old drawing to be off at 60, got ${offM.toFixed(1)} m`);
+  }
+});

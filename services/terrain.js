@@ -1,3 +1,4 @@
+import { frameBounds, vertexLatLng } from './mapFrame.js';
 import { gpxzChunkGrid } from './gpxzChunks.js';
 import { attachLandCover } from './worldCover.js';
 import { attachTreeSpecies, includeTreeSpeciesEarly } from './treeSpecies.js';
@@ -106,26 +107,12 @@ const unwrapLngNearRef = (lng, refLng) => {
  * Compute fetch bounds from the same local metric projection used by resampling.
  * This avoids meters/degree approximation drift, especially at higher latitudes.
  */
-const computeMetricFetchBounds = (normalizedCenter, width, height, padMeters = 4) => {
-  const toWGS84 = createLocalToWGS84(normalizedCenter.lat, normalizedCenter.lng);
-  const halfWidth = width / 2 + padMeters;
-  const halfHeight = height / 2 + padMeters;
-
-  const corners = [
-    toWGS84.forward([-halfWidth, halfHeight]),
-    toWGS84.forward([halfWidth, halfHeight]),
-    toWGS84.forward([-halfWidth, -halfHeight]),
-    toWGS84.forward([halfWidth, -halfHeight]),
-  ];
-
-  const lats = corners.map(([, lat]) => lat);
-  const unwrappedLngs = corners.map(([lng]) => unwrapLngNearRef(lng, normalizedCenter.lng));
-
-  return {
-    north: Math.max(...lats),
-    south: Math.min(...lats),
-    ...continuousLngRange(Math.min(...unwrappedLngs), Math.max(...unwrappedLngs)),
-  };
+// A map's bounds: exactly its size through its centre (services/mapFrame.js: the one definition of where a map's
+// pixels are). Until 2026-11 this was the map plus 4 m each side, which the game then drew at the map's own size:
+// every level a little small (1.5 % on a 512 m map).
+const computeMetricFetchBounds = (normalizedCenter, width, height) => {
+  const b = frameBounds(normalizedCenter, width, height);
+  return { north: b.north, south: b.south, ...continuousLngRange(b.west, b.east) };
 };
 
 /**
@@ -1046,9 +1033,8 @@ const fillLazNoDataWithGlobalTerrain = async (
   const cellLatLng = (idx) => {
     const row = Math.floor(idx / width);
     const col = idx - row * width;
-    const u = width > 1 ? (col / (width - 1)) : 0;
-    const v = height > 1 ? (row / (height - 1)) : 0;
-    return { lat: bounds.north - v * latSpan, lng: bounds.west + u * lngSpan };
+    // (the grid's own vertices: services/mapFrame.js)
+    return vertexLatLng(bounds, width, height, col, row);
   };
 
   // The high-res LAZ surface and the coarse global DEM usually sit on different
@@ -2078,8 +2064,6 @@ export const fetchTerrainData = async (
         north: Number(targetBounds.north),
         south: Number(targetBounds.south),
         ...continuousLngRange(targetBounds.west, targetBounds.east),
-        // (a chunk of the level's lattice: services/chunkLayout.js chunkBounds)
-        ...(targetBounds.pixelEdges ? { pixelEdges: true } : {}),
       }
     : computeMetricFetchBounds(
         normalizedCenter,
