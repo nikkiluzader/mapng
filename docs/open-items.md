@@ -317,6 +317,31 @@ As of 2026-11-23:
   road widths" and "Add missing buildings from Overture"; after it Location, Area & detail and the elevation data
   source are open and every other section of steps 1 and 2 is closed (`RESET_SECTIONS`).
 
+## Now: Fizz_Mechanic's feedback on 0.3.5 (forwarded by the user, 2026-11-24)
+
+- **Inventory taken, nothing fixed yet.** The user: "I'm not sure how much of it we can get into 0.3.6 but we can
+  take an inventory." His text, point by point, and the screenshots: `scratch/fizz035/feedback_0.3.5.md`,
+  `scratch/fizz035/shots/dm01..dm19.png`; video of the Mesh Road joins: youtu.be/lB5vT2Gj1Ss. His map: Tignes, once
+  with Mesh Roads, once Terrain Untouched. Test areas already in scratch/levelprobe/data: fz_d87a, fz_foret,
+  fz_funival, fz_glattier, fz_hairpin, gt_chevril, gt_tignes, val_disere.
+  - **Galleries (avalanche barriers): [10] to [14].** Five points, one family: a roof too high, one too low and
+    deep in the ground, one that climbs too fast, one too short, one that ignores the ground in Untouched mode. He
+    also shows ones he calls good. Probably one cause in how a gallery takes its height along its length.
+  - **Funiculars: [08], [09].** One line follows the ground over it in waves and bulges the terrain over its tunnel;
+    he wants one steady slope. Another he says was better before 0.3.5 (a regression to find).
+  - **Bridges: [06] width** (keep the road's width, walls outside it), **[16] spikes** (new since 0.3.5, he says),
+    **[15]** small bridges solid underneath (he calls it minor).
+  - **Joins: [01]** road to bridge and road to gallery. Carried over from the 0.3.3 list (2.4, 9.3).
+  - **[02] a tunnel far too big under the roads above it** (the box by the dam; the 0.3.3 list's item 7 said it
+    was sound in game: look again from his angle).
+  - **[05] a road that narrows for no reason; [07] a wall too wide for the road above it**, cutting the lower road.
+  - **[18] the dam:** good in Untouched mode; in normal mode part of its face is dark, rough terrain.
+  - **Mesh Roads only: [03] joins that puncture tyres, [04] hairpins.** Mesh Roads are experimental and off by
+    default; the 0.3.3 list's item 8.
+  - **Unnumbered:** sidewalk slabs tilted at a roundabout and lying across a junction.
+  Proposed for 0.3.6 (not agreed yet): the galleries' heights, the funicular's steady slope, bridge width and the
+  bridge spikes. For later: Mesh Road joins and hairpins, the big tunnel box, water under small bridges.
+
 ## Now: Fizz_Mechanic's 0.3.3 list (2026-11-19; on hold until after the 0.3.5 release, user 2026-11-20)
 
 Held items are listed on the release page under "Moved to the next release".
