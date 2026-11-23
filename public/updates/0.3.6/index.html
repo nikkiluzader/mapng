@@ -166,9 +166,9 @@
     <a class="btn" href="/updates/0.3.5/">What came in 0.3.5</a>
   </div>
 
-  <!-- DRAFT (remove before release): this page is a preview and is not indexed. Still to add: pictures of the Tiles
-       controls and of road mode once the Single tile / Batch job tabs are gone; a picture of a tiled level and a road
-       level in game; the Reset button; the final list of fixes. Sections marked "in progress" describe work that is
+  <!-- DRAFT (remove before release): this page is a preview and is not indexed. Still to add: a picture of road
+       mode; a picture of a tiled level and a road level in game (Game texture); the level thumbnail as the game's
+       list shows it; the final list of fixes. Sections marked "in progress" describe work that is
        not finished. -->
   <p class="note"><b>Preview.</b> This page is being written while 0.3.6 is being finished. Parts marked "in progress" are not done yet.</p>
 
@@ -183,7 +183,11 @@
       <li><b>Shared and saved.</b> A share code, saved settings and the desktop app's Modify all carry the tiles. Up to 64 tiles.</li>
     </ul>
     <p>A shape that is not one full square is built with the ground as models (introduced in 0.3.5), so the level has no terrain outside your tiles.</p>
-    <p class="note"><b>In progress.</b> The top-level "Single tile" and "Batch job" tabs are being retired in favour of tiles. Batch mode was made for exporting assets, and people were using it to build huge levels, which it was never meant for. The export step keeps its choice of what to export.</p>
+    <h3>Pick the anchor with one click</h3>
+    <p>With more than one tile, an <b>Anchor</b> row lists every tile and <b>Centre</b>. The anchor is the point that sits on the location you typed or searched for. Click another tile, or Centre, and the anchor moves there. The tiles themselves stay exactly where they are on the map: the location follows the anchor. The same holds when you add, drag or remove a tile.</p>
+    <figure><img src="images/tiles-anchor.jpg" alt="The Tiles controls with three tiles in a row. The Anchor row shows Tile 1, Tile 2, Tile 3 and Centre; Tile 3 is picked, and on the map the crosshair sits in the middle of the third tile." loading="lazy"><figcaption>Three tiles with the anchor on tile 3: the crosshair marks the anchor, and the chips above Generate show the whole map's size.</figcaption></figure>
+    <h3>One workflow</h3>
+    <p>The "Single tile" and "Batch job" tabs at the top are gone. Batch mode was made for exporting assets, and people were using it to build huge levels, which it was never meant for. Tiles cover that now, and step 3 keeps its choice of what to export. If you had an unfinished batch job saved from an earlier version, MapNG opens it once more so you can finish or discard it.</p>
   </section>
 
   <section id="road" data-nav="Road mode">
@@ -207,7 +211,10 @@
       <li>The level's report now covers the whole level and every piece, and the progress shows which piece is being built, in all seven languages.</li>
       <li>If a piece fails, the message says which one and at which step.</li>
     </ul>
-    <p class="note"><b>Not finished.</b> Where pieces meet in a dense city with bridges or tunnels close to the join, the ground on the two sides can still disagree, because each piece shapes its roads from its own part of the road network. A long bridge or tunnel reaching far past its piece is cut. Use this for country roads and open ground for now.</p>
+    <h3>Roads that meet where pieces join</h3>
+    <p>Each piece used to work out its road heights from its own part of the road network. A ramp or a tunnel seen whole by one piece and cut short by the next could meet metres apart. A finished piece now hands its road heights to the next one, which starts from them: its roads leave the join at the neighbour's height, and a tunnel continues on the neighbour's line.</p>
+    <figure><img src="images/seam-roads-before-after.jpg" alt="Four height profiles of roads across a join between two pieces. Left column, before: a tunnel road with a 7.2 m step at the join and a street with a 6.5 m step. Right column, after: each is one continuous line through the join." loading="lazy"><figcaption>Behind the scenes, a test level through central Oslo: two roads across a join (dashed line), each piece solved alone (left) and with the neighbour's heights handed on (right). Road ends that met at different heights went from 23 to 2.</figcaption></figure>
+    <p class="note"><b>Not finished.</b> A piece that sees only part of a tunnel or a long bridge still decides on that part alone, and a street on a lid over a tunnel trench that lies exactly on a join can still dip there. Long levels through dense cities are better than they were, not yet clean everywhere.</p>
   </section>
 
   <section id="alignment" data-nav="Exact alignment">
@@ -242,6 +249,19 @@
     <p>More on how MapNG is built and what it sends where: <a href="/security.html">Security</a> and <a href="/data.html">Your data</a>.</p>
   </section>
 
+  <section id="app" data-nav="The app">
+    <div class="kicker">Website and desktop</div>
+    <h2>A Reset button, readable progress, a proper thumbnail</h2>
+    <ul>
+      <li><b>Reset.</b> The round arrow at the top of the sidebar puts MapNG back to a fresh start, on the website and in the desktop app (where it used to be a plain reload). It asks first, then clears every setting, the location, the tiles and any picked road, asks for your location again and starts in Tile mode with one 1024 tile. Your API key, your own Overpass server, the language, light or dark mode and your sharing choices are kept, and levels you have saved are not touched.</li>
+      <li><b>Progress you can read.</b> The progress window for Generate and for the export no longer cuts lines off. The stage's name and every line wrap, the finished lines are all kept in a list you can scroll, and the window fits any screen.</li>
+      <li><b>A MapNG thumbnail.</b> In the game's level list your level now shows a MapNG card with its own name, not a satellite picture.</li>
+      <li><b>The real size above Generate.</b> The chips above the Generate button show the size of the whole map for several tiles and for a road, not one tile's.</li>
+    </ul>
+    <figure><img src="images/progress-card.jpg" alt="The progress window during an export: five stage tiles, the stage name on two lines, a list of finished steps with their times, and the running step written out in full over two lines." loading="lazy"><figcaption>The progress window with long lines, all shown in full.</figcaption></figure>
+    <figure><img src="images/level-thumbnail.jpg" alt="A dark card with the orange MapNG logo, the name MapNG, a level name in orange and the line Real-world map for BeamNG.drive." loading="lazy"><figcaption>The new level thumbnail.</figcaption></figure>
+  </section>
+
   <section id="fixes" data-nav="Fixes">
     <div class="kicker">Smaller things</div>
     <h2>Fixes</h2>
@@ -258,9 +278,9 @@
     <div class="kicker">Coming next</div>
     <h2>Still being worked on</h2>
     <ul>
-      <li>Pieces of a long level meeting cleanly in cities, where bridges and tunnels are close to a join.</li>
+      <li>Long tunnels and bridges planned once for the whole level, so every piece of a long level agrees on them.</li>
+      <li>Exporting heightmaps and textures per tile from the tiles workflow, which the old batch jobs did.</li>
       <li>Previews that show only the shape you picked, and a minimap to match.</li>
-      <li>A Reset button, on the website and in the desktop app, that puts everything back to a fresh start.</li>
       <li>Streets standing on a narrow ridge with jagged sides in steep towns, walls along tunnel approaches, and the other items carried over from <a href="/updates/0.3.5/#next">0.3.5's list</a>.</li>
     </ul>
   </section>

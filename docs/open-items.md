@@ -1,6 +1,6 @@
 # MapNG open items
 
-Last reviewed: 2026-11-23 (security pass fixed; main = dev at e6ee91e)
+Last reviewed: 2026-11-23, evening (dev 28c4af8: the 0.3.6 fixes; main still at 0340d20, waiting on the user's word)
 
 The short "now" board: current work, what waits on someone, and checks owed on shipped work. The other tracking
 files: `refs/output/backlog.md` holds everything wanted later, by area; `refs/output/releases.md` what shipped;
@@ -11,7 +11,16 @@ these files; they are never copied.
 
 As of 2026-11-23:
 
-- `main` = `dev` at e6ee91e (pushed 2026-11-23 on the user's word, after a sweep). mapng.com now carries tiles in
+- `dev` is at 28c4af8, `main` at 0340d20 (the security pass and last week's features, pushed 2026-11-23). Not on
+  main yet, all from 2026-11-23: the exact map frame and the Mapterhorn half pixel, the footprint clipper, the seam
+  work (roads rejoined by height, a chunk starting on its neighbours' ground, the neighbours' road heights as fixed
+  conditions), road mode's roads-only reads and handles, share codes, the chunked export's hardening, the Reset
+  button, the one workflow (tabs gone), the level's thumbnail card, the tiles' anchor, the progress card, the 0.3.6
+  page draft. Checked on dev: 1,473 unit tests; the smoke matrix on 9c4df69 (135 cells identical to the
+  security-pass sweep) and 18 cells of two tunnel areas again on the seam work (identical); the browser checks
+  named under each item. Owed before main: the user's word; a web end-to-end run on the production build; the
+  packed desktop app end to end (none since the security pass).
+- Earlier the same day: `main` = `dev` at e6ee91e (pushed 2026-11-23 on the user's word, after a sweep). mapng.com now carries tiles in
   step 1, road mode, chunked levels and the security pass (worker, pages). The desktop app on users' machines is
   still 0.3.5: the desktop security fixes (updater, switches, permission handler, redirect guard, Electron 44.11.5,
   Node 26.13.1) reach users with the next desktop release. Checked before the push: 1,441 unit tests; the smoke
@@ -185,14 +194,15 @@ As of 2026-11-23:
 ## Now: the 0.3.6 release page
 
 - **Release page draft** (user, 2026-11-23: "we can start building a new release page as we go"):
-  `public/updates/0.3.6/` (a preview: noindex, a "Preview" note and "in progress" marks; `LATEST_UPDATE` in
-  worker/updates.js stays 0.3.5 until the release). Sections so far: any shape (tiles), road mode, long shapes in
-  pieces, exact alignment (with scratch/frame's before/after diagram), the security pass, fixes, still being worked
-  on. To add: pictures of the Tiles controls and road mode after the Single tile / Batch job tabs are gone (the road
-  picture in the session's scratchpad still shows them), a tiled level and a road level in game (Game texture),
-  the Reset button, the final fixes; then remove the draft comment and the noindex, and bump `LATEST_UPDATE`.
-- Seen while taking the road picture: in road mode the summary chips above Generate still say "1.0 x 1.0 km" and
-  "1024 px" (one tile's size), not the road's stretch and corridor.
+  `public/updates/0.3.6/`, marked as a preview and not indexed. 2026-11-23 evening: the tiles' anchor, the one
+  workflow, roads meeting where pieces join (with the before/after long sections), and a section on the Reset
+  button, the progress window and the level thumbnail, with four pictures from the day's checks. Still to add: a
+  picture of road mode; pictures of a tiled level and a road level in game (Game texture); the thumbnail as the
+  game's list shows it; the final list of fixes. Before the release: remove the DRAFT comment, the preview note and
+  `noindex`, and bump `LATEST_UPDATE` in `worker/updates.js`.
+- **End to end in the browser, 2026-11-23 evening (dev server, dev 28c4af8):** two tiles added, Generate (33 s),
+  2D and 3D previews, a BeamNG export saved: no page errors; the level's thumbnail is the new card in the app's
+  font; the level lint gives warnings only. Not run: the production build, the desktop app.
 
 ## Now: a Reset button (desktop and web)
 
