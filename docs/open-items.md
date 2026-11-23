@@ -131,6 +131,18 @@ As of 2026-11-23:
   Done when: each alignment item has a test that fails before the fix; a chunked level and a road level at
   latitude 60 line up with the map data to the pixel; the sweep is unchanged.
 
+## Now: the 0.3.6 release page
+
+- **Release page draft** (user, 2026-11-23: "we can start building a new release page as we go"):
+  `public/updates/0.3.6/` (a preview: noindex, a "Preview" note and "in progress" marks; `LATEST_UPDATE` in
+  worker/updates.js stays 0.3.5 until the release). Sections so far: any shape (tiles), road mode, long shapes in
+  pieces, exact alignment (with scratch/frame's before/after diagram), the security pass, fixes, still being worked
+  on. To add: pictures of the Tiles controls and road mode after the Single tile / Batch job tabs are gone (the road
+  picture in the session's scratchpad still shows them), a tiled level and a road level in game (Game texture),
+  the Reset button, the final fixes; then remove the draft comment and the noindex, and bump `LATEST_UPDATE`.
+- Seen while taking the road picture: in road mode the summary chips above Generate still say "1.0 x 1.0 km" and
+  "1024 px" (one tile's size), not the road's stretch and corridor.
+
 ## Now: a Reset button (desktop and web)
 
 - **The desktop app's Refresh becomes Reset, and the website gets the same button** (user, 2026-11-23: "i really

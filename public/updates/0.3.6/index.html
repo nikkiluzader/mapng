@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MapNG 0.3.6: Any Shape, Road Mode, Exact Alignment</title>
+<meta name="description" content="MapNG 0.3.6: maps of any shape from tiles, a road mode that builds a level along a road, long shapes built in pieces, terrain and map data aligned exactly, and a security pass on the app and its updates.">
+<meta name="robots" content="noindex">
+<link rel="canonical" href="https://mapng.com/updates/0.3.6/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MapNG 0.3.6: any shape, road mode, exact alignment">
+<meta property="og:description" content="Maps of any shape, a level along a road, exact alignment, a safer app.">
+<meta property="og:url" content="https://mapng.com/updates/0.3.6/">
+<meta property="og:image" content="https://mapng.com/updates/0.3.6/images/alignment-before-after.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<script>
+  // the theme before the first paint: the app's link (?theme=), else this visit's, else the app's own choice, else the system's
+  (function () { var t; try { var q = new URLSearchParams(location.search).get('theme'); if (q === 'dark' || q === 'light') sessionStorage.setItem('mapng_page_theme', q); t = sessionStorage.getItem('mapng_page_theme') || localStorage.getItem('theme'); } catch (e) { /* storage blocked */ } if (t !== 'dark' && t !== 'light') t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; document.documentElement.setAttribute('data-theme', t); })();
+</script>
+<style>
+  /* BeamNG.drive's UI fonts, as the app (public/fonts, SIL OFL) */
+  @font-face { font-family: "Noto Sans"; src: url(/fonts/noto-sans-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass"; src: url(/fonts/overpass-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass Mono"; src: url(/fonts/overpass-mono-latin-wght-normal.woff2) format("woff2"); font-weight: 300 700; font-display: swap; }
+  :root {
+    --bg: #f7f7f8; --surface: #ffffff; --surface-2: #f2f2f4; --border: #e3e3e8;
+    --text: #1d1d22; --text-2: #4a4a55; --muted: #6e6e7a;
+    --brand: #ff6600; --brand-ink: #c2410c; --brand-tint: #fff4ec;
+    --ok: #15803d; --code-bg: #1d1d22; --code-text: #f4f4f6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+      --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+      --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+      --ok: #4ade80; --code-bg: #0b0b0e; --code-text: #ececf0;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+    --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+    --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+    --ok: #4ade80; --code-bg: #0b0b0e; --code-text: #ececf0;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--brand-ink); }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 0 16px; }
+  header.top { background: linear-gradient(90deg, #ff6600, #f59e0b); color: #fff; }
+  header.top .wrap { padding-top: 20px; padding-bottom: 36px; }
+  .brand { display: inline-flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; opacity: .95; }
+  .brand img { width: 22px; height: 22px; }
+  h1, h2, h3 { font-family: "Overpass", "Noto Sans", system-ui, sans-serif; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.15; margin: 22px 0 10px; letter-spacing: -0.01em; }
+  .lede { font-size: 18px; max-width: 640px; margin: 0; color: rgba(255,255,255,.95); }
+  main { padding: 0 0 64px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: -22px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .card b { display: block; font-size: 15px; margin-bottom: 2px; }
+  .card span { color: var(--text-2); font-size: 14px; }
+  .card .tick { color: var(--ok); font-weight: 700; margin-right: 4px; }
+  section { margin-top: 44px; }
+  h2 { font-size: 24px; line-height: 1.25; margin: 0 0 10px; }
+  h3 { font-size: 17px; margin: 22px 0 6px; }
+  p, li { color: var(--text-2); }
+  .note { background: var(--brand-tint); border-left: 3px solid var(--brand); border-radius: 0 8px 8px 0; padding: 10px 14px; color: var(--text); font-size: 15px; }
+  pre { background: var(--code-bg); color: var(--code-text); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-size: 14px; line-height: 1.5; }
+  code { font-family: "Overpass Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; }
+  p code, li code, td code { background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; color: var(--text); }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; color: var(--text); white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  td { color: var(--text-2); }
+  .flow { list-style: none; padding: 0; margin: 14px 0 0; counter-reset: step; }
+  .flow li { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px 12px 52px; margin: 0 0 22px; counter-increment: step; }
+  .flow li::before { content: counter(step); position: absolute; left: 14px; top: 12px; width: 26px; height: 26px; border-radius: 50%; background: var(--brand); color: #fff; font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+  .flow li:not(:last-child)::after { content: ""; position: absolute; left: 26px; bottom: -22px; width: 2px; height: 22px; background: var(--border); }
+  .flow b { color: var(--text); }
+  .flow .where { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .02em; color: var(--brand-ink); background: var(--brand-tint); border-radius: 999px; padding: 1px 8px; margin-left: 6px; vertical-align: 1px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 12px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .stat .v { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
+  .stat .k { font-size: 13px; color: var(--muted); }
+  .usage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 12px; }
+  .usage-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
+  .usage-card h3 { font-size: 14px; margin: 0 0 6px; }
+  .usage-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; font-size: 13px; margin: 4px 0; }
+  .usage-row .bar { grid-column: 1 / -1; height: 4px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
+  .usage-row .bar span { display: block; height: 100%; background: var(--brand); border-radius: 2px; }
+  .usage-row .n { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .never { columns: 2 240px; column-gap: 24px; padding-left: 20px; }
+  .never li { break-inside: avoid; margin-bottom: 6px; }
+  footer { border-top: 1px solid var(--border); margin-top: 56px; padding-top: 18px; font-size: 14px; color: var(--muted); }
+  footer p { color: var(--muted); }
+
+  /* this page's own pieces */
+  .pill { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .02em; border-radius: 999px; padding: 1px 9px; margin-right: 6px; vertical-align: 1px; white-space: nowrap; }
+  .pill.desk { color: var(--brand-ink); background: var(--brand-tint); }
+  .pill.web { color: var(--text); background: var(--surface-2); border: 1px solid var(--border); }
+  .pill.both { color: #fff; background: var(--brand); }
+  .measures { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 14px; }
+  .measure { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .measure h3 { margin: 6px 0 4px; font-size: 16px; }
+  .measure p { margin: 0; font-size: 14.5px; }
+  .measure .how { margin-top: 8px; font-size: 13px; color: var(--muted); }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-top: 12px; }
+  .two > div { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .two h3 { margin-top: 0; }
+  .two ul { padding-left: 18px; margin: 6px 0 0; }
+  .two li { font-size: 14.5px; margin-bottom: 4px; }
+  .limits li { margin-bottom: 8px; }
+  .toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; padding: 0; list-style: none; }
+  .toc a { display: inline-block; font-size: 14px; text-decoration: none; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; color: var(--text); }
+  .toc a:hover { border-color: var(--brand); }
+
+  /* this page: pictures and the summary tiles */
+  section { padding-top: 34px; }
+  section h2 { font-size: 24px; line-height: 1.25; margin: 0 0 10px; }
+  section p, section li { color: var(--text-2); }
+  section p { margin: 0 0 12px; max-width: 70ch; }
+  section ul { margin: 0 0 12px; padding-left: 20px; max-width: 70ch; }
+  section li { margin-bottom: 6px; }
+  figure { margin: 16px 0 20px; }
+  figure img { display: block; width: 100%; height: auto; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+  figcaption { font-size: 13.5px; color: var(--muted); margin-top: 6px; max-width: 78ch; }
+  .kicker { font: 700 11px/1 "Overpass", "Noto Sans", sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--brand-ink); margin-bottom: 8px; }
+  .cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  .btn { display: inline-block; padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 14px; text-decoration: none; border: 1px solid var(--border); color: var(--text); background: var(--surface); }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .note { border-left: 3px solid var(--brand); background: var(--brand-tint); padding: 10px 14px; margin: 14px 0; color: var(--text-2); max-width: 74ch; }
+  footer { border-top: 1px solid var(--border); margin-top: 40px; padding: 20px 0 0; font-size: 13.5px; color: var(--muted); }
+
+  /* 0.3.5: pictures still to come (draft) */
+  .ph { border: 2px dashed var(--border); border-radius: 8px; background: var(--surface-2); color: var(--muted); padding: 34px 18px; text-align: center; font-size: 14px; }
+  .ph b { display: block; color: var(--text-2); margin-bottom: 4px; }
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+  .pair figure { margin: 0; }
+  .draft-tag { display: inline-block; margin: 14px 0 0; padding: 4px 10px; border-radius: 999px; background: rgba(0,0,0,.25); color: #fff; font-size: 13px; font-weight: 600; }
+</style>
+<link rel="stylesheet" href="/pages.css">
+<script src="/pages.js" defer></script>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/favicon.svg" alt="">MapNG</a>
+    <h1>MapNG 0.3.6: any shape, road mode, exact alignment</h1>
+    <p class="lede">A map no longer has to be one square. Add tiles to make any shape, or pick a road and build a level along it. Terrain and map data now sit exactly where the game draws them. And the app, its updates and the website went through a full security pass.</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="cards">
+    <div class="card"><b><span class="tick">✓</span>Any shape</b><span>Add tiles in step 1 and build them as one map.</span></div>
+    <div class="card"><b><span class="tick">✓</span>Road mode</b><span>Pick a road, set its ends and a width.</span></div>
+    <div class="card"><b><span class="tick">✓</span>Exact alignment</b><span>Terrain and roads where they really are.</span></div>
+    <div class="card"><b><span class="tick">✓</span>A safer app</b><span>Checked updates, locked releases.</span></div>
+  </div>
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>
+    <a class="btn" href="/">Open MapNG in the browser</a>
+    <a class="btn" href="/updates/0.3.5/">What came in 0.3.5</a>
+  </div>
+
+  <!-- DRAFT (remove before release): this page is a preview and is not indexed. Still to add: pictures of the Tiles
+       controls and of road mode once the Single tile / Batch job tabs are gone; a picture of a tiled level and a road
+       level in game; the Reset button; the final list of fixes. Sections marked "in progress" describe work that is
+       not finished. -->
+  <p class="note"><b>Preview.</b> This page is being written while 0.3.6 is being finished. Parts marked "in progress" are not done yet.</p>
+
+  <section id="tiles" data-nav="Any shape">
+    <div class="kicker">Step 1: Location</div>
+    <h2>Maps of any shape</h2>
+    <p>Step 1 now starts with one tile, the same square as before. <b>Add a tile</b> puts another beside it at the same size. Keep tiles together on a grid, or move them freely with snapping, and drag each one on the map. Generate then builds <b>one map</b> over all of them: an L, a strip along a valley, a ring round a lake.</p>
+    <ul>
+      <li><b>One level, not a batch.</b> The tiles are built as a single level with its roads, buildings and ground running straight through. Nothing has to be stitched afterwards.</li>
+      <li><b>Only the ground you asked for.</b> Outside the tiles there is no terrain, and map data is cut exactly at the edge of the ground: a road, a railway or a river crossing a narrow part is kept, and nothing hangs over empty space.</li>
+      <li><b>Drawn where they are built.</b> Each tile on the map is drawn exactly where its ground will be, at any latitude.</li>
+      <li><b>Shared and saved.</b> A share code, saved settings and the desktop app's Modify all carry the tiles. Up to 64 tiles.</li>
+    </ul>
+    <p>A shape that is not one full square is built with the ground as models (introduced in 0.3.5), so the level has no terrain outside your tiles.</p>
+    <p class="note"><b>In progress.</b> The top-level "Single tile" and "Batch job" tabs are being retired in favour of tiles. Batch mode was made for exporting assets, and people were using it to build huge levels, which it was never meant for. The export step keeps its choice of what to export.</p>
+  </section>
+
+  <section id="road" data-nav="Road mode">
+    <div class="kicker">Step 1: Location</div>
+    <h2>Road mode: a level along a road</h2>
+    <p>Switch Area &amp; detail to <b>Road mode</b> and click a road on the map. MapNG follows it both ways by its name or number, and you get a stretch with a handle at each end and a width either side, from 50 m to 2 km. Generate builds the level over that corridor only.</p>
+    <ul>
+      <li><b>Handles that follow the roads.</b> Drag a handle along the road to shorten the stretch. Drop it farther away, up to 20 km at a time, and the stretch follows the road network to it, keeping to the road you picked. Went the wrong way? Drag the handle back along the line.</li>
+      <li><b>It stays on your road.</b> The stretch does not wander onto another road that shares a number, does not turn back along the other side of a dual carriageway, and goes straight through roundabouts.</li>
+      <li><b>Quick to answer.</b> Picking and routing read only the roads of the area, not everything Generate needs: a click answers in a fraction of a second, and an area already read is not read again.</li>
+      <li><b>The width is real.</b> The corridor is measured on the ground, so it is as wide at the far end of a long road as in the middle. (Before this was fixed, on a 30 km road at latitude 60 the corridor was over 100 m off and the road could leave it.)</li>
+    </ul>
+  </section>
+
+  <section id="chunks" data-nav="Long shapes">
+    <div class="kicker">In progress</div>
+    <h2>Long and diagonal shapes, built in pieces</h2>
+    <p>A long diagonal road has a small area but a huge bounding box, and it used to be refused as "too big". Such shapes are now built in pieces of 2 km along the shape and joined into one level. Roads cut where two pieces meet are joined back into one road, and the game's traffic drives across.</p>
+    <ul>
+      <li>The export builds every piece from what Generate already downloaded. It downloads nothing.</li>
+      <li>The level's report now covers the whole level and every piece, and the progress shows which piece is being built, in all seven languages.</li>
+      <li>If a piece fails, the message says which one and at which step.</li>
+    </ul>
+    <p class="note"><b>Not finished.</b> Where pieces meet in a dense city with bridges or tunnels close to the join, the ground on the two sides can still disagree, because each piece shapes its roads from its own part of the road network. A long bridge or tunnel reaching far past its piece is cut. Use this for country roads and open ground for now.</p>
+  </section>
+
+  <section id="alignment" data-nav="Exact alignment">
+    <div class="kicker">Accuracy</div>
+    <h2>Terrain and map data, exactly where the game draws them</h2>
+    <p>While checking the new shapes we measured where a map's terrain really ends up, and found every level slightly out. All of it is fixed at the root, for every map:</p>
+    <ul>
+      <li><b>Every level was a little small.</b> A map was fetched 4 m wider on every side than the game then drew it: 1.5 % on a 512 m map, 0.2 % on a 4 km one.</li>
+      <li><b>Terrain up to a square off the map data.</b> Heights were sampled on one grid and read on another.</li>
+      <li><b>The default elevation source was half a pixel off.</b> The free lidar source (Mapterhorn) sat half a source pixel north-west of its place: 0.4 m on 1 m lidar, about 10 m on the 30 m data.</li>
+      <li><b>Flat-earth shortcuts.</b> Tiles, long shapes and the road corridor each used a fixed number of metres per degree. They now all use one definition with the real figure for the map's latitude.</li>
+    </ul>
+    <figure><img src="images/alignment-before-after.jpg" alt="Two diagrams of a 512 m map split into 16 blocks. Left, MapNG 0.3.5: arrows pointing outward from the centre, the terrain up to 5.5 m from where the game draws it. Right, now: every block at 0.0 m." loading="lazy"><figcaption>A 512 m map of Val d'Isère on 1 m lidar. Left: in 0.3.5 the terrain was stretched outward, up to 5.5 m at the corners. Right: now 0.0 m everywhere. Measured against the source data, read by separate code.</figcaption></figure>
+    <p>Checked in the game as well: on a test level with untouched terrain, 961 points of the game's own ground height match the source elevation at their real positions to within a millimetre, and the level's roads lie on OpenStreetMap's lines (median 0 cm, worst 6 cm). A level built in pieces at latitude 60 reads the same.</p>
+    <p>What this means for you: a level made from the same place again will sit a little differently (up to a square, plus the few metres at the edges). Levels you already exported are not changed.</p>
+  </section>
+
+  <section id="security" data-nav="Security">
+    <div class="kicker">Trust</div>
+    <h2>A full security pass</h2>
+    <p>The website, the desktop app, the update system and the way releases are built were all reviewed again. No break-in was found; these were weaknesses, and they are closed:</p>
+    <ul>
+      <li><b>Updates are checked before they are offered, and the download is tied to that check.</b> On test builds the app could check one release and then download another. It now refuses to download anything but the update it verified.</li>
+      <li><b>Released files cannot be swapped.</b> Once a release is published on GitHub its files and its tag are locked.</li>
+      <li><b>The signing keys are out of reach.</b> They can only be used by a release build started from a version tag, and the step that signs the update list no longer shares a machine with any third-party code.</li>
+      <li><b>The signed program cannot be repurposed.</b> MapNG.exe can no longer be run as a general script runner by other software on your computer.</li>
+      <li><b>The app asks for less.</b> It may use your location (if you ask it to), the clipboard and full screen. Camera, microphone, notifications and everything else are refused outright.</li>
+      <li><b>Only listed addresses, redirects included.</b> The export already connected only to the addresses on <a href="/data.html#addresses">MapNG's published list</a>. A listed server can no longer pass it on to one that is not.</li>
+      <li><b>Newer foundations.</b> Electron and the bundled Node were moved to their current security releases.</li>
+      <li><b>The report service is harder to flood,</b> and reports can only be read through the developer's own sign-in.</li>
+    </ul>
+    <p>More on how MapNG is built and what it sends where: <a href="/security.html">Security</a> and <a href="/data.html">Your data</a>.</p>
+  </section>
+
+  <section id="fixes" data-nav="Fixes">
+    <div class="kicker">Smaller things</div>
+    <h2>Fixes</h2>
+    <ul>
+      <li><b>"Generate does nothing" with your own elevation file.</b> With an uploaded elevation file the app always offered Generate, then decided nothing had changed. A map data file loaded after generating was ignored the same way. Both now generate again. (Thanks for the report.)</li>
+      <li><b>"Settings changed since generating"</b> now follows everything that changes the map, tiles and a picked road included.</li>
+      <li>A shared road comes back with its ends where they were.</li>
+      <li>Switching tiles from free to together puts every tile back on the grid.</li>
+      <li>The level built in pieces could download map data again if you exported more than half an hour after generating. It no longer does.</li>
+    </ul>
+  </section>
+
+  <section id="next" data-nav="Next release">
+    <div class="kicker">Coming next</div>
+    <h2>Still being worked on</h2>
+    <ul>
+      <li>Pieces of a long level meeting cleanly in cities, where bridges and tunnels are close to a join.</li>
+      <li>Previews that show only the shape you picked, and a minimap to match.</li>
+      <li>A Reset button, on the website and in the desktop app, that puts everything back to a fresh start.</li>
+      <li>Streets standing on a narrow ridge with jagged sides in steep towns, walls along tunnel approaches, and the other items carried over from <a href="/updates/0.3.5/#next">0.3.5's list</a>.</li>
+    </ul>
+  </section>
+
+  <footer>
+    <p>MapNG is free and open source: <a href="https://github.com/nikkiluzader/mapng">github.com/nikkiluzader/mapng</a>. Thanks to everyone on Discord who sent maps, screenshots and reports. Earlier updates: <a href="/updates/0.3.5/">0.3.5</a>, <a href="/updates/0.3.4/">0.3.4</a>.</p>
+  </footer>
+</main>
+</body>
+</html>
