@@ -577,7 +577,7 @@ const extraTiles = computed(() => {
   const f = tilesOnMap();
   return f.boxes.slice(1).map((bounds, k) => ({ i: k + 1, center: f.centers[k + 1], bounds }));
 });
-const tilesOnMap = () => tilesFrame(tileAnchor(), tileApi.tilesPx.value, tileApi.R.value, Number(props.processingMetersPerPixel) > 0 ? Number(props.processingMetersPerPixel) : 1);
+const tilesOnMap = () => tilesFrame(tileAnchor(), tileApi.tilesPx.value, tileApi.R.value, Number(props.processingMetersPerPixel) > 0 ? Number(props.processingMetersPerPixel) : 1, store.tileAnchor);
 const dropTile = (tile, event) => {
   const ll = event?.target?.getLatLng?.(); if (!ll) return;
   tileApi.moveTile(tile.i, tilesOnMap().offsetOf(ll));
@@ -697,7 +697,10 @@ const activeSelectionSizeMeters = computed(() => {
 });
 
 const bounds = computed(() => {
-  const metricBounds = computeMetricSelectionBounds(props.boxLocked ? props.center : currentCenter.value, activeSelectionSizeMeters.value);
+  // (several tiles anchored elsewhere than on tile 1: tile 1 is drawn where the tiled map has it, not round the
+  // crosshair, which marks the anchor)
+  const anchoredAway = store.tiles.length > 1 && store.tileAnchor !== 0 && !store.batchMode && !hasBatchGrid.value && !showUploadedCoverageBounds.value && store.areaMode !== 'road';
+  const metricBounds = anchoredAway ? tilesOnMap().boxes[0] : computeMetricSelectionBounds(props.boxLocked ? props.center : currentCenter.value, activeSelectionSizeMeters.value);
   if (!metricBounds) return null;
   const nw = L.latLng(metricBounds.north, metricBounds.west);
   const se = L.latLng(metricBounds.south, metricBounds.east);

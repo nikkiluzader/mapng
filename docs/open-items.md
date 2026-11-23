@@ -163,11 +163,19 @@ As of 2026-11-23:
 
 - **Progress windows cut text off.** Redesign them so every line of the verbose text shows on any screen size.
   Status: not started. Where: StageLoader and the export / Generate progress cards.
-- **The level's thumbnail is a MapNG logo and text,** no more satellite image. Status: not started. Where: the
-  preview step of `exportBeamNGLevel.js` ("Rendering the level preview thumbnail").
-- **An anchor for several tiles.** With more than one tile, a choice of anchor tile or anchor point appears (today
-  always tile 1, the first / leftmost); one-click controls. Status: not started. Where: `services/tileLayout.js`
-  (`tilesFrame` takes an anchor), `composables/useTiles.js`, the Tiles controls in step 1.
+- **The level's thumbnail is a MapNG logo and text,** no more satellite image. Done on dev 2026-11-23:
+  `generatePreviewBlob` in `exportBeamNGLevel.js` draws a dark 1024 x 576 card (the logo, "MapNG", the level's own
+  name, one line under it) in the app's display font; the desktop runner registers the same font file
+  (`desktop/runner/browserShims.mjs`). A chunked level's card carries the level's name, not the first chunk's.
+  Sample: `scratch/thumb/preview_card.png`. Open: a look at it in the game's level list.
+- **An anchor for several tiles.** Done on dev 2026-11-23: with more than one tile an "Anchor" row shows every tile
+  and "Centre" as one-click choices (`components/controls/TileLayout.vue`). The anchor is the point that stands on
+  the location; picking another one, or adding, moving or removing a tile, never moves the tiles on the map: the
+  location moves to the anchor (`composables/useTiles.js` commit, `services/tileLayout.js` anchorOffsetPx /
+  tilesFrame's fifth argument / pointAt). It travels in share codes, saved settings and Modify
+  (`anchorAt` beside the tiles). Checked in the browser (`scratch/verify-pw/e2e_anchor.mjs`): tile 3 and Centre on
+  three tiles, a removal. Open: an anchor at a free point (a click on the map), if wanted; a Generate and an export
+  with the anchor off tile 1, in game.
 
 ## Now: the 0.3.6 release page
 

@@ -11,6 +11,7 @@ import { sanitizePoints, pointLabel } from './spawnPoints.js';
 import { sanitizeContentOff, sanitizeExcludeTags, PRESET_IDS } from './buildContent.js';
 import { sanitizeTreeKindsOff, sanitizeTreeModelsOff, sanitizeTreeSwaps } from './beamngTrees.js';
 import { simplifyPts, cumulative, stretchBetween } from './roadPick.js';
+import { cleanTileAnchor } from './tileLayout.js';
 
 // ---- the area: tiles or a road (refs/output/tiles-step2-plan.md D, road-mode-plan.md) ----
 const MAX_CODE_TILES = 64;
@@ -47,7 +48,8 @@ export function sanitizeArea(a) {
   const list = Array.isArray(a.tiles?.list) ? a.tiles.list.slice(0, MAX_CODE_TILES).map((t) => ({ dx: num(t?.dx, -1000, 1000) ?? 0, dy: num(t?.dy, -1000, 1000) ?? 0 })) : [];
   if (list.length < 2) return null;
   list[0] = { dx: 0, dy: 0 };
-  return { mode: 'tiles', tiles: { list, together: a.tiles.together !== false, snap: a.tiles.snap !== false } };
+  // (the anchor: a tile of the list or 'center'; anything else is tile 1, as codes made before it mean)
+  return { mode: 'tiles', tiles: { list, anchor: cleanTileAnchor(a.tiles.anchor, list.length), together: a.tiles.together !== false, snap: a.tiles.snap !== false } };
 }
 
 /** Export-panel settings: [name in the config, localStorage key, kind, default]. */

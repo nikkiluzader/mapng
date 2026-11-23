@@ -57,7 +57,10 @@ test('a map\'s tiles read back checked; a single map has none', async () => {
   assert.equal(tilesFromTerrain({}), null);
   assert.equal(tilesFromTerrain({ tiles: { list: [{ dx: 0, dy: 0 }] } }), null);
   const t = tilesFromTerrain({ tiles: { list: [{ dx: 3, dy: 1 }, { dx: 1, dy: 'x' }], tilePx: 512, anchor: { lat: 1, lng: 2 }, together: false } });
-  assert.deepEqual(t, { list: [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }], tilePx: 512, anchor: { lat: 1, lng: 2 }, together: false, snap: true });
+  assert.deepEqual(t, { list: [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }], tilePx: 512, anchor: { lat: 1, lng: 2 }, anchorAt: 0, together: false, snap: true });
+  // (which point the anchor is: kept when it names a tile of the list or the centre, else tile 1)
+  assert.equal(tilesFromTerrain({ tiles: { list: [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }], anchorAt: 'center' } }).anchorAt, 'center');
+  assert.equal(tilesFromTerrain({ tiles: { list: [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }], anchorAt: 5 } }).anchorAt, 0);
   const many = { tiles: { list: Array.from({ length: 200 }, (_, i) => ({ dx: i, dy: 0 })), tilePx: 256 } };
   assert.equal(tilesFromTerrain(many).list.length, MAX_TILES);
 });
@@ -101,4 +104,29 @@ test('free tiles put together: every tile on the grid, none on another (as compo
   assert.equal(new Set(placed.map((t) => `${t.dx},${t.dy}`)).size, placed.length);
   // each within a tile or two of where it was
   placed.forEach((t, i) => assert.ok(Math.abs(t.dx - free[i].dx) <= 2 * R && Math.abs(t.dy - free[i].dy) <= 2 * R));
+});
+
+test('the anchor: a tile or the centre stands on the location, and the tiles stay put when it changes', async () => {
+  const { tilesFrame, anchorOffsetPx, cleanTileAnchor } = await import('../services/tileLayout.js');
+  const R = 1024; const mpp = 2; const tiles = [{ dx: 0, dy: 0 }, { dx: R, dy: 0 }, { dx: 2 * R, dy: R }];
+  assert.deepEqual(anchorOffsetPx(tiles, R, 0), { x: 0, y: 0 });
+  assert.deepEqual(anchorOffsetPx(tiles, R, 2), { x: 2 * R, y: R });
+  assert.deepEqual(anchorOffsetPx(tiles, R, 'center'), { x: R, y: R / 2 });      // the middle of the 3 x 2 box
+  assert.equal(cleanTileAnchor(7, 3), 0); assert.equal(cleanTileAnchor('center', 3), 'center'); assert.equal(cleanTileAnchor('x', 3), 0); assert.equal(cleanTileAnchor(2, 3), 2);
+  const here = { lat: 47.0, lng: 8.0 };
+  const f0 = tilesFrame(here, tiles, R, mpp);             // as it always was: tile 1 on the location
+  assert.ok(Math.abs(f0.centers[0].lat - here.lat) < 1e-9 && Math.abs(f0.centers[0].lng - here.lng) < 1e-9);
+  const f2 = tilesFrame(here, tiles, R, mpp, 2);          // tile 3 on the location
+  assert.ok(Math.abs(f2.centers[2].lat - here.lat) < 1e-9 && Math.abs(f2.centers[2].lng - here.lng) < 1e-9);
+  const fc = tilesFrame(here, tiles, R, mpp, 'center');   // the map's own centre on the location
+  assert.ok(Math.abs(fc.center.lat - here.lat) < 1e-12 && Math.abs(fc.center.lng - here.lng) < 1e-12);
+  // picking another anchor: the location moves to where that point is now, and no tile moves (within a millimetre)
+  const at = anchorOffsetPx(tiles, R, 2); const there = f0.pointAt({ x: at.x * mpp, y: at.y * mpp });
+  const again = tilesFrame(there, tiles, R, mpp, 2);
+  for (let i = 0; i < 3; i++) {
+    const dLat = (again.centers[i].lat - f0.centers[i].lat) * 111320; const dLng = (again.centers[i].lng - f0.centers[i].lng) * 111320 * Math.cos(47 * Math.PI / 180);
+    assert.ok(Math.hypot(dLat, dLng) < 0.01, `tile ${i + 1} moved ${Math.hypot(dLat, dLng)} m`);
+  }
+  // pointAt is offsetOf's inverse
+  const o = f0.offsetOf(there); assert.ok(Math.abs(o.x - at.x * mpp) < 1e-6 && Math.abs(o.y - at.y * mpp) < 1e-6);
 });

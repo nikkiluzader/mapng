@@ -868,7 +868,7 @@ const triggerDownload = (blob, filename) => {
 // (the area beyond one square goes too: the tiles, or the road and its stretch)
 const currentArea = () => (store.areaMode === 'road' && store.road
   ? { mode: 'road', road: { ...toRaw(store.road), halfWidthM: store.roadHalfWidthM } }
-  : { mode: 'tiles', tiles: { list: toRaw(store.tiles), together: store.tilesTogether, snap: store.tilesSnap } });
+  : { mode: 'tiles', tiles: { list: toRaw(store.tiles), anchor: store.tileAnchor, together: store.tilesTogether, snap: store.tilesSnap } });
 const currentSessionConfig = () => buildSessionConfig({ ...buildRunConfiguration(), rawTerrain: store.rawTerrain }, localStorage, { backgroundMask: store.backgroundActive ? toRaw(store.backgroundMask) : null, points: toRaw(store.points), area: currentArea() });
 
 const copyRunConfiguration = async () => {
@@ -930,9 +930,9 @@ const applyPendingConfig = () => {
     if (area?.mode === 'road') {
       store.setAreaMode('road'); store.setRoad({ ...area.road, ids: [] }); store.setRoadHalfWidthM(area.road.halfWidthM);
     } else if (area?.mode === 'tiles') {
-      store.setAreaMode('tiles'); store.setTiles(area.tiles.list); store.setTilesTogether(area.tiles.together); store.setTilesSnap(area.tiles.snap);
+      store.setAreaMode('tiles'); store.setTiles(area.tiles.list); store.setTileAnchor(area.tiles.anchor); store.setTilesTogether(area.tiles.together); store.setTilesSnap(area.tiles.snap);
     } else if (hasArea) {
-      store.setAreaMode('tiles'); store.setTiles([{ dx: 0, dy: 0 }]);
+      store.setAreaMode('tiles'); store.setTiles([{ dx: 0, dy: 0 }]); store.setTileAnchor(0);
     }
     if (typeof config.rawTerrain === 'boolean') store.setRawTerrain(config.rawTerrain);
     if (typeof config.gapFillSource === 'string' && config.gapFillSource) gapFillSource.value = normalizeGapFillSource(config.gapFillSource);

@@ -2409,7 +2409,12 @@
     "desktopWarn": "Past {max} px across: the level may be too big for the game to load.",
     "clear": "Back to one tile",
     "chunked": "Built in pieces (experimental): this shape is too long or diagonal for one grid, so it is made in chunks that are joined into one level. Generate downloads every chunk first; the previews show a coarser overview.",
-    "bigDesktop": "Big: this shape covers {km2} km², more than the website allows ({maxKm2} km²). The desktop app builds it, but it may take a long time and need a lot of disk space."
+    "bigDesktop": "Big: this shape covers {km2} km², more than the website allows ({maxKm2} km²). The desktop app builds it, but it may take a long time and need a lot of disk space.",
+    "anchor": "Anchor",
+    "anchorTile": "Anchor on tile {n}",
+    "anchorCenter": "Centre",
+    "anchorCenterTitle": "Anchor on the centre of all tiles",
+    "anchorHint": "The anchor is the point that sits on the location above. Click a tile or Centre to move it: the tiles stay where they are."
   },
   "road": {
     "areaMode": "What the map covers",

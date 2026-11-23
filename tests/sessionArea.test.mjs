@@ -9,7 +9,11 @@ const D = 1 / 111320;
 test('one tile is no area; tiles and roads are kept, checked', () => {
   assert.equal(sanitizeArea({ mode: 'tiles', tiles: { list: [{ dx: 0, dy: 0 }] } }), null);
   const t = sanitizeArea({ mode: 'tiles', tiles: { list: [{ dx: 5, dy: 5 }, { dx: 1, dy: 'x' }], together: false } });
-  assert.deepEqual(t, { mode: 'tiles', tiles: { list: [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }], together: false, snap: true } });
+  assert.deepEqual(t, { mode: 'tiles', tiles: { list: [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }], anchor: 0, together: false, snap: true } });
+  // (the anchor travels with the tiles: a tile of the list or the centre; anything else from a pasted code is tile 1)
+  assert.equal(sanitizeArea({ mode: 'tiles', tiles: { list: [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }], anchor: 'center' } }).tiles.anchor, 'center');
+  assert.equal(sanitizeArea({ mode: 'tiles', tiles: { list: [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }], anchor: 1 } }).tiles.anchor, 1);
+  assert.equal(sanitizeArea({ mode: 'tiles', tiles: { list: [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }], anchor: { evil: 1 } } }).tiles.anchor, 0);
   const many = sanitizeArea({ mode: 'tiles', tiles: { list: Array.from({ length: 500 }, (_, i) => ({ dx: i, dy: 0 })) } });
   assert.equal(many.tiles.list.length, 64);
 });

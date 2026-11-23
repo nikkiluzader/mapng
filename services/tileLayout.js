@@ -113,6 +113,7 @@ export function tilesFromTerrain(td) {
   return {
     list, tilePx: Math.max(1, Math.round(Number(t.tilePx) || 1024)),
     anchor: Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null,
+    anchorAt: cleanTileAnchor(t.anchorAt, list.length),
     together: t.together !== false, snap: t.snap !== false,
   };
 }
@@ -120,16 +121,20 @@ export function tilesFromTerrain(td) {
 /**
  * A tiled map where it is built (services/mapFrame.js): { grid (layoutGrid), center (the map's), bounds (the map's),
  * boxes: each tile's { north, south, east, west }, centers: each tile's { lat, lng }, offsetOf({ lat, lng }): a point
- * as metres from tile 0's middle (x east, y north) }. anchor: tile 0's middle; tilesPx: the tiles in pixels; R: a
+ * as metres from tile 0's middle (x east, y north), pointAt: its inverse }. anchor: the place the layout's anchored
+ * point stands on; anchorAt: which point that is (a tile's index or 'center'; tile 0 when not given); tilesPx: the tiles in pixels; R: a
  * tile's side in pixels; mpp: metres per pixel. The tiles drawn on the map and the map Generate builds both come from
  * this, so a tile is drawn exactly where its ground will be.
  */
-export function tilesFrame(anchor, tilesPx, R, mpp) {
+export function tilesFrame(anchor, tilesPx, R, mpp, anchorAt = 0) {
   const grid = layoutGrid(tilesPx, R); const m = Number(mpp) > 0 ? Number(mpp) : 1;
-  // the map's centre, such that tile 0's middle is the anchor in the map's own frame (its scale is the centre's)
+  // the map's centre, such that the anchored point (tile 0's middle, another tile's, or the middle of them all:
+  // anchorOffsetPx) is the anchor in the map's own frame (its scale is the centre's)
+  const at = anchorOffsetPx(tilesPx, R, anchorAt, grid);
+  const off = { x: grid.centerOffset.x - at.x, y: grid.centerOffset.y - at.y };
   let lat = anchor.lat;
-  for (let k = 0; k < 4; k++) lat = anchor.lat + (grid.centerOffset.y * m) / metresPerDegree(lat).lat;
-  const center = { lat, lng: anchor.lng + (grid.centerOffset.x * m) / metresPerDegree(lat).lng };
+  for (let k = 0; k < 4; k++) lat = anchor.lat + (off.y * m) / metresPerDegree(lat).lat;
+  const center = { lat, lng: anchor.lng + (off.x * m) / metresPerDegree(lat).lng };
   const bounds = frameBounds(center, grid.width * m, grid.height * m);
   const boxes = grid.rects.map(([x, y, w, h]) => {
     const [west, north] = gridLngLat(bounds, grid.width, grid.height, x, y); const [east, south] = gridLngLat(bounds, grid.width, grid.height, x + w, y + h);
@@ -141,5 +146,23 @@ export function tilesFrame(anchor, tilesPx, R, mpp) {
     const g = gridPosition(bounds, grid.width, grid.height, p.lat, p.lng);
     return { x: (g.gx - (r0[0] + r0[2] / 2)) * m, y: ((r0[1] + r0[3] / 2) - g.gy) * m };
   };
-  return { grid, center, bounds, boxes, centers, offsetOf };
+  // (the other way: a point given as metres from tile 0's middle, as { lat, lng })
+  const pointAt = (o) => {
+    const [lng, la] = gridLngLat(bounds, grid.width, grid.height, r0[0] + r0[2] / 2 + o.x / m, r0[1] + r0[3] / 2 - o.y / m);
+    return { lat: la, lng };
+  };
+  return { grid, center, bounds, boxes, centers, offsetOf, pointAt };
+}
+
+/** The anchor as stored or shared, checked against n tiles: 'center', or a tile's index (0 when it is none). */
+export const cleanTileAnchor = (a, n) => (a === 'center' ? 'center' : Number.isInteger(a) && a > 0 && a < n ? a : 0);
+
+/**
+ * Where the anchor is in the layout: pixels from tile 0's middle (x east, y north). anchorAt: a tile's index (its
+ * middle; 0 is tile 0, as it always was) or 'center' (the middle of the tiles' whole box).
+ */
+export function anchorOffsetPx(tilesPx, R, anchorAt = 0, grid = null) {
+  if (anchorAt === 'center') { const g = grid || layoutGrid(tilesPx, R); return { x: g.centerOffset.x, y: g.centerOffset.y }; }
+  const t = tilesPx[cleanTileAnchor(anchorAt, tilesPx.length)];
+  return t ? { x: t.dx, y: t.dy } : { x: 0, y: 0 };
 }

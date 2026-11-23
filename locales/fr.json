@@ -2409,7 +2409,12 @@
     "desktopWarn": "Au-delà de {max} px : le niveau risque d'être trop grand pour que le jeu le charge.",
     "clear": "Revenir à une tuile",
     "chunked": "Construit en morceaux (expérimental) : cette forme est trop longue ou trop en diagonale pour une seule grille, elle est donc faite en morceaux réunis en un seul niveau. Générer télécharge d'abord chaque morceau ; les aperçus montrent une vue d'ensemble plus grossière.",
-    "bigDesktop": "Grand : cette forme couvre {km2} km², plus que ce que permet le site ({maxKm2} km²). L'application de bureau la construit, mais cela peut prendre longtemps et demander beaucoup d'espace disque."
+    "bigDesktop": "Grand : cette forme couvre {km2} km², plus que ce que permet le site ({maxKm2} km²). L'application de bureau la construit, mais cela peut prendre longtemps et demander beaucoup d'espace disque.",
+    "anchor": "Ancre",
+    "anchorTile": "Ancre sur la tuile {n}",
+    "anchorCenter": "Centre",
+    "anchorCenterTitle": "Ancre au centre de toutes les tuiles",
+    "anchorHint": "L’ancre est le point posé sur le lieu ci-dessus. Cliquez sur une tuile ou sur Centre pour la déplacer : les tuiles restent où elles sont."
   },
   "road": {
     "areaMode": "Ce que couvre la carte",

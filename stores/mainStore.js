@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed, shallowRef, watch } from 'vue';
 import { loadBatchState } from '../services/batchJob';
+import { cleanTileAnchor } from '../services/tileLayout.js';
 import { terrainMode, setTerrainMode } from '../composables/useTerrainMode.js';
 import { emptyMask, maskHasAreas } from '../services/backgroundMask.js';
 import { sanitizePoints, POINTS_STORAGE_KEY } from '../services/spawnPoints.js';
@@ -182,11 +183,17 @@ export const useMainStore = defineStore('main', () => {
     } catch { return [{ dx: 0, dy: 0 }]; }
   })());
   const tilesTogether = ref(localStorage.getItem('mapng_tiles_together') !== 'false');
+  // which point of the tiles stands on the location (services/tileLayout.js anchorOffsetPx): a tile's index, or
+  // 'center' for the middle of them all. Tile 1 (index 0) unless chosen.
+  const tileAnchor = ref((() => { try { const a = localStorage.getItem('mapng_tiles_anchor'); return cleanTileAnchor(a === 'center' ? a : Number(a), tiles.value.length); } catch { return 0; } })());
+  function setTileAnchor(a) { tileAnchor.value = cleanTileAnchor(a, tiles.value.length); try { localStorage.setItem('mapng_tiles_anchor', String(tileAnchor.value)); } catch { /* private mode */ } }
   const tilesSnap = ref(localStorage.getItem('mapng_tiles_snap') !== 'false');
   function setTiles(list) {
     tiles.value = Array.isArray(list) && list.length ? list.map((t) => ({ dx: Number(t.dx) || 0, dy: Number(t.dy) || 0 })) : [{ dx: 0, dy: 0 }];
     tiles.value[0] = { dx: 0, dy: 0 };   // (tile 0 is the map's centre)
     localStorage.setItem('mapng_tiles', JSON.stringify(tiles.value));
+    // (an anchor on a tile that is gone falls back to tile 1)
+    if (tileAnchor.value !== cleanTileAnchor(tileAnchor.value, tiles.value.length)) setTileAnchor(0);
   }
   // road mode (refs/output/road-mode-plan.md): the area is a picked road widened either side, instead of tiles
   const areaMode = ref(localStorage.getItem('mapng_area_mode') === 'road' ? 'road' : 'tiles');
@@ -386,7 +393,7 @@ export const useMainStore = defineStore('main', () => {
     setBatchGridRows,
     setBatchTileFollowCenter,
     setBatchTileOffsets,
-    tiles, tilesTogether, tilesSnap, setTiles, setTilesTogether, setTilesSnap,
+    tiles, tilesTogether, tilesSnap, tileAnchor, setTiles, setTilesTogether, setTilesSnap, setTileAnchor,
     areaMode, road, roadHalfWidthM, setAreaMode, setRoad, setRoadHalfWidthM,
     setBatchTileNames
   };

@@ -2409,7 +2409,12 @@
     "desktopWarn": "Über {max} px breit: Das Level ist für das Spiel womöglich zu groß zum Laden.",
     "clear": "Zurück zu einer Kachel",
     "chunked": "In Teilen gebaut (experimentell): Diese Form ist für ein einzelnes Raster zu lang oder zu schräg, daher wird sie in Stücken erstellt, die zu einem Level zusammengefügt werden. Generieren lädt zuerst jedes Stück herunter; die Vorschauen zeigen eine gröbere Übersicht.",
-    "bigDesktop": "Groß: Diese Form umfasst {km2} km², mehr als die Website erlaubt ({maxKm2} km²). Die Desktop-App baut sie, das kann aber lange dauern und viel Speicherplatz brauchen."
+    "bigDesktop": "Groß: Diese Form umfasst {km2} km², mehr als die Website erlaubt ({maxKm2} km²). Die Desktop-App baut sie, das kann aber lange dauern und viel Speicherplatz brauchen.",
+    "anchor": "Anker",
+    "anchorTile": "Anker auf Kachel {n}",
+    "anchorCenter": "Mitte",
+    "anchorCenterTitle": "Anker auf die Mitte aller Kacheln",
+    "anchorHint": "Der Anker ist der Punkt, der auf dem Ort oben liegt. Klicke auf eine Kachel oder auf Mitte, um ihn zu versetzen: Die Kacheln bleiben, wo sie sind."
   },
   "road": {
     "areaMode": "Was die Karte abdeckt",

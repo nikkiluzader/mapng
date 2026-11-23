@@ -4,8 +4,10 @@
 //
 // Kept: what is the user's own and tedious or impossible to give again, and what they chose about their privacy:
 // keys and servers, the language, light or dark, the sharing choices, and the app's own bookkeeping.
+import { PERSONAL_STORAGE_KEYS } from './personalKeys.js';
+
 export const RESET_KEEPS = new Set([
-  'mapng_gpxzApiKey', 'mapng_customOverpassUrl',           // the user's own key and server
+  ...PERSONAL_STORAGE_KEYS,                                 // the user's own key and server (services/personalKeys.js)
   'mapng_locale',                                           // the language
   'mapng_share_exports', 'mapng_share_settings',            // privacy choices (asked once; never asked again by a reset)
   'mapng_tip_last_shown_at', 'mapng_levelDeleteWarned',     // "already shown" notes

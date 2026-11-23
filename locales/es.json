@@ -2409,7 +2409,12 @@
     "desktopWarn": "Más de {max} px: el nivel puede ser demasiado grande para que el juego lo cargue.",
     "clear": "Volver a una tesela",
     "chunked": "Construido por partes (experimental): esta forma es demasiado larga o diagonal para una sola cuadrícula, así que se crea en trozos que se unen en un solo nivel. Generar descarga primero cada trozo; las vistas previas muestran una vista general más gruesa.",
-    "bigDesktop": "Grande: esta forma cubre {km2} km², más de lo que permite la web ({maxKm2} km²). La aplicación de escritorio la construye, pero puede tardar mucho y necesitar mucho espacio en disco."
+    "bigDesktop": "Grande: esta forma cubre {km2} km², más de lo que permite la web ({maxKm2} km²). La aplicación de escritorio la construye, pero puede tardar mucho y necesitar mucho espacio en disco.",
+    "anchor": "Ancla",
+    "anchorTile": "Ancla en la tesela {n}",
+    "anchorCenter": "Centro",
+    "anchorCenterTitle": "Ancla en el centro de todas las teselas",
+    "anchorHint": "El ancla es el punto que queda sobre la ubicación de arriba. Haz clic en una tesela o en Centro para moverla: las teselas se quedan donde están."
   },
   "road": {
     "areaMode": "Qué cubre el mapa",

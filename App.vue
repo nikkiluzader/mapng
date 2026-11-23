@@ -670,7 +670,7 @@ const buildGenerationKey = (c, res, osm, elevationSource, gpxzKey, uploadedEleva
     resolution: res,
     // (tiles in step 1: the layout changes the map; one tile adds nothing, so a single square's key is as before)
     ...(store.areaMode === 'road' && !store.batchMode ? { road: store.road ? [store.road.pts.length, Math.round(store.road.startM), Math.round(store.road.endM), store.roadHalfWidthM, store.road.pts[0]?.lat, store.road.pts.at(-1)?.lng] : null }
-      : store.tiles.length > 1 ? { tiles: store.tiles.map((t) => [Math.round(t.dx * 1e4), Math.round(t.dy * 1e4)]) } : {}),
+      : store.tiles.length > 1 ? { tiles: store.tiles.map((t) => [Math.round(t.dx * 1e4), Math.round(t.dy * 1e4)]), tileAnchor: store.tileAnchor } : {}),
     processingMetersPerPixel: processingMpp,
     osm,
     elevationSource,
@@ -1074,13 +1074,13 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         if (!desktopApp && !g.webOk) throw new Error(t('tiles.webCap', { km2: Math.round(g.areaPx * mpp * mpp / 1e6), maxKm2: Math.round(WEB_MAX_SIDE * WEB_MAX_SIDE * mpp * mpp / 1e6) }));
         // (the map's centre in its own frame, tile 0's middle on the chosen centre: services/tileLayout.js tilesFrame,
         // which the tiles on the map are drawn from too)
-        genCenter = tilesFrame(center.value, store.tiles.map((t) => ({ dx: Math.round(t.dx * R), dy: Math.round(t.dy * R) })), R, mpp).center;
+        genCenter = tilesFrame(center.value, store.tiles.map((t) => ({ dx: Math.round(t.dx * R), dy: Math.round(t.dy * R) })), R, mpp, store.tileAnchor).center;
         genSize = g.terrainBlock ? g.width : { width: g.width, height: g.height };
         if (!g.terrainBlock && g.areaPx < g.width * g.height) generationOptions.footprint = g.rects;
         if (g.chunked) { generationOptions.footprint = g.rects; generationOptions.chunked = { W: g.width, H: g.height, mpp }; }
         // (what the tiles were: the previews, share codes and the desktop's Modify read them back; plain numbers, as
         // this goes to a worker or the desktop app)
-        generationOptions.tiles = { list: store.tiles.map((t) => ({ dx: t.dx, dy: t.dy })), tilePx: R, anchor: { lat: center.value.lat, lng: center.value.lng }, together: !!store.tilesTogether, snap: !!store.tilesSnap };
+        generationOptions.tiles = { list: store.tiles.map((t) => ({ dx: t.dx, dy: t.dy })), tilePx: R, anchor: { lat: center.value.lat, lng: center.value.lng }, anchorAt: store.tileAnchor, together: !!store.tilesTogether, snap: !!store.tilesSnap };
         console.log(`[Tiles] ${store.tiles.length} tiles: a ${g.width}×${g.height} grid, ${g.terrainBlock ? 'a power-of-two square (TerrainBlock)' : `ground models${generationOptions.footprint ? ', footprint ' + g.areaPx + ' px' : ''}`}${g.overlaps ? ', overlaps fetched once' : ''}${g.islands ? ', islands' : ''}.`);
       }
       // (the desktop app fetches and processes in a Node process: no 4 GB
@@ -1230,11 +1230,11 @@ const handleModifyLevel = async (level) => {
     setCenter({ lat: info.center.lat, lng: info.center.lng }, { force: true });
   } else if (savedTiles) {
     store.setAreaMode('tiles');
-    store.setTiles(savedTiles.list); store.setTilesTogether(savedTiles.together); store.setTilesSnap(savedTiles.snap);
+    store.setTiles(savedTiles.list); store.setTileAnchor(savedTiles.anchorAt); store.setTilesTogether(savedTiles.together); store.setTilesSnap(savedTiles.snap);
     setCenter(savedTiles.anchor || { lat: info.center.lat, lng: info.center.lng }, { force: true });
     setResolution(savedTiles.tilePx, { force: true });
   } else {
-    store.setAreaMode('tiles'); store.setTiles([{ dx: 0, dy: 0 }]);
+    store.setAreaMode('tiles'); store.setTiles([{ dx: 0, dy: 0 }]); store.setTileAnchor(0);
     setCenter({ lat: info.center.lat, lng: info.center.lng }, { force: true });
     if (info.resolution && typeof info.resolution !== 'object') setResolution(info.resolution, { force: true });
   }

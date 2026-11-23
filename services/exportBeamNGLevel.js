@@ -698,50 +698,55 @@ async function getTerrainTextureBlob(terrainData, textureType = 'hybrid') {
 }
 
 /**
- * Generate a 512×512 preview PNG (satellite or heightmap fallback).
- * Required: freeroamConfigurator.validateFiles() checks that the file listed
- * in info.json["previews"] physically exists — without it the level falls back
- * to the default level (West Coast USA).
+ * The level's thumbnail in the game's level list: the MapNG logo, the name "MapNG" and the level's own name on a dark
+ * card (user, 2026-11-23: "a MapNG Logo and text as the level thumbnail (no more satellite image)"). 16:9, with
+ * everything inside the middle square, so a list that crops it square loses nothing.
+ * Required: freeroamConfigurator.validateFiles() checks that the file listed in info.json["previews"] physically
+ * exists; without it the level falls back to the default level (West Coast USA).
  */
-async function generatePreviewBlob(terrainData) {
-  const SIZE = 512;
+export const PREVIEW_W = 1024;
+export const PREVIEW_H = 576;
+async function generatePreviewBlob(title = '') {
+  const W = PREVIEW_W; const H = PREVIEW_H;
   const canvas = document.createElement('canvas');
-  canvas.width = SIZE;
-  canvas.height = SIZE;
+  canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
-
-  if (terrainData.satelliteTextureUrl) {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    await new Promise((resolve, reject) => {
-      img.onload = resolve;
-      img.onerror = reject;
-      img.src = terrainData.satelliteTextureUrl;
-    });
-    ctx.drawImage(img, 0, 0, SIZE, SIZE);
-  } else {
-    const { width, height, heightMap, minHeight, maxHeight } = terrainData;
-    const imgData = ctx.createImageData(SIZE, SIZE);
-    const range = maxHeight - minHeight;
-    const stepX = width / SIZE;
-    const stepY = height / SIZE;
-    for (let y = 0; y < SIZE; y++) {
-      for (let x = 0; x < SIZE; x++) {
-        const srcX = Math.min(Math.floor(x * stepX), width - 1);
-        const srcY = Math.min(Math.floor(y * stepY), height - 1);
-        const h = heightMap[srcY * width + srcX];
-        const v = range > 0 ? Math.floor(((h - minHeight) / range) * 255) : 128;
-        const idx = (y * SIZE + x) * 4;
-        imgData.data[idx] = v;
-        imgData.data[idx + 1] = v;
-        imgData.data[idx + 2] = v;
-        imgData.data[idx + 3] = 255;
-      }
-    }
-    ctx.putImageData(imgData, 0, 0);
+  // the card: dark, a little lighter toward the top left
+  const bg = ctx.createLinearGradient?.(0, 0, W, H);
+  if (bg) { bg.addColorStop(0, '#2a2e36'); bg.addColorStop(1, '#14161a'); }
+  ctx.fillStyle = bg || '#1c1f25'; ctx.fillRect(0, 0, W, H);
+  // (a canvas that cannot draw paths or text, as a test's stand-in: the plain card; the file must exist all the same)
+  if (typeof ctx.beginPath !== 'function' || typeof ctx.fillText !== 'function') {
+    console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Thumbnail: this canvas draws no paths or text; the card is left plain.`);
+    return new Promise((r) => canvas.toBlob(r, 'image/png'));
   }
-
-  return new Promise(r => canvas.toBlob(r, 'image/png'));
+  // faint height lines across the card
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 2;
+  for (let k = 0; k < 7; k++) {
+    ctx.beginPath();
+    for (let x = 0; x <= W; x += 16) { const y = H * (0.18 + k * 0.12) + Math.sin(x / 150 + k * 1.7) * 22 + Math.sin(x / 61 + k) * 7; if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+    ctx.stroke();
+  }
+  // the logo (public/favicon.svg, drawn here: no image to load): an orange tile with two white peaks
+  const L = 200; const lx = W / 2 - L / 2; const ly = 70; const u = L / 100;
+  const tile = (x, y, w, h, r) => { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); };
+  ctx.fillStyle = '#FF6600'; tile(lx, ly, L, L, 16 * u); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.95)';
+  for (const tri of [[15, 75, 35, 35, 55, 75], [40, 75, 60, 25, 85, 75]]) { ctx.beginPath(); ctx.moveTo(lx + tri[0] * u, ly + tri[1] * u); ctx.lineTo(lx + tri[2] * u, ly + tri[3] * u); ctx.lineTo(lx + tri[4] * u, ly + tri[5] * u); ctx.closePath(); ctx.fill(); }
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2 * u; ctx.beginPath(); ctx.moveTo(lx + 10 * u, ly + 80 * u); ctx.lineTo(lx + 90 * u, ly + 80 * u); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1.5 * u; ctx.beginPath(); ctx.moveTo(lx + 10 * u, ly + 85 * u); ctx.lineTo(lx + 90 * u, ly + 85 * u); ctx.stroke();
+  // the texts, each made to fit the middle square
+  // (the app's display font: asked for first, a canvas draws a fallback while a web font is still loading; the
+  // desktop runner registers the same file, desktop/runner/browserShims.mjs)
+  const FONT = '"Overpass Variable", "Overpass", "Noto Sans Variable", "Segoe UI", "Helvetica Neue", Arial, sans-serif';
+  try { await Promise.all([800, 600, 400].map((w) => globalThis.document?.fonts?.load?.(`${w} 40px "Overpass Variable"`))); } catch { /* the fallback font */ }
+  const fit = (text, px, weight, maxW) => { let size = px; do { ctx.font = `${weight} ${size}px ${FONT}`; size -= 2; } while (size > 14 && ctx.measureText(text).width > maxW); };
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#ffffff'; fit('MapNG', 92, 800, H - 60); ctx.fillText('MapNG', W / 2, 372);
+  const name = String(title || '').trim();
+  if (name) { ctx.fillStyle = '#FF8A3D'; fit(name, 44, 600, H - 60); ctx.fillText(name, W / 2, 436); }
+  ctx.fillStyle = 'rgba(255,255,255,0.6)'; fit('Real-world map for BeamNG.drive', 26, 400, H - 60); ctx.fillText('Real-world map for BeamNG.drive', W / 2, name ? 490 : 436);
+  return new Promise((r) => canvas.toBlob(r, 'image/png'));
 }
 
 /**
@@ -13572,6 +13577,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     seamBlend = null,
     // (tests and plots: called with the post-blend's moves, { levelName, N, delta, weight, core })
     seamDebug = null,
+    // (a chunk: the whole level's name for the thumbnail, not the chunk's own)
+    previewTitle = null,
     // a chunk: the finished neighbours' solved road heights (services/chunkSeamRoads.js seamRoadLookup), held in the
     // seam's band; and whether to hand this chunk's own on (finalRoads)
     seamRoads = null,
@@ -15146,7 +15153,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
 
   beginStep('thumbnail', 'Rendering the level preview thumbnail…');
   await yield_();
-  let previewBlob = await generatePreviewBlob(exportTerrainData);
+  let previewBlob = await generatePreviewBlob(previewTitle || levelDisplayName);
+  console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Thumbnail: the MapNG card with the level's name (${PREVIEW_W}×${PREVIEW_H}); no satellite image.`);
 
   // (experimental) the ground as models: from the finished heights and the painted surfaces, holes included
   let groundModels = null;

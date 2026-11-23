@@ -11,7 +11,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Worker as NodeWorker } from 'node:worker_threads';
-import { createCanvas, Image, ImageData, loadImage } from '@napi-rs/canvas';
+import { createCanvas, GlobalFonts, Image, ImageData, loadImage } from '@napi-rs/canvas';
 
 const blobs = new Map();
 let blobSeq = 0;
@@ -129,6 +129,13 @@ class ShimWorker {
 }
 
 export function installBrowserShims({ assetsDir, apiOrigin = 'https://mapng.com', apiFetch = null } = {}) {
+  // the app's own fonts for text drawn on a canvas (the level's thumbnail): the same files the pages use
+  if (assetsDir) {
+    for (const [file, family] of [['overpass-latin-wght-normal.woff2', 'Overpass Variable'], ['noto-sans-latin-wght-normal.woff2', 'Noto Sans Variable']]) {
+      const f = path.join(assetsDir, 'fonts', file);
+      try { if (fs.existsSync(f)) GlobalFonts.registerFromPath(f, family); } catch { /* the canvas falls back to a system font */ }
+    }
+  }
   if (typeof globalThis.Worker === 'undefined') globalThis.Worker = ShimWorker;
   globalThis.document = {
     createElement(tag) {

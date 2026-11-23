@@ -85,7 +85,7 @@ export async function exportChunked({ JSZip, footprint, W, H, center, mpp, level
     onProgress({ chunk: k + 1, of: chunks.length, step: 'export' });
     const chunkLevel = `${levelName}_c${c.key}`;
     const res = await inChunk(c, k, 'exporting it', () => exportChunk(td, L.chunkCenter(c), {
-      ...options, levelName: chunkLevel, groundAsModels: true,
+      ...options, levelName: chunkLevel, previewTitle: options.levelName || levelName, groundAsModels: true,
       groundShape: { size: c.size, runs: c.runs },
       chunkCore: [c.core[0] - c.x0, c.core[1] - c.y0, c.core[2] - c.x0, c.core[3] - c.y0],
       seamBlend, seamRoads, keepFinalHeights: true,

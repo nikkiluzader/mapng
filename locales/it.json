@@ -2409,7 +2409,12 @@
     "desktopWarn": "Oltre {max} px: il livello potrebbe essere troppo grande perché il gioco lo carichi.",
     "clear": "Torna a un riquadro",
     "chunked": "Costruito a pezzi (sperimentale): questa forma è troppo lunga o diagonale per una sola griglia, quindi viene creata in pezzi uniti in un unico livello. Genera scarica prima ogni pezzo; le anteprime mostrano una panoramica più grossolana.",
-    "bigDesktop": "Grande: questa forma copre {km2} km², più di quanto consenta il sito ({maxKm2} km²). L'app desktop la costruisce, ma può richiedere molto tempo e molto spazio su disco."
+    "bigDesktop": "Grande: questa forma copre {km2} km², più di quanto consenta il sito ({maxKm2} km²). L'app desktop la costruisce, ma può richiedere molto tempo e molto spazio su disco.",
+    "anchor": "Ancora",
+    "anchorTile": "Ancora sulla tessera {n}",
+    "anchorCenter": "Centro",
+    "anchorCenterTitle": "Ancora al centro di tutte le tessere",
+    "anchorHint": "L’ancora è il punto che sta sul luogo qui sopra. Fai clic su una tessera o su Centro per spostarla: le tessere restano dove sono."
   },
   "road": {
     "areaMode": "Cosa copre la mappa",

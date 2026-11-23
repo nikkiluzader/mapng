@@ -23,12 +23,25 @@
         <BaseSwitch :on="store.tilesSnap" :label="t('tiles.snap')" data-testid="tiles-snap" :disabled="disabled" @toggle="store.setTilesSnap(!store.tilesSnap)" />
       </label>
 
-      <ul class="flex flex-wrap gap-1" :aria-label="t('tiles.list')">
-        <li v-for="(tile, i) in store.tiles" :key="i" class="flex items-center gap-1 rounded border border-gray-200 dark:border-gray-600 px-1.5 py-0.5 text-micro text-gray-600 dark:text-gray-300">
-          {{ t('tiles.tile', { n: i + 1 }) }}
-          <button v-if="i > 0" type="button" class="text-gray-400 hover:text-red-500" :title="t('tiles.remove', { n: i + 1 })" :aria-label="t('tiles.remove', { n: i + 1 })" :data-testid="`tile-remove-${i}`" :disabled="disabled" @click="removeTile(i)"><X :size="11" /></button>
-        </li>
-      </ul>
+      <!-- The tiles, and the anchor: the point that stands on the location in step 1. One click on a tile, or on
+           "Centre", picks it; the tiles stay where they are and the location moves to the anchor. -->
+      <div class="space-y-1" data-testid="tile-anchor">
+        <div class="flex items-center gap-1.5 text-xs font-medium text-gray-700 dark:text-gray-300"><Anchor :size="12" />{{ t('tiles.anchor') }}</div>
+        <ul class="flex flex-wrap gap-1" role="radiogroup" :aria-label="t('tiles.anchor')">
+          <li v-for="(tile, i) in store.tiles" :key="i" :class="['flex items-center rounded border text-micro', store.tileAnchor === i ? 'border-brand bg-brand-50/60 dark:bg-brand/10 text-brand font-semibold' : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300']">
+            <button type="button" role="radio" :aria-checked="store.tileAnchor === i" class="flex items-center gap-1 px-1.5 py-0.5 hover:text-brand disabled:cursor-not-allowed" :title="t('tiles.anchorTile', { n: i + 1 })" :data-testid="`tile-anchor-${i}`" :disabled="disabled" @click="setAnchor(i)">
+              <Anchor v-if="store.tileAnchor === i" :size="10" />{{ t('tiles.tile', { n: i + 1 }) }}
+            </button>
+            <button v-if="i > 0" type="button" class="pr-1 text-gray-400 hover:text-red-500" :title="t('tiles.remove', { n: i + 1 })" :aria-label="t('tiles.remove', { n: i + 1 })" :data-testid="`tile-remove-${i}`" :disabled="disabled" @click="removeTile(i)"><X :size="11" /></button>
+          </li>
+          <li :class="['flex items-center rounded border text-micro', store.tileAnchor === 'center' ? 'border-brand bg-brand-50/60 dark:bg-brand/10 text-brand font-semibold' : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300']">
+            <button type="button" role="radio" :aria-checked="store.tileAnchor === 'center'" class="flex items-center gap-1 px-1.5 py-0.5 hover:text-brand disabled:cursor-not-allowed" :title="t('tiles.anchorCenterTitle')" data-testid="tile-anchor-center" :disabled="disabled" @click="setAnchor('center')">
+              <Anchor v-if="store.tileAnchor === 'center'" :size="10" />{{ t('tiles.anchorCenter') }}
+            </button>
+          </li>
+        </ul>
+        <p class="text-micro text-gray-500 dark:text-gray-400">{{ t('tiles.anchorHint') }}</p>
+      </div>
 
       <p class="text-micro text-gray-600 dark:text-gray-300" data-testid="tile-grid">{{ t('tiles.gridLine', { w: grid.width, h: grid.height, km: areaKm }) }}</p>
       <p v-if="grid.terrainBlock" class="text-micro text-emerald-700 dark:text-emerald-300" data-testid="tile-terrain">{{ t('tiles.terrain') }}</p>
@@ -52,7 +65,7 @@
 <script setup>
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { Plus, X, AlertTriangle, Layers } from 'lucide-vue-next';
+import { Plus, X, AlertTriangle, Layers, Anchor } from 'lucide-vue-next';
 import BaseButton from '../base/BaseButton.vue';
 import BaseSwitch from '../base/BaseSwitch.vue';
 import { useMainStore } from '../../stores/mainStore';
@@ -68,7 +81,7 @@ const props = defineProps({
 const { t } = useI18n();
 const store = useMainStore();
 const isDesktop = !!desktopApp;
-const { multi, grid, full, addTile, removeTile, clearTiles, setTogether } = useTiles(() => props.resolution, () => props.metersPerPixel);
+const { multi, grid, full, addTile, removeTile, clearTiles, setTogether, setAnchor } = useTiles(() => props.resolution, () => props.metersPerPixel);
 const capArgs = computed(() => {
   const m = Number(props.metersPerPixel) > 0 ? Number(props.metersPerPixel) : 1;
   return { km2: Math.round((grid.value?.areaPx || 0) * m * m / 1e6), maxKm2: Math.round(WEB_MAX_SIDE * WEB_MAX_SIDE * m * m / 1e6) };
