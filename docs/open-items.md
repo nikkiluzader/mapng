@@ -50,6 +50,45 @@ As of 2026-11-23:
     - the export report is the first chunk's; the merged zip is built in memory (stream it for the biggest).
   - Then step 3 (Batch mode retired) and step 4 (speed for big shapes).
 
+## Now: review of last week's work (2026-11-23), before 0.3.6
+
+- **Code review of tiles, road mode and chunked levels** (user, 2026-11-23; two independent reads of the code plus
+  checks here). All of it is live on mapng.com since the main push of 2026-11-23. Findings to fix, by weight:
+  - **Alignment (the strict rule).** (1) Chunked: with `pixelEdges` the resampler puts row r at north - r/H
+    (`resamplerWorker.js:69-71`) while every reader takes row r as (r+1)/H (`terrainLookup.js`, `groundMesh.js`,
+    `roadSnap.js`): terrain one pixel off the map data in y in every chunk. (2) Chunked: the level lattice is
+    111320 m per degree (`chunkLayout.js:59`), not the metric projection the unchunked path uses: up to 0.67 % in
+    scale, tens of metres over a 23 km road. (3) Road mode: the corridor is rasterised in metres but Generate's
+    pixels are linear in lat/lng (`roadCorridor.js`): measured 20 m off at latitude 45 on a 16 km map, 122 m at 60
+    on 30 km, so a road can leave its own corridor. (4) Tiles are drawn and centred with 111320 m per degree
+    (`App.vue:1056`, `MapSelector.vue:576`) but built in metric bounds: a tile 28 km out is drawn about 190 m from
+    where it is built.
+  - **Things lost or wrong at edges.** The footprint clipper tests vertices only (`footprintClip.js:68-81`): a line
+    crossing with no vertex inside is dropped, a segment spanning a gap is kept whole, a roundabout is split and not
+    rejoined. Chunked: generated meshes, sites and signals within 64 px of a seam stay on the ground before the
+    blend (`exportBeamNGLevel.js:7940`, the shift samples one row off at `:15096`); a road over two or more seams
+    with near meetings stays split and the rejoin ignores height (a street joined to a viaduct above it:
+    `chunkMerge.js:102-110`, both reproduced); a building whose middle falls in a core with no footprint is built
+    by nobody.
+  - **Downloads and other servers.** The chunked export runs a full Generate per chunk with no cache-only switch:
+    30 minutes after Generate it downloads again and can mix map data between chunks. Road picking calls the full
+    Generate pull per click (every feature in 2.4 km, up to 20 x 20 km per handle drop, a public Overpass query
+    with "live servers first"): use the roads-only read (`fetchOsmRoads`), and no picking while generating.
+  - **Behaviour.** `followRoad` matches against the last way and has no turn limit (U-turns onto the other
+    carriageway, drifts from I 95 to US 1, never passes a roundabout). Routing and the corridor raster run on the
+    main thread, three copies of the computed, on every slider tick. A shared road does not come back exactly and a
+    pasted one has no size limit. A slow route result overwrites a Clear. No 64-tile cap in the window. Chunked: no
+    cancel, no chunk named in an error, a missing minimum height read as 0.
+  - **Rules.** Chunk progress texts in the export are English only; the merge's log lines reach no report; the
+    seam blend skips silently on a size mismatch; 16384 is written in three places.
+  - **Tests.** The new tests cover helpers; nothing runs a two-chunk export and merge, the corridor against the
+    real bounds, the clipper on crossings, or a share round trip. The commit messages' checks were by hand.
+  - **Unfinished from the plans:** step 2 parts C (previews masked to the footprint), E (drag, desktop, languages,
+    game tests), F (edge skirt, buildings at the edge, masked minimap); step 3 (Batch mode retired: its tile grid
+    and combined level now duplicate tiles); the chunked list above in "tiles in step 1".
+  Done when: each alignment item has a test that fails before the fix; a chunked level and a road level at
+  latitude 60 line up with the map data to the pixel; the sweep is unchanged.
+
 ## Now: Fizz_Mechanic's 0.3.3 list (2026-11-19; on hold until after the 0.3.5 release, user 2026-11-20)
 
 Held items are listed on the release page under "Moved to the next release".
