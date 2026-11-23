@@ -42,8 +42,9 @@
     "howBuilt": "So wird es gebaut"
   },
   "mode": {
-    "singleTile": "Einzelnes Tile",
-    "batchJob": "Batch-Job"
+    "retiredTitle": "Ein unfertiger Batch-Auftrag",
+    "retiredBody": "Batch-Aufträge wurden durch Kacheln ersetzt: Füge in Schritt 1 (Ort) Kacheln hinzu und wähle in Schritt 3, was exportiert wird. Dieser gespeicherte Auftrag aus einer früheren Version kann hier noch abgeschlossen werden.",
+    "retiredLeave": "Auftrag verwerfen und verlassen"
   },
   "view": {
     "location": "Ort",
@@ -2426,6 +2427,7 @@
     "start": "Anfang",
     "end": "Ende",
     "pickFirst": "Wähle zuerst eine Straße auf der Karte (Straßenmodus).",
+    "noneYet": "Keine Straße gewählt",
     "error_none": "Dort ist keine Straße: Klicke näher an eine Straße.",
     "error_read": "Die Straßen hier konnten nicht gelesen werden. Versuch es gleich noch einmal.",
     "routing": "Der Weg entlang der Straßen wird gesucht…",

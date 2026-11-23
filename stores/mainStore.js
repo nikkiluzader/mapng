@@ -43,7 +43,10 @@ export const useMainStore = defineStore('main', () => {
     }
   }
 
-  const batchMode = ref(localStorage.getItem('mapng_batch_mode') === 'true');
+  // Batch jobs are retired (tiles in step 1 took their place, user 2026-11-20): the old batch panel opens only for
+  // an unfinished job saved by an earlier version, so it can be finished or discarded. Nobody else starts in it.
+  const batchMode = ref(localStorage.getItem('mapng_batch_mode') === 'true' && !!loadBatchState());
+  if (!batchMode.value) { try { localStorage.removeItem('mapng_batch_mode'); } catch { /* private mode */ } }
 
   // Advanced mode brings back the map-maker tools the basic UI hides: the 2D
   // asset / 3D model downloads, Surrounding Tiles, per-category level export

@@ -42,8 +42,9 @@
     "howBuilt": "Come è fatto"
   },
   "mode": {
-    "singleTile": "Tessera singola",
-    "batchJob": "Job batch"
+    "retiredTitle": "Un lavoro batch non finito",
+    "retiredBody": "I lavori batch sono stati sostituiti dalle tessere: aggiungi tessere al passo 1 (Luogo) e scegli cosa esportare al passo 3. Questo lavoro salvato da una versione precedente può ancora essere finito qui.",
+    "retiredLeave": "Scarta il lavoro ed esci"
   },
   "view": {
     "location": "Posizione",
@@ -2426,6 +2427,7 @@
     "start": "Inizio",
     "end": "Fine",
     "pickFirst": "Prima scegli una strada sulla mappa (Modalità strada).",
+    "noneYet": "Nessuna strada scelta",
     "error_none": "Nessuna strada lì: fai clic più vicino a una strada.",
     "error_read": "Non è stato possibile leggere le strade qui. Riprova tra un momento.",
     "routing": "Ricerca del percorso lungo le strade…",

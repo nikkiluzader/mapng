@@ -48,7 +48,16 @@ As of 2026-11-23:
     - the 23 km road end to end (web and desktop), in game;
     - the per-chunk prefetch at Generate runs the whole Generate (a downloads-only pass would halve it);
     - the export report is the first chunk's; the merged zip is built in memory (stream it for the biggest).
-  - Then step 3 (Batch mode retired) and step 4 (speed for big shapes).
+  - **Step 3, first part done on dev 2026-11-23:** the Single tile / Batch job tabs are gone (user's decision,
+    repeated 2026-11-23). The app has one workflow. The old batch panel opens only for an unfinished job saved by an
+    earlier version, under a bar that says batch jobs are now tiles and offers "Discard the job and leave"; a
+    finished job closes it for good. Checked in the browser (`scratch/verify-pw/e2e_notabs.mjs`,
+    `e2e_batchleft.mjs`). The summary chips above Generate show the road's or the tiles' own size (they showed one
+    tile's), and "No road picked" before a pick.
+    Left of step 3: export assets per tile from the tiles workflow (the batch job's old purpose: today step 3 exports
+    the whole shape as one); the batch code, its texts and tests removed once that exists; the About and help texts
+    that still name Batch mode (`locales/*`: about lists, tech stack); the stats page's batch counters.
+  - Then step 4 (speed for big shapes).
 
 ## Now: review of last week's work (2026-11-23), before 0.3.6
 

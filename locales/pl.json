@@ -42,8 +42,9 @@
     "howBuilt": "Jak to powstaje"
   },
   "mode": {
-    "singleTile": "Pojedynczy kafelek",
-    "batchJob": "Zadanie wsadowe"
+    "retiredTitle": "Niedokończone zadanie wsadowe",
+    "retiredBody": "Zadania wsadowe zastąpiono kaflami: dodaj kafle w kroku 1 (Miejsce) i wybierz w kroku 3, co wyeksportować. To zadanie zapisane we wcześniejszej wersji można jeszcze tutaj dokończyć.",
+    "retiredLeave": "Odrzuć zadanie i wyjdź"
   },
   "view": {
     "location": "Lokalizacja",
@@ -2426,6 +2427,7 @@
     "start": "Początek",
     "end": "Koniec",
     "pickFirst": "Najpierw wybierz drogę na mapie (Tryb drogi).",
+    "noneYet": "Nie wybrano drogi",
     "error_none": "Tu nie ma drogi: kliknij bliżej drogi.",
     "error_read": "Nie udało się odczytać dróg w tym miejscu. Spróbuj ponownie za chwilę.",
     "routing": "Szukanie trasy po drogach…",

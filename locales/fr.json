@@ -42,8 +42,9 @@
     "howBuilt": "Comment il est fait"
   },
   "mode": {
-    "singleTile": "Tuile unique",
-    "batchJob": "Tâche par lot"
+    "retiredTitle": "Un traitement par lots inachevé",
+    "retiredBody": "Les traitements par lots sont remplacés par les tuiles : ajoutez des tuiles à l’étape 1 (Lieu) et choisissez quoi exporter à l’étape 3. Ce traitement enregistré par une version précédente peut encore être terminé ici.",
+    "retiredLeave": "Abandonner le traitement et quitter"
   },
   "view": {
     "location": "Lieu",
@@ -2426,6 +2427,7 @@
     "start": "Début",
     "end": "Fin",
     "pickFirst": "Choisissez d'abord une route sur la carte (Mode route).",
+    "noneYet": "Aucune route choisie",
     "error_none": "Pas de route ici : cliquez plus près d'une route.",
     "error_read": "Les routes ici n'ont pas pu être lues. Réessayez dans un instant.",
     "routing": "Recherche du chemin par les routes…",

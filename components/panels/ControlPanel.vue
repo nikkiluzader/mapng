@@ -640,13 +640,18 @@ const stopOsmFile = onOsmFileChange((f) => { osmFile.value = f; });
 onUnmounted(stopOsmFile);
 const summaryItems = computed(() => {
   const upload = Array.isArray(props.uploadedElevationFile) ? props.uploadedElevationFile.length > 0 : !!props.uploadedElevationFile;
-  const km = ((Number(props.resolution) || 0) * (Number(props.processingMetersPerPixel) || 1)) / 1000;
-  const kmText = km >= 10 ? km.toFixed(0) : km.toFixed(1);
+  // (the map's own size: one tile's, the tiles' whole box, or the road's box; they showed one tile's for all three)
+  const mpp = Number(props.processingMetersPerPixel) || 1;
+  const own = !nativeDims.value && !store.batchMode;
+  const shape = own && store.areaMode === 'road' ? roadApi.grid.value : own && store.tiles.length > 1 ? tileApi.grid.value : null;
+  const wPx = shape ? shape.width : Number(props.resolution) || 0; const hPx = shape ? shape.height : wPx;
+  const kmOf = (px) => { const km = (px * mpp) / 1000; return km >= 10 ? km.toFixed(0) : km.toFixed(1); };
+  const noRoad = own && store.areaMode === 'road' && !shape;
   const mode = store.advancedMode ? terrainMode.value : 'ready';
   const fromFile = fetchOSM.value && osmFile.value && osmFileCoverage(osmFile.value.bounds, selectionArea.value).coverage !== 'none';
   return [
-    { key: 'area', rowLabel: t('wizard.rowArea'), label: t('genSummary.area', { w: kmText, h: kmText }), target: 'mapng-sec-area', step: 1 },
-    { key: 'px', rowLabel: t('wizard.rowResolution'), label: t('genSummary.px', { px: props.resolution }), target: 'mapng-sec-area', step: 1 },
+    { key: 'area', rowLabel: t('wizard.rowArea'), label: noRoad ? t('road.noneYet') : t('genSummary.area', { w: kmOf(wPx), h: kmOf(hPx) }), target: 'mapng-sec-area', step: 1, warn: noRoad },
+    ...(noRoad ? [] : [{ key: 'px', rowLabel: t('wizard.rowResolution'), label: t('genSummary.px', { px: shape ? `${wPx} × ${hPx}` : props.resolution }), target: 'mapng-sec-area', step: 1 }]),
     { key: 'source', rowLabel: t('wizard.rowElevation'), label: t(`genSummary.source_${upload ? 'upload' : elevationSource.value}`), target: 'mapng-sec-elevation', step: 2 },
     { key: 'terrain', rowLabel: t('wizard.rowTerrain'), label: t(`terrainChoice.${mode}`), target: 'mapng-sec-elevation', step: 2, warn: mode === 'untouched' },
     { key: 'osm', rowLabel: t('wizard.rowMapData'), label: t(!fetchOSM.value ? 'genSummary.osmOff' : fromFile ? 'genSummary.osmFile' : 'genSummary.osmOn'), target: 'mapng-sec-mapdata', step: 2, warn: !fetchOSM.value },

@@ -18,7 +18,7 @@
       @show-disclaimer="showDisclaimer = true"
       @show-stack="showStackInfo = true"
       @toggle-dark="store.toggleDarkMode"
-      @set-batch-mode="setBatchMode"
+      @leave-batch="leaveBatch"
     >
       <!-- Single mode -->
       <ControlPanel
@@ -593,11 +593,14 @@ const handleGlobalDevToggleKey = (event) => {
   }
 };
 
-const setBatchMode = (value) => {
-  setStoreBatchMode(value);
-  if (value && Number(resolution.value) > 8192) {
-    setResolution(8192);
-  }
+// Batch jobs are retired: the only way is out. The saved job is discarded with it (the bar says so).
+const leaveBatch = () => {
+  if (batchRunning.value) return;
+  clearBatchState();
+  savedBatchState.value = null;
+  batchState.value = null;
+  showBatchProgress.value = false;
+  setStoreBatchMode(false);
 };
 
 // Attempt to get user location on load
@@ -1316,6 +1319,7 @@ const handleBatchProgressClose = () => {
     clearBatchState();
     savedBatchState.value = null;
     batchState.value = null;
+    setStoreBatchMode(false);
   }
   // If paused or has errors, keep state for resume
   savedBatchState.value = loadBatchState();

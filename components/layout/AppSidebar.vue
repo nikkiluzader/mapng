@@ -63,7 +63,13 @@
       </BaseButton>
     </div>
 
-    <ModeToggle :batch-mode="batchMode" @set-batch-mode="$emit('set-batch-mode', $event)" />
+    <!-- Batch jobs are retired (tiles in step 1): this bar shows only while an unfinished job from an earlier
+         version is open, with the way out -->
+    <div v-if="batchMode" class="px-4 py-2 border-b border-amber-300/60 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 text-xs text-amber-900 dark:text-amber-100 space-y-1.5" data-testid="batch-retired" role="status">
+      <p class="font-semibold">{{ t('mode.retiredTitle') }}</p>
+      <p class="leading-relaxed">{{ t('mode.retiredBody') }}</p>
+      <button type="button" class="px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-500 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed" :disabled="heavyJobRunning" data-testid="batch-leave" @click="$emit('leave-batch')">{{ t('mode.retiredLeave') }}</button>
+    </div>
 
     <!-- (the panel lays itself out: components/ui/WizardLayout.vue, with its own scrolling) -->
     <div class="flex-1 min-h-0 flex flex-col">
@@ -144,7 +150,6 @@ import { resetApp } from '../../services/resetApp.js';
 import { desktopApp, DESKTOP_DOWNLOAD_URL } from '../../services/platform/desktop.js';
 import { useI18n } from 'vue-i18n';
 import BaseButton from '../base/BaseButton.vue';
-import ModeToggle from '../ui/ModeToggle.vue';
 import { getSupportedLocales, setI18nLanguage } from '../../i18n';
 import { CircleHelp, Heart, Sun, Moon, Code, Download, RotateCcw, Globe, Github, MessageCircle, Mail, Database, Shield, ShieldCheck, Activity, Share2, FlaskConical, BarChart3 } from 'lucide-vue-next';
 import { openShareDialog } from '../../composables/useShareDialog.js';
@@ -212,7 +217,7 @@ const props = defineProps({
   buildDevTime: { type: String, default: 'n/a' },
 });
 
-defineEmits(['show-about', 'show-support', 'show-disclaimer', 'show-stack', 'toggle-dark', 'set-batch-mode']);
+defineEmits(['show-about', 'show-support', 'show-disclaimer', 'show-stack', 'toggle-dark', 'leave-batch']);
 
 const handleLocaleChange = (event) => {
   setI18nLanguage(event.target.value);

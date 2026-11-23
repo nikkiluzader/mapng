@@ -47,8 +47,9 @@
     "howBuilt": "How it's built"
   },
   "mode": {
-    "singleTile": "Single tile",
-    "batchJob": "Batch job"
+    "retiredTitle": "An unfinished batch job",
+    "retiredBody": "Batch jobs have been replaced by tiles: add tiles in step 1 (Location) and pick what to export in step 3. This saved job from an earlier version can still be finished here.",
+    "retiredLeave": "Discard the job and leave"
   },
   "view": {
     "location": "Location",
@@ -2426,6 +2427,7 @@
     "start": "Start",
     "end": "End",
     "pickFirst": "Pick a road on the map first (Road mode).",
+    "noneYet": "No road picked",
     "error_none": "No road there: click closer to a road.",
     "error_read": "The roads here could not be read. Try again in a moment.",
     "routing": "Finding the way along the roads…",

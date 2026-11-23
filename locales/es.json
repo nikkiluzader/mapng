@@ -42,8 +42,9 @@
     "howBuilt": "Cómo se hace"
   },
   "mode": {
-    "singleTile": "Tesela única",
-    "batchJob": "Lote"
+    "retiredTitle": "Un trabajo por lotes sin terminar",
+    "retiredBody": "Los trabajos por lotes se han sustituido por teselas: añade teselas en el paso 1 (Ubicación) y elige qué exportar en el paso 3. Este trabajo guardado de una versión anterior aún puede terminarse aquí.",
+    "retiredLeave": "Descartar el trabajo y salir"
   },
   "view": {
     "location": "Ubicación",
@@ -2426,6 +2427,7 @@
     "start": "Inicio",
     "end": "Fin",
     "pickFirst": "Primero elige una carretera en el mapa (Modo carretera).",
+    "noneYet": "Ninguna carretera elegida",
     "error_none": "No hay carretera ahí: haz clic más cerca de una carretera.",
     "error_read": "No se pudieron leer las carreteras de aquí. Inténtalo de nuevo en un momento.",
     "routing": "Buscando el camino por las carreteras…",
