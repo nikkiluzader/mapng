@@ -167,10 +167,15 @@ export const useMainStore = defineStore('main', () => {
   // --- Tiles in step 1 (services/tileLayout.js, refs/output/tiles-plan.md) ---
   // tile offsets from tile 0 (on the map's centre) in tiles (x east, y north): a change of tile size scales the layout;
   // one tile is today's single square. Together: on a grid of whole tiles; free: anywhere, snapping when near.
+  // (a road as the app makes it: a line of real points, its two ends as distances along it. Anything else in storage,
+  // a cut-off or hand-edited entry, is no road: the corridor's maths would run on it at start)
+  const validRoad = (r) => !!r && Array.isArray(r.pts) && r.pts.length >= 2 && r.pts.length <= 50000
+    && r.pts.every((p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lng) && Math.abs(p.lat) <= 90 && Math.abs(p.lng) <= 360)
+    && Number.isFinite(r.startM) && Number.isFinite(r.endM) && r.startM >= 0 && r.endM >= r.startM;
   const tiles = ref((() => {
     try {
       const saved = JSON.parse(localStorage.getItem('mapng_tiles') || 'null');
-      return Array.isArray(saved) && saved.length && saved.every((t) => Number.isFinite(t?.dx) && Number.isFinite(t?.dy)) ? saved : [{ dx: 0, dy: 0 }];
+      return Array.isArray(saved) && saved.length && saved.length <= 64 && saved.every((t) => Number.isFinite(t?.dx) && Number.isFinite(t?.dy) && Math.abs(t.dx) <= 1000 && Math.abs(t.dy) <= 1000) ? saved : [{ dx: 0, dy: 0 }];
     } catch { return [{ dx: 0, dy: 0 }]; }
   })());
   const tilesTogether = ref(localStorage.getItem('mapng_tiles_together') !== 'false');
@@ -185,13 +190,13 @@ export const useMainStore = defineStore('main', () => {
   const road = ref((() => {
     try {
       const r = JSON.parse(localStorage.getItem('mapng_road') || 'null');
-      return r && Array.isArray(r.pts) && r.pts.length >= 2 ? r : null;
+      return validRoad(r) ? r : null;
     } catch { return null; }
   })());
   const roadHalfWidthM = ref(Number(localStorage.getItem('mapng_road_half_width')) || 250);
   function setAreaMode(m) { areaMode.value = m === 'road' ? 'road' : 'tiles'; localStorage.setItem('mapng_area_mode', areaMode.value); }
   function setRoad(r) {
-    road.value = r && Array.isArray(r.pts) && r.pts.length >= 2 ? r : null;
+    road.value = validRoad(r) ? r : null;
     try { if (road.value) localStorage.setItem('mapng_road', JSON.stringify(road.value)); else localStorage.removeItem('mapng_road'); } catch { /* full storage: kept for this session */ }
   }
   function setRoadHalfWidthM(v) { roadHalfWidthM.value = Number(v) || 250; localStorage.setItem('mapng_road_half_width', String(roadHalfWidthM.value)); }

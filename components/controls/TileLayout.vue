@@ -4,7 +4,7 @@
     <div class="flex items-center gap-2">
       <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{{ t('tiles.title') }}</span>
       <span class="text-micro text-gray-500 dark:text-gray-400" data-testid="tile-count">{{ t('tiles.count', { n: store.tiles.length }, store.tiles.length) }}</span>
-      <BaseButton size="sm" variant="secondary" class="ml-auto" data-testid="tile-add" :disabled="disabled" @click="addTile">
+      <BaseButton size="sm" variant="secondary" class="ml-auto" data-testid="tile-add" :disabled="disabled || full" @click="addTile">
         <Plus :size="12" class="mr-0.5" />{{ t('tiles.add') }}
       </BaseButton>
     </div>
@@ -15,7 +15,7 @@
         <button v-for="opt in ['together', 'free']" :key="opt" type="button" role="radio" :aria-checked="(opt === 'together') === store.tilesTogether"
           :data-testid="`tiles-${opt}`" :disabled="disabled"
           :class="['rounded border px-2 py-1.5 text-xs font-medium transition-colors', (opt === 'together') === store.tilesTogether ? 'border-brand bg-brand-50/60 dark:bg-brand/10 text-brand' : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300']"
-          @click="store.setTilesTogether(opt === 'together')">{{ t(`tiles.${opt}`) }}</button>
+          @click="setTogether(opt === 'together')">{{ t(`tiles.${opt}`) }}</button>
       </div>
       <p class="text-micro text-gray-500 dark:text-gray-400">{{ t(store.tilesTogether ? 'tiles.togetherHint' : 'tiles.freeHint') }}</p>
       <label v-if="!store.tilesTogether" class="flex items-center justify-between text-xs text-gray-700 dark:text-gray-300">
@@ -68,7 +68,7 @@ const props = defineProps({
 const { t } = useI18n();
 const store = useMainStore();
 const isDesktop = !!desktopApp;
-const { multi, grid, addTile, removeTile, clearTiles } = useTiles(() => props.resolution, () => props.metersPerPixel);
+const { multi, grid, full, addTile, removeTile, clearTiles, setTogether } = useTiles(() => props.resolution, () => props.metersPerPixel);
 const capArgs = computed(() => {
   const m = Number(props.metersPerPixel) > 0 ? Number(props.metersPerPixel) : 1;
   return { km2: Math.round((grid.value?.areaPx || 0) * m * m / 1e6), maxKm2: Math.round(WEB_MAX_SIDE * WEB_MAX_SIDE * m * m / 1e6) };

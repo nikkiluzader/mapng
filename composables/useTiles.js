@@ -2,7 +2,7 @@
 // and the actions. resolution: the tile's side in pixels (a ref or getter); mpp: metres per pixel (a ref or getter).
 import { computed, unref } from 'vue';
 import { useMainStore } from '../stores/mainStore';
-import { layoutGrid, nextTileSpot, placeTile } from '../services/tileLayout.js';
+import { layoutGrid, nextTileSpot, placeTile, MAX_TILES } from '../services/tileLayout.js';
 
 const val = (v) => (typeof v === 'function' ? v() : unref(v));
 
@@ -15,8 +15,25 @@ export function useTiles(resolution, mpp) {
   const multi = computed(() => store.tiles.length > 1);
   const grid = computed(() => layoutGrid(tilesPx.value, R.value));
   const toTiles = (list) => list.map((t) => ({ dx: t.dx / R.value, dy: t.dy / R.value }));
+  /** No more than MAX_TILES: a share code and a saved level carry that many (more were cut off there, silently). */
+  const full = computed(() => store.tiles.length >= MAX_TILES);
   function addTile() {
+    if (full.value) return;
     store.setTiles([...store.tiles, ...toTiles([nextTileSpot(tilesPx.value, R.value)])]);
+  }
+  /**
+   * Together or free. Turned on, every tile is put on the grid (its nearest free spot, in order), so tiles placed
+   * freely, off the grid and over each other, do not stay that way under a setting that says they are together.
+   */
+  function setTogether(on) {
+    store.setTilesTogether(!!on);
+    if (!on || store.tiles.length < 2) return;
+    const placed = [{ dx: 0, dy: 0 }];
+    for (let i = 1; i < tilesPx.value.length; i++) {
+      const list = [...placed, tilesPx.value[i]];
+      placed.push(placeTile(list, i, tilesPx.value[i], R.value, { together: true, snap: false }));
+    }
+    store.setTiles(toTiles(placed));
   }
   function removeTile(i) {
     if (i <= 0) return;
@@ -33,5 +50,5 @@ export function useTiles(resolution, mpp) {
   }
   /** Each tile's centre offset in metres from the map's centre (x east, y north), for drawing. */
   const tileOffsetsM = computed(() => tilesPx.value.map((t) => ({ x: t.dx * M.value, y: t.dy * M.value })));
-  return { R, tilesPx, tileOffsetsM, multi, grid, addTile, removeTile, clearTiles, moveTile };
+  return { R, tilesPx, tileOffsetsM, multi, grid, full, addTile, removeTile, clearTiles, moveTile, setTogether };
 }

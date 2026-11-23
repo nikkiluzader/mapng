@@ -10,12 +10,17 @@ import { PERSONAL_STORAGE_KEYS, withoutPersonal } from './personalKeys.js';
 import { sanitizePoints, pointLabel } from './spawnPoints.js';
 import { sanitizeContentOff, sanitizeExcludeTags, PRESET_IDS } from './buildContent.js';
 import { sanitizeTreeKindsOff, sanitizeTreeModelsOff, sanitizeTreeSwaps } from './beamngTrees.js';
-import { simplifyPts, cumulative } from './roadPick.js';
+import { simplifyPts, cumulative, stretchBetween } from './roadPick.js';
 
 // ---- the area: tiles or a road (refs/output/tiles-step2-plan.md D, road-mode-plan.md) ----
 const MAX_CODE_TILES = 64;
 const MAX_CODE_ROAD_POINTS = 2000;
-const num = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : null; };
+// (a pasted road is someone else's data: more points or more road than the app itself ever makes is refused, not
+// worked through. The app follows at most 6,000 points and adds 20 km a drop.)
+const MAX_CODE_ROAD_RAW_POINTS = 20000;
+const MAX_CODE_ROAD_KM = 300;
+// (a number, or a string that is one: null, '', true and the rest are not, and never count as 0)
+const num = (v, lo, hi) => { if (typeof v !== 'number' && !(typeof v === 'string' && v.trim() !== '')) return null; const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : null; };
 const shortTexts = (a) => (Array.isArray(a) ? a.filter((x) => typeof x === 'string' && x).slice(0, 5).map((x) => x.slice(0, 80)) : []);
 /**
  * A config's area, checked (a pasted code is someone else's data): { mode: 'tiles', tiles: { list, together, snap } }
@@ -24,12 +29,20 @@ const shortTexts = (a) => (Array.isArray(a) ? a.filter((x) => typeof x === 'stri
 export function sanitizeArea(a) {
   if (!a || typeof a !== 'object') return null;
   if (a.mode === 'road' && a.road && Array.isArray(a.road.pts)) {
-    const pts = a.road.pts.map((p) => ({ lat: num(p?.lat, -85.06, 85.06), lng: num(p?.lng, -180, 180) })).filter((p) => p.lat !== null && p.lng !== null);
+    if (a.road.pts.length > MAX_CODE_ROAD_RAW_POINTS) return null;
+    const pts = [];
+    for (const p of a.road.pts) { const lat = num(p?.lat, -85.06, 85.06); const lng = num(p?.lng, -180, 180); if (lat === null || lng === null) return null; pts.push({ lat, lng }); }
     if (pts.length < 2) return null;
-    const simple = simplifyPts(pts, 0.5, MAX_CODE_ROAD_POINTS);
+    // the stretch itself, cut at its ends on the line as given (the distances are along THAT line), then simplified:
+    // the ends come back where they were. (The ends used to be applied to the simplified line, which is shorter.)
+    const given = cumulative(pts).at(-1);
+    if (!(given > 0) || given > MAX_CODE_ROAD_KM * 1000) return null;
+    const a0 = num(a.road.startM, 0, given) ?? 0; const a1 = num(a.road.endM, 0, given) ?? given;
+    const stretch = Math.abs(a1 - a0) >= 1 ? stretchBetween(pts, a0, a1) : pts;
+    const simple = simplifyPts(stretch, 0.5, MAX_CODE_ROAD_POINTS);
+    if (simple.length < 2) return null;
     const total = cumulative(simple).at(-1);
-    const startM = num(a.road.startM, 0, total) ?? 0; const endM = num(a.road.endM, 0, total) ?? total;
-    return { mode: 'road', road: { pts: simple, startM, endM, halfWidthM: num(a.road.halfWidthM, 50, 2000) ?? 250, names: shortTexts(a.road.names), refs: shortTexts(a.road.refs), highway: typeof a.road.highway === 'string' ? a.road.highway.slice(0, 40) : 'road' } };
+    return { mode: 'road', road: { pts: simple, startM: 0, endM: total, halfWidthM: num(a.road.halfWidthM, 50, 2000) ?? 250, names: shortTexts(a.road.names), refs: shortTexts(a.road.refs), highway: typeof a.road.highway === 'string' ? a.road.highway.slice(0, 40) : 'road' } };
   }
   const list = Array.isArray(a.tiles?.list) ? a.tiles.list.slice(0, MAX_CODE_TILES).map((t) => ({ dx: num(t?.dx, -1000, 1000) ?? 0, dy: num(t?.dy, -1000, 1000) ?? 0 })) : [];
   if (list.length < 2) return null;

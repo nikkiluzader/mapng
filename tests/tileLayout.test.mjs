@@ -89,3 +89,16 @@ test('tiles on the map are where the map has them, at any latitude', async () =>
     if (lat === 60) assert.ok(offM > 5, `expected the old drawing to be off at 60, got ${offM.toFixed(1)} m`);
   }
 });
+
+test('free tiles put together: every tile on the grid, none on another (as composables/useTiles.js setTogether does)', async () => {
+  const { placeTile } = await import('../services/tileLayout.js');
+  const R = 1024;
+  // placed freely: off the grid, two of them over each other
+  const free = [{ dx: 0, dy: 0 }, { dx: 700, dy: 130 }, { dx: 760, dy: 90 }, { dx: -1500, dy: 2100 }];
+  const placed = [{ dx: 0, dy: 0 }];
+  for (let i = 1; i < free.length; i++) placed.push(placeTile([...placed, free[i]], i, free[i], R, { together: true, snap: false }));
+  for (const t of placed) assert.ok(t.dx % R === 0 && t.dy % R === 0, `${t.dx}, ${t.dy} is off the grid`);
+  assert.equal(new Set(placed.map((t) => `${t.dx},${t.dy}`)).size, placed.length);
+  // each within a tile or two of where it was
+  placed.forEach((t, i) => assert.ok(Math.abs(t.dx - free[i].dx) <= 2 * R && Math.abs(t.dy - free[i].dy) <= 2 * R));
+});
