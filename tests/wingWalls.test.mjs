@@ -114,3 +114,20 @@ test('no wing walls in the mouth of a junction at a deck end', () => {
   assert.ok(onRoad.every((q) => q.x >= 4 - 1e-9), `a wall in the junction's mouth at x = ${Math.min(...onRoad.map((q) => q.x))}`);
   for (const q of onRoad) for (const d of [q.inner, q.outer - 0.3]) assert.ok(!armPavement(q.x + q.nx * d, q.y + q.ny * d, 1), 'a block on an arm');
 });
+
+// A short block by itself along the approach, away from the deck's end, is no wall: a lump of concrete in the grass
+// (a 4 m one stood by a track's junction 20 m from a small bridge at Val d'Isère). One at the deck's end stays,
+// however short, and so does a long one further out.
+test('a short stretch of steep side away from the deck gets no block; the wing at the deck does', () => {
+  // the fill's side steep only at x = 30..36 (24 m from the deck) and from x = 50 to the deck at 60
+  const patchy = (x, y) => (Math.abs(y) <= 5.01 ? 4 : (x >= 30 && x <= 36) || x >= 50 ? 0 : Math.max(0, 4 - Math.max(0, Math.abs(y) - 5) / 2));
+  const runs = wingWallRuns(graph(), { groundAt: patchy });
+  assert.equal(runs.loneSkipped, 2, 'the short stray block left out on both sides');
+  assert.equal(runs.length, 2);
+  for (const r of runs) assert.ok(Math.min(...r.stations.map((q) => q.x)) >= 44, 'only the wing at the deck');
+  // the same stray stretch 30 m long: a wall
+  const long = (x, y) => (Math.abs(y) <= 5.01 ? 4 : (x >= 4 && x <= 36) || x >= 50 ? 0 : Math.max(0, 4 - Math.max(0, Math.abs(y) - 5) / 2));
+  const kept = wingWallRuns(graph(), { groundAt: long });
+  assert.equal(kept.loneSkipped, 0);
+  assert.equal(kept.length, 4);
+});

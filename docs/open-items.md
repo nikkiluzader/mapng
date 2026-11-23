@@ -346,12 +346,12 @@ As of 2026-11-23:
   near structures. Nothing done since 0.3.5 touched any of it; `fz_funival` on today's code still ends at 97 %.
   **Agreed for 0.3.6 (user, 2026-11-24):** (1) the funicular's steady slope, (2) gallery heights and the
   gallery-to-bridge join, (3) bridge width and the bridge spikes. The rest after the release.
-  - **(1) done on dev, not seen in game, sweep owed.** A steep railway's tunnel is the highest line under the
+  - **(1) done on dev, not seen in game.** A steep railway's tunnel is the highest line under the
     ground that only steepens (`steadyUnder` in `services/beamngTunnels.js`). Perce-Neige: grades of 4 to 52 % and
     a 50 % step became 18 % then 28 %, one bend. Probe and plot: `scratch/fizz035/funi_fetch.mjs`,
     `funi_probe.mjs`, `funi_plot.py`, `funi_section.png`. `fz_funival`'s 97 % is the test area's edge cutting the
     tunnel (the end aims at the ground there), not his map.
-  - **(2) gallery heights: the main cause fixed on dev, not seen in game, sweep owed.** The survey here kept the
+  - **(2) gallery heights: the main cause fixed on dev, not seen in game.** The survey here kept the
     galleries' roofs; a roof is level across the lanes, so it was read as the road's own bench and the road pulled
     up onto it (Pigettes: a 4.3 m hump in 40 m, 30 % at the ends; his [12], [13], and the join by the bridge of
     [01]). Now a level stretch counts only within 2.5 m of the road carried between the benches already known
@@ -361,7 +361,18 @@ As of 2026-11-23:
     - Open: [10] the D 902's gallery stretches round the lake "a little low and deep in the ground" (a bored
       tunnel's open stretches, another code path: not looked at); [11] "too short" and [14] not matched to a
       gallery by name yet; the other eight galleries of his map not exported one by one.
-  - **(3) bridge width and spikes: not started.** For later: Mesh Road joins and hairpins, the big tunnel box, water under small bridges.
+  - **(3) bridge spikes [16]: part done on dev; bridge width [06]: not reproduced.** Seen in game on a small level
+    (new area `fz_trackbridge`, 512, a 10 m track bridge; shots `scratch/fizz035/tb_before_after.jpg`).
+    - The "spikes" are the wing-wall blocks at bridge ends (new in 0.3.3, `services/structures/wingWalls.js`): a
+      slab 3.3 m out from the road's edge, as built. A short one standing by itself along the approach, away from
+      the deck, is now left out (under 10 m and never within 6 m of the deck's end; logged). Gone in game.
+    - **Open, the user's call:** the block at the deck's end is still a 4 m by 4 m slab beside a 3.6 m track. A
+      narrower wall would show the terrain's steep toothed side again (why the block is that wide).
+    - Width: on this bridge the deck (3.6 m road + 0.45 m each side for the parapets) and the track drawn on it
+      (3.96 m) agree, and every bridge way in five Tignes areas has the class of the roads at its ends. His
+      picture shows a track about twice the deck's width: needs the place (which bridge) from him.
+    - Seen on the way: a track's deck is bare concrete (no dirt on it).
+  - **Sweep owed** for the three fixes (tunnels, galleries, wing walls) before main. For later: Mesh Road joins and hairpins, the big tunnel box, water under small bridges.
 
 ## Now: Fizz_Mechanic's 0.3.3 list (2026-11-19; on hold until after the 0.3.5 release, user 2026-11-20)
 

@@ -17,6 +17,8 @@ const WALL_MIN_DROP_M = 0.8;            // the road this far over the ground bes
 const APPROACH_M = 120;                 // further along the approach a wall stands only where the side is steep ...
 const STEEP_DROP_M = 1.2;               // ... this much of drop ...
 const STEEP_WITHIN_M = 1.5;             // ... within this of the shoulder's edge (a 1 in 2 slope drops 0.75 m there)
+const WING_AT_DECK_M = 6;              // a run that comes this near a deck's end is that deck's wing wall ...
+const LONE_MIN_M = 10;                 // ... any other run shorter than this is left out
 const WALL_UNDER_EDGE_M = 0.05;         // the block starts this far under the road's drawn edge (no slot between them)
 const WALL_PAST_M = 0.3;                // ... and ends this far past the steep strip
 const WALL_TOP_M = 0.03;                // its top over the road's height
@@ -95,6 +97,7 @@ export function wingWallRuns(graph, { groundAt, onOtherRoad = () => false, shoul
   if (!z || !groundAt) return [];
   const { kindOf, toDeck } = deckDistancesThrough(graph, APPROACH_M);
   const runs = [];
+  let loneSkipped = 0;
   graph.edges.forEach((e, k) => {
     if (e.rail || !z[k]) return;   // (a railway's fill near its bridge: left, the track bed has its own ballast shoulders)
     // (a road the export does not draw (a private garage ramp at layer -1 in Tignes): no wall standing in the grass)
@@ -102,7 +105,18 @@ export function wingWallRuns(graph, { groundAt, onOtherRoad = () => false, shoul
     const n = e.s.length;
     for (const side of [1, -1]) {
       let run = null;
-      const close = () => { if (run && run.stations.length >= 2) runs.push(run); run = null; };
+      // (a short block standing by itself along the approach, off the deck's end: no wall, a lump of concrete in
+      // the grass. A 4 m one stood beside a track's junction 20 m from a 10 m bridge at Val d'Isère)
+      const close = () => {
+        if (run && run.stations.length >= 2) {
+          const st = run.stations;
+          let len = 0;
+          for (let j = 1; j < st.length; j++) len += fastHypot(st[j].x - st[j - 1].x, st[j].y - st[j - 1].y);
+          if (run.nearDeck > WING_AT_DECK_M && len < LONE_MIN_M) loneSkipped++;
+          else runs.push(run);
+        }
+        run = null;
+      };
       for (let i = 0; i < n; i++) {
         if (kindOf[k][i] === 'deck' || !(toDeck[k][i] < APPROACH_M)) { close(); continue; }
         // (a station on another road's pavement: the junction itself, no wall. Three roads meeting at a deck's end
@@ -155,13 +169,15 @@ export function wingWallRuns(graph, { groundAt, onOtherRoad = () => false, shoul
             .some(([px, py, d]) => onOtherRoad(px + nx * d, py + ny * d, k));
           if (hits) { close(); continue; }
         }
-        run ||= { edge: k, side, stations: [] };
+        run ||= { edge: k, side, stations: [], nearDeck: Infinity };
+        run.nearDeck = Math.min(run.nearDeck, toDeck[k][i]);
         // (no parapet where the block fills the gap to another road's pavement: a median, not an edge)
         run.stations.push({ x: e.x[i], y: e.y[i], z: zr, nx, ny, inner: inner0, outer, foot: Math.min(gOut, gMid) - WALL_FOOT_M, parapet: median ? 0 : PARAPET_H_M });
       }
       close();
     }
   });
+  runs.loneSkipped = loneSkipped;
   return runs;
 }
 
