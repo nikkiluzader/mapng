@@ -339,6 +339,35 @@ function fitApproachWindow(approach, groundAt, [from, to]) {
 
 // Gaussian smoothing of the deviation from the straight line between the
 // ends (both ends stay put), odd-reflected past them.
+/**
+ * The highest line from one end's height to the other's that only ever bends upward (each stretch at least as steep
+ * as the one before it) and stays under a ceiling: the straight grade where the ceiling allows it, else straight
+ * runs between the few places the ceiling comes down to it. `drop` lowers the ceiling (room for the smoothing).
+ */
+export function steadyUnder(st, endZ, ceil, drop = 0) {
+  const n = st.length;
+  const y = (i) => (i === 0 ? endZ[0] : i === n - 1 ? endZ[1] : ceil[i] - drop);
+  const hull = [];
+  for (let i = 0; i < n; i++) {
+    while (hull.length >= 2) {
+      const a = hull[hull.length - 2];
+      const b = hull[hull.length - 1];
+      // b stays only if it lies under the line a -> i
+      if ((y(b) - y(a)) * (st[i].s - st[a].s) >= (y(i) - y(a)) * (st[b].s - st[a].s)) hull.pop();
+      else break;
+    }
+    hull.push(i);
+  }
+  const z = new Array(n);
+  for (let k = 0; k < hull.length - 1; k++) {
+    const a = hull[k];
+    const b = hull[k + 1];
+    for (let i = a; i <= b; i++) z[i] = y(a) + ((y(b) - y(a)) * (st[i].s - st[a].s)) / Math.max(1e-9, st[b].s - st[a].s);
+  }
+  if (n === 1) z[0] = endZ[0];
+  return z;
+}
+
 function smoothPinned(z, step, sigmaM) {
   const n = z.length;
   if (n < 3) return z.slice();
@@ -983,7 +1012,37 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
     // (a steep railway's tube kept under its cover after the smoothing, ends pinned: a funicular passing under a
     // gully at 48 % had the dip's bottom smoothed back up through the ground, and was left on the surface)
     if (MAXG > MAX_GRADE && !low) {
-      for (let i = 1; i < n - 1; i++) z[i] = Math.min(z[i], g[i] - need);
+      // (one steady slope, not the surface's shape: the line is the straight grade bent only where the ground comes
+      // down to it, as few times as that takes. Held under each station's own ground, the Perce-Neige funicular at
+      // Tignes copied 650 m of the slope over it, grades from 4 to 52 %, and took a 50 % step under a hollow)
+      // (the ends as before: a portal's end comes down to its tube, which is under cover from the first station on;
+      // at the map's edge nothing joins the line, and its end goes where the slope takes it)
+      const ceil = g.map((v) => v - need);
+      const ends = endZ.slice();
+      if (n >= 5) {
+        // the steady line under the ground alone, carried out to each end at its own slope there
+        const inner = st.slice(1, n - 1);
+        const zi = steadyUnder(inner, [ceil[1], ceil[n - 2]], ceil.slice(1, n - 1));
+        const out = [zi[0] - ((zi[1] - zi[0]) * (st[1].s - st[0].s)) / Math.max(1e-9, st[2].s - st[1].s),
+          zi[n - 3] + ((zi[n - 3] - zi[n - 4]) * (st[n - 1].s - st[n - 2].s)) / Math.max(1e-9, st[n - 2].s - st[n - 3].s)];
+        for (const e of [0, 1]) {
+          const iE = e ? n - 1 : 0;
+          if (known(iE) || (free[e] && Number.isFinite(freeZ?.[e]))) continue;
+          ends[e] = free[e] ? out[e] : Math.min(endZ[e], out[e]);
+          if (free[e]) endZ[e] = ends[e];
+        }
+      }
+      // (the smoothing rounds each bend upward: the ground's hold lowered by what that takes, measured clear of the ends)
+      const clearOfEnds = (i) => st[i].s >= 3 * SMOOTH_SIGMA_M && L - st[i].s >= 3 * SMOOTH_SIGMA_M;
+      let drop = 0;
+      for (let round = 0; round < 4; round++) {
+        z = smoothPinned(steadyUnder(st, ends, ceil, drop), STEP_M, SMOOTH_SIGMA_M);
+        let over = 0;
+        for (let i = 1; i < n - 1; i++) if (clearOfEnds(i)) over = Math.max(over, z[i] - ceil[i]);
+        if (over <= 0.02) break;
+        drop += over;
+      }
+      for (let i = 1; i < n - 1; i++) z[i] = Math.min(z[i], ceil[i]);
       // (... and its grade limit again, by lowering only: the cover followed the surface's bumps, a 250 % kink at
       // the Funival's top end)
       const gl = MAXG * 0.97;

@@ -724,6 +724,30 @@ test('a steep railway tunnel (funicular) climbs at its own grade and stays under
   }
 });
 
+// A funicular's tunnel is one steady slope, not a copy of the hillside over it (Tignes' Perce-Neige: 650 m of its
+// line followed the slope's waves at 4 to 52 %, the dips under it filled over the tube into a bulge). The line bends
+// only where the ground comes down to it.
+test('a steep railway tunnel keeps a steady slope under a wavy hillside', () => {
+  const xy = []; for (let y = 0; y <= 1500; y += 10) xy.push([0, y]);
+  // a gentle lower slope with 6 m waves every 120 m, then the mountain: 18 % for 500 m, 40 % after it
+  const g = (x, y) => 1000 + 12 + (y < 500 ? 0.18 * y : 90 + 0.4 * (y - 500)) + 6 * Math.sin((y / 120) * 2 * Math.PI);
+  const approaches = [{ xy: [[0, 0], [0, -100]] }, { xy: [[0, 1500], [0, 1600]] }];
+  const t = solveTunnel({ xy, half: 2.5, grade: 1 }, { groundAt: g, approaches });
+  assert.equal(t.ok, true, t.reason);
+  let bends = 0; let down = 0; let prev = null;
+  for (let i = t.iS + 2; i < t.iN - 1; i++) {
+    const p = t.line[i]; const q = t.line[i - 1];
+    if (p.s < 60 || p.s > 1440) continue;                          // clear of the portals
+    const gr = (p.z - q.z) / (p.s - q.s);
+    if (gr < 0) down++;
+    if (prev !== null && gr < prev - 0.002) bends++;
+    prev = gr;
+    assert.ok(g(p.x, p.y) - p.z > 0, 'under the ground');
+  }
+  assert.equal(down, 0, 'the line never runs downhill on its way up');
+  assert.equal(bends, 0, `the slope only ever steepens (${bends} place(s) where it eased off)`);
+});
+
 // A short underpass under a street, where the ground model took the street's deck away: the lower road's open
 // trench shows through, the street's ground 5.5 m up on both sides (the D 87A under the D 902 by the Tignes dam,
 // crossing at 20 degrees). The low box takes its lid from the street's own ground beside the trench.

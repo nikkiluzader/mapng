@@ -344,8 +344,14 @@ As of 2026-11-23:
   filled (his waves and bulge); the Pigettes gallery's end climbs 35 % beside a bridge; every gallery has the same
   5.20 m crown; the Mesh Roads export has 6 stepped joints where the Decal Roads one has none; 584 terrain spikes
   near structures. Nothing done since 0.3.5 touched any of it; `fz_funival` on today's code still ends at 97 %.
-  Proposed for 0.3.6 (not agreed yet): the galleries' heights, the funicular's steady slope, bridge width and the
-  bridge spikes. For later: Mesh Road joins and hairpins, the big tunnel box, water under small bridges.
+  **Agreed for 0.3.6 (user, 2026-11-24):** (1) the funicular's steady slope, (2) gallery heights and the
+  gallery-to-bridge join, (3) bridge width and the bridge spikes. The rest after the release.
+  - **(1) done on dev, not seen in game, sweep owed.** A steep railway's tunnel is the highest line under the
+    ground that only steepens (`steadyUnder` in `services/beamngTunnels.js`). Perce-Neige: grades of 4 to 52 % and
+    a 50 % step became 18 % then 28 %, one bend. Probe and plot: `scratch/fizz035/funi_fetch.mjs`,
+    `funi_probe.mjs`, `funi_plot.py`, `funi_section.png`. `fz_funival`'s 97 % is the test area's edge cutting the
+    tunnel (the end aims at the ground there), not his map.
+  - **(2), (3): not started.** For later: Mesh Road joins and hairpins, the big tunnel box, water under small bridges.
 
 ## Now: Fizz_Mechanic's 0.3.3 list (2026-11-19; on hold until after the 0.3.5 release, user 2026-11-20)
 
