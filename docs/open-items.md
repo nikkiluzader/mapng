@@ -97,6 +97,9 @@ As of 2026-11-23:
   spans); now 0.000 m everywhere. The check also found the Mapterhorn source (the default) read half a source pixel
   north-west of its place (its tiles' origins were given as pixel middles and the resampler added the half pixel
   again: 0.4 m on 1 m lidar, about 10 m on the 30 m data at zoom 12): fixed in services/mapterhorn.js.
+  In game the same day (untouched terrain, level removed after): 961 points of the game's own terrain height are
+  0.0 cm rms from the source at their real positions (worst 0.1 cm), and 473 road points lie on OpenStreetMap's
+  lines (median 0 cm, worst 6 cm; a square off would read 62 cm).
   **Next, in order:** seam rejoin (height check, three or more pieces) and blend before build; road picking
   (roads-only read, no picking while generating, follow rules, routing off the main thread); chunked export
   (cache-only, cancel, translated progress, merged report); user reports since 2026-11-22 (user, 2026-11-23: "go
