@@ -488,6 +488,7 @@
     "surroundingsTexture": "Umgebungs-Textur",
     "surroundingTerrain": "Umgebendes Gelände",
     "surroundingDesc": "Zeigt das Gelände rund um dein Gebiet in der Vorschau (geringere Detailstufe).",
+    "surroundingShaped": "Wird für eine Karte aus mehreren Kacheln oder entlang einer Straße nicht angezeigt.",
     "surroundingsSatelliteProgress": "{completed} von {total} Satellitenbildern heruntergeladen",
     "wireframeMode": "Drahtgittermodus",
     "features3d": "3D-Features",

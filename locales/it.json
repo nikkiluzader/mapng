@@ -488,6 +488,7 @@
     "surroundingsTexture": "Texture dintorni",
     "surroundingTerrain": "Terreno circostante",
     "surroundingDesc": "Mostra il terreno intorno alla tua area nell'anteprima (dettaglio ridotto).",
+    "surroundingShaped": "Non mostrato per una mappa di più tessere o lungo una strada.",
     "surroundingsSatelliteProgress": "{completed} di {total} immagini satellitari scaricate",
     "wireframeMode": "Modalità wireframe",
     "features3d": "Elementi 3D",

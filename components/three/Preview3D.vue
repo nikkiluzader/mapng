@@ -58,7 +58,7 @@
               :show-water="showWater"
               :water-level-offset-meters="waterLevelOffsetMeters"
               :wireframe="advancedMode && showWireframe"
-              :skirt="cinematic && !(advancedMode && showSurroundings)"
+              :skirt="cinematic && !(advancedMode && showSurroundings && !shapedMap)"
               :lakes="cinematic"
             />
 
@@ -72,7 +72,7 @@
             />
 
             <SurroundingTerrain3D
-              v-if="advancedMode"
+              v-if="advancedMode && !shapedMap"
               :terrain-data="terrainData"
               :visible="showSurroundings"
               :quality="surroundingQuality"
@@ -322,12 +322,14 @@
           </div>
 
           <label class="flex items-center gap-2 cursor-pointer group/check">
-            <BaseSwitch :on="showSurroundings" :label="t('preview.surroundingTerrain')" @toggle="showSurroundings = !showSurroundings" />
+            <BaseSwitch :on="showSurroundings && !shapedMap" :disabled="shapedMap" :label="t('preview.surroundingTerrain')" @toggle="showSurroundings = !showSurroundings" />
             <span class="text-xs text-gray-700 dark:text-gray-300 group-hover/check:text-gray-900 dark:group-hover/check:text-white"
               >{{ t('preview.surroundingTerrain') }}</span
             >
           </label>
-          <p v-if="showSurroundings" class="text-micro text-gray-400 dark:text-gray-500 ml-[42px] -mt-1">{{ t('preview.surroundingDesc') }}</p>
+          <!-- (the surroundings are eight squares round a square map: a map of tiles or along a road has no such ring) -->
+          <p v-if="shapedMap" class="text-micro text-gray-400 dark:text-gray-500 ml-[42px] -mt-1" data-testid="surroundings-shaped">{{ t('preview.surroundingShaped') }}</p>
+          <p v-else-if="showSurroundings" class="text-micro text-gray-400 dark:text-gray-500 ml-[42px] -mt-1">{{ t('preview.surroundingDesc') }}</p>
           <p
             v-if="showSurroundings && surroundingTextureType === 'satellite' && isSurroundingsLoading"
             class="text-micro text-gray-400 dark:text-gray-500 ml-[42px] -mt-1"
@@ -413,6 +415,7 @@
 
 <script setup>
 import { hasTexture } from '../../services/textureOnDemand.js';
+import { previewShape } from '../../services/batchShape.js';
 import { ref, computed, reactive, watch, onErrorCaptured, toRaw } from "vue";
 import { useBaseTexture } from '../../composables/useBaseTexture.js';
 import { useI18n } from 'vue-i18n';
@@ -657,6 +660,8 @@ const showWireframe = remembered('mapng_preview3d_wireframe', false, onOff);
 const showWater = remembered('mapng_preview3d_water', true, onOff);
 const waterLevelOffsetMeters = ref(0);
 const showSurroundings = remembered('mapng_preview3d_surroundings', false, onOff);
+// (a map that covers only part of its box: tiles, a road's corridor, a chunked level)
+const shapedMap = computed(() => !!previewShape(toRaw(props.terrainData)));
 const showSceneSettings = remembered('mapng_preview3d_sceneSettings', false, onOff);
 
 // "Preview only" note: the preview is a quick, light look at the data; the

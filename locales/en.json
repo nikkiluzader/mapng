@@ -493,6 +493,7 @@
     "surroundingsTexture": "Surroundings texture",
     "surroundingTerrain": "Surrounding terrain",
     "surroundingDesc": "Shows terrain around your area in the preview (lower detail).",
+    "surroundingShaped": "Not shown for a map of several tiles or along a road.",
     "surroundingsSatelliteProgress": "{completed} of {total} satellite images downloaded",
     "wireframeMode": "Wireframe mode",
     "features3d": "3D features",

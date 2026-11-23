@@ -488,6 +488,7 @@
     "surroundingsTexture": "Tekstura otoczenia",
     "surroundingTerrain": "Teren otaczający",
     "surroundingDesc": "Pokazuje w podglądzie teren wokół Twojego obszaru (mniej szczegółów).",
+    "surroundingShaped": "Niewyświetlane dla mapy z kilku kafli albo wzdłuż drogi.",
     "surroundingsSatelliteProgress": "Pobrano {completed} z {total} zdjęć satelitarnych",
     "wireframeMode": "Tryb szkieletu",
     "features3d": "Obiekty 3D",

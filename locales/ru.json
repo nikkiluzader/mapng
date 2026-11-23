@@ -488,6 +488,7 @@
     "surroundingsTexture": "Текстура окружения",
     "surroundingTerrain": "Окружающий рельеф",
     "surroundingDesc": "Показывает рельеф вокруг вашей области в предпросмотре (с меньшей детализацией).",
+    "surroundingShaped": "Не показывается для карты из нескольких тайлов или вдоль дороги.",
     "surroundingsSatelliteProgress": "Загружено спутниковых снимков: {completed} из {total}",
     "wireframeMode": "Каркасный режим",
     "features3d": "3D-объекты",

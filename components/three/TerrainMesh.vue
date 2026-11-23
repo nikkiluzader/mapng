@@ -296,6 +296,31 @@ function buildSkirt(vertices, widthSteps, heightSteps, upm, data) {
   return g;
 }
 
+// A shaped map's sides (tiles, a road's corridor): a wall down from every edge of the drawn shape, found as the sides
+// used by one triangle only. No base under it: the shape's own outline is what is shown.
+function buildShapeSkirt(vertices, index, upm, data) {
+  const relief = (Number(data.maxHeight) - Number(data.minHeight)) * upm;
+  const base = -Math.max(1.2, Math.min(6, (Number.isFinite(relief) ? relief : 10) * 0.06 + 1));
+  const uses = new Map();
+  const side = (a, b) => { const k = a < b ? a * 4294967296 + b : b * 4294967296 + a; const e = uses.get(k); if (e) e.n++; else uses.set(k, { a, b, n: 1 }); };
+  for (let t = 0; t < index.length; t += 3) { side(index[t], index[t + 1]); side(index[t + 1], index[t + 2]); side(index[t + 2], index[t]); }
+  const pos = []; const col = []; const idx = [];
+  const push = (x, y, z, k) => { pos.push(x, y, z); const c = SKIRT_BOTTOM.clone().lerp(SKIRT_TOP, k); col.push(c.r, c.g, c.b); return pos.length / 3 - 1; };
+  for (const { a, b, n } of uses.values()) {
+    if (n !== 1) continue;
+    const at = push(vertices[a * 3], vertices[a * 3 + 1], vertices[a * 3 + 2], 1); const bt = push(vertices[b * 3], vertices[b * 3 + 1], vertices[b * 3 + 2], 1);
+    const ab = push(vertices[a * 3], vertices[a * 3 + 1], base, 0); const bb = push(vertices[b * 3], vertices[b * 3 + 1], base, 0);
+    idx.push(at, ab, bt, bt, ab, bb);
+  }
+  if (!idx.length) return null;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
 // Lakes: each standing-water outline (OSM natural=water, reservoirs, wide
 // rivers) as a surface at its level (the median ground inside it: the data
 // records a lake's surface as its ground), a hair above the terrain.
@@ -559,8 +584,8 @@ watch([() => props.terrainData?.heightMap, () => props.quality], () => {
 
   geometry.value = markRaw(geo);
   if (skirtGeometry.value) skirtGeometry.value.dispose();
-  // (the skirt runs round the map's box: a shaped map has none, its edge is the shape's own)
-  skirtGeometry.value = insideShape ? null : markRaw(buildSkirt(vertices, widthSteps, heightSteps, upm, data));
+  // (a shaped map: the wall follows the shape's own edge, not the map's box)
+  { const sk = insideShape ? buildShapeSkirt(vertices, geo.index.array, upm, data) : buildSkirt(vertices, widthSteps, heightSteps, upm, data); skirtGeometry.value = sk ? markRaw(sk) : null; }
   if (lakeGeometry.value) lakeGeometry.value.dispose();
   lakeGeometry.value = (() => { try { const g = buildLakes(data, upm); return g ? markRaw(g) : null; } catch (e) { console.warn('[TerrainMesh] lakes not built:', e?.message || e); return null; } })();
 

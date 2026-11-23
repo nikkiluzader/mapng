@@ -50,8 +50,8 @@ Before the 0.3.6 desktop release:
 5. **Tiles step 2 leftovers.** Part C done on dev 2026-11-23: the 2D preview dims what is outside the picked shape
    and the 3D preview draws only the shape (tiles, a road's corridor, a chunked level's overview; one shared test,
    `footprintTest` in `services/batchShape.js`). Checked in the browser on an L of three tiles
-   (`scratch/verify-pw/e2e_shape_previews.mjs`, pictures `shape_2D.png`, `shape_3D.png`). Left of C: a thin wall
-   along the shape's edge in 3D, the surroundings switched off for shaped maps.
+   (`scratch/verify-pw/e2e_shape_previews.mjs`, pictures `shape_2D.png`, `shape_3D.png`). Also done: a wall along the shape's own
+   edge in the 3D preview (best quality), and the 3D surroundings switched off for shaped maps with a note.
    Part F done on dev 2026-11-23: a wall 15 m down from the ground's cut edge on every ground-model level (shaped or
    plain; drawn only, no collision; none where a chunk hands over to its neighbour) (`services/groundMesh.js`); a
    building is kept only when every side of its outline is over ground (`services/footprintClip.js`: 34 of them on

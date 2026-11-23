@@ -488,6 +488,7 @@
     "surroundingsTexture": "Texture des environs",
     "surroundingTerrain": "Terrain environnant",
     "surroundingDesc": "Affiche le terrain autour de votre zone dans l'aperçu (moins détaillé).",
+    "surroundingShaped": "Non affiché pour une carte de plusieurs tuiles ou le long d’une route.",
     "surroundingsSatelliteProgress": "{completed} images satellite sur {total} téléchargées",
     "wireframeMode": "Mode fil de fer",
     "features3d": "Éléments 3D",
