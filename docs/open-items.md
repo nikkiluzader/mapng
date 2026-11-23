@@ -286,7 +286,9 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
     retired (its public half into `UPDATE_KEYS`);
   - (done 2026-11-23: the `CRASH_ADMIN_TOKEN` worker secret is deleted on both workers) remove its line
     (`MAPNG_CRASH_ADMIN_TOKEN`) from mapng.env;
-  - decide on GitHub's immutable releases (a published release could then not be rebuilt in place);
+  - (done 2026-11-23: GitHub's immutable releases are on. A published release's files and tag can no longer be
+    changed: a release that needs a rebuild gets a new version number. Drafts can still be changed, so the workflow's
+    uploads, signatures and checksums go on before publishing, as they already do.)
 - **Checked 2026-11-23 with the user's token:** Workers Builds has one trigger per worker (`main` for mapng, `dev`
   for dev-mapng), no other branch builds, no build variables; Access: the admin app covers `mapng.com/admin*` and
   `/api/admin/*` for one address (its cookie now HttpOnly, SameSite Lax), the dev app covers dev.mapng.com for 35
