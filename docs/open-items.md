@@ -47,7 +47,12 @@ Before the 0.3.6 desktop release:
    ellipsoid's metres per degree, not a flat 111,320 (0.2 % at latitude 45). Checked: unit tests, a browser run
    through the 3D preview and an export. Left: the sweep's areas re-fetched on the new frame; the retired batch
    job's tile centres (`services/batchJob.js`) left as they are.
-5. **Tiles step 2 leftovers:** previews masked to the footprint, a masked minimap, the edge skirt.
+5. **Tiles step 2 leftovers.** Part C done on dev 2026-11-23: the 2D preview dims what is outside the picked shape
+   and the 3D preview draws only the shape (tiles, a road's corridor, a chunked level's overview; one shared test,
+   `footprintTest` in `services/batchShape.js`). Checked in the browser on an L of three tiles
+   (`scratch/verify-pw/e2e_shape_previews.mjs`, pictures `shape_2D.png`, `shape_3D.png`). Left of C: a thin wall
+   along the shape's edge in 3D, the surroundings switched off for shaped maps. Left, part F: the edge skirt in the
+   level, buildings kept only when wholly inside, the minimap and base texture masked outside.
 6. **Release page:** in-game pictures, a road mode picture, the final fix list; then publish it.
 
 Known and not blocking 0.3.6 (say so on the page):

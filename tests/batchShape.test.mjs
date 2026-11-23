@@ -72,3 +72,23 @@ test('outside the footprint the heights stretch out from its edge', () => {
   assert.deepEqual([...h.subarray(7 * N, 8 * N)], [...h.subarray(3 * N, 4 * N)]);
   assert.ok(!h.includes(-1));
 });
+
+test('the previews’ footprint test and mask: rects, a road’s runs, a chunked level’s overview, none', async () => {
+  const { footprintTest, footprintMaskPixels, previewShape } = await import('../services/batchShape.js');
+  // an L of two 4 x 4 tiles on an 8 x 8 grid: the top-left and bottom-left quarters
+  const td = { width: 8, height: 8, footprint: [[0, 0, 4, 4], [0, 4, 4, 4]] };
+  const inside = footprintTest(td);
+  assert.equal(inside(0.25, 0.25), true); assert.equal(inside(0.25, 0.75), true); assert.equal(inside(0.75, 0.25), false); assert.equal(inside(0.5, 0.5), false);
+  const px = footprintMaskPixels(td, 4, 4, [1, 2, 3, 200]);
+  const alpha = Array.from({ length: 16 }, (_, k) => px[k * 4 + 3]);
+  assert.deepEqual(alpha, [0, 0, 200, 200, 0, 0, 200, 200, 0, 0, 200, 200, 0, 0, 200, 200]);
+  // a road's corridor as row runs
+  const road = footprintTest({ width: 10, height: 2, footprint: { runs: [[0, 2, 5], [1, 4, 9]] } });
+  assert.equal(road(0.3, 0.25), true); assert.equal(road(0.3, 0.75), false); assert.equal(road(0.6, 0.75), true);
+  // a chunked level's overview is smaller than its grid: the footprint is on the level's grid
+  const ov = { width: 100, height: 50, chunked: { W: 8000, H: 4000, footprint: [[0, 0, 4000, 4000]] } };
+  assert.deepEqual([previewShape(ov).W, previewShape(ov).H], [8000, 4000]);
+  assert.equal(footprintTest(ov)(0.25, 0.5), true); assert.equal(footprintTest(ov)(0.75, 0.5), false);
+  // a plain map: no test, no mask
+  assert.equal(footprintTest({ width: 8, height: 8 }), null); assert.equal(footprintMaskPixels({ width: 8, height: 8 }, 4, 4), null);
+});

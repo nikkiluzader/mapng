@@ -205,3 +205,47 @@ export function shapeArea(fp, N, W = N) {
   let px = 0; for (const r of shapeRows(fp, N, W)) if (r) for (const [a, b] of r) px += b - a;
   return px;
 }
+
+// ── The footprint for the previews ─────────────────────────────────────────────
+/**
+ * A map's footprint and the grid it is given on: { fp, W, H }, or null for a map that is all ground (one square, a
+ * full rectangle). A chunked level's overview is smaller than its grid: its footprint is on the level's own grid
+ * (terrainData.chunked), which the fractions below take care of.
+ */
+export function previewShape(td) {
+  if (hasShape(td?.footprint)) return { fp: td.footprint, W: td.width, H: td.height };
+  if (hasShape(td?.chunked?.footprint)) return { fp: td.chunked.footprint, W: td.chunked.W, H: td.chunked.H };
+  return null;
+}
+
+/**
+ * A test for the previews: inside(u, v) for a place given as fractions of the map (u from the west, v from the
+ * north, 0..1), or null when the map has no footprint. One row lookup and a short scan of that row's runs.
+ */
+export function footprintTest(td) {
+  const s = previewShape(td); if (!s) return null;
+  const rows = shapeRows(s.fp, s.H, s.W);
+  return (u, v) => {
+    const y = Math.min(s.H - 1, Math.max(0, Math.floor(v * s.H))); const x = u * s.W;
+    const l = rows[y]; if (!l) return false;
+    for (const [a, b] of l) if (x >= a && x < b) return true;
+    return false;
+  };
+}
+
+/**
+ * The picture that dims what is outside the footprint: RGBA pixels mw x mh (Uint8ClampedArray), clear inside, `rgba`
+ * outside; null when the map has no footprint. Each pixel is judged at its middle.
+ */
+export function footprintMaskPixels(td, mw, mh, rgba = [17, 24, 39, 150]) {
+  const inside = footprintTest(td); if (!inside) return null;
+  const px = new Uint8ClampedArray(mw * mh * 4);
+  for (let j = 0; j < mh; j++) {
+    const v = (j + 0.5) / mh;
+    for (let i = 0; i < mw; i++) {
+      if (inside((i + 0.5) / mw, v)) continue;
+      const k = (j * mw + i) * 4; px[k] = rgba[0]; px[k + 1] = rgba[1]; px[k + 2] = rgba[2]; px[k + 3] = rgba[3];
+    }
+  }
+  return px;
+}

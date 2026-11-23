@@ -118,6 +118,7 @@ import { useI18n } from 'vue-i18n';
 import { CHECKBOX, SELECT_XS } from '../base/controlStyles.js';
 import L from 'leaflet';
 import { squareOfDrag } from '../../services/modelArea.js';
+import { footprintMaskPixels } from '../../services/batchShape.js';
 import 'leaflet/dist/leaflet.css';
 import { attachContentLayer } from './contentLayer.js';
 import { useMainStore } from '../../stores/mainStore';
@@ -390,6 +391,20 @@ const drawTexture = () => {
   else outline.setStyle({ fill: !shown });
 };
 
+// A map of tiles or along a road covers only part of its box: the rest is dimmed, so the preview shows the shape
+// that will be built (services/batchShape.js; the map's data is already cut to it at Generate).
+const MASK_MAX_PX = 1024;
+let maskLayer = null;
+const drawMask = () => {
+  if (!map) return;
+  if (maskLayer) { map.removeLayer(maskLayer); maskLayer = null; }
+  const d = td(); const b = bounds(); if (!d || !b) return;
+  const k = Math.min(1, MASK_MAX_PX / Math.max(d.width, d.height));
+  const mw = Math.max(1, Math.round(d.width * k)); const mh = Math.max(1, Math.round(d.height * k));
+  const px = footprintMaskPixels(d, mw, mh); if (!px) return;
+  maskLayer = new CanvasOverlay(canvasOf(px, mw, mh), b, { interactive: false, className: 'mapng-preview2d-mask', pane: 'mapngMask' }).addTo(map);
+};
+
 // what is under the cursor: the content layer's own hit test
 let hoverRaf = 0;
 const onMove = (e) => {
@@ -416,12 +431,16 @@ onMounted(() => {
   map.createPane('mapngTexture').style.zIndex = '250';
   map.createPane('mapngContours').style.zIndex = '260';
   map.getPane('mapngContours').style.pointerEvents = 'none';
+  // (over the texture and the contours, under the drawn features: what is outside the picked shape, dimmed)
+  map.createPane('mapngMask').style.zIndex = '270';
+  map.getPane('mapngMask').style.pointerEvents = 'none';
   const b = bounds();
   if (b) fit();
   drawBackdrop();
   syncBackdrop();
   drawTexture();
   drawContours();
+  drawMask();
   content = attachContentLayer(map, {
     getFeatures: () => td()?.osmFeatures || null,
     isShown: () => colourMap.value && hasFeatures.value,
@@ -459,11 +478,12 @@ watch(() => [hasBackdrop.value, store.exportDataOptions], syncBackdrop);
 watch(() => [hasBackdrop.value, showBackdrop.value, terrainView.value], drawBackdrop);
 watch(() => [showContours.value, contourStep.value, terrainView.value === 'normal', texture.value === 'none'], drawContours);
 watch(() => [colourMap.value, off.value, store.advancedMode], () => { content?.update(); if (!colourMap.value) hover.value = null; });
-watch(() => props.terrainData, () => { cloudFor = ''; if (!props.terrainData?.pointPreview) cloudView.value = 'off'; outline && map?.removeLayer(outline); outline = null; shownKind = null; sampledFor = null; backdropTiles = null; backdropKey = ''; drawTexture(); drawContours(); drawBackdrop(); syncBackdrop(); content?.update(); fit(); });
+watch(() => props.terrainData, () => { cloudFor = ''; if (!props.terrainData?.pointPreview) cloudView.value = 'off'; outline && map?.removeLayer(outline); outline = null; shownKind = null; sampledFor = null; backdropTiles = null; backdropKey = ''; drawTexture(); drawContours(); drawMask(); drawBackdrop(); syncBackdrop(); content?.update(); fit(); });
 </script>
 
 <style>
 /* (the texture's own pixels when zoomed in, not a blur) */
 .mapng-preview2d-texture { image-rendering: auto; }
 .mapng-preview2d-contours { image-rendering: auto; pointer-events: none; }
+.mapng-preview2d-mask { image-rendering: pixelated; pointer-events: none; }
 </style>

@@ -2,6 +2,7 @@
 import { computed, shallowRef, reactive, watch, toRaw, markRaw, onUnmounted, ref } from 'vue';
 import * as THREE from 'three';
 import { metresPerDegree, heightAtFraction } from '../../services/mapFrame.js';
+import { footprintTest } from '../../services/batchShape.js';
 import { useTresContext, useLoop } from '@tresjs/core';
 import { useMainStore } from '../../stores/mainStore';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -536,6 +537,19 @@ watch([() => props.terrainData?.heightMap, () => props.quality], () => {
     uvs[i * 2 + 1] = v;
   }
 
+  // A map of tiles or along a road: only the picked shape is drawn (services/batchShape.js). The triangles whose
+  // middle is outside it are left out of the index; the vertices stay, so normals and texture coordinates line up.
+  const insideShape = footprintTest(data);
+  if (insideShape && geo.index) {
+    const idx = geo.index.array; const kept = [];
+    for (let t = 0; t < idx.length; t += 3) {
+      const a = idx[t]; const b = idx[t + 1]; const c = idx[t + 2];
+      const u = (uvs[a * 2] + uvs[b * 2] + uvs[c * 2]) / 3; const v = (uvs[a * 2 + 1] + uvs[b * 2 + 1] + uvs[c * 2 + 1]) / 3;
+      if (insideShape(u, v)) kept.push(a, b, c);
+    }
+    geo.setIndex(kept);
+  }
+
   geo.computeVertexNormals();
 
   // Dispose old geometry if it exists
@@ -545,7 +559,8 @@ watch([() => props.terrainData?.heightMap, () => props.quality], () => {
 
   geometry.value = markRaw(geo);
   if (skirtGeometry.value) skirtGeometry.value.dispose();
-  skirtGeometry.value = markRaw(buildSkirt(vertices, widthSteps, heightSteps, upm, data));
+  // (the skirt runs round the map's box: a shaped map has none, its edge is the shape's own)
+  skirtGeometry.value = insideShape ? null : markRaw(buildSkirt(vertices, widthSteps, heightSteps, upm, data));
   if (lakeGeometry.value) lakeGeometry.value.dispose();
   lakeGeometry.value = (() => { try { const g = buildLakes(data, upm); return g ? markRaw(g) : null; } catch (e) { console.warn('[TerrainMesh] lakes not built:', e?.message || e); return null; } })();
 
