@@ -11,11 +11,18 @@ these files; they are never copied.
 
 Before the 0.3.6 desktop release:
 
-1. **Desktop app end to end on today's work** (packed Linux app, unpacked Windows build): Generate, export, Reset
-   (Electron has no location service: unticked "Keep the map where it is" should land on Flagstaff), the progress
-   card during a real export, the thumbnail in the game's level list. None run since the security pass.
-2. **The new release workflow has never run:** first tag, watch `sign-manifest` and both `.sig` files. Ask before the
-   tag.
+1. **Desktop app end to end on today's work.** Done 2026-11-23 on b9f6667: the packed Linux app
+   (`scratch/verify-pw/e2e_desktop_packed.mjs`, `e2e_desktop_reset.mjs`) and an unpacked Windows build run on Windows
+   over its debugging port (`e2e_win_cdp.mjs`, `e2e_win_reset.mjs`; its own data and mods folders, removed after):
+   Generate, a BeamNG export saved into the mods folder, no page errors; the progress card lists every finished line
+   with nothing cut off; the level's thumbnail is the MapNG card in the app's font; Reset keeps the map by default
+   and, unticked, lands on Flagstaff after about 6 s (no location service in Electron); no tabs. Left: the thumbnail
+   as the game's level list shows it; the signed installer from the test build (user).
+2. **The new release workflow.** Done 2026-11-23: test build v0.3.6-dev.3 (tag at 2c9c488, cut on the user's word)
+   ran it for the first time: both builds, `sign-manifest` and `publish-test-build` succeeded; the pre-release
+   carries `latest.yml.sig` and `latest-linux.yml.sig`, and both verify with the app's own key (a changed copy does
+   not). Left: the user installs the test build (the signed Windows installer has not been run here); an update
+   from dev.2 to dev.3 through the app (download and install have never been run end to end).
 3. **Seams in game on a small level** (only the target area): the tunnel and the street at a join. The last look was
    before the final fix.
 4. **Alignment leftovers of the frame change:** the 3D preview mesh and the upload paths (LAZ, ASC, GML) still use
