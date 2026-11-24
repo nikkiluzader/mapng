@@ -9,6 +9,9 @@ these files; they are never copied.
 
 ## 0.3.7 (started 2026-11-24, night)
 
+**A new session starts with `docs/handoff.md`** (the user asked for it 2026-11-24: the next sessions may run on
+another model; keep it current, tick items as they finish).
+
 Order agreed with the user: batch code removal, then sidewalks at banks and the water, then slip roads ending at
 the outer lane; after those Fizz_Mechanic's remaining structure points, long bridges in levels built in pieces,
 Mesh Road joins. Riding along: the other 38 sweep areas re-framed, Zion's tunnel with shaping off and Amsterdam's
@@ -41,9 +44,13 @@ Mesh Road joins. Riding along: the other 38 sweep areas re-framed, Zion's tunnel
     out before it merges). Sections before / after: `kingst_seawall_sect.png`, `kingst_seawall_sect_after.png`.
     Counts on Mapterhorn, dev -> branch now: `kingst` floating 0 -> 7, buried 34 -> 23; `naldo` floating 18 -> 19,
     buried 47 -> 19; `ams_centraal` floating 30 -> 31, buried 27 -> 32.
-  - **Left on the branch:** Kingston's walled sunken garden (210, 686: the fill raises its floor 2 m, slab up to
-    1.6 m over it; 3 places), single places at (298, 68), (210, -872), (322, -146); Amsterdam Centraal's two new
-    buried clusters at (108, -202) and (88, -206).
+  - **The sunken garden: fixed on the branch** (cc90cc4): land whose top lies more than 6 m in from the wall is
+    left alone (`TOP_FAR_M`). Counts now: `kingst` 4 / 23 (dev 0 / 34), `naldo` 18 / 19 (dev 18 / 47),
+    `ams_centraal` 31 / 32 (dev 30 / 27).
+  - **Left on the branch:** Amsterdam Centraal's two new buried clusters at (108, -202) and (88, -206): an
+    embankment's 1 in 2 slope levelled out to the wall at its foot (`scratch/fizz035/ams_sw_cmp.png`); tried and
+    reverted: skipping banks under 0.6 m per metre (Naldo buried 19 -> 42, Kingston 4 / 23 -> 12 / 34). Single
+    places in Kingston at (298, 68), (210, 686), (322, -146).
   - Also on the branch's list from before: the walled sunken garden (210, 686), sidewalks at bridge ends by the
     river wall. Naldo's slabs at the raised motorway approach are untouched by the branch.
   - `quayFill.js` and `gridIndexAt` use rows as H - 1 - r: check against the corrected map frame.
