@@ -38,8 +38,9 @@ when done, rewrite the "state" of the item you stop in. It does not replace the 
       442 held until the end; `abb0594` the road panel warns from 40 pieces (seven languages), never refuses on
       desktop (user's decision 2026-11-24: let people try, the reports are useful).
       Checked: unit tests (70,000 files; 5 GB through MapNG's reader), a six-piece level read by Python and by the
-      level list and loaded in the game, the road warning in the browser with the reported road. A sweep on
-      `7e241c3` was started (`scratch/fizz035/sweep_zip.json`): read it before main.
+      level list and loaded in the game, the road warning in the browser with the reported road. The sweep on
+      `7e241c3` is clean: 135 of 135 cells, identical to the previous clean sweep (`scratch/fizz035/sweep_zip.json`;
+      it builds single levels only, so the pieces' path is covered by the tests and the six-piece level above).
       **Not done / not proven:** the window's out-of-memory crash itself (no log; likely the backdrop download in
       the window for a 158 km level, `ensureExportData` in ExportPanel: move that step to the runner on desktop?);
       no level over 65,535 files has been built end to end yet (only the writer is tested past it); the merged
