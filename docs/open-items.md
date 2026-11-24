@@ -382,6 +382,9 @@ As of 2026-11-23:
       (3.96 m) agree, and every bridge way in five Tignes areas has the class of the roads at its ends. His
       picture shows a track about twice the deck's width: needs the place (which bridge) from him.
     - Seen on the way: a track's deck is bare concrete (no dirt on it).
+  - **Gallery fix seen in game 2026-11-24** (`fz_pigettes` as a 512 level, removed after): from the valley side a
+    level roof on its columns, the road straight through; from the driver's seat the road runs in with no rise
+    (`scratch/fizz035/pig_game_outside.jpg`, `pig_game_driver.jpg`). The funicular: not seen in game yet.
   - **Sweep, 2026-11-24, on b56d02d:** the 135-cell smoke matrix gives the same numbers in every cell as the last
     clean one (`scratch/fizz035/sweep_fizz1.json` against `scratch/sweep_frame.json`); the ten flags against the
     stored baselines are the same ten known ones. The smoke set has no avalanche gallery and no funicular, so it

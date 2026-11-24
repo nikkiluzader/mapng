@@ -7,6 +7,9 @@
 //   node scripts/sweep/fetchArea.mjs <name> <lat> <lng> [size=1024]   (MPP=1)
 //   node scripts/sweep/fetchArea.mjs --catalog [name...]   areas.json entries not yet fetched
 //   OSM_ONLY=1 node scripts/sweep/fetchArea.mjs <name> <lat> <lng> [size]   osm.json again, elevation kept
+//   REFRAME=1 node scripts/sweep/fetchArea.mjs --catalog <name>...   the heightmaps resampled again with today's code
+//       from the GeoTIFFs saved in the area's folder (no GPXZ request) and the 30 m tiles; osm.json kept. For a
+//       change to how a map is framed (2026-11: the exact frame). Then fetchMapterhorn.mjs for the areas with mh.
 //
 // Writes <MAPNG_AREAS>/<name>/{gpxz.tif, gpxz.f32, t30.f32, osm.json, meta.json}.
 // An area whose OSM came back near empty (an outage) is refused, not saved.
@@ -25,7 +28,7 @@ const args = process.argv.slice(2);
 let jobs;
 if (args[0] === '--catalog') {
   const want = new Set(args.slice(1));
-  jobs = areas().filter((a) => (!want.size || want.has(a.name)) && !fs.existsSync(path.join(AREAS_DIR, a.name, 'osm.json')));
+  jobs = areas().filter((a) => (!want.size || want.has(a.name)) && (process.env.REFRAME ? fs.existsSync(path.join(AREAS_DIR, a.name, 'osm.json')) : !fs.existsSync(path.join(AREAS_DIR, a.name, 'osm.json'))));
 } else {
   const [name, lat, lng, size] = args;
   if (!name || !Number.isFinite(+lat) || !Number.isFinite(+lng)) { console.error('usage: fetchArea.mjs <name> <lat> <lng> [size=1024] | --catalog [name...]'); process.exit(2); }
@@ -62,7 +65,25 @@ async function fetchOne({ name, lat, lng, size }) {
   // ── GPXZ ──
   // (T30_ONLY=1: no GPXZ, whose raster stops at 10 km² an account; the global 30 m alone)
   let gpxzSmooth = false, resolutions = [], gpxz = null, image = null, rasterRes = null;
-  if (!process.env.T30_ONLY) {
+  const REFRAME = !!process.env.REFRAME;
+  const old = REFRAME && fs.existsSync(`${OUT}/meta.json`) ? JSON.parse(fs.readFileSync(`${OUT}/meta.json`, 'utf8')) : null;
+  const savedTifs = REFRAME ? fs.readdirSync(OUT).filter((f) => /^gpxz(_\d+_\d+)?\.tif$/.test(f)).sort() : [];
+  if (REFRAME && savedTifs.length) {
+    // the saved rasters, resampled again: what a framing change needs, with no request to GPXZ
+    gpxzSmooth = !!old?.gpxzSmooth; resolutions = old?.resolutions || [];
+    const many = savedTifs.filter((f) => f !== 'gpxz.tif');
+    const tiles = [];
+    for (const f of many.length ? many : savedTifs) {
+      const buf = fs.readFileSync(`${OUT}/${f}`);
+      const tiff = await GeoTIFF.fromArrayBuffer(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+      const img = await tiff.getImage();
+      tiles.push({ image: img, raster: (await img.readRasters())[0] });
+      image = img;
+    }
+    rasterRes = image.getResolution();
+    gpxz = await resampleToMeterGrid({ type: 'geotiff', data: tiles }, center, SIZE, SIZE, 'bilinear', gpxzSmooth, true, bounds, true);
+    fs.writeFileSync(`${OUT}/gpxz.f32`, Buffer.from(gpxz.heightMap.buffer));
+  } else if (!process.env.T30_ONLY && !REFRAME) {
   {
     const latIn = (bounds.north - bounds.south) * 0.2, lngIn = (bounds.east - bounds.west) * 0.2;
     const cLat = (bounds.north + bounds.south) / 2, cLng = (bounds.east + bounds.west) / 2;
@@ -135,10 +156,11 @@ async function fetchOne({ name, lat, lng, size }) {
   const t30 = await resampleToMeterGrid({ type: 'sampler', sampler }, center, SIZE, SIZE, 'bilinear', smoothR >= 1 ? smoothR : false, true, bounds, true);
   fs.writeFileSync(`${OUT}/t30.f32`, Buffer.from(t30.heightMap.buffer));
 
-  fs.writeFileSync(`${OUT}/meta.json`, JSON.stringify({ name, center, size: SIZE, mpp: MPP, fetchBounds: bounds, bounds: (gpxz || t30).bounds, gpxzSmooth, resolutions, rasterRes, rasterSize: image ? [image.getWidth(), image.getHeight()] : null }, null, 1));
+  fs.writeFileSync(`${OUT}/meta.json`, JSON.stringify({ ...(old || {}), name, center, size: SIZE, mpp: MPP, fetchBounds: bounds, bounds: (gpxz || t30).bounds, gpxzSmooth, resolutions, rasterRes, rasterSize: image ? [image.getWidth(), image.getHeight()] : null }, null, 1));
   console.log(name, 'gpxz res', resolutions.map((r) => `${r.res}m ${r.src}`).join(', '), 'smooth', gpxzSmooth, 'raster', rasterRes, image?.getWidth(), image?.getHeight());
   }
 
+  if (process.env.REFRAME) { console.log(name, 'reframed: osm.json kept'); return; }
   // ── OSM ──
   const url = key('TRACESTRACK_API_URL');
   if (url) {
