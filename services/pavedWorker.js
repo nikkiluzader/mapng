@@ -22,6 +22,14 @@ export function pavedTile(item) {
     for (const ring of item.water) markPolygon(inW, g, ring, 1);
     for (let i = 0; i < cells.length; i++) if (inW[i]) cells[i] &= ~(WALK | GAP);
   }
+  // (nor over an at-grade track bed: a footway over a level crossing and a street's sidewalk at one were paved as
+  // raised slabs with curbs across the rails, a car crashed into one (SPLATPLAYS, Perth, 2026-11-24). The paving
+  // stops at the bed's edge; the ground between runs flush)
+  if (item.railBeds?.length) {
+    const inB = new Uint8Array(cells.length);
+    for (const ring of item.railBeds) markPolygon(inB, g, ring, 1);
+    for (let i = 0; i < cells.length; i++) if (inB[i]) cells[i] &= ~(WALK | GAP);
+  }
   // (nor across a river's channel: its bed is dug after the sidewalks, and paving over it floated over the dug bed)
   if (item.rivers?.length) {
     const inR = new Uint8Array(cells.length);

@@ -64,6 +64,9 @@ export const POLE_TYPES = {
   // where a tower line leaves a building's roof (a powerhouse, a substation hall): no model, the seven wires
   // brought down to a row across the line just over the roof
   roof_anchor: { shape: null, top: 0, wires: [[0, -4.1, 1.2], [0, 4.1, 1.2], [0, -2.7, 1.2], [0, 2.7, 1.2], [0, -1.3, 1.2], [0, 1.3, 1.2], [0, 0, 1.2]], yawOffset: -Math.PI / 2, maxSpan: 600, sag: 0.022 },
+  // a power line carried on poles (power=line whose nodes are power=pole: sub-transmission, 33 to 66 kV): the tall
+  // wooden pole, spanning further than a street's wires
+  line_pole: { shape: 'poleWoodTall', top: 13.5, wires: [[0, 0.75, 13.3], [0, 0.75, 12.57], [0, 0.75, 11.85]], yawOffset: Math.PI / 2, lampZ: 9.5, maxSpan: 250, sag: 0.008 },
   tower: { shape: 'towerLattice', top: 29.9, base: 4, wires: [[0, -4.1, 15.7], [0, 4.1, 15.7], [0, -4.1, 20.45], [0, 4.1, 20.45], [0, -4.1, 25.2], [0, 4.1, 25.2], [0, 0, 29.9]], yawOffset: -Math.PI / 2, maxSpan: 600, sag: 0.022 },
 };
 // [type, weight] by region
@@ -82,6 +85,19 @@ export function isTowerLine(tags = {}) {
   if (tags.power !== 'line') return false;
   const volts = String(tags.voltage || '').split(/[;,/]/).map((v) => Number.parseFloat(v)).filter(Number.isFinite);
   return !volts.length || Math.max(...volts) >= 100000;
+}
+
+/**
+ * Each vertex's support on a mapped line: its own node's tag first (power=tower: a lattice tower; power=pole: a pole),
+ * an untagged vertex as most of the line's tagged ones, and only a line with no tagged vertex by its own tags
+ * (isTowerLine). poleType: the pole for the line's pole vertices. -> ['tower' | poleType, ...]
+ */
+export function lineSupportTypes(line, poleType) {
+  const sup = line.supports || [];
+  let towers = 0; let poles = 0;
+  for (const s of sup) { if (s === 'tower') towers++; else if (s === 'pole') poles++; }
+  const fallback = towers || poles ? (towers > poles ? 'tower' : poleType) : isTowerLine(line.tags) ? 'tower' : poleType;
+  return Array.from({ length: line.length }, (_, i) => (sup[i] === 'tower' ? 'tower' : sup[i] === 'pole' ? poleType : fallback));
 }
 
 /**
@@ -458,10 +474,13 @@ export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, he
   const poles = [];
   const wires = [];
   const nearMappedLine = lineIndex(mapped.powerLines || []);
+  const placedAt = new Map();
   // Mapped low-voltage lines: a pole at every vertex, cross-arm across the line.
   for (const line of mapped.powerLines || []) {
-    // (a high-voltage line: a lattice tower at every vertex, as OSM maps them)
-    const type = isTowerLine(line.tags) ? 'tower' : choosePoleType({ lat, lon, tags: line.tags || {}, seed: `line:${line.id ?? line[0]?.join(',')}` });
+    // (each vertex as its node is mapped, power=tower or power=pole; untagged ones as the rest of the line, a line
+    // with none tagged by its own tags: lineSupportTypes. A power=line on poles gets the tall line pole)
+    const poleType = line.tags?.power === 'line' ? 'line_pole' : choosePoleType({ lat, lon, tags: line.tags || {}, seed: `line:${line.id ?? line[0]?.join(',')}` });
+    const types = lineSupportTypes(line, poleType);
     let run = [];
     for (let i = 0; i < line.length && poles.length < maxPoles; i++) {
       // (a vertex on a building or on water, or where a deck is in the way: nothing stands there, and the wires
@@ -470,15 +489,22 @@ export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, he
       const b = line[Math.min(line.length - 1, i + 1)];
       const along = Math.atan2(b[1] - a[1], b[0] - a[0]);
       const [x, y, z] = line[i];
-      const on = line.blocked?.[i];
+      const type = types[i];
+      // (inside a building or on water: nothing stands; within a tower's base of a wall: a tower does not either)
+      const on = type === 'tower' ? (line.nearWall?.[i] ?? line.blocked?.[i]) : line.blocked?.[i];
       // (a tower line's vertex on a building: the wires go to its roof, no tower inside it)
       if (type === 'tower' && Number.isFinite(on)) { run.push({ x, y, z: (z ?? heightAt(x, y)) + on, yaw: along + Math.PI / 2, lamp: false, type: 'roof_anchor' }); continue; }
       // (a tower's 7.8 m base clear of any deck, from a little under its foot to its peak: at the Hoover Dam two towers
       // mapped beside a road bridge stood through its deck, the check made at their centre alone)
       const base = POLE_TYPES[type].base || 0; const gz = z ?? heightAt(x, y);
       if (on || isBlocked(x, y, gz - (base ? 2 : 0), gz + POLE_TYPES[type].top, base || undefined)) { wires.push(...wireLines(run)); run = []; continue; }
+      // (a node two lines share, a minor line leaving a power line's pole: one support, both lines' wires on it)
+      const key = `${Math.round(x)},${Math.round(y)}`;
+      const shared = placedAt.get(key);
+      if (shared && fastHypot(shared.x - x, shared.y - y) < 1) { run.push(shared); continue; }
       const pole = { x, y, z: z ?? heightAt(x, y), yaw: along + Math.PI / 2, lamp: false, type };
       poles.push(pole);
+      placedAt.set(key, pole);
       run.push(pole);
     }
     wires.push(...wireLines(run));

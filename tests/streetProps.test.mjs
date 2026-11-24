@@ -206,3 +206,30 @@ test('a pole, unlike a tower, still stands beside that deck: the margin is the t
     isBlocked: (x, y, z, zTop, margin = 1) => Math.abs(x - 4.5) <= 1 + margin && z < 4 && zTop > 4 });
   assert.equal(r.poles.length, 1);
 });
+
+// (SPLATPLAYS, Perth 2026-11-24: power=line with no voltage on power=pole nodes came out as lattice towers, and a
+// pole beside a house wall had its wires run to a roof that was not there)
+test('a power line\'s supports follow their own nodes: pole nodes get poles, tower nodes towers, untagged ones the line\'s majority', () => {
+  const at = (n) => Array.from({ length: n }, (_, i) => [i * 90, 0, 0]);
+  const onPoles = Object.assign(at(5), { tags: { power: 'line' }, supports: ['pole', 'pole', null, 'pole', 'pole'] });
+  const a = placeStreetProps({ carriageways: [], runs: [], mapped: { powerLines: [onPoles] }, heightAt: () => 0, countryPoles: false });
+  assert.deepEqual(a.poles.map((p) => p.type), ['line_pole', 'line_pole', 'line_pole', 'line_pole', 'line_pole']);
+  assert.ok(a.wires.length >= 4 * 3, 'wires on every 90 m span');
+  const mixed = Object.assign(at(4), { tags: { power: 'line' }, supports: ['tower', 'pole', null, 'tower'] });
+  assert.deepEqual(placeStreetProps({ carriageways: [], runs: [], mapped: { powerLines: [mixed] }, heightAt: () => 0, countryPoles: false }).poles.map((p) => p.type), ['tower', 'line_pole', 'tower', 'tower']);
+  const untagged = Object.assign(at(3), { tags: { power: 'line', voltage: '66000' } });
+  assert.ok(placeStreetProps({ carriageways: [], runs: [], mapped: { powerLines: [untagged] }, heightAt: () => 0, countryPoles: false }).poles.every((p) => p.type !== 'tower'), 'under 100 kV with no node tags: poles, as before');
+  const hv = Object.assign(at(3), { tags: { power: 'line' } });
+  assert.ok(placeStreetProps({ carriageways: [], runs: [], mapped: { powerLines: [hv] }, heightAt: () => 0, countryPoles: false }).poles.every((p) => p.type === 'tower'), 'no voltage, no node tags: towers, as before');
+});
+
+test('a pole beside a wall stands (the wall clearance is a tower\'s); two lines sharing a node share one support', () => {
+  const line = Object.assign([[0, 0, 0], [40, 0, 0], [80, 0, 0]], { tags: { power: 'line' }, supports: ['pole', 'pole', 'pole'], blocked: [false, false, false], nearWall: [false, 6, false] });
+  const minor = Object.assign([[40, 0, 0], [40, 40, 0]], { tags: { power: 'minor_line' }, supports: ['pole', 'pole'] });
+  const r = placeStreetProps({ carriageways: [], runs: [], mapped: { powerLines: [line, minor] }, heightAt: () => 0, countryPoles: false });
+  assert.equal(r.poles.length, 4, 'three on the line (none skipped by the wall), one more for the minor line');
+  assert.ok(!r.poles.some((p) => p.type === 'roof_anchor'));
+  const towerLine = Object.assign([[0, 0, 0], [300, 0, 0], [600, 0, 0]], { tags: { power: 'line' }, supports: ['tower', 'tower', 'tower'], blocked: [false, false, false], nearWall: [false, 6, false] });
+  const t = placeStreetProps({ carriageways: [], runs: [], mapped: { powerLines: [towerLine] }, heightAt: () => 0, countryPoles: false });
+  assert.equal(t.poles.filter((p) => p.type === 'tower').length, 2, 'a tower beside the wall still gives way to it');
+});

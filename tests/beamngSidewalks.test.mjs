@@ -853,3 +853,22 @@ test('a road bridge\'s mapped sidewalks overlapping its drawn lanes are set out 
     assert.ok(off.every((v) => Math.abs(v - 0.15) < 0.04), `a curb over the deck: ${Math.min(...off).toFixed(2)}..${Math.max(...off).toFixed(2)}`);
   }
 });
+
+// (SPLATPLAYS, Perth 2026-11-24: a footway over a level crossing was a raised slab with curbs across the rails)
+test('a walk crossing an at-grade track bed stops at its edges; the paved model clears the bed too', async () => {
+  const { buildWalkRuns } = await import('../services/beamngSidewalks.js');
+  const { pavedTile } = await import('../services/pavedWorker.js');
+  const s = street({ tags: {}, nodes: Array.from({ length: 21 }, (_, i) => [-100 + i * 10, 0, 5, 8]) });
+  const nodes = Array.from({ length: 41 }, (_, i) => [-40 + i * 2, 10, 0]);
+  const bed = [[-3, -50], [3, -50], [3, 50], [-3, 50]];   // a track running north-south through x = 0, 6 m bed
+  const without = buildWalkRuns([{ nodes, half: 1, sidewalk: true }], [s], { groundAt: () => 5 });
+  assert.equal(without.length, 1);
+  const runs = buildWalkRuns([{ nodes, half: 1, sidewalk: true }], [s], { groundAt: () => 5, railBeds: [bed] });
+  assert.equal(runs.length, 2, 'cut in two at the bed');
+  for (const r of runs) for (const q of r.centre) assert.ok(Math.abs(q[0]) >= 2.9, `no slab point on the bed (x ${q[0].toFixed(2)})`);
+  // the paved area's tile: a walk across the bed, paving cleared over it
+  const item = { box: [-20, 0, 20, 20], roads: [], cornerArcs: [], walks: [{ pts: nodes.map((q) => [q[0], q[1]]), half: 1 }], streetWalks: [], greenery: [], buildings: [] };
+  const paved = (it) => { const { cells, g } = pavedTile(it); let onBed = 0; for (let r = 0; r < g.h; r++) for (let c = 0; c < g.w; c++) { const x = g.x0 + (c + 0.5) * g.res; if (Math.abs(x) < 2.9 && cells[r * g.w + c]) onBed++; } return onBed; };
+  assert.ok(paved(item) > 0, 'without beds the walk is paved across');
+  assert.equal(paved({ ...item, railBeds: [bed] }), 0, 'with the bed, nothing paved on it');
+});

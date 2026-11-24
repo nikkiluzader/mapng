@@ -799,8 +799,10 @@ function splitRunsWhereBlocked(runs, blocked) {
   return out;
 }
 
-export function buildSidewalkRuns(carriageways, { zones = [], driveways = [], medians = new Map(), buildings = [], footways = [], parking = [], walkEnds = [], openGround = [], houses = [] } = {}) {
+export function buildSidewalkRuns(carriageways, { zones = [], driveways = [], medians = new Map(), buildings = [], footways = [], parking = [], walkEnds = [], openGround = [], houses = [], railBeds = [] } = {}) {
   const index = buildCarriagewayIndex(carriageways);
+  // (an at-grade track bed: no slab across the rails, the sidewalk stops at its edge)
+  const onRail = railBeds?.length ? buildingIndex(railBeds) : () => false;
   const sidesOf = streetSides(carriageways, footways);
   // Driveways and parking aisles (OSM service roads, not carriageways of
   // their own) cross a sidewalk with its curb lowered: a dip, not a cut.
@@ -862,7 +864,7 @@ export function buildSidewalkRuns(carriageways, { zones = [], driveways = [], me
   for (const cw of carriageways) {
     const sides = sidesOf.get(cw);
     const ignore = sameStreet.get(cw.owner);
-    const blocked = (x, y) => carriagewaysAt(index, x, y, CUT_MARGIN_M, { sides: true }).some((c) => !ignore.has(c.owner));
+    const blocked = (x, y) => onRail(x, y) || carriagewaysAt(index, x, y, CUT_MARGIN_M, { sides: true }).some((c) => !ignore.has(c.owner));
     const curb = fwIndex ? sidewalkSides({ ...cw, tags: {} }).left : 0;
     for (const [side, width] of [[1, sides.left], [-1, sides.right]]) {
       // a divided road's median side has the median, not a sidewalk
@@ -1841,8 +1843,10 @@ function apronsOf(run, cells, { groundAt = null, seaZ = -Infinity, clear = () =>
  * drawn footways [{ nodes, half, sidewalk }]: those tagged footway=sidewalk, and
  * any other running along a street (a park's walks stay on the terrain).
  */
-export function buildWalkRuns(paths, carriageways, { groundAt, driveways = [], buildings = [], walls = [], parking = [], water = [], seaZ = -Infinity } = {}) {
+export function buildWalkRuns(paths, carriageways, { groundAt, driveways = [], buildings = [], walls = [], parking = [], water = [], seaZ = -Infinity, railBeds = [] } = {}) {
   if (!groundAt) return [];
+  // (a footway over a level crossing: its slab stops at the track bed, the ground between runs flush)
+  const onRail = railBeds?.length ? buildingIndex(railBeds) : () => false;
   const inWater = water?.length ? buildingIndex(water) : () => false;
   const index = buildCarriagewayIndex(carriageways);
   const inBuilding = buildings?.length ? buildingIndex(buildings) : () => false;
@@ -2053,7 +2057,7 @@ export function buildWalkRuns(paths, carriageways, { groundAt, driveways = [], b
     };
     // (not a crosswalk's zone: it reaches a metre past the curb, and cut a
     // sidewalk running along the curb past the crossing; on the road is enough)
-    const blocked = (x, y) => sideOn(x, y) || isOnOtherCarriageway(index, x, y, 0, () => false) || inBuilding(x, y) || inParking(x, y) || groundAt(x, y) < seaZ + WALK_SHORE_M;
+    const blocked = (x, y) => sideOn(x, y) || isOnOtherCarriageway(index, x, y, 0, () => false) || inBuilding(x, y) || inParking(x, y) || onRail(x, y) || groundAt(x, y) < seaZ + WALK_SHORE_M;
     for (const piece of bridgeCorners(cutNodes(line, blocked, { minPieceM: 0.5 }), (x, y) => blocked(x, y) || isOnOtherCarriageway(index, x, y, WALK_ROAD_M, () => false), half)) {
       // (a crossing's landing between the sidewalk and the curb can be short)
       if (runLength(piece) < (chosen[k].crossing ? WALK_LANDING_M : WALK_MIN_M)) continue;
@@ -3624,6 +3628,8 @@ function* sidewalkMeshes(carriageways, options = {}) {
       seaMask: options.seaMask || null,
       walkH: WALK_H,
       riverChannels: options.riverChannels || [],
+      // (at-grade track beds: the paved area, which reads the mapped walks whole, cleared over them too)
+      railBeds: options.railBeds || [],
       houses: options.houses || [],
       carriageways, corners, walks: options.walks || [], runs, openGround: options.openGround || [], buildings: options.buildings || [], driveways: options.driveways || [],
       curbH: CURB_H, crossSlope: CROSS_SLOPE, curbOnlyM: CURB_ONLY_M, THREE, groundAt: options.groundAt || null,

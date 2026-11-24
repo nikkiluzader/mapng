@@ -10769,6 +10769,27 @@ function besideDeckAt(bridgeDecks = []) {
     return false;
   };
 }
+/** At-grade track beds as world-space quads, one per segment: [[x, y], x4] (railways.js railHalfWidth + RAIL_BED_PAD_M). */
+const RAIL_BED_PAD_M = 0.3;
+function railBedRings(features, toWorld) {
+  const rings = [];
+  for (const f of features || []) {
+    const t = f?.tags || {};
+    if (f?.type !== 'railway' || !railKindOf(t) || t.highway || !(f.geometry?.length >= 2)) continue;
+    if ((t.bridge && t.bridge !== 'no') || (t.tunnel && t.tunnel !== 'no') || t.covered === 'yes') continue;
+    const half = railHalfWidth(t) + RAIL_BED_PAD_M;
+    const P = f.geometry.map(toWorld);
+    for (let i = 0; i + 1 < P.length; i++) {
+      const [ax, ay] = P[i]; const [bx, by] = P[i + 1];
+      const L = Math.hypot(bx - ax, by - ay); if (L < 1e-3) continue;
+      const ux = (bx - ax) / L; const uy = (by - ay) / L; const nx = -uy * half; const ny = ux * half;
+      // (a little past each end, so the quads of a bend overlap)
+      const ex = ux * 0.5; const ey = uy * 0.5;
+      rings.push([[ax - ex + nx, ay - ey + ny], [bx + ex + nx, by + ey + ny], [bx + ex - nx, by + ey - ny], [ax - ex - nx, ay - ey - ny]]);
+    }
+  }
+  return rings;
+}
 function collectMappedStreetProps(terrainData, squareSize) {
   const out = { hydrants: [], bins: [], benches: [], poles: [], powerLines: [] };
   const toWorld = (p) => {
@@ -10783,7 +10804,10 @@ function collectMappedStreetProps(terrainData, squareSize) {
       const t = f.tags || {}; const h = Number.parseFloat(t.height); const levels = Number.parseFloat(t['building:levels']);
       return { g: f.geometry, s, n, w, e, on: f.type === 'water' ? 'water' : Number.isFinite(h) && h > 2 ? h : Number.isFinite(levels) && levels > 0 ? levels * 3.2 : 9 };
     });
-  const onBuildingOrWater = (p) => {
+  // (inside: on water or inside a building, no support of any kind stands there. nearWall: only within a lattice
+  // tower's base of a wall, where a pole stands fine: street poles beside a house fence were caught by the tower's
+  // clearance and their wires ran to a point over a roof that was not there (SPLATPLAYS, Perth, 2026-11-24))
+  const onBuildingOrWater = (p, { towerClear = true } = {}) => {
     for (const r of solids) {
       if (p.lat < r.s || p.lat > r.n || p.lng < r.w || p.lng > r.e) continue;
       let inside = false;
@@ -10795,6 +10819,7 @@ function collectMappedStreetProps(terrainData, squareSize) {
     }
     // (beside a building's wall, within a tower's own base: the tower would stand in the wall. Hoover Dam's
     // powerhouse: seven mapped 3 to 4 m outside its outline stood inside it)
+    if (!towerClear) return false;
     const kx = 111320 * Math.cos((p.lat * Math.PI) / 180); const ky = 110574; const m = TOWER_BASE_CLEAR_M;
     for (const r of solids) {
       if (r.on === 'water' || p.lat < r.s - m / ky || p.lat > r.n + m / ky || p.lng < r.w - m / kx || p.lng > r.e + m / kx) continue;
@@ -10806,6 +10831,14 @@ function collectMappedStreetProps(terrainData, squareSize) {
     }
     return false;
   };
+  // (each line vertex's own support as mapped: power=tower, power=pole, else null. A line tagged power=line is not
+  // always on towers: SPLATPLAYS's Perth lines, power=line with no voltage, run on power=pole nodes and came out as
+  // lattice towers at every vertex)
+  const supportAt = new Map();
+  for (const f of terrainData.osmFeatures || []) {
+    const pw = f?.tags?.power;
+    if ((pw === 'pole' || pw === 'tower') && f.geometry?.length === 1) supportAt.set(`${f.geometry[0].lat.toFixed(7)},${f.geometry[0].lng.toFixed(7)}`, pw);
+  }
   for (const f of terrainData.osmFeatures || []) {
     const tags = f.tags || {};
     if (f.type === 'power_line') {
@@ -10814,7 +10847,12 @@ function collectMappedStreetProps(terrainData, squareSize) {
         // (its tags along: a line's material / height picks its poles)
         // (a vertex on water: nothing stands there. On a building, a line leaving a powerhouse or a substation hall:
         // no tower inside it, the wires run to its roof; `blocked` is 'water' or the roof's height over the ground)
-        out.powerLines.push(Object.assign(f.geometry.map(toWorld), { tags, id: f.id, blocked: f.geometry.map((p) => onBuildingOrWater(p)) }));
+        out.powerLines.push(Object.assign(f.geometry.map(toWorld), {
+          tags, id: f.id,
+          blocked: f.geometry.map((p) => onBuildingOrWater(p, { towerClear: false })),
+          nearWall: f.geometry.map((p) => onBuildingOrWater(p)),
+          supports: f.geometry.map((p) => supportAt.get(`${p.lat.toFixed(7)},${p.lng.toFixed(7)}`) || null),
+        }));
       }
       continue;
     }
@@ -14641,6 +14679,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
             heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
             minHeight: Number(exportTerrainData.minHeight) || 0, worldSize: exportTerrainData.width * squareSize,
           }, exportTerrainData.landCover, -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0), { coarse: !!terrainData?.coarseElevation, coast: coastLinesOf(exportTerrainData, squareSize) }); } catch { return null; } })() : null;
+  const sidewalkRailBeds = includeRoads && includeSidewalks ? railBedRings(exportTerrainData.osmFeatures, (p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0)) : [];
+  if (includeRoads && includeSidewalks) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Sidewalks: ${sidewalkRailBeds.length} at-grade track bed piece(s) kept clear of raised slabs (a path or sidewalk crossing the rails stops at the bed's edge).`);
   // (the walkway tops on worker threads in the desktop app; here otherwise)
   const sidewalks = includeRoads && includeSidewalks
     ? await buildSidewalkMeshesParallel(groundWithRings, {
@@ -14652,6 +14692,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         // (and each tunnel's tube and approach cutting: the paving does not know the tunnel's lane, its carriageway
         // being no ground road, and laid a curbed slab across the D 87A in its box's mouth)
         .concat(tunnelFootprints(tunnelList)),
+      // (at-grade track beds: no raised slab across the rails. A footway over a level crossing and a street's
+      // sidewalk at one were built as curbed slabs over the tracks, a car crashed into one (SPLATPLAYS, Perth,
+      // 2026-11-24); the path stops at the bed's edge, the ground between runs flush. Not a track on a bridge or in a
+      // tunnel, not a tram running in its street)
+      railBeds: sidewalkRailBeds,
       // driveways and parking aisles: the curb lowered where they cross
       driveways: (exportTerrainData.osmFeatures || [])
         .filter((f) => f.type === 'road' && f.tags?.highway === 'service' && f.geometry?.length > 1)
