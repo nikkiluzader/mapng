@@ -15749,7 +15749,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     });
     // (a test hook, as __MAPNG_STRUCT_DEBUG: the runs, for a map of the walls)
     if (typeof globalThis.__MAPNG_WALL_DEBUG === 'function') globalThis.__MAPNG_WALL_DEBUG(runs);
-    if (runs.loneSkipped > 0) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Wing walls: ${runs.loneSkipped} short run(s) standing by themselves along an approach, away from the deck's end, left out.`);
+    if (runs.gentleSkipped > 0) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Wing walls: ${runs.gentleSkipped} station(s) over the ground beside them but along a bank the terrain draws cleanly (the run's typical side drops less than 1.2 m within a square): no wall.`);
+    if (runs.loneSkipped > 0) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Wing walls: ${runs.loneSkipped} run(s) under 4 m long left out (a stub, not a wall).`);
     const mesh = buildWingWallMesh(runs, PLAZA_MATERIAL('concrete'), plazaTileM('concrete'));
     if (mesh) {
       sidewalks.meshes.push(mesh);

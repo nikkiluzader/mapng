@@ -364,10 +364,14 @@ As of 2026-11-23:
   - **(3) bridge spikes [16]: part done on dev; bridge width [06]: not reproduced.** Seen in game on a small level
     (new area `fz_trackbridge`, 512, a 10 m track bridge; shots `scratch/fizz035/tb_before_after.jpg`).
     - The "spikes" are the wing-wall blocks at bridge ends (new in 0.3.3, `services/structures/wingWalls.js`): a
-      slab 3.3 m out from the road's edge, as built. A short one standing by itself along the approach, away from
-      the deck, is now left out (under 10 m and never within 6 m of the deck's end; logged). Gone in game.
-    - **Open, the user's call:** the block at the deck's end is still a 4 m by 4 m slab beside a 3.6 m track. A
-      narrower wall would show the terrain's steep toothed side again (why the block is that wide).
+      slab 3.3 m out from the road's edge wherever the road stood 0.8 m over the ground beside it. **Changed on dev
+      2026-11-24 (the user left the choice to me):** a run of wall is built only where its side is really steep
+      (the run's middle station drops 1.2 m within one terrain square), and never under 4 m long. Wall length on
+      Mapterhorn, before -> after: `fz_trackbridge` 38 m -> 0, `kingst` 16 m -> 0, `ams_centraal` 75 m in 19 runs
+      -> 34 m in 3, `naldo` 1030 m -> 927 m (the tall approaches keep theirs). In game on the small level: both
+      track bridges clean, banks as plain ground (`scratch/fizz035/tb_wingwalls.jpg`).
+      Not looked at in game: a city's tall approach (naldo) after the change; a second sweep (the checks do not
+      measure walls).
     - Width: on this bridge the deck (3.6 m road + 0.45 m each side for the parapets) and the track drawn on it
       (3.96 m) agree, and every bridge way in five Tignes areas has the class of the roads at its ends. His
       picture shows a track about twice the deck's width: needs the place (which bridge) from him.

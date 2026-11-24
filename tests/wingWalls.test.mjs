@@ -115,19 +115,27 @@ test('no wing walls in the mouth of a junction at a deck end', () => {
   for (const q of onRoad) for (const d of [q.inner, q.outer - 0.3]) assert.ok(!armPavement(q.x + q.nx * d, q.y + q.ny * d, 1), 'a block on an arm');
 });
 
-// A short block by itself along the approach, away from the deck's end, is no wall: a lump of concrete in the grass
-// (a 4 m one stood by a track's junction 20 m from a small bridge at Val d'Isère). One at the deck's end stays,
-// however short, and so does a long one further out.
-test('a short stretch of steep side away from the deck gets no block; the wing at the deck does', () => {
-  // the fill's side steep only at x = 30..36 (24 m from the deck) and from x = 50 to the deck at 60
-  const patchy = (x, y) => (Math.abs(y) <= 5.01 ? 4 : (x >= 30 && x <= 36) || x >= 50 ? 0 : Math.max(0, 4 - Math.max(0, Math.abs(y) - 5) / 2));
+// A metre or two of block is a tooth, not a wall: runs under 4 m are left out, at the deck's end or away from it.
+test('a stub of wall under 4 m is left out; a longer run stays', () => {
+  // the fill's side steep only at x = 30..32 (a stub) and from x = 50 to the deck at 60
+  const patchy = (x, y) => (Math.abs(y) <= 5.01 ? 4 : (x >= 30 && x <= 32) || x >= 50 ? 0 : Math.max(0, 4 - Math.max(0, Math.abs(y) - 5) / 2));
   const runs = wingWallRuns(graph(), { groundAt: patchy });
-  assert.equal(runs.loneSkipped, 2, 'the short stray block left out on both sides');
+  assert.equal(runs.loneSkipped, 2, 'the stub left out on both sides');
   assert.equal(runs.length, 2);
   for (const r of runs) assert.ok(Math.min(...r.stations.map((q) => q.x)) >= 44, 'only the wing at the deck');
-  // the same stray stretch 30 m long: a wall
-  const long = (x, y) => (Math.abs(y) <= 5.01 ? 4 : (x >= 4 && x <= 36) || x >= 50 ? 0 : Math.max(0, 4 - Math.max(0, Math.abs(y) - 5) / 2));
-  const kept = wingWallRuns(graph(), { groundAt: long });
-  assert.equal(kept.loneSkipped, 0);
-  assert.equal(kept.length, 4);
+});
+
+// A bank the terrain draws cleanly needs no wall: beside a small track bridge the ground fell 0.9 m over 2.5 m and
+// lay level from there, and a 4 m slab stood over it. A wall stands only where the side drops 1.2 m within a square.
+test('a gentle bank beside the road at the deck gets no wall; a steep side does', () => {
+  const bank = (x, y) => (Math.abs(y) <= 4 ? 4 : Math.max(3.1, 4 - 0.36 * (Math.abs(y) - 4)));   // 0.9 m down over 2.5 m
+  const gentle = wingWallRuns(graph(), { groundAt: bank });
+  assert.equal(gentle.length, 0);
+  assert.ok(gentle.gentleSkipped > 0, 'counted for the log');
+  // a hillside falling away at 40 degrees from the road's edge: the terrain's own slope, no block on it
+  const hill = (x, y) => (Math.abs(y) <= 4 ? 4 : 4 - 0.84 * (Math.abs(y) - 4));
+  assert.equal(wingWallRuns(graph(), { groundAt: hill }).length, 0);
+  // the fill's side dropping 3 m in 2 m: walls
+  const steep = (x, y) => (Math.abs(y) <= 5 ? 4 : Math.max(1, 4 - 1.5 * (Math.abs(y) - 5)));
+  assert.equal(wingWallRuns(graph(), { groundAt: steep }).length, 2);
 });

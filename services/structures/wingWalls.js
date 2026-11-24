@@ -17,8 +17,8 @@ const WALL_MIN_DROP_M = 0.8;            // the road this far over the ground bes
 const APPROACH_M = 120;                 // further along the approach a wall stands only where the side is steep ...
 const STEEP_DROP_M = 1.2;               // ... this much of drop ...
 const STEEP_WITHIN_M = 1.5;             // ... within this of the shoulder's edge (a 1 in 2 slope drops 0.75 m there)
-const WING_AT_DECK_M = 6;              // a run that comes this near a deck's end is that deck's wing wall ...
-const LONE_MIN_M = 10;                 // ... any other run shorter than this is left out
+const WING_STEEP_M = 1.2;               // the side falls this much within one terrain square: steep, a wall
+const STUB_MIN_M = 4;                  // no run shorter than this
 const WALL_UNDER_EDGE_M = 0.05;         // the block starts this far under the road's drawn edge (no slot between them)
 const WALL_PAST_M = 0.3;                // ... and ends this far past the steep strip
 const WALL_TOP_M = 0.03;                // its top over the road's height
@@ -98,6 +98,7 @@ export function wingWallRuns(graph, { groundAt, onOtherRoad = () => false, shoul
   const { kindOf, toDeck } = deckDistancesThrough(graph, APPROACH_M);
   const runs = [];
   let loneSkipped = 0;
+  let gentleSkipped = 0;
   graph.edges.forEach((e, k) => {
     if (e.rail || !z[k]) return;   // (a railway's fill near its bridge: left, the track bed has its own ballast shoulders)
     // (a road the export does not draw (a private garage ramp at layer -1 in Tignes): no wall standing in the grass)
@@ -105,14 +106,16 @@ export function wingWallRuns(graph, { groundAt, onOtherRoad = () => false, shoul
     const n = e.s.length;
     for (const side of [1, -1]) {
       let run = null;
-      // (a short block standing by itself along the approach, off the deck's end: no wall, a lump of concrete in
-      // the grass. A 4 m one stood beside a track's junction 20 m from a 10 m bridge at Val d'Isère)
+      // (a stub: a metre or two of block is a tooth, not a wall. They stood at junction corners and deck ends, 17 of
+      // Amsterdam Centraal's 19 runs)
       const close = () => {
         if (run && run.stations.length >= 2) {
           const st = run.stations;
           let len = 0;
           for (let j = 1; j < st.length; j++) len += fastHypot(st[j].x - st[j - 1].x, st[j].y - st[j - 1].y);
-          if (run.nearDeck > WING_AT_DECK_M && len < LONE_MIN_M) loneSkipped++;
+          const steeps = st.map((q) => q.steep).sort((p, q) => p - q);
+          if (len < STUB_MIN_M) loneSkipped++;
+          else if (!(steeps[steeps.length >> 1] >= WING_STEEP_M)) gentleSkipped += st.length;
           else runs.push(run);
         }
         run = null;
@@ -151,6 +154,24 @@ export function wingWallRuns(graph, { groundAt, onOtherRoad = () => false, shoul
         if (beside) { const m = (Math.max(inner0, Math.min(core, outer - 0.1)) + outer) / 2; gMid = Math.min(groundAt(e.x[i] + nx * m, e.y[i] + ny * m), groundAt(e.x[i] + nx * (outer - 0.4), e.y[i] + ny * (outer - 0.4))); }
         if (beside) gOut = gMid;
         if (!Number.isFinite(zr) || !Number.isFinite(gOut) || zr - Math.min(gOut, gMid) < WALL_MIN_DROP_M) { close(); continue; }
+        // (a wall only where the side is steep: a drop of WING_STEEP_M within one terrain square somewhere under the
+        // block. A bank the terrain draws cleanly needs none: beside a 10 m track bridge at Val d'Isère the ground
+        // fell 0.9 m over 2.5 m and lay level from there, and a 4 m by 4 m slab stood over it; along a track on a
+        // hillside the blocks stood on the 40 degree slope itself, 26 m of them)
+        // (judged over the whole run, by its middle station's steepness: station by station a real wall was cut
+        // into stubs wherever one station read a little under the mark)
+        let steepest = Infinity;
+        if (!beside) {
+          const win = Math.max(1, shoulderM);
+          steepest = 0;
+          let prev = groundAt(e.x[i] + nx * inner0, e.y[i] + ny * inner0);
+          for (let d = inner0 + win / 2; d <= outer + win / 2 + 1e-6; d += win / 2) {
+            const gd = groundAt(e.x[i] + nx * d, e.y[i] + ny * d);
+            const gn = groundAt(e.x[i] + nx * (d + win / 2), e.y[i] + ny * (d + win / 2));
+            steepest = Math.max(steepest, prev - gn);
+            prev = gd;
+          }
+        }
         // (past the wing itself, only where the fill's side has no slope: the terrain could not spread it, a
         // raised carriageway beside a quay street or beside its own other carriageway. Copenhagen's Torvegade:
         // two strips 2.5 m over the ground, vertical sides and a 2.3 m trench between them, 60 m long)
@@ -169,15 +190,15 @@ export function wingWallRuns(graph, { groundAt, onOtherRoad = () => false, shoul
             .some(([px, py, d]) => onOtherRoad(px + nx * d, py + ny * d, k));
           if (hits) { close(); continue; }
         }
-        run ||= { edge: k, side, stations: [], nearDeck: Infinity };
-        run.nearDeck = Math.min(run.nearDeck, toDeck[k][i]);
+        run ||= { edge: k, side, stations: [] };
         // (no parapet where the block fills the gap to another road's pavement: a median, not an edge)
-        run.stations.push({ x: e.x[i], y: e.y[i], z: zr, nx, ny, inner: inner0, outer, foot: Math.min(gOut, gMid) - WALL_FOOT_M, parapet: median ? 0 : PARAPET_H_M });
+        run.stations.push({ x: e.x[i], y: e.y[i], z: zr, nx, ny, inner: inner0, outer, foot: Math.min(gOut, gMid) - WALL_FOOT_M, parapet: median ? 0 : PARAPET_H_M, steep: steepest });
       }
       close();
     }
   });
   runs.loneSkipped = loneSkipped;
+  runs.gentleSkipped = gentleSkipped;
   return runs;
 }
 
