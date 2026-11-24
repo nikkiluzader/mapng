@@ -56,9 +56,10 @@ when done, rewrite the "state" of the item you stop in. It does not replace the 
       `__mergeMoved`, `__mergeTail`). **The sideways move is limited to city streets' slip roads:** freeway and
       trunk ramps at a road's end are left as drawn, because a single-point interchange in Phoenix came out
       differently laid (`scratch/fizz035/dp_zoom_cmp.png`) and nobody has checked it against the real place. The
-      "surface ends at the outer lane" rule still applies to freeway ramps (16 in that area). A second sweep was
-      started on `135507f` (`scratch/fizz035/sweep_slip2.json`): READ IT; it must show no difference from
-      `sweep_final.json` beyond small shifts before anything goes to main.
+      "surface ends at the outer lane" rule still applies to freeway ramps (16 in that area). The second sweep
+      on `135507f` is clean (`scratch/fizz035/sweep_slip2.json`): 135 of 135 cells pass; 4 cells differ from
+      `sweep_final.json`, each by one count (Kingston buried 38 -> 39 and 34 -> 35, one steep stretch at
+      deckpark_g on 30 m). Not on main: that needs the user's word.
       **Test build `v0.3.7-dev.2` (tag at `c4c99b4`) has the FIRST version** (duplicate names, freeway ramps moved):
       a `dev.3` is wanted once the second sweep is clean (ask the user first).
       **Open on this item:** (0) freeway interchanges: draw two or three before and after with photos before
