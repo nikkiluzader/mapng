@@ -80,3 +80,34 @@ test level are not to be judged.
 **Looks like:** a sweep result that matches neither the old nor the new code. **Cause:** the sweep runs the working
 tree's code cell by cell, so a mid-run edit changes the later cells. **Fix:** do not edit `services/` (or exporters)
 until the sweep is done; use a git worktree for parallel work (see `docs/handoff.md`, "Traps").
+
+---
+
+## Link files: what MapNG links, and what it must not
+
+BeamNG's Link Files page (`refs/beamng-docs/Link Files.md`): a level should hold link files for shared assets and
+only its own level files; links suit assets that reference nothing else (textures, raw mesh data).
+
+**What MapNG links (reviewed 2026-11-24):**
+- Every official model from another level (`.dae`): `services/beamngLinkFiles.js`, through `rewriteForLinks` on every
+  object file that can hold a model (signs, street furniture, signals, fuel stations, level objects, vegetation,
+  forest items, water, sky). Models in the game's shared `/art/` folder are used where they are (the page's own
+  advice). The OSM tag library's models (`data/osm-tag-library.json`, `data/game-model-catalogue.json`) reach the
+  level through the same path: nothing to add to the catalogue itself.
+- Textures in the shape, biome, sign and fuel-station materials and on water, but only those the game ships as a
+  real file under exactly that name: `services/textureLinkTargets.js`, made by
+  `scripts/build-texture-link-targets.py` (re-run after a game update and after the material libraries change).
+
+**What it must not link:**
+- Terrain material textures: TerrainCellMaterial does not follow `.link` (verified 2026-07-22).
+- Textures the game itself reaches through its own link file (many tree textures: `levels/jungle_rock_island/...
+  /t_tro_vines_b.color.png.link` -> `/assets/...`, often a `.png` name whose cooked `.dds` lives in `/assets`). A MapNG
+  link to such a path, or to where the game's chain ends, left the texture missing: `E|GFXTextureManager::_cookTexture|
+  Missing source texture ...` in `beamng.log`, many times a second; the same level with direct paths had none. They
+  keep their direct path; the game's own links resolve them.
+
+**Not linkable because it is MapNG's own:** the reflection cubemap (`public/cubemap/`, 33 MB per level; not in the
+game, checked against all its archives), the flag model, the facade light texture, every generated mesh.
+
+**How to check a level:** load it in free-roam from an empty `temp/levels/<level>` and grep the log from its
+"Level loading" line for `Missing source texture` / `NO TEXTURE`; there should be none.

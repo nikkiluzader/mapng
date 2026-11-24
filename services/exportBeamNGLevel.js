@@ -35,6 +35,7 @@ import { TREE_MIX_CREDIT } from './treeSpecies.js';
 import { placeBoats } from './boats.js';
 import { GROUND_CLASSES, satelliteGroundClasses } from './osmTexture.js';
 import { SHAPE_IMPOSTER_FILES } from './beamngTreeLibrary.js';
+import { TEXTURE_LINK_TARGETS } from './textureLinkTargets.js';
 import { prepareCroppedTerrainData, cropHeightmap, cropOSMFeatures, adjustBounds } from './cropTerrain.js';
 import { stepHash, cachedStep, terrainFingerprint } from './stepCache.js';
 import { sanitizePoints, planSpawnPoints, spawnReportLines } from './spawnPoints.js';
@@ -14224,7 +14225,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   if (roadRules) {
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Road rules: ${roadRules.countryName} (${roadRules.countryCode}), ${resolvedRightHandDrive ? 'left' : 'right'}-hand traffic${roadRules.euroSignals ? ', EU signal cycle' : ''}.`);
   }
-  const linkRegistry = createBeamNGLinkFileRegistry(levelName, { companions: SHAPE_IMPOSTER_FILES });
+  const linkRegistry = createBeamNGLinkFileRegistry(levelName, { companions: SHAPE_IMPOSTER_FILES, textureTargets: TEXTURE_LINK_TARGETS });
 
   const size = exportTerrainData.width;
   const osmFeatureCount = Array.isArray(exportTerrainData.osmFeatures) ? exportTerrainData.osmFeatures.length : 0;
@@ -17140,7 +17141,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   if (groundCoverProfile?.materialName && groundCoverProfile.materialDef && !biomeRuntimeDefs[groundCoverProfile.materialName]) {
     biomeRuntimeDefs[groundCoverProfile.materialName] = groundCoverProfile.materialDef;
   }
-  zip.file(`${base}/map_assets/official_assets/biome_materials/main.materials.json`, JSON.stringify(biomeRuntimeDefs, null, 2));
+  // (their textures through link files, as BeamNG's Link Files page asks: not terrain materials, which do not follow links)
+  const linkTextures = (defs) => linkRegistry.rewriteObjectPathsDeep(defs, { textures: true });
+  zip.file(`${base}/map_assets/official_assets/biome_materials/main.materials.json`, JSON.stringify(linkTextures(biomeRuntimeDefs), null, 2));
 
   // Per-biome shape material defs harvested from the game install
   // (scripts/build-shape-material-library.py). Every material a placed .dae
@@ -17161,19 +17164,19 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     ))
   );
   if (Object.keys(shapeMaterialDefs).length > 0) {
-    zip.file(`${base}/map_assets/official_assets/shape_materials/main.materials.json`, JSON.stringify(shapeMaterialDefs, null, 2));
+    zip.file(`${base}/map_assets/official_assets/shape_materials/main.materials.json`, JSON.stringify(linkTextures(shapeMaterialDefs), null, 2));
   }
 
   // Sign paint materials (signs_usa atlas + metal pole). Without these the
   // linked sign meshes render as bare metal. See getSignRuntimeMaterialDefs.
   if (signObjects.length > 0) {
-    zip.file(`${base}/map_assets/official_assets/signs_materials/main.materials.json`, JSON.stringify(getSignRuntimeMaterialDefs(), null, 2));
+    zip.file(`${base}/map_assets/official_assets/signs_materials/main.materials.json`, JSON.stringify(linkTextures(getSignRuntimeMaterialDefs()), null, 2));
   }
 
   // Fuel station mesh materials (eca_gastation_pumps / eca_charging_station).
   // Without these the linked pump/charger meshes render untextured.
   if (fuelStationObjects.length > 0) {
-    zip.file(`${base}/map_assets/official_assets/fuelstation_materials/main.materials.json`, JSON.stringify(getFuelStationRuntimeMaterialDefs(), null, 2));
+    zip.file(`${base}/map_assets/official_assets/fuelstation_materials/main.materials.json`, JSON.stringify(linkTextures(getFuelStationRuntimeMaterialDefs()), null, 2));
   }
 
   // ── art/cubemaps/Universal_cubemap_reflection ─────────────────────────────
@@ -17717,7 +17720,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   }
 
   const rewrittenLevelObjectItems = rewriteForLinks(levelObjectItems);
-  const rewrittenWaterObjects = rewriteForLinks(waterObjects);
+  const rewrittenWaterObjects = linkRegistry.rewriteObjectPathsDeep(waterObjects, { textures: true });
 
   zip.file(`${base}/main/MissionGroup/level_objects/items.level.json`,
     toNDJSON(rewrittenLevelObjectItems)
