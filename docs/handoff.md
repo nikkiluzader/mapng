@@ -85,6 +85,17 @@ replace the tracking files (see CLAUDE.md, "Tracking"); it is the short "start h
       `scratch/osmformats/`. **Not proven:** the .o5m reader against a real osmconvert file (compiling osmconvert was
       refused by the permission check; tested against an encoder written to the same spec); relation member deltas
       assumed per member type (the wiki is silent).
+- [x] **SPLATPLAYS's Perth report** (`refs/splat_feedback/`, report glastonbury_road; `30a59cd`): power=line on
+      power=pole nodes now stands on poles (`lineSupportTypes` in `services/streetProps.js`, per-vertex `supports` from
+      the export), one support where lines share a node, the tower's wall clearance kept to towers; raised paving
+      cleared over at-grade track beds in the walk runs, street runs and the paved model (`railBeds`,
+      `railBedRings` in the export, `pavedWorker.js`). Test area `splat_xing` built from his report's own map data;
+      before/after `scratch/splat/ab/top_cmp.png`, game `game_crossing.jpg`, `game_poles.jpg`. Sweep clean, baselines
+      `9cdf7ca`. **Not seen:** his "one pole wrong" spot itself (-32.10986, 116.00445, 3 km off the test area).
+      Follow-up in the backlog: a flush footway panel at level crossings.
+- [x] **0.3.7 release page draft** (`7edfe58`, `public/updates/0.3.7/`, not indexed, not linked): formats with the
+      reasons for the ones not opened, Monaco .osm.pbf vs Shapefile in game, line curves, large levels. Still to add
+      before release: the Perth fixes, whatever else lands.
 - [ ] **Toma's three notes** (backlog, section 1), not started.
 - [ ] **Tile rotation** (user asked 2026-11-24 about 0.3.7): answered feasible but big (1-2 weeks; whole-map rotation
       first, tiles rotated apart from each other only as a shaped level); suggested as the first 0.3.8 item, the user
