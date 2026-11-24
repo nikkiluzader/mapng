@@ -20,6 +20,34 @@ these files; they are never copied.
   (resolution x m per pixel: 4.1 km here), not the road's or the tiles' whole extent, so neither showed; the far
   ends of this level sit about 78 km from its centre (BeamNG: objects shake past about 30 km). Road mode has no
   limit on length or on the number of pieces. Not changed yet: proposed to the user.
+  **Correction and more from the tester's Discord thread (lominsa, shown by the user 2026-11-24):** the export
+  panel's "How heavy is this level? Extremely heavy ... Are you serious?" card DID show (158 km across, corners
+  111 km out, 16 GB at its peak); only step 1's notes did not. What he saw, run by run:
+  - Generate of the 442 pieces took about an hour (25 min in: "Chunk 212 of 442, loading elevation").
+  - The road's end handle drags only 20 km at a time (he worked in 50 km steps).
+  - First export (0.5 m, backdrop on): stuck on "Preparing / Waiting for the downloads" (the backdrop), Cancel did
+    nothing; overnight it did not finish: this crash report. Likely, not proven: the data step (backdrop download
+    for a 158 km level) runs in the WINDOW process (`ensureExportData` in ExportPanel), and the dump says the
+    window ran out of memory.
+  - Second export (1 m): 70 minutes at 0 % on the progress card ("Chunk 208 of 442: generating from the cache")
+    while the Windows taskbar bar filled; then it finished, but "The report could not be read" and the level is
+    in the mods folder but not in MapNG's level list.
+  Causes found in the code (2026-11-24):
+  1. **Progress card at 0 %:** the chunked export's progress messages carry `pct` but no `phase` /
+     `phaseFraction` (exportBeamNGLevel.js, "Chunk ${p.chunk} of ${p.of}"), and the card draws its bar from the
+     phase. The taskbar uses `pct`. Confirmed in code, current dev too.
+  2. **Report unreadable, level not listed:** the merged level is written with JSZip, which cannot write ZIP64.
+     Tested: 70,000 files give an end record saying 4,466 entries and no ZIP64 record; MapNG's own zip reader
+     (`desktop/levelLibrary.js` zipEntries) trusts that count, so it misses the level's info.json / report. Over
+     4 GB the offsets would wrap too. Whether this level passed 65,535 files is not verified (likely at 442 pieces).
+     Whether BeamNG itself reads such a zip is not known.
+  3. **Runner memory:** `services/chunkedExport.js` keeps every finished piece's zip loaded (JSZip) until the merge:
+     442 of them.
+  4. **Misleading warning:** the heavy-level card says "the level will be the middle 2048 x 2048: 36 % of the
+     area ... generate again at 27.051 m/px": it reads the overview's grid, which means nothing for a level built
+     in pieces.
+  5. **Cancel** does not stop the data step's downloads.
+  6. Step 1's notes measure one tile (above).
 
 **A new session starts with `docs/handoff.md`** (the user asked for it 2026-11-24: the next sessions may run on
 another model; keep it current, tick items as they finish).
