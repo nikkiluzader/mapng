@@ -7,7 +7,6 @@
   <BackupDataNotice />
   <div class="flex flex-1 min-h-0 w-full flex-row overflow-hidden">
     <AppSidebar
-      :batch-mode="batchMode"
       :is-dark-mode="isDarkMode"
       :build-main-hash="buildMainHash"
       :build-main-time="buildMainTime"
@@ -18,11 +17,8 @@
       @show-disclaimer="showDisclaimer = true"
       @show-stack="showStackInfo = true"
       @toggle-dark="store.toggleDarkMode"
-      @leave-batch="leaveBatch"
     >
-      <!-- Single mode -->
       <ControlPanel
-        v-if="!batchMode"
         :center="center"
         :zoom="zoom"
         :resolution="resolution"
@@ -58,32 +54,6 @@
         @elevation-slot-removed="handleElevationSlotRemoved"
         @show-support="openSupportTip('manual')"
         @export-success="handleSingleExportSuccess"
-      />
-
-      <!-- Batch mode -->
-      <BatchControlPanel
-        v-if="batchMode"
-        :center="center"
-        :resolution="resolution"
-        :processing-meters-per-pixel="processingMetersPerPixel"
-        :is-running="batchRunning"
-        :saved-state="savedBatchState"
-        :tile-offsets="batchTileOffsets"
-        :tile-names="batchTileNames"
-        :tile-follow-center="batchTileFollowCenter"
-        @location-change="handleLocationChange"
-        @resolution-change="store.setResolution"
-        @start-batch="handleStartBatch"
-        @resume-batch="handleResumeBatch"
-        @clear-saved-batch="handleClearSavedBatch"
-        @clear-cache="handleClearBatchCache"
-        @update:grid-cols="store.setBatchGridCols"
-        @update:grid-rows="store.setBatchGridRows"
-        @update:tile-offsets="store.setBatchTileOffsets"
-        @update:tile-names="store.setBatchTileNames"
-        @update:tile-follow-center="store.setBatchTileFollowCenter"
-        @update:processingMetersPerPixel="handleProcessingMetersPerPixelChange"
-        @show-support="openSupportTip('manual')"
       />
     </AppSidebar>
 
@@ -133,13 +103,9 @@
             :uploaded-elevation-meta="uploadedElevationMeta"
             :uploaded-area-mode="uploadedAreaMode"
             :surrounding-tile-positions="surroundingTilePositions"
-            :batch-grid="batchGridTiles"
-            :batch-grid-follows-center="batchGridFollowsCenter"
-            :batch-editable="batchMode && !batchRunning && !showBatchProgress"
             :box-locked="store.boxLocked"
             @move="handleMapMove" 
             @zoom="store.setZoom"
-            @batch-tile-drag="handleBatchTileDrag"
           />
         </div>
         
@@ -206,17 +172,6 @@
   </div>
   </div>
 
-  <!-- Batch Progress Modal -->
-    <BatchProgressModal
-      v-if="showBatchProgress && batchState"
-      :state="batchState"
-      :current-step="batchCurrentStep"
-      @close="handleBatchProgressClose"
-      @cancel="handleBatchCancel"
-      @resume="handleResumeBatch"
-      @retry-failed="handleRetryFailed"
-    />
-
     <!-- About Modal -->
     <AboutModal v-if="showAbout" @close="showAbout = false" />
 
@@ -256,8 +211,6 @@ import DisclaimerModal from './components/modals/DisclaimerModal.vue';
 import TechStackModal from './components/modals/TechStackModal.vue';
 import SupportTipModal from './components/modals/SupportTipModal.vue';
 import ControlPanel from './components/panels/ControlPanel.vue';
-import BatchControlPanel from './components/panels/BatchControlPanel.vue';
-import BatchProgressModal from './components/modals/BatchProgressModal.vue';
 import MapSelector from './components/map/MapSelector.vue';
 import Preview3D from './components/three/Preview3D.vue';
 import Preview2D from './components/map/Preview2D.vue';
@@ -293,23 +246,6 @@ import { layoutGrid, WEB_MAX_SIDE, tilesFromTerrain, tilesFrame } from './servic
 import { needsChunks } from './services/chunkedGenerate.js';
 import { corridorGrid } from './services/roadCorridor.js';
 import { stretchBetween, cumulative } from './services/roadPick.js';
-import {
-  computeGridTiles,
-  computeGridTilesWithOffsets,
-  createBatchJobState,
-  getDefaultTileLabel,
-  runBatchJob,
-  saveBatchState,
-  loadBatchState,
-  clearBatchState,
-  clearBatchClientCache,
-  resetFailedTiles,
-} from './services/batchJob';
-
-if (import.meta.env.DEV) {
-  import('./services/batchDebugHarness.js');
-}
-
 const store = useMainStore();
 const { t } = useI18n({ useScope: 'global' });
 // (the "MapNG was updated" notice: services/appUpdate.js)
@@ -320,24 +256,13 @@ const {
   zoom,
   resolution,
   isDarkMode,
-  batchMode,
   terrainData,
   lastGenerationKey,
   isLoading,
   loadingStatus,
   previewMode,
   viewMode,
-  surroundingTilePositions,
-  batchGridCols,
-  batchGridRows,
-  batchTileFollowCenter,
-  batchTileOffsets,
-  batchTileNames,
-  batchState,
-  batchRunning,
-  batchCurrentStep,
-  showBatchProgress,
-  savedBatchState
+  surroundingTilePositions
 } = storeToRefs(store);
 
 // The ground texture looked at or exported, when Generate did not paint it: painted now, once, from what the
@@ -415,11 +340,6 @@ const stopGenerationProgress = () => {
 const lastLoggedLoadingStatus = ref('');
 const lastLoggedLoadingPercent = ref(-1);
 let abortController = null;
-let batchAbortController = null;
-// The raw job object runBatchJob mutates. batchState holds shallow copies of it
-// for reactivity, so anything that must reach the runner writes here.
-let batchLiveState = null;
-
 const KOFI_URL = 'https://ko-fi.com/nikluz';
 const TIP_LAST_SHOWN_KEY = 'mapng_tip_last_shown_at';
 const TIP_COOLDOWN_MS = 24 * 60 * 60 * 1000;
@@ -446,12 +366,6 @@ const handleSupportTipClose = () => {
 const maybePromptSupportAfterSingleExport = () => {
   if (!canAutoShowTip()) return;
   openSupportTip('single');
-  markTipShownNow();
-};
-
-const maybePromptSupportAfterBatchComplete = () => {
-  if (!canAutoShowTip()) return;
-  openSupportTip('batch');
   markTipShownNow();
 };
 
@@ -492,8 +406,6 @@ const processingMetersPerPixel = ref(
   storedProcessingMpp,
 );
 
-const getEffectiveProcessingMpp = (value = processingMetersPerPixel.value) => normalizeProcessingMpp(value);
-
 const handleProcessingMetersPerPixelChange = (value, { force = false } = {}) => {
   // (background areas lock the box: its size too)
   if (store.boxLocked && !force) return;
@@ -515,46 +427,6 @@ const applyAscCoordinateSelection = async (meta) => {
   return applyAscCoordinateSystem(meta, epsgCode);
 };
 
-// Compute batch grid tiles for map overlay (live preview while configuring)
-// The preview grid is laid out around the map centre (it moves with a drag);
-// a job's own tiles, or "Tiles follow map center" turned off, stay where they
-// are on the map. (MapSelector draws a following grid at the live centre.)
-const batchGridFollowsCenter = computed(() => {
-  if (!batchMode.value || batchTileFollowCenter.value === false) return false;
-  const status = batchState.value?.status;
-  return !(batchState.value && (showBatchProgress.value || batchRunning.value || ['running', 'paused', 'pending'].includes(status)));
-});
-const batchGridTiles = computed(() => {
-  if (!batchMode.value) return [];
-  // Use persisted batch tiles only while a job is active/paused
-  // or while the progress modal is open.
-  const status = batchState.value?.status;
-  const usePersistedTiles = !!batchState.value && (
-    showBatchProgress.value ||
-    batchRunning.value ||
-    status === 'running' ||
-    status === 'paused' ||
-    status === 'pending'
-  );
-  if (usePersistedTiles) return batchState.value.tiles;
-  // Otherwise compute preview grid from config
-  return computeGridTilesWithOffsets(
-    center.value,
-    resolution.value,
-    batchGridCols.value,
-    batchGridRows.value,
-    batchTileOffsets.value,
-    Number(resolution.value) * getEffectiveProcessingMpp(),
-  ).map((tile) => {
-    const customName = (batchTileNames.value || []).find((entry) => Number(entry.index) === tile.index)?.name || '';
-    return {
-      ...tile,
-      customName,
-      label: customName || getDefaultTileLabel(tile, batchGridCols.value),
-    };
-  });
-});
-
 // Build info (injected by Vite at build time)
 const formatBuildTime = (value) => {
   const raw = String(value || '').trim();
@@ -569,7 +441,7 @@ const buildMainTime = formatBuildTime(__BUILD_MAIN_TIME__);
 const buildDevHash = String(__BUILD_DEV_HASH__ || 'n/a');
 const buildDevTime = formatBuildTime(__BUILD_DEV_TIME__);
 
-const { setCenter, setResolution, setBatchMode: setStoreBatchMode } = store;
+const { setCenter, setResolution } = store;
 
 const isValidCenter = (point) => {
   const lat = Number(point?.lat);
@@ -591,16 +463,6 @@ const handleGlobalDevToggleKey = (event) => {
       setResolution(8192);
     }
   }
-};
-
-// Batch jobs are retired: the only way is out. The saved job is discarded with it (the bar says so).
-const leaveBatch = () => {
-  if (batchRunning.value) return;
-  clearBatchState();
-  savedBatchState.value = null;
-  batchState.value = null;
-  showBatchProgress.value = false;
-  setStoreBatchMode(false);
 };
 
 // Attempt to get user location on load
@@ -669,7 +531,7 @@ const buildGenerationKey = (c, res, osm, elevationSource, gpxzKey, uploadedEleva
     lng: c.lng,
     resolution: res,
     // (tiles in step 1: the layout changes the map; one tile adds nothing, so a single square's key is as before)
-    ...(store.areaMode === 'road' && !store.batchMode ? { road: store.road ? [store.road.pts.length, Math.round(store.road.startM), Math.round(store.road.endM), store.roadHalfWidthM, store.road.pts[0]?.lat, store.road.pts.at(-1)?.lng] : null }
+    ...(store.areaMode === 'road' ? { road: store.road ? [store.road.pts.length, Math.round(store.road.startM), Math.round(store.road.endM), store.roadHalfWidthM, store.road.pts[0]?.lat, store.road.pts.at(-1)?.lng] : null }
       : store.tiles.length > 1 ? { tiles: store.tiles.map((t) => [Math.round(t.dx * 1e4), Math.round(t.dy * 1e4)]), tileAnchor: store.tileAnchor } : {}),
     processingMetersPerPixel: processingMpp,
     osm,
@@ -1055,7 +917,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
       let genCenter = center.value; let genSize = resolution.value;
       // road mode (refs/output/road-mode-plan.md): the chosen stretch widened either side; its grid and row runs from
       // services/roadCorridor.js (the same frame and pixels Generate uses); always ground models
-      if (store.areaMode === 'road' && !store.batchMode) {
+      if (store.areaMode === 'road') {
         const r = store.road;
         if (!r) throw new Error(t('road.pickFirst'));
         const mpp = Number(processingMpp || 1);
@@ -1264,211 +1126,7 @@ const switchTo2D = () => {
   // without losing their generated exports.
 };
 
-// ─── Batch Job Handlers ─────────────────────────────────────────────
-
-const handleStartBatch = (config) => {
-  const state = createBatchJobState({
-    ...config,
-    processingMetersPerPixel: getEffectiveProcessingMpp(config.processingMetersPerPixel),
-  });
-  batchState.value = state;
-  showBatchProgress.value = true;
-  executeBatchJob(state);
-};
-
-const handleResumeBatch = () => {
-  let state = batchState.value || savedBatchState.value;
-  if (!state) return;
-
-  // If resuming from saved state, hydrate it
-  if (!batchState.value) {
-    batchState.value = state;
-  }
-
-  showBatchProgress.value = true;
-  executeBatchJob(batchState.value);
-};
-
-const handleRetryFailed = () => {
-  if (!batchState.value) return;
-  resetFailedTiles(batchState.value);
-  // Force reactivity update
-  batchState.value = { ...batchState.value };
-  executeBatchJob(batchState.value);
-};
-
-const handleBatchCancel = () => {
-  // Mark the runner's own object — it checks status to tell cancel from pause.
-  const target = batchLiveState || batchState.value;
-  if (target) {
-    target.status = 'canceled';
-    saveBatchState(target);
-    batchState.value = { ...target };
-  }
-  if (batchAbortController) {
-    batchAbortController.abort();
-    batchAbortController = null;
-  }
-};
-
-const handleBatchProgressClose = () => {
-  showBatchProgress.value = false;
-  // If the job is fully complete with no errors, clear saved state
-  if (batchState.value?.status === 'completed') {
-    maybePromptSupportAfterBatchComplete();
-    clearBatchState();
-    savedBatchState.value = null;
-    batchState.value = null;
-    setStoreBatchMode(false);
-  }
-  // If paused or has errors, keep state for resume
-  savedBatchState.value = loadBatchState();
-};
-
-const handleClearSavedBatch = () => {
-  clearBatchState();
-  savedBatchState.value = null;
-  batchState.value = null;
-};
-
-const handleClearBatchCache = async () => {
-  try {
-    await clearBatchClientCache();
-    alert(t('app.batchCacheCleared'));
-  } catch (error) {
-    console.error('[Batch] Failed to clear cache:', error);
-    alert(t('app.batchCacheClearFailed'));
-  }
-};
-
-const executeBatchJob = async (state) => {
-  batchRunning.value = true;
-  batchAbortController = new AbortController();
-  batchLiveState = state;
-
-  // Re-snapshot the runner's own object, not the previous snapshot: copying a
-  // copy freezes top-level fields (status, finalizing, counts) at their first
-  // value, so the UI never sees the job leave the tile loop.
-  const syncBatchState = () => {
-    batchState.value = { ...state };
-  };
-
-  try {
-    await runBatchJob(
-      state,
-      // onProgress
-      ({ tileIndex, step, tile }) => {
-        batchCurrentStep.value = step;
-        if (Number.isInteger(tileIndex)) state.currentTileIndex = tileIndex;
-        if (tile?.id) state.currentTileId = tile.id;
-        // Force reactivity on tile status changes
-        syncBatchState();
-      },
-      // onTileComplete
-      (tile) => {
-        syncBatchState();
-      },
-      // onError
-      (tile, error) => {
-        console.error(`[Batch] Tile ${tile.label || `R${tile.row + 1}C${tile.col + 1}`} failed:`, error);
-        syncBatchState();
-      },
-      batchAbortController.signal
-    );
-  } catch (error) {
-    if (error.name !== 'AbortError') {
-      console.error('[Batch] Unexpected error:', error);
-      state.status = 'failed';
-      saveBatchState(state);
-    }
-  } finally {
-    batchRunning.value = false;
-    batchAbortController = null;
-    batchCurrentStep.value = '';
-    // Force final state update
-    syncBatchState();
-    savedBatchState.value = loadBatchState();
-  }
-};
-
-const handleBatchTileDrag = ({ index, lat, lng }) => {
-  if (!Number.isInteger(index)) return;
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-
-  const baseTiles = computeGridTiles(
-    center.value,
-    resolution.value,
-    batchGridCols.value,
-    batchGridRows.value,
-    Number(resolution.value) * getEffectiveProcessingMpp(),
-  );
-  const baseTile = baseTiles.find((tile) => tile.index === index);
-  if (!baseTile) return;
-
-  const metersPerDegLat = 111320;
-  const metersPerDegLng = 111320 * Math.cos(baseTile.center.lat * Math.PI / 180);
-  const offsetX = (lng - baseTile.center.lng) * metersPerDegLng;
-  const offsetY = (lat - baseTile.center.lat) * metersPerDegLat;
-
-  const current = Array.isArray(batchTileOffsets.value) ? [...batchTileOffsets.value] : [];
-  const byIndex = new Map(current.map((entry) => [Number(entry.index), { ...entry }]));
-  byIndex.set(index, { index, offsetX, offsetY });
-
-  const next = [...byIndex.values()]
-    .filter((entry) => Math.abs(Number(entry.offsetX || 0)) > 0.001 || Math.abs(Number(entry.offsetY || 0)) > 0.001)
-    .sort((a, b) => a.index - b.index);
-
-  store.setBatchTileOffsets(next);
-};
-
 const handleMapMove = (newCenter) => {
-  const oldCenter = center.value;
   store.setCenter(newCenter);
-
-  // "World-fixed" mode: when the user pans the map, keep the batch tiles
-  // anchored at their geographic positions instead of moving with the grid
-  // centre. Achieved by recalculating each tile's offset against the new
-  // base grid so the absolute lat/lng stays constant.
-  // Only applies when a batch job is not running and the user has opted out
-  // of tile-follow-centre (the default is tiles follow the centre).
-  const keepWorldFixed = batchMode.value
-    && !batchRunning.value
-    && !showBatchProgress.value
-    && batchTileFollowCenter.value === false;
-
-  if (!keepWorldFixed) return;
-
-  const oldTiles = computeGridTilesWithOffsets(
-    oldCenter,
-    resolution.value,
-    batchGridCols.value,
-    batchGridRows.value,
-    batchTileOffsets.value,
-    Number(resolution.value) * getEffectiveProcessingMpp(),
-  );
-  const newBaseTiles = computeGridTiles(
-    newCenter,
-    resolution.value,
-    batchGridCols.value,
-    batchGridRows.value,
-    Number(resolution.value) * getEffectiveProcessingMpp(),
-  );
-
-  const nextOffsets = oldTiles.map((tile) => {
-    const baseTile = newBaseTiles.find((candidate) => candidate.index === tile.index);
-    if (!baseTile) return null;
-
-    const metersPerDegLat = 111320;
-    const metersPerDegLng = 111320 * Math.cos(baseTile.center.lat * Math.PI / 180);
-    const offsetX = (tile.center.lng - baseTile.center.lng) * metersPerDegLng;
-    const offsetY = (tile.center.lat - baseTile.center.lat) * metersPerDegLat;
-
-    return { index: tile.index, offsetX, offsetY };
-  })
-    .filter(Boolean)
-    .filter((entry) => Math.abs(Number(entry.offsetX || 0)) > 0.001 || Math.abs(Number(entry.offsetY || 0)) > 0.001)
-    .sort((a, b) => a.index - b.index);
-
-  store.setBatchTileOffsets(nextOffsets);
 };
 </script>

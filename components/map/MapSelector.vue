@@ -105,7 +105,7 @@
       />
 
       <l-rectangle 
-        v-if="selectionBounds && !hasBatchGrid && !showUploadedCoverageBounds && !roadModeOn"
+        v-if="selectionBounds && !showUploadedCoverageBounds && !roadModeOn"
         :bounds="[[selectionBounds.south, selectionBounds.west], [selectionBounds.north, selectionBounds.east]]" 
         color="#FF6600"
         :weight="2"
@@ -120,7 +120,7 @@
         <l-polyline :lat-lngs="roadLine" color="#FF6600" :weight="2" :opacity="0.7" :interactive="false" :options="{ dashArray: '4, 6' }" />
         <l-polyline v-if="stretchLine.length > 1" :lat-lngs="stretchLine" color="#FF6600" :weight="corridorPx" :opacity="0.18" :interactive="false" :options="{ lineCap: 'round', lineJoin: 'round' }" />
         <l-polyline v-if="stretchLine.length > 1" :lat-lngs="stretchLine" color="#FF6600" :weight="3" :interactive="false" />
-        <l-marker v-for="h in roadHandles" :key="'road-' + h.which" :lat-lng="h.at" :draggable="true" :icon="batchHandleIcon" @dragend="(event) => dropRoadHandle(h.which, event)">
+        <l-marker v-for="h in roadHandles" :key="'road-' + h.which" :lat-lng="h.at" :draggable="true" :icon="dragHandleIcon" @dragend="(event) => dropRoadHandle(h.which, event)">
           <l-tooltip :permanent="false" direction="top" :offset="[0, -8]">{{ t(h.which === 'start' ? 'road.start' : 'road.end') }}</l-tooltip>
         </l-marker>
       </template>
@@ -142,14 +142,14 @@
         :key="'tile-handle-' + tile.i"
         :lat-lng="[tile.center.lat, tile.center.lng]"
         :draggable="true"
-        :icon="batchHandleIcon"
+        :icon="dragHandleIcon"
         @dragend="(event) => dropTile(tile, event)"
       >
         <l-tooltip :permanent="false" direction="top" :offset="[0, -8]">{{ t('tiles.tile', { n: tile.i + 1 }) }}</l-tooltip>
       </l-marker>
 
       <l-rectangle
-        v-if="showUploadedCoverageBounds && !hasBatchGrid"
+        v-if="showUploadedCoverageBounds"
         :bounds="[[nativeCoverageBounds.south, nativeCoverageBounds.west], [nativeCoverageBounds.north, nativeCoverageBounds.east]]"
         color="#3B82F6"
         :weight="1.5"
@@ -159,7 +159,7 @@
 
       <l-rectangle
         v-for="tile in uploadedCoverageTiles"
-        v-if="showUploadedTileZones && !hasBatchGrid"
+        v-if="showUploadedTileZones"
         :key="`uploaded-zip-tile-${tile.index}`"
         :bounds="[[tile.bounds.south, tile.bounds.west], [tile.bounds.north, tile.bounds.east]]"
         color="#60A5FA"
@@ -174,7 +174,7 @@
 
       <l-rectangle
         v-for="tile in uploadedMissingTiles"
-        v-if="showUploadedTileZones && !hasBatchGrid"
+        v-if="showUploadedTileZones"
         :key="`uploaded-zip-missing-${tile.row}-${tile.col}`"
         :bounds="[[tile.bounds.south, tile.bounds.west], [tile.bounds.north, tile.bounds.east]]"
         color="#EF4444"
@@ -189,7 +189,7 @@
 
       <!-- (native mode: the power-of-two square the export keeps from the middle of the upload) -->
       <l-rectangle
-        v-if="nativeSquareBounds && !hasBatchGrid"
+        v-if="nativeSquareBounds"
         :bounds="[[nativeSquareBounds.south, nativeSquareBounds.west], [nativeSquareBounds.north, nativeSquareBounds.east]]"
         color="#FF6600"
         :weight="2"
@@ -200,7 +200,7 @@
       </l-rectangle>
 
       <l-rectangle
-        v-if="uploadedCropBounds && !hasBatchGrid"
+        v-if="uploadedCropBounds"
         :bounds="[[uploadedCropBounds.south, uploadedCropBounds.west], [uploadedCropBounds.north, uploadedCropBounds.east]]"
         color="#FF6600"
         :weight="2"
@@ -209,38 +209,11 @@
         :options="{ dashArray: '2, 8', lineCap: 'round' }"
       />
 
-      <!-- Batch Grid Tiles -->
-      <l-rectangle
-        v-for="tile in shownBatchGrid"
-        :key="'batch-' + tile.index"
-        :bounds="[[tile.bounds.south, tile.bounds.west], [tile.bounds.north, tile.bounds.east]]"
-        :color="batchTileColor(tile)"
-        :weight="tile.status === 'processing' ? 2.5 : 1.5"
-        :fill-opacity="batchTileFillOpacity(tile)"
-        :options="{ dashArray: tile.status === 'pending' ? '4, 6' : undefined, lineCap: 'round' }"
-      />
-
       <l-rectangle v-if="compareSpotBounds" :bounds="compareSpotBounds" color="#f97316" :weight="2" :fill-opacity="0.08" :options="{ dashArray: '5, 5', interactive: false }" />
 
-      <l-marker
-        v-for="tile in shownBatchGrid"
-        v-if="batchEditable"
-        :key="'batch-handle-' + tile.index"
-        :lat-lng="[tile.center.lat, tile.center.lng]"
-        :draggable="true"
-        :icon="batchHandleIcon"
-        @drag="(event) => handleBatchTileDrag(tile, event)"
-        @dragend="(event) => handleBatchTileDrag(tile, event)"
-      >
-        <l-tooltip :permanent="false" direction="top" :offset="[0, -8]">
-          {{ t('mapSelector.moveTile', { label: tile.label || `R${tile.row + 1}C${tile.col + 1}` }) }}
-        </l-tooltip>
-      </l-marker>
-
-      <!-- Surrounding Tile Bounding Boxes (hidden during batch mode) -->
+      <!-- Surrounding Tile Bounding Boxes -->
       <l-rectangle
         v-for="rect in surroundingBounds"
-        v-if="!hasBatchGrid"
         :key="rect.key"
         :bounds="[[rect.south, rect.west], [rect.north, rect.east]]"
         color="#3B82F6"
@@ -381,16 +354,14 @@
       <button type="button" role="menuitem" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700" @click="copyCoordinates">{{ copiedNotice ? t('map.copied') : t('map.copyCoordinates') }}</button>
       <!-- the 500 m square "Compare sources here" looks at (components/map/SourceComparison.vue) -->
       <button type="button" role="menuitem" data-testid="ctx-compare-here" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700" @click="compareSourcesHere">{{ t('map.compareAtSpot') }}</button>
-      <!-- Spawn and quicktravel points (single tile; components/controls/SpawnPoints.vue) -->
-      <template v-if="pointsActive()">
-        <div class="my-1 border-t border-gray-200 dark:border-gray-700"></div>
+      <!-- Spawn and quicktravel points (components/controls/SpawnPoints.vue) -->
+      <div class="my-1 border-t border-gray-200 dark:border-gray-700"></div>
         <button type="button" role="menuitem" data-testid="ctx-spawn-here" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2" :disabled="pointsEditor.full()" @click="addPointHere(true)">
           <Star :size="12" class="text-amber-500" />{{ t('spawnPoints.spawnHere') }}
         </button>
         <button type="button" role="menuitem" data-testid="ctx-quicktravel-here" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2" :disabled="pointsEditor.full()" @click="addPointHere(false)">
           <Navigation :size="12" class="text-brand" />{{ t('spawnPoints.quicktravelHere') }}
         </button>
-      </template>
     </div>
   </div>
 </template>
@@ -468,52 +439,11 @@ const props = defineProps({
   uploadedElevationMeta: { type: Object, default: null },
   uploadedAreaMode: { type: String, default: 'native' },
   surroundingTilePositions: { type: Array, default: () => [] },
-  batchGrid: { type: Array, default: () => [] },
-  batchGridFollowsCenter: { type: Boolean, default: false },
-  batchEditable: { type: Boolean, default: false },
   // background areas drawn: the box stays put while the view pans and zooms
   boxLocked: { type: Boolean, default: false },
 });
 
-const hasBatchGrid = computed(() => props.batchGrid && props.batchGrid.length > 0);
-// The batch grid as drawn: the app lays it out around its centre, which hears
-// about a drag only every MOVE_EMIT_MS, so drawn as given the boxes jumped
-// after the map in steps. Shifted by how far the map has moved since, they
-// follow it like the single selection box; the app's own layout takes over
-// when the move is reported.
-const shownBatchGrid = computed(() => {
-  const grid = props.batchGrid;
-  if (!grid?.length) return grid || [];
-  if (!props.batchGridFollowsCenter) return grid;
-  const dLat = currentCenter.value.lat - props.center.lat;
-  const dLng = currentCenter.value.lng - props.center.lng;
-  if ((Math.abs(dLat) < 1e-12 && Math.abs(dLng) < 1e-12) || Math.abs(dLng) > 180) return grid;
-  return grid.map((tile) => ({
-    ...tile,
-    bounds: { north: tile.bounds.north + dLat, south: tile.bounds.south + dLat, east: tile.bounds.east + dLng, west: tile.bounds.west + dLng },
-    center: { lat: tile.center.lat + dLat, lng: tile.center.lng + dLng },
-  }));
-});
-
-const batchTileColor = (tile) => {
-  switch (tile.status) {
-    case 'processing': return '#3B82F6';
-    case 'completed': return '#10B981';
-    case 'failed': return '#EF4444';
-    default: return '#FF6600';
-  }
-};
-
-const batchTileFillOpacity = (tile) => {
-  switch (tile.status) {
-    case 'processing': return 0.2;
-    case 'completed': return 0.15;
-    case 'failed': return 0.2;
-    default: return 0.05;
-  }
-};
-
-const emit = defineEmits(['move', 'zoom', 'batchTileDrag']);
+const emit = defineEmits(['move', 'zoom']);
 
 const mapRef = ref(null);
 // The map's starting view only. Later centre/zoom changes from outside go
@@ -571,7 +501,7 @@ const isMovingProgrammatically = ref(false);
 const tileApi = useTiles(() => props.resolution, () => props.processingMetersPerPixel);
 const tileAnchor = () => (props.boxLocked ? props.center : currentCenter.value);   // (a dropped handle redrawn at its placed spot, even when that is where it was)
 const extraTiles = computed(() => {
-  if (store.batchMode || hasBatchGrid.value || store.tiles.length < 2 || showUploadedCoverageBounds.value) return [];
+  if (store.tiles.length < 2 || showUploadedCoverageBounds.value) return [];
   // (round the selection: the pinned centre while the area is locked, else the map's)
   // (each tile where Generate will build it: the tiled map's own frame, services/tileLayout.js tilesFrame)
   const f = tilesOnMap();
@@ -589,7 +519,7 @@ const dropTile = (tile, event) => {
 
 // road mode on the map
 const roadApi = useRoadMode(() => props.processingMetersPerPixel);
-const roadModeOn = computed(() => store.areaMode === 'road' && !store.batchMode && !hasBatchGrid.value && !showUploadedCoverageBounds.value);
+const roadModeOn = computed(() => store.areaMode === 'road' && !showUploadedCoverageBounds.value);
 const roadShown = computed(() => roadModeOn.value && !!store.road);
 const roadLine = computed(() => (store.road?.pts || []).map((p) => [p.lat, p.lng]));
 const stretchLine = computed(() => (roadApi.stretch.value || []).map((p) => [p.lat, p.lng]));
@@ -612,26 +542,12 @@ const dropRoadHandle = async (which, event) => {
   nextTick(() => { const h = roadHandles.value.find((x) => x.which === which); if (h) marker.setLatLng(h.at); });
 };
 
-const batchHandleIcon = L.divIcon({
-  className: 'mapng-batch-handle',
+const dragHandleIcon = L.divIcon({
+  className: 'mapng-drag-handle',
   html: '<div style="width:14px;height:14px;border-radius:9999px;background:var(--brand);border:2px solid white;box-shadow:0 0 0 1px rgba(0,0,0,0.25);"></div>',
   iconSize: [14, 14],
   iconAnchor: [7, 7],
 });
-
-const handleBatchTileDrag = (tile, event) => {
-  const marker = event?.target;
-  if (!marker || !tile) return;
-  const latLng = marker.getLatLng();
-  if (!latLng) return;
-  emit('batchTileDrag', {
-    index: tile.index,
-    row: tile.row,
-    col: tile.col,
-    lat: latLng.lat,
-    lng: latLng.lng,
-  });
-};
 
 // Keyless Esri tiles (the satellite / topo layers come from the same servers).
 // CARTO's basemaps started rendering "API KEY REQUIRED" in 2026-10.
@@ -699,7 +615,7 @@ const activeSelectionSizeMeters = computed(() => {
 const bounds = computed(() => {
   // (several tiles anchored elsewhere than on tile 1: tile 1 is drawn where the tiled map has it, not round the
   // crosshair, which marks the anchor)
-  const anchoredAway = store.tiles.length > 1 && store.tileAnchor !== 0 && !store.batchMode && !hasBatchGrid.value && !showUploadedCoverageBounds.value && store.areaMode !== 'road';
+  const anchoredAway = store.tiles.length > 1 && store.tileAnchor !== 0 && !showUploadedCoverageBounds.value && store.areaMode !== 'road';
   const metricBounds = anchoredAway ? tilesOnMap().boxes[0] : computeMetricSelectionBounds(props.boxLocked ? props.center : currentCenter.value, activeSelectionSizeMeters.value);
   if (!metricBounds) return null;
   const nw = L.latLng(metricBounds.north, metricBounds.west);
@@ -767,26 +683,8 @@ const uploadedCropBounds = computed(() => {
   return computeUploadedCropBounds(currentCenter.value, activeSelectionSizeMeters.value, nativeCoverageBounds.value);
 });
 
-// The area being exported: the batch grid extent when a grid is shown,
-// otherwise the crop box (BYOD crop mode) or the selection box.
+// The area being exported: the crop box (BYOD crop mode) or the selection box.
 const exportAreaBounds = computed(() => {
-  if (hasBatchGrid.value) {
-    let north = -Infinity;
-    let south = Infinity;
-    let east = -Infinity;
-    let west = Infinity;
-    for (const tile of shownBatchGrid.value) {
-      const b = tile?.bounds;
-      if (!b) continue;
-      north = Math.max(north, b.north);
-      south = Math.min(south, b.south);
-      east = Math.max(east, b.east);
-      west = Math.min(west, b.west);
-    }
-    if ([north, south, east, west].every((v) => Number.isFinite(v))) {
-      return { north, south, east, west };
-    }
-  }
   return uploadedCropBounds.value || selectionBounds.value;
 });
 
@@ -999,9 +897,9 @@ watch([leafletMap, showLidarCoverage], async ([map, on]) => {
 }, { immediate: true });
 
 // The box the map's own tools frame (the elevation preview's box): the export
-// area, the BYOD crop or the batch grid. Dimmed around, labelled with its size.
+// area or the BYOD crop. Dimmed around, labelled with its size.
 // (road mode: no box, so no dimming round it and no size label: the user, 2026-11-21)
-const maskedBox = computed(() => (hasBatchGrid.value || roadModeOn.value ? null : (uploadedCropBounds.value || (showUploadedCoverageBounds.value ? null : selectionBounds.value))));
+const maskedBox = computed(() => (roadModeOn.value ? null : (uploadedCropBounds.value || (showUploadedCoverageBounds.value ? null : selectionBounds.value))));
 // Only once the box is big enough on screen to read (zoomed out, the dim
 // would just grey the whole map and the label would cover what is there).
 const maskPaneReady = ref(false);
@@ -1253,14 +1151,13 @@ const onKeydown = (e) => { if (e.key === 'Escape') closeContextMenu(); };
 // Background areas (Location step): the layer draws them and takes the clicks
 const store = useMainStore();
 
-// Spawn and quicktravel points: a single tile's, on its map (not a batch job's)
+// Spawn and quicktravel points, on the map
 const pointsEditor = usePointsEditor();
 let pointLayer = null;
-const pointsActive = () => !store.batchMode && !hasBatchGrid.value;
 // the box a point must be in to be exported: the export area (or an upload's crop / coverage)
 const pointsBox = computed(() => uploadedCropBounds.value || (showUploadedCoverageBounds.value ? nativeCoverageBounds.value : selectionBounds.value));
 watch(
-  () => [store.points, store.pointTool, store.selectedPointId, store.batchMode, hasBatchGrid.value, pointsBox.value, locale.value],
+  () => [store.points, store.pointTool, store.selectedPointId, pointsBox.value, locale.value],
   () => pointLayer?.update(),
 );
 const addPointHere = (isDefault) => {
@@ -1272,7 +1169,7 @@ const addPointHere = (isDefault) => {
 const bgEditor = useBackgroundEditor();
 let bgLayer = null;
 watch(
-  () => [store.backgroundMask, store.backgroundTool, store.advancedMode, store.batchMode, store.backgroundDrawn, bgEditor.roadChoices.value, bgEditor.unmaskShape.value, selectionBounds.value],
+  () => [store.backgroundMask, store.backgroundTool, store.advancedMode, store.backgroundDrawn, bgEditor.roadChoices.value, bgEditor.unmaskShape.value, selectionBounds.value],
   () => bgLayer?.update(),
 );
 // Unlocked again: the box goes back under the crosshair where it was
@@ -1298,7 +1195,7 @@ const onMapReady = (map) => {
     getMetersAcross: () => activeSelectionSizeMeters.value,
     getRoadChoices: () => bgEditor.roadChoices.value,
     getUnmask: () => ({ shape: bgEditor.unmaskShape.value, brushM: bgEditor.brushM.value, background: bgEditor.paintBackground.value, smoothAgain: bgEditor.paintSmooth.value }),
-    isActive: () => store.advancedMode && !hasBatchGrid.value && !store.batchMode && (store.backgroundDrawn || store.backgroundTool !== 'pan'),
+    isActive: () => store.advancedMode && (store.backgroundDrawn || store.backgroundTool !== 'pan'),
     edit: bgEditor.edit,
     setHint: bgEditor.setHint,
     t,
@@ -1310,7 +1207,7 @@ const onMapReady = (map) => {
     getTool: () => store.pointTool,
     getSelected: () => store.selectedPointId,
     setSelected: (id) => { store.selectedPointId = id; },
-    isActive: pointsActive,
+    isActive: () => true,
     editor: pointsEditor,
     t,
   });
@@ -1331,11 +1228,11 @@ const onMapReady = (map) => {
   });
   map.on('contextmenu', (e) => {
     copiedNotice.value = false;
-    // (kept inside the map: the menu is ~220 × 100 px, 170 with the point items)
+    // (kept inside the map: the menu is ~220 × 170 px)
     const size = map.getSize();
     contextMenu.value = {
       x: Math.min(e.containerPoint.x, size.x - 220),
-      y: Math.min(e.containerPoint.y, size.y - (pointsActive() ? 170 : 100)),
+      y: Math.min(e.containerPoint.y, size.y - 170),
       lat: e.latlng.lat,
       lng: clampLng(e.latlng.lng),
     };

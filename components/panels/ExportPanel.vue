@@ -727,7 +727,7 @@ import { rasterizeMask, backgroundFraction } from '../../services/backgroundMask
 import { summarizeExportSettings, translateExportSettings } from '../../services/exportSettingsSummary.js';
 import TexturePaintModal from '../modals/TexturePaintModal.vue';
 import { buildRunConfiguration as buildRunConfigurationBase } from '../../services/runConfiguration';
-import { generateHeightmapBlob, generateTerBlob } from '../../services/batchExports';
+import { generateHeightmapBlob, generateTerBlob } from '../../services/assetExports.js';
 import { exportToGLB, exportToDAE } from '../../services/export3d';
 import { useWorkflow } from '../../composables/useWorkflow.js';
 import { ensureTexture, hasTexture } from '../../services/textureOnDemand.js';

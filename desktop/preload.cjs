@@ -14,12 +14,6 @@ contextBridge.exposeInMainWorld('mapngDesktop', {
   setOwnServer: (origin) => ipcRenderer.invoke('desktop:setOwnServer', origin),
   chooseModsFolder: () => ipcRenderer.invoke('desktop:chooseModsFolder'),
   showItem: (file) => ipcRenderer.invoke('desktop:showItem', file),
-  // a batch job's file was saved into Downloads/MapNG Batch: { name, path, state }
-  onBatchFileSaved: (callback) => {
-    const listener = (_event, saved) => callback(saved);
-    ipcRenderer.on('desktop:batchFileSaved', listener);
-    return () => ipcRenderer.removeListener('desktop:batchFileSaved', listener);
-  },
   beginJob: () => ipcRenderer.invoke('job:begin'),
   writeJobFile: (jobId, name, bytes, append) => ipcRenderer.invoke('job:write', jobId, name, bytes, append),
   runJob: (jobId, job, onProgress) => {

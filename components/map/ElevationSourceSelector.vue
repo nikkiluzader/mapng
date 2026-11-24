@@ -94,9 +94,6 @@
                     <p class="text-micro text-gray-500 dark:text-gray-400 leading-tight mt-1">
                         {{ t('map.freeTier') }} <a href="https://www.gpxz.io/" target="_blank" rel="noopener" class="text-brand hover:underline">{{ t('map.getKey') }}</a>
                     </p>
-                    <p v-if="isBatchMode" class="text-micro text-amber-600 dark:text-amber-500 font-medium mt-1">
-                      <AlertTriangle :size="11" class="inline -mt-0.5 mr-0.5" />{{ t('map.gpxzBatchWarning', { tiles: totalTiles }) }}
-                    </p>
                     <!-- GPXZ Account Status -->
                     <div v-if="localGpxzApiKey" class="mt-2">
                       <button @click="verifyGpxzKey" :disabled="isCheckingGPXZ"
@@ -178,14 +175,6 @@ const props = defineProps({
     default: false
   },
   areaSqKm: {
-    type: Number,
-    default: 0
-  },
-  isBatchMode: {
-    type: Boolean,
-    default: false
-  },
-  totalTiles: {
     type: Number,
     default: 0
   },

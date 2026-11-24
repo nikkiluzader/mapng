@@ -19,10 +19,10 @@ test('a saved Standard (the old default) moves to Mapterhorn once; switching bac
 });
 
 test('other saved choices are kept, and marked so a later Standard is never moved', () => {
-  const s = store({ mapng_batch_elevation: 'gpxz' });
-  assert.equal(initialElevationSource('mapng_batch_elevation', s), 'gpxz');
-  s.setItem('mapng_batch_elevation', 'default');
-  assert.equal(initialElevationSource('mapng_batch_elevation', s), 'default');
+  const s = store({ mapng_other_elevation: 'gpxz' });
+  assert.equal(initialElevationSource('mapng_other_elevation', s), 'gpxz');
+  s.setItem('mapng_other_elevation', 'default');
+  assert.equal(initialElevationSource('mapng_other_elevation', s), 'default');
 });
 
 test('storage that throws (private mode) still gives a source', () => {

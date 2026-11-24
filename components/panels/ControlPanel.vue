@@ -98,12 +98,12 @@
         </div>
 
         <!-- the area: tiles (one is today's square) or a road widened either side (refs/output/road-mode-plan.md) -->
-        <div v-if="!nativeDims && !store.batchMode" class="grid grid-cols-2 gap-1.5" role="radiogroup" :aria-label="t('road.areaMode')">
+        <div v-if="!nativeDims" class="grid grid-cols-2 gap-1.5" role="radiogroup" :aria-label="t('road.areaMode')">
           <button v-for="m in ['tiles', 'road']" :key="m" type="button" role="radio" :aria-checked="store.areaMode === m" :data-testid="`area-mode-${m}`" :disabled="isGenerating"
             :class="['rounded border px-2 py-1.5 text-xs font-medium transition-colors', store.areaMode === m ? 'border-brand bg-brand-50/60 dark:bg-brand/10 text-brand' : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300']"
             @click="store.setAreaMode(m)">{{ t(`road.mode_${m}`) }}</button>
         </div>
-        <fieldset v-if="!nativeDims && (store.areaMode !== 'road' || store.batchMode)" :disabled="store.boxLocked" :class="store.boxLocked ? 'opacity-60' : ''" :title="store.boxLocked ? (store.boxLockedByBackground ? t('backgroundAreas.lockedField') : t('map.lockedField')) : null">
+        <fieldset v-if="!nativeDims && store.areaMode !== 'road'" :disabled="store.boxLocked" :class="store.boxLocked ? 'opacity-60' : ''" :title="store.boxLocked ? (store.boxLockedByBackground ? t('backgroundAreas.lockedField') : t('map.lockedField')) : null">
           <ResolutionSelector
             :modelValue="resolution"
             @update:modelValue="$emit('resolutionChange', $event)"
@@ -128,8 +128,8 @@
                is on the road's own line) -->
           <ProcessingResolutionInput
             :model-value="processingMetersPerPixel"
-            :resolution="store.areaMode === 'road' && !store.batchMode ? 0 : Number(resolution) || 0"
-            :per-tile="store.tiles.length > 1 && store.areaMode !== 'road' && !store.batchMode"
+            :resolution="store.areaMode === 'road' ? 0 : Number(resolution) || 0"
+            :per-tile="store.tiles.length > 1 && store.areaMode !== 'road'"
             @update:model-value="(v) => $emit('update:processingMetersPerPixel', v)"
           />
         </fieldset>
@@ -150,15 +150,15 @@
           <span>{{ t('controlPanel.farShake') }}</span>
         </p>
 
-        <!-- tiles: one map of any shape (not with an uploaded elevation file, not in a batch job; editable with the area
+        <!-- tiles: one map of any shape (not with an uploaded elevation file; editable with the area
              locked: the lock pins the selection while the map pans, the tiles stay movable: the user, 2026-11-21) -->
         <RoadMode
-          v-if="!nativeDims && !store.batchMode && store.areaMode === 'road'"
+          v-if="!nativeDims && store.areaMode === 'road'"
           :meters-per-pixel="processingMetersPerPixel"
           :disabled="isGenerating"
         />
         <TileLayout
-          v-if="!nativeDims && !store.batchMode && store.areaMode !== 'road'"
+          v-if="!nativeDims && store.areaMode !== 'road'"
           :resolution="resolution"
           :meters-per-pixel="processingMetersPerPixel"
           :disabled="isGenerating"
@@ -166,9 +166,8 @@
 
       </SettingSection>
 
-      <!-- Spawn and quicktravel points (Basic too: where the car starts is a basic wish; not in a batch job) -->
+      <!-- Spawn and quicktravel points (Basic too: where the car starts is a basic wish) -->
       <SpawnPoints
-        v-if="!store.batchMode"
         :center="center"
         :resolution="resolution"
         :meters-per-pixel="processingMetersPerPixel"
@@ -409,7 +408,7 @@
           :useGPXZ="useGPXZ"
           :gpxz-api-key="gpxzApiKey"
           :has-custom-elevation="!!uploadedElevationFile"
-          :nothing-to-generate="store.areaMode === 'road' && !store.batchMode && !store.road"
+          :nothing-to-generate="store.areaMode === 'road' && !store.road"
           @generate="(preview) => $emit('generate', preview, fetchOSM, elevationSource, gpxzApiKey, elevationUnitOverride, metersPerPixel, gapFillSource, normalizeFallbackSource(fallbackSource, elevationSource))"
           @ready="step = 4; if (store.viewMode === 'location' && terrainData) store.viewMode = 'preview2d'"
         />
@@ -503,7 +502,7 @@ import WizardLayout from '../ui/WizardLayout.vue';
 import { BIG_AREA_KM, reachesShakeDistance } from '../../services/levelLimits.js';
 import { getLoadedOsmFile, onOsmFileChange, osmFileCoverage } from '../../services/osmFile.js';
 import OsmFileInput from '../controls/OsmFileInput.vue';
-import { computeGridBounds } from '../../services/batchJob.js';
+import { computeGridBounds } from '../../services/batchShape.js';
 import GenerateSummary from '../ui/GenerateSummary.vue';
 import { terrainMode, setTerrainMode, terrainGenerationOptions } from '../../composables/useTerrainMode.js';
 import { reloadTerrainSettings } from '../../composables/useTerrainMode.js';
@@ -573,7 +572,7 @@ watch(fetchOSM, (newVal) => {
   localStorage.setItem('mapng_fetchOSM', String(newVal));
 });
 
-// On unless turned off; read by fetchOSMData (single tile and batch alike).
+// On unless turned off; read by fetchOSMData.
 // (shared with the note in the view bar: composables/useOsmSource.js keeps it)
 const { tilesFirst: osmTilesFirst } = useOsmSource();
 const overtureBuildings = ref(localStorage.getItem(OVERTURE_BUILDINGS_STORAGE_KEY) !== 'false');
@@ -653,7 +652,7 @@ const summaryItems = computed(() => {
   const upload = Array.isArray(props.uploadedElevationFile) ? props.uploadedElevationFile.length > 0 : !!props.uploadedElevationFile;
   // (the map's own size: one tile's, the tiles' whole box, or the road's box; they showed one tile's for all three)
   const mpp = Number(props.processingMetersPerPixel) || 1;
-  const own = !nativeDims.value && !store.batchMode;
+  const own = !nativeDims.value;
   const shape = own && store.areaMode === 'road' ? roadApi.grid.value : own && store.tiles.length > 1 ? tileApi.grid.value : null;
   const wPx = shape ? shape.width : Number(props.resolution) || 0; const hPx = shape ? shape.height : wPx;
   const kmOf = (px) => { const km = (px * mpp) / 1000; return km >= 10 ? km.toFixed(0) : km.toFixed(1); };
@@ -812,7 +811,7 @@ if (desktopApp?.onUsage) {
   onUnmounted(() => stopUsage?.());
 }
 const generateMemory = computed(() => {
-  if (!desktopApp || !machineMemory.value || nativeDims.value || store.batchMode) return null;
+  if (!desktopApp || !machineMemory.value || nativeDims.value) return null;
   const g = store.areaMode === 'road' ? roadApi.grid.value : store.tiles.length > 1 ? tileApi.grid.value : null;
   if (store.areaMode === 'road' && !g) return null;
   // (a shape built in chunks is generated one chunk at a time)
@@ -830,11 +829,11 @@ const tileApi = useTiles(() => props.resolution, () => props.processingMetersPer
 const roadApi = useRoadMode(() => props.processingMetersPerPixel);
 const totalAreaSqM = computed(() => {
   // (road mode: the corridor's area)
-  if (store.areaMode === 'road' && !nativeDims.value && !store.batchMode) {
+  if (store.areaMode === 'road' && !nativeDims.value) {
     const g = roadApi.grid.value; const m = Number(props.processingMetersPerPixel) > 0 ? Number(props.processingMetersPerPixel) : 1;
     return g ? g.areaPx * m * m : 0;
   }
-  if (store.tiles.length > 1 && !nativeDims.value && !store.batchMode) {
+  if (store.tiles.length > 1 && !nativeDims.value) {
     const m = Number(props.processingMetersPerPixel) > 0 ? Number(props.processingMetersPerPixel) : 1;
     return tileApi.grid.value.areaPx * m * m;
   }

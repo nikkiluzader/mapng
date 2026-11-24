@@ -43,8 +43,8 @@ test('no shared setting is stored under a personal key', () => {
   for (const key of PERSONAL_STORAGE_KEYS) assert.ok(!shared.includes(key), key);
 });
 
-test('both control panels strip personal settings before applying a config', () => {
-  for (const file of ['components/panels/ControlPanel.vue', 'components/panels/BatchControlPanel.vue']) {
+test('the control panel strips personal settings before applying a config', () => {
+  for (const file of ['components/panels/ControlPanel.vue']) {
     const src = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
     assert.match(src, /const src = withoutPersonal\(config\?\.runConfiguration \|\| config\);/, file);
     assert.doesNotMatch(src, /gpxzApiKey\.value = src\.|gpxzStatus\.value = \{ \.\.\.src\./, file);

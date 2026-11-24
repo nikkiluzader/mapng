@@ -1,11 +1,11 @@
 <template>
   <!-- The control panel as a wizard: the mode switch, a stepper, one step's
        settings (scrolling), and a bottom bar that is always there (what the
-       button will build, and the button). Single tile and batch alike.
+       button will build, and the button).
        Every step stays mounted (v-show in the panel): switching steps keeps
        what was typed, and the export panel keeps its state. -->
   <div class="flex-1 min-h-0 flex flex-col">
-    <!-- the mode switch under Single tile / Batch job: Basic/Advanced, or Separate tiles/Combined level -->
+    <!-- the mode switch: Basic/Advanced -->
     <div v-if="$slots.bar" class="px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
       <slot name="bar" />
     </div>

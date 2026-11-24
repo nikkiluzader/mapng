@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia';
 import { ref, computed, shallowRef, watch } from 'vue';
-import { loadBatchState } from '../services/batchJob';
 import { cleanTileAnchor } from '../services/tileLayout.js';
 import { terrainMode, setTerrainMode } from '../composables/useTerrainMode.js';
 import { emptyMask, maskHasAreas } from '../services/backgroundMask.js';
@@ -44,27 +43,31 @@ export const useMainStore = defineStore('main', () => {
     }
   }
 
-  // Batch jobs are retired (tiles in step 1 took their place, user 2026-11-20): the old batch panel opens only for
-  // an unfinished job saved by an earlier version, so it can be finished or discarded. Nobody else starts in it.
-  const batchMode = ref(localStorage.getItem('mapng_batch_mode') === 'true' && !!loadBatchState());
-  if (!batchMode.value) { try { localStorage.removeItem('mapng_batch_mode'); } catch { /* private mode */ } }
+  // Batch jobs are gone (tiles in step 1 took their place; removed in 0.3.7). What an earlier version left behind is
+  // thrown away once at start: its settings, an unfinished saved job and its download cache.
+  for (const key of [
+    'mapng_batch_mode', 'mapng_batch_cols', 'mapng_batch_rows', 'mapng_batch_tile_follow_center',
+    'mapng_batch_tile_offsets', 'mapng_batch_tile_names', 'mapng_batch_state_v2', 'mapng_batch_state',
+    'mapng_batch_combined_level', 'mapng_batch_elevation', 'mapng_batch_elevation_migrated', 'mapng_batch_exports',
+    'mapng_batch_level_options', 'mapng_batch_mesh', 'mapng_batch_osm', 'mapng_batch_profile',
+    'mapng_batch_shared_elevation', 'mapng_batch_show_tile_layout',
+    'mapng_ui_sec_batchexports', 'mapng_ui_sec_batchlevel', 'mapng_ui_sec_batchperf2', 'mapng_ui_sec_batchres',
+  ]) {
+    try { localStorage.removeItem(key); } catch { /* private mode */ }
+  }
+  try { globalThis.indexedDB?.deleteDatabase('mapng-batch-cache'); } catch { /* blocked */ }
 
   // Advanced mode brings back the map-maker tools the basic UI hides: the 2D
   // asset / 3D model downloads, Surrounding Tiles, per-category level export
   // toggles and the preview's surroundings + wireframe. Basic is the default.
   const advancedMode = ref(localStorage.getItem('mapng_advanced_mode') === 'true');
   // Raw terrain: the Terrain choice "Untouched" (composables/useTerrainMode.js;
-  // advanced mode and batch jobs): generation leaves the elevation and OSM
+  // advanced mode): generation leaves the elevation and OSM
   // roads exactly as pulled (no height blur, ground filter, river lowering,
   // road snapping or smoothing; the road curves stay). Read it through
   // rawTerrainActive so basic mode never applies it.
   const rawTerrain = computed(() => terrainMode.value === 'untouched');
   const rawTerrainActive = computed(() => advancedMode.value && rawTerrain.value);
-
-  if (batchMode.value && Number(resolution.value) > 8192) {
-    resolution.value = 8192;
-    localStorage.setItem('mapng_resolution', String(8192));
-  }
 
   // --- Single Tile State ---
   // (shallow: a generated terrain holds millions of objects — OSM features and
@@ -121,7 +124,7 @@ export const useMainStore = defineStore('main', () => {
     const m = backgroundMask.value;
     return !!m.bounds && ((m.lines?.length || 0) > 0 || (m.paint?.length || 0) > 0 || (m.raw?.length || 0) > 0 || maskHasAreas(m));
   });
-  const backgroundActive = computed(() => advancedMode.value && !batchMode.value && backgroundDrawn.value);
+  const backgroundActive = computed(() => advancedMode.value && backgroundDrawn.value);
   // (also locked, with nothing drawn yet, once a drawing tool is picked: the
   // map can then be zoomed and panned to draw without the box following it)
   const backgroundPinned = ref(false);
@@ -132,8 +135,8 @@ export const useMainStore = defineStore('main', () => {
   // (and unlocked by hand over drawn mask areas: the lock button works at any time. The areas were drawn for
   // the box where it is; they are removed, with a word why, once it moves. Locked again before that, they stay.)
   const boxUnlockedOverMask = ref(false);
-  const boxLockedByBackground = computed(() => (backgroundActive.value && !boxUnlockedOverMask.value) || (backgroundPinned.value && advancedMode.value && !batchMode.value));
-  const boxLocked = computed(() => boxLockedByBackground.value || (boxPinnedByUser.value && !batchMode.value));
+  const boxLockedByBackground = computed(() => (backgroundActive.value && !boxUnlockedOverMask.value) || (backgroundPinned.value && advancedMode.value));
+  const boxLocked = computed(() => boxLockedByBackground.value || boxPinnedByUser.value);
   function setBackgroundPinned(v) { backgroundPinned.value = !!v; }
   function setBoxPinned(v) { boxPinnedByUser.value = !!v; }
   function setBoxUnlockedOverMask(v) { boxUnlockedOverMask.value = !!v && backgroundDrawn.value; }
@@ -214,34 +217,6 @@ export const useMainStore = defineStore('main', () => {
   function setTilesTogether(v) { tilesTogether.value = !!v; localStorage.setItem('mapng_tiles_together', String(!!v)); }
   function setTilesSnap(v) { tilesSnap.value = !!v; localStorage.setItem('mapng_tiles_snap', String(!!v)); }
 
-  // --- Batch Job State ---
-  const batchGridCols = ref(parseInt(localStorage.getItem('mapng_batch_cols')) || 3);
-  const batchGridRows = ref(parseInt(localStorage.getItem('mapng_batch_rows')) || 3);
-  const batchTileFollowCenter = ref(localStorage.getItem('mapng_batch_tile_follow_center') !== 'false');
-  const batchTileOffsets = ref((() => {
-    try {
-      const saved = localStorage.getItem('mapng_batch_tile_offsets');
-      const parsed = saved ? JSON.parse(saved) : [];
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  })());
-  const batchTileNames = ref((() => {
-    try {
-      const saved = localStorage.getItem('mapng_batch_tile_names');
-      const parsed = saved ? JSON.parse(saved) : [];
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  })());
-  const batchState = ref(null);
-  const batchRunning = ref(false);
-  const batchCurrentStep = ref('');
-  const showBatchProgress = ref(false);
-  const savedBatchState = ref(loadBatchState());
-
   // --- Actions ---
   // (force: opening a project or share code; it brings or clears its own mask)
   function setCenter(newCenter, { force = false } = {}) {
@@ -295,36 +270,6 @@ export const useMainStore = defineStore('main', () => {
   }
   function clearBackgroundMask() { setBackgroundMask(emptyMask()); backgroundTool.value = 'pan'; backgroundPinned.value = false; }
 
-  function setBatchMode(value) {
-    batchMode.value = value;
-    localStorage.setItem('mapng_batch_mode', value ? 'true' : 'false');
-  }
-
-  function setBatchGridCols(cols) {
-    batchGridCols.value = cols;
-    localStorage.setItem('mapng_batch_cols', String(cols));
-  }
-
-  function setBatchGridRows(rows) {
-    batchGridRows.value = rows;
-    localStorage.setItem('mapng_batch_rows', String(rows));
-  }
-
-  function setBatchTileFollowCenter(value) {
-    batchTileFollowCenter.value = !!value;
-    localStorage.setItem('mapng_batch_tile_follow_center', batchTileFollowCenter.value ? 'true' : 'false');
-  }
-
-  function setBatchTileOffsets(offsets) {
-    batchTileOffsets.value = Array.isArray(offsets) ? offsets : [];
-    localStorage.setItem('mapng_batch_tile_offsets', JSON.stringify(batchTileOffsets.value));
-  }
-
-  function setBatchTileNames(names) {
-    batchTileNames.value = Array.isArray(names) ? names : [];
-    localStorage.setItem('mapng_batch_tile_names', JSON.stringify(batchTileNames.value));
-  }
-
   return {
     compareSpot,
     // State
@@ -332,7 +277,6 @@ export const useMainStore = defineStore('main', () => {
     zoom,
     resolution,
     isDarkMode,
-    batchMode,
     terrainData,
     exportStepOpen,
     lastGenerationKey,
@@ -368,16 +312,6 @@ export const useMainStore = defineStore('main', () => {
     setBackgroundPinned,
     setBackgroundMask,
     clearBackgroundMask,
-    batchGridCols,
-    batchGridRows,
-    batchTileFollowCenter,
-    batchTileOffsets,
-    batchTileNames,
-    batchState,
-    batchRunning,
-    batchCurrentStep,
-    showBatchProgress,
-    savedBatchState,
     // Actions
     setCenter,
     setZoom,
@@ -388,13 +322,7 @@ export const useMainStore = defineStore('main', () => {
     rawTerrain,
     rawTerrainActive,
     setRawTerrain,
-    setBatchMode,
-    setBatchGridCols,
-    setBatchGridRows,
-    setBatchTileFollowCenter,
-    setBatchTileOffsets,
     tiles, tilesTogether, tilesSnap, tileAnchor, setTiles, setTilesTogether, setTilesSnap, setTileAnchor,
-    areaMode, road, roadHalfWidthM, setAreaMode, setRoad, setRoadHalfWidthM,
-    setBatchTileNames
+    areaMode, road, roadHalfWidthM, setAreaMode, setRoad, setRoadHalfWidthM
   };
 });

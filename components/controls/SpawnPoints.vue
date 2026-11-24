@@ -129,7 +129,6 @@ const asideText = computed(() => (rows.value.length ? t('spawnPoints.aside', { n
 // P places points, Escape stops, Delete removes the selected one (not while typing)
 function onKey(e) {
   if (e.ctrlKey || e.metaKey || e.altKey || /input|textarea|select/i.test(e.target?.tagName || '') || e.target?.isContentEditable) return;
-  if (store.batchMode) return;
   if (e.key === 'p' || e.key === 'P') { editor.setTool(!store.pointTool); e.preventDefault(); return; }
   if (e.key === 'Escape' && store.pointTool) { editor.setTool(false); return; }
   // (Delete only: Backspace is too easy to press meaning something else)

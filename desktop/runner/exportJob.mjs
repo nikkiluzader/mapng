@@ -43,7 +43,7 @@ async function main() {
   fs.mkdirSync(job.outputDir, { recursive: true });
   let partial = null; let fd = null; let size = 0;
   // The data step, when nothing ran it ahead (a terrain the window made
-  // itself: a batch's combined level, an upload): its downloads first, as
+  // itself: an upload): its downloads first, as
   // their own step, so the export after it only processes
   if (!job.options?.dataStepDone) {
     const { exportDataNeeds, downloadExportData } = await import('../../services/exportData.js');

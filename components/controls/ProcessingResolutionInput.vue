@@ -66,7 +66,7 @@ const props = defineProps({
   modelValue: { type: [Number, String], default: 1 },
   // The output size (px) it applies to, for the coverage summary.
   resolution: { type: Number, default: 0 },
-  // Batch: the output size is per tile.
+  // Several tiles: the output size is per tile.
   perTile: { type: Boolean, default: false },
 });
 const emit = defineEmits(['update:modelValue']);

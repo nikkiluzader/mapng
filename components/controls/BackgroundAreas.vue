@@ -232,7 +232,7 @@ function onKey(e) {
     if (shape) setShape(shape);
   }
 }
-// Areas drawn for another box (moved while in Basic mode or a batch job): they no
+// Areas drawn for another box (moved while in Basic mode): they no
 // longer fit, so they go, with a word why
 function dropIfStale() {
   const m = store.backgroundMask;

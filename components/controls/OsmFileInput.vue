@@ -24,7 +24,7 @@
       </div>
       <p class="mt-1.5 flex items-start gap-1.5 leading-snug" :class="coverageClass">
         <component :is="coverage.coverage === 'full' ? CheckCircle2 : AlertTriangle" :size="12" class="shrink-0 mt-px" />
-        <span>{{ t(`osmFile.coverage_${coverage.coverage}${grid && coverage.coverage === 'partial' ? 'Grid' : ''}`, { pct: Math.round(coverage.share * 100) }) }}</span>
+        <span>{{ t(`osmFile.coverage_${coverage.coverage}`, { pct: Math.round(coverage.share * 100) }) }}</span>
       </p>
     </div>
 
@@ -111,10 +111,8 @@ import {
 } from '../../services/osmFile.js';
 
 const props = defineProps({
-  // the area being generated: { south, west, north, east } (a batch: the whole grid)
+  // the area being generated: { south, west, north, east }
   area: { type: Object, required: true },
-  // (a batch grid: each tile checks the file on its own)
-  grid: { type: Boolean, default: false },
 });
 const { t, locale } = useI18n({ useScope: 'global' });
 

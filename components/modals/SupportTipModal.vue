@@ -52,7 +52,6 @@ defineEmits(['close']);
 const { t } = useI18n({ useScope: 'global' });
 
 const contextLabel = computed(() => {
-  if (props.context === 'batch') return 'support.contextBatch';
   if (props.context === 'single') return 'support.contextSingle';
   return 'support.contextGeneral';
 });

@@ -63,14 +63,6 @@
       </BaseButton>
     </div>
 
-    <!-- Batch jobs are retired (tiles in step 1): this bar shows only while an unfinished job from an earlier
-         version is open, with the way out -->
-    <div v-if="batchMode" class="px-4 py-2 border-b border-amber-300/60 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 text-xs text-amber-900 dark:text-amber-100 space-y-1.5" data-testid="batch-retired" role="status">
-      <p class="font-semibold">{{ t('mode.retiredTitle') }}</p>
-      <p class="leading-relaxed">{{ t('mode.retiredBody') }}</p>
-      <button type="button" class="px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-500 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed" :disabled="heavyJobRunning" data-testid="batch-leave" @click="$emit('leave-batch')">{{ t('mode.retiredLeave') }}</button>
-    </div>
-
     <!-- (the panel lays itself out: components/ui/WizardLayout.vue, with its own scrolling) -->
     <div class="flex-1 min-h-0 flex flex-col">
       <slot />
@@ -218,7 +210,6 @@ const isProductionHost = typeof window !== 'undefined'
   && /^(www\.)?mapng\.com$/i.test(window.location.hostname);
 
 const props = defineProps({
-  batchMode: { type: Boolean, default: false },
   isDarkMode: { type: Boolean, default: false },
   buildMainHash: { type: String, default: 'n/a' },
   buildMainTime: { type: String, default: 'n/a' },
@@ -226,7 +217,7 @@ const props = defineProps({
   buildDevTime: { type: String, default: 'n/a' },
 });
 
-defineEmits(['show-about', 'show-support', 'show-disclaimer', 'show-stack', 'toggle-dark', 'leave-batch']);
+defineEmits(['show-about', 'show-support', 'show-disclaimer', 'show-stack', 'toggle-dark']);
 
 const handleLocaleChange = (event) => {
   setI18nLanguage(event.target.value);

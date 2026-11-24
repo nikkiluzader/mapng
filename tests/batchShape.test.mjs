@@ -1,7 +1,7 @@
 // services/batchShape.js: a shaped combined level's layout, overlap ownership and footprint.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { snapTileOffsets, shapedLayout, pixelOwner, footprintRows, inFootprint, keepSquareFor, fillOutsideFootprint } from '../services/batchShape.js';
+import { computeGridBounds, snapTileOffsets, shapedLayout, pixelOwner, footprintRows, inFootprint, keepSquareFor, fillOutsideFootprint } from '../services/batchShape.js';
 
 test('offsets snap to whole pixels', () => {
   assert.deepEqual(snapTileOffsets([{ index: 1, offsetX: 10.6, offsetY: -3.2 }], 2).map((o) => [o.offsetX, o.offsetY]), [[10, -4]]);
@@ -91,4 +91,15 @@ test('the previews’ footprint test and mask: rects, a road’s runs, a chunked
   assert.equal(footprintTest(ov)(0.25, 0.5), true); assert.equal(footprintTest(ov)(0.75, 0.5), false);
   // a plain map: no test, no mask
   assert.equal(footprintTest({ width: 8, height: 8 }), null); assert.equal(footprintMaskPixels({ width: 8, height: 8 }, 4, 4), null);
+});
+
+test('grid bounds: the square around the centre, in metres on the ground', () => {
+  const b = computeGridBounds({ lat: 0, lng: 10 }, 1024, 1, 1, 2048);
+  const half = 1024 / 111320;
+  assert.ok(Math.abs(b.north - half) < 1e-12 && Math.abs(b.south + half) < 1e-12);
+  assert.ok(Math.abs(b.east - (10 + half)) < 1e-12 && Math.abs(b.west - (10 - half)) < 1e-12);
+  // no span given: the output size in metres; a grid is cols x rows of them; longitude widens with latitude
+  const g = computeGridBounds({ lat: 60, lng: 0 }, 1000, 3, 2);
+  assert.ok(Math.abs((g.north - g.south) * 111320 - 2000) < 1e-6);
+  assert.ok(Math.abs((g.east - g.west) * 111320 * Math.cos(60 * Math.PI / 180) - 3000) < 1e-6);
 });

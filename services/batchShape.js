@@ -1,4 +1,4 @@
-// A shaped combined level (batch mode, combined level, ground as models): the tiles where the user put them, as one
+// A shaped level (tiles in step 1, ground as models): the tiles where the user put them, as one
 // level whose area is exactly their footprint. The export still works on one square grid (its many map-wide steps
 // assume it), the smallest power-of-two square holding every tile; the ground models, the map data, the trees and the
 // spawn keep to the footprint (exportBeamNGLevel.js groundShape).
@@ -11,6 +11,28 @@
 // - the footprint is the union of the tile squares, nothing more.
 //
 // Pixel space: x east, y south (rows from the north), the square N pixels a side.
+
+/**
+ * The bounds { north, south, east, west } of a grid of `gridCols` x `gridRows` squares centred on `center`, each
+ * `tileSpanMeters` a side (the output size in metres; `resolution` when not given). One by one: the selected square.
+ */
+export function computeGridBounds(center, resolution, gridCols, gridRows, tileSpanMeters = resolution) {
+  const metersPerDegLat = 111320;
+  const metersPerDegLng = 111320 * Math.cos(center.lat * Math.PI / 180);
+  const spanMeters = Number.isFinite(Number(tileSpanMeters)) && Number(tileSpanMeters) > 0
+    ? Number(tileSpanMeters)
+    : Number(resolution);
+
+  const totalWidth = gridCols * spanMeters;
+  const totalHeight = gridRows * spanMeters;
+
+  return {
+    north: center.lat + totalHeight / 2 / metersPerDegLat,
+    south: center.lat - totalHeight / 2 / metersPerDegLat,
+    east: center.lng + totalWidth / 2 / metersPerDegLng,
+    west: center.lng - totalWidth / 2 / metersPerDegLng,
+  };
+}
 
 /** The tile offsets (metres) snapped to whole pixels of `mpp` metres. */
 export function snapTileOffsets(offsets, mpp) {
