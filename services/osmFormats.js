@@ -3,6 +3,9 @@
 // QGIS, overpass turbo's export). Asked for on Discord (2026-11-20). The result is Overpass JSON text, so the desktop
 // app's generator, which is handed the file's text, reads it as it reads any other.
 import Pbf from 'pbf';
+import { compressionOf, decompress } from './osmDecompress.js';
+import { o5mKind, decodeO5m } from './osmO5m.js';
+import { shapefilesToGeojson } from './osmShapefile.js';
 
 // ── GeoJSON ─────────────────────────────────────────────────────────────────
 
@@ -248,15 +251,47 @@ export async function decodeOsmPbf(input, { onProgress } = {}) {
 }
 
 /**
- * A file the user picked -> its OSM data as text the importer reads: an .osm.pbf decoded to Overpass JSON, anything
- * else (OSM XML, Overpass JSON, GeoJSON) as it is (parseOsmFile reads GeoJSON itself).
+ * A file the user picked -> its OSM data as text the importer reads. Recognised by its first bytes, not only its name,
+ * and opened layer by layer: compressed (.gz, .bz2, .xz: osmDecompress.js), zipped (a Shapefile set, or one OSM file
+ * in a .zip), then .osm.pbf, .o5m (osmO5m.js) decoded to Overpass JSON, Shapefiles to GeoJSON (osmShapefile.js), and
+ * OSM XML (also .osh history), Overpass JSON and GeoJSON as text (parseOsmFile reads them).
+ * Refused with the reason: change files (.osc, .o5c: edits, not a map), OsmAnd's .obf and vector-tile .pbf/.mvt
+ * (map tiles drawn from OSM, with most tags and every way's real shape gone).
+ * The formats asked for by SPLATPLAYS (Discord #general 2026-11-21).
  */
 export async function osmTextOfFile(file, { onProgress } = {}) {
   const name = String(file?.name || '').toLowerCase();
-  const start = new Uint8Array(await file.slice(0, 64 * 1024 + 4).arrayBuffer());
-  if (name.endsWith('.pbf') || looksLikePbf(start)) {
-    const data = await decodeOsmPbf(await file.arrayBuffer(), { onProgress });
-    return JSON.stringify(data);
+  return osmTextOfBytes(new Uint8Array(await file.arrayBuffer()), name, { onProgress });
+}
+
+const isZip = (b) => b.length > 4 && b[0] === 0x50 && b[1] === 0x4b && b[2] === 0x03 && b[3] === 0x04;
+const OSM_IN_ZIP = /\.(osm|osh|xml|json|geojson|pbf|o5m|gz|bz2|xz)$/i;
+
+export async function osmTextOfBytes(bytes, name = '', { onProgress, depth = 0 } = {}) {
+  if (depth > 3) throw new Error('This file is packed too many times over.');
+  const inner = name.replace(/\.(gz|bz2|xz|zip)$/i, '');
+  if (compressionOf(bytes)) return osmTextOfBytes(await decompress(bytes), inner, { onProgress, depth: depth + 1 });
+  if (isZip(bytes)) {
+    const { default: JSZip } = await import('jszip');
+    const zip = await JSZip.loadAsync(bytes);
+    const entries = Object.values(zip.files).filter((f) => !f.dir && !/(^|\/)(__MACOSX|\.)/.test(f.name));
+    if (entries.some((f) => /\.shp$/i.test(f.name))) {
+      const files = {};
+      for (const f of entries) if (/\.(shp|dbf|prj|cpg)$/i.test(f.name)) files[f.name] = await f.async('uint8array');
+      const gj = shapefilesToGeojson(files);
+      console.log(`[OSM file] Shapefiles (${gj.layout === 'geofabrik' ? "Geofabrik's layers" : 'columns read as OSM tags'}): ${gj.layers.map((l) => `${l.layer} ${l.read} of ${l.of}`).join(', ')}. Lanes, widths, surfaces, sidewalks and building heights are not in Shapefiles.`);
+      return JSON.stringify({ type: 'FeatureCollection', features: gj.features });
+    }
+    const osm = entries.filter((f) => OSM_IN_ZIP.test(f.name));
+    if (osm.length !== 1) throw new Error(osm.length ? 'This zip holds more than one map file: pick the one to load and load it on its own.' : 'This zip holds no OpenStreetMap file (.osm, .osm.pbf, .o5m, GeoJSON or a Shapefile set).');
+    return osmTextOfBytes(await osm[0].async('uint8array'), osm[0].name.toLowerCase(), { onProgress, depth: depth + 1 });
   }
-  return file.text();
+  if (looksLikePbf(bytes)) return JSON.stringify(await decodeOsmPbf(bytes, { onProgress }));
+  const o5 = o5mKind(bytes);
+  if (o5) return JSON.stringify(decodeO5m(bytes, { onProgress }));
+  if (/\.obf$/.test(inner)) throw new Error("OsmAnd's .obf files cannot be read: they hold OsmAnd's own drawing data, not OpenStreetMap's tags and ways. Use an .osm.pbf of the same area (Geofabrik, BBBike).");
+  if (/\.(osc|o5c)$/.test(inner)) throw new Error('This is a change file: it lists edits, not a map. Load the map file it was made against instead.');
+  if (/\.(pbf|mvt)$/.test(inner)) throw new Error('This .pbf is not an OpenStreetMap extract: it may be a map tile (vector tiles keep few tags and cut every way at the tile edge). Use an .osm.pbf (Geofabrik, BBBike, osmium).');
+  if (bytes.length && (bytes[0] < 0x09 || (bytes[0] > 0x0d && bytes[0] < 0x20)) && bytes[0] !== 0xef) throw new Error('Not an OpenStreetMap file. Use a .osm file (openstreetmap.org Export or JOSM), an .osm.pbf or .o5m extract, Overpass JSON, GeoJSON or a Shapefile zip (also .gz, .bz2 or .xz).');
+  return new TextDecoder('utf-8').decode(bytes);
 }

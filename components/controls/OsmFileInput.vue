@@ -90,7 +90,7 @@
         <Upload :size="16" />
         <span class="font-medium">{{ reading ? t('osmFile.reading') : t('osmFile.drop') }}</span>
         <span class="text-micro text-gray-400">{{ t('osmFile.formats') }}</span>
-        <input type="file" accept=".osm,.xml,.json,.pbf,.geojson,application/xml,application/json,application/geo+json" class="sr-only" @change="onPick" />
+        <input type="file" accept=".osm,.osh,.xml,.json,.pbf,.o5m,.geojson,.gz,.bz2,.xz,.zip,application/xml,application/json,application/geo+json,application/zip,application/gzip,application/x-bzip2,application/x-xz" class="sr-only" @change="onPick" />
       </label>
       <p v-if="error" :title="error" class="flex items-start gap-1.5 leading-snug text-red-600 dark:text-red-400">
         <AlertTriangle :size="12" class="shrink-0 mt-px" />{{ t('osmFile.bad') }}

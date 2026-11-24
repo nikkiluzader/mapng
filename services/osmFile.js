@@ -41,8 +41,20 @@ const gone = (a) => a.action === 'delete' || a.visible === 'false';
  */
 function readOsmXml(text) {
   const nodes = new Map();
-  const ways = [];
-  const relations = [];
+  const ways = new Map();
+  const relations = new Map();
+  // (a history file, .osh, holds every version of each object: the newest one stands, and an object whose newest
+  // version is deleted is gone. Read as a plain .osm, every version of a way came in as a way of its own and a
+  // deletion did not take out what came before it (SPLATPLAYS asked for .osh, 2026-11-21))
+  const versions = new Map();   // 'n123' -> version kept
+  const newer = (key, a) => {
+    const v = Number(a.version);
+    if (!Number.isFinite(v)) return true;
+    const had = versions.get(key);
+    if (had != null && had > v) return false;
+    versions.set(key, v);
+    return true;
+  };
   let bounds = null;
   let current = null;          // the node / way / relation being read
   const TAG = /<(\/?)(node|way|relation|tag|nd|member|bounds)\b([^>]*?)(\/?)>/g;
@@ -53,20 +65,24 @@ function readOsmXml(text) {
     switch (name) {
       case 'node': {
         const node = { type: 'node', id: Number(a.id), lat: Number(a.lat), lon: Number(a.lon) };
-        if (!gone(a) && Number.isFinite(node.lat) && Number.isFinite(node.lon)) nodes.set(node.id, node);
-        current = selfClosing ? null : node;
+        const take = newer(`n${node.id}`, a);
+        if (take && gone(a)) nodes.delete(node.id);
+        else if (take && Number.isFinite(node.lat) && Number.isFinite(node.lon)) nodes.set(node.id, node);
+        current = selfClosing || !take ? null : node;
         break;
       }
       case 'way': {
         const way = { type: 'way', id: Number(a.id), refs: [], tags: null };
-        if (!gone(a)) ways.push(way);
-        current = selfClosing ? null : way;
+        const take = newer(`w${way.id}`, a);
+        if (take && gone(a)) ways.delete(way.id); else if (take) ways.set(way.id, way);
+        current = selfClosing || !take ? null : way;
         break;
       }
       case 'relation': {
         const rel = { type: 'relation', id: Number(a.id), members: [], tags: null };
-        if (!gone(a)) relations.push(rel);
-        current = selfClosing ? null : rel;
+        const take = newer(`r${rel.id}`, a);
+        if (take && gone(a)) relations.delete(rel.id); else if (take) relations.set(rel.id, rel);
+        current = selfClosing || !take ? null : rel;
         break;
       }
       case 'tag':
@@ -94,7 +110,7 @@ function readOsmXml(text) {
       default:
     }
   }
-  return { nodes, ways, relations, bounds };
+  return { nodes, ways: [...ways.values()], relations: [...relations.values()], bounds };
 }
 
 /** Overpass JSON (out geom, or out body + skel) -> the same shape as readOsmXml. */
@@ -135,12 +151,12 @@ export function parseOsmFile(text) {
     if (!Array.isArray(json?.elements)) throw new Error('This JSON file is not OpenStreetMap data (no "elements", no GeoJSON features).');
     read = readOverpassJson(json);
   } else if (/<osm\b/.test(head) || /<osmChange\b/.test(head)) {
-    if (/<osmChange\b/.test(head)) throw new Error('This is a change file (osmChange), not map data.');
+    if (/<osmChange\b/.test(head)) throw new Error('This is a change file (.osc): it lists edits, not a map. Load the map file it was made against instead.');
     read = readOsmXml(String(text));
   } else if (head.startsWith('<')) {
     throw new Error('This XML file is not OpenStreetMap data (no <osm> element).');
   } else {
-    throw new Error('Not an OpenStreetMap file. Use a .osm file (openstreetmap.org Export or JOSM), an .osm.pbf extract, Overpass JSON or GeoJSON.');
+    throw new Error('Not an OpenStreetMap file. Use a .osm file (openstreetmap.org Export or JOSM), an .osm.pbf or .o5m extract, Overpass JSON, GeoJSON or a Shapefile zip (also .gz, .bz2 or .xz).');
   }
 
   const { nodes, ways, relations, wayGeometry } = read;

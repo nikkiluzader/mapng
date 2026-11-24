@@ -1552,7 +1552,7 @@
     "openSite": "Открыть в OSM",
     "tooBig": "Слишком большой участок для одного экспорта openstreetmap.org (не больше 0,25 квадратного градуса и 50 000 точек). Уменьшите участок или сохраните его из JOSM.",
     "drop": "Перетащите сюда файл .osm или нажмите, чтобы выбрать",
-    "formats": ".osm (экспорт openstreetmap.org, JOSM), .osm.pbf (Geofabrik, BBBike, osmium), JSON Overpass или GeoJSON",
+    "formats": ".osm (экспорт openstreetmap.org, JOSM; также история .osh), .osm.pbf (Geofabrik, BBBike, osmium), .o5m, JSON Overpass, GeoJSON или zip с Shapefile (слои Geofabrik, меньше деталей); любой из них также как .gz, .bz2 или .xz",
     "reading": "Чтение файла…",
     "bad": "Этот файл не удалось прочитать как данные OpenStreetMap.",
     "remove": "Больше не использовать этот файл",

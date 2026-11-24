@@ -1,0 +1,618 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<osm version='0.6' generator='mapng-test'>
+  <bounds minlat='54.884' minlon='23.926' maxlat='54.888' maxlon='23.934' />
+<node id='60002413' timestamp='2025-11-17T21:44:49Z' visible='true' version='28' lat='54.8867593' lon='23.9310396' />
+<node id='8846102653' timestamp='2021-06-18T14:59:21Z' visible='true' version='1' lat='54.8868091' lon='23.93096' />
+<node id='761797462' timestamp='2025-11-17T21:44:49Z' visible='true' version='7' lat='54.8868581' lon='23.9308827' />
+<node id='364861087' timestamp='2022-12-19T22:21:44Z' visible='true' version='9' lat='54.8851246' lon='23.9277573' />
+<node id='1871529808' timestamp='2022-06-12T09:11:47Z' visible='true' version='2' lat='54.8851017' lon='23.9274224' />
+<node id='765082893' timestamp='2022-06-12T09:11:47Z' visible='true' version='2' lat='54.8850983' lon='23.9272957' />
+<node id='1871529809' timestamp='2022-06-12T09:11:47Z' visible='true' version='2' lat='54.885113' lon='23.9271699' />
+<node id='364777543' timestamp='2022-06-12T09:11:47Z' visible='true' version='12' lat='54.8851387' lon='23.927074' />
+<node id='914212072' timestamp='2024-06-24T14:36:35Z' visible='true' version='2' lat='54.8851658' lon='23.927009' />
+<node id='765082895' timestamp='2024-06-24T14:36:35Z' visible='true' version='3' lat='54.8852067' lon='23.9269352' />
+<node id='914212061' timestamp='2024-06-24T14:36:35Z' visible='true' version='5' lat='54.885246' lon='23.9268708'>
+    <tag k='crossing' v='uncontrolled' />
+    <tag k='highway' v='crossing' />
+    <tag k='tactile_paving' v='yes' />
+  </node>
+<node id='2681216583' timestamp='2022-12-23T14:09:50Z' visible='true' version='2' lat='54.8853189' lon='23.9266663' />
+<node id='10274352625' timestamp='2022-12-19T22:21:44Z' visible='true' version='1' lat='54.8848747' lon='23.9273109' />
+<node id='364861114' timestamp='2022-12-19T22:21:44Z' visible='true' version='12' lat='54.8846275' lon='23.9268855' />
+<node id='6459875306' action='modify' timestamp='2021-11-08T22:21:42Z' visible='true' version='2' lat='54.88786478569' lon='23.93339146839' />
+<node id='-29541' action='modify' visible='true' lat='54.88778158687' lon='23.93302649193' />
+<node id='366580047' action='modify' timestamp='2023-04-13T08:34:29Z' visible='true' version='2' lat='54.88768174223' lon='23.93264088282' />
+<node id='10806991440' action='modify' timestamp='2023-04-13T08:34:29Z' visible='true' version='1' lat='54.88762311396' lon='23.93245517116' />
+<node id='60002115' action='modify' timestamp='2023-04-13T08:34:29Z' visible='true' version='23' lat='54.88751004243' lon='23.93215473006' />
+<node id='366579899' action='modify' timestamp='2024-08-23T07:15:31Z' visible='true' version='7' lat='54.88780099321' lon='23.93379426042' />
+<node id='664111860' action='modify' timestamp='2024-08-23T07:15:31Z' visible='true' version='7' lat='54.88793005667' lon='23.93370247208' />
+<node id='761797394' timestamp='2016-08-22T05:18:12Z' visible='true' version='3' lat='54.8847709' lon='23.9291682' />
+<node id='761890848' timestamp='2016-09-28T18:18:16Z' visible='true' version='4' lat='54.8847621' lon='23.929183' />
+<node id='761797408' timestamp='2016-09-28T18:18:16Z' visible='true' version='4' lat='54.8847326' lon='23.9292265' />
+<node id='4355271638' timestamp='2016-08-18T09:28:39Z' visible='true' version='1' lat='54.8847068' lon='23.9292728' />
+<node id='9825157311' timestamp='2022-06-17T11:23:58Z' visible='true' version='1' lat='54.8847523' lon='23.9293867' />
+<node id='761890849' timestamp='2020-02-05T14:16:23Z' visible='true' version='6' lat='54.8847123' lon='23.9294398' />
+<node id='4355271637' timestamp='2020-02-05T14:16:23Z' visible='true' version='2' lat='54.8846855' lon='23.9294822' />
+<node id='761797410' timestamp='2020-02-05T14:16:23Z' visible='true' version='6' lat='54.8846561' lon='23.9295287' />
+<node id='4355271636' timestamp='2020-02-05T14:16:23Z' visible='true' version='3' lat='54.8846202' lon='23.9295854' />
+<node id='664140515' timestamp='2020-02-05T14:16:23Z' visible='true' version='7' lat='54.8846098' lon='23.9296019' />
+<node id='4360958789' timestamp='2020-02-05T14:16:23Z' visible='true' version='2' lat='54.8845826' lon='23.929645' />
+<node id='4355271635' timestamp='2016-09-28T18:18:16Z' visible='true' version='2' lat='54.884573' lon='23.9296602' />
+<node id='2419882842' timestamp='2016-08-18T09:28:55Z' visible='true' version='2' lat='54.8844723' lon='23.9297805' />
+<node id='3238153743' timestamp='2014-12-16T16:37:19Z' visible='true' version='1' lat='54.8858951' lon='23.9311176' />
+<node id='13719551990' timestamp='2026-04-09T21:13:03Z' visible='true' version='1' lat='54.8856428' lon='23.9306658' />
+<node id='8303866148' timestamp='2021-01-08T20:46:20Z' visible='true' version='1' lat='54.8855044' lon='23.930418' />
+<node id='761797398' timestamp='2022-06-17T11:23:58Z' visible='true' version='3' lat='54.8854852' lon='23.9304479' />
+<node id='761890850' timestamp='2022-06-17T11:23:58Z' visible='true' version='5' lat='54.8854711' lon='23.9304699'>
+    <tag k='railway' v='crossing' />
+  </node>
+<node id='761797427' timestamp='2022-06-17T11:23:58Z' visible='true' version='5' lat='54.8854546' lon='23.9304955'>
+    <tag k='barrier' v='entrance' />
+  </node>
+<node id='761797428' timestamp='2022-06-17T11:23:58Z' visible='true' version='5' lat='54.8854363' lon='23.930524'>
+    <tag k='railway' v='crossing' />
+  </node>
+<node id='761797426' timestamp='2022-06-17T11:23:58Z' visible='true' version='3' lat='54.8854202' lon='23.9305458' />
+<node id='761797390' timestamp='2016-08-22T05:18:12Z' visible='true' version='3' lat='54.8869612' lon='23.9331433' />
+<node id='761797440' action='modify' timestamp='2022-11-04T13:28:49Z' visible='true' version='3' lat='54.88694547139' lon='23.93316814402'>
+    <tag k='crossing:barrier' v='no' />
+    <tag k='railway' v='crossing' />
+  </node>
+<node id='761797438' timestamp='2012-12-16T10:47:39Z' visible='true' version='2' lat='54.8869246' lon='23.9332016'>
+    <tag k='barrier' v='entrance' />
+  </node>
+<node id='761797430' action='modify' timestamp='2022-11-04T13:28:51Z' visible='true' version='4' lat='54.88691274969' lon='23.93322163297'>
+    <tag k='crossing:barrier' v='no' />
+    <tag k='railway' v='crossing' />
+  </node>
+<node id='761797441' action='modify' timestamp='2022-06-17T11:23:58Z' visible='true' version='2' lat='54.88689704649' lon='23.93324775598' />
+<node id='761797445' timestamp='2022-06-17T11:23:58Z' visible='true' version='3' lat='54.8859136' lon='23.9320869' />
+<node id='761797446' timestamp='2024-06-24T14:36:35Z' visible='true' version='2' lat='54.8860713' lon='23.9318351' />
+<node id='761797447' timestamp='2024-06-24T14:36:35Z' visible='true' version='2' lat='54.8862668' lon='23.9315432' />
+<node id='13719527828' timestamp='2026-04-09T20:55:02Z' visible='true' version='1' lat='54.8864916' lon='23.9311982' />
+<node id='761797454' timestamp='2016-08-18T09:28:56Z' visible='true' version='2' lat='54.8859743' lon='23.9321974' />
+<node id='9825157305' timestamp='2024-06-24T14:36:35Z' visible='true' version='2' lat='54.8859711' lon='23.9316465' />
+<node id='761797396' timestamp='2024-06-24T14:36:35Z' visible='true' version='5' lat='54.8861211' lon='23.9316008' />
+<node id='3238153736' timestamp='2024-06-24T14:36:35Z' visible='true' version='2' lat='54.8861455' lon='23.931561' />
+<node id='6629286803' timestamp='2024-06-24T14:36:35Z' visible='true' version='3' lat='54.8861711' lon='23.9315192' />
+<node id='761797449' timestamp='2024-06-24T14:36:35Z' visible='true' version='5' lat='54.88703' lon='23.9304706' />
+<node id='800120133' timestamp='2024-06-24T14:36:35Z' visible='true' version='4' lat='54.8871581' lon='23.9307203' />
+<node id='761797451' timestamp='2024-06-24T14:36:35Z' visible='true' version='5' lat='54.8870838' lon='23.9302651' />
+<node id='761797464' timestamp='2012-11-19T09:45:59Z' visible='true' version='4' lat='54.8871976' lon='23.9300884' />
+<node id='761797465' timestamp='2024-06-24T14:36:35Z' visible='true' version='6' lat='54.8864391' lon='23.930746' />
+<node id='761797466' timestamp='2024-06-24T14:36:35Z' visible='true' version='5' lat='54.8865425' lon='23.9309359' />
+<node id='13719527827' timestamp='2026-04-09T20:55:02Z' visible='true' version='1' lat='54.8865972' lon='23.9310363' />
+<node id='761797448' timestamp='2024-06-24T14:36:35Z' visible='true' version='5' lat='54.8866302' lon='23.931097' />
+<node id='761797468' timestamp='2024-06-24T14:36:35Z' visible='true' version='5' lat='54.8868052' lon='23.9314183' />
+<node id='761797467' timestamp='2024-06-24T14:36:35Z' visible='true' version='4' lat='54.8869116' lon='23.9316138' />
+<node id='761890852' timestamp='2016-08-22T05:18:12Z' visible='true' version='3' lat='54.8872737' lon='23.9332955' />
+<node id='3238153725' timestamp='2024-06-24T14:36:35Z' visible='true' version='2' lat='54.8874437' lon='23.9330319' />
+<node id='761890860' timestamp='2024-06-24T14:36:35Z' visible='true' version='3' lat='54.8875448' lon='23.9330842' />
+<node id='761890866' timestamp='2024-08-23T07:15:31Z' visible='true' version='3' lat='54.8876222' lon='23.9329653' />
+<node id='10806991435' timestamp='2023-04-13T08:34:29Z' visible='true' version='1' lat='54.8875803' lon='23.9330097' />
+<node id='5410350724' timestamp='2023-04-13T08:34:29Z' visible='true' version='2' lat='54.8875155' lon='23.9332049' />
+<node id='5410350725' timestamp='2018-02-13T17:53:47Z' visible='true' version='1' lat='54.887528' lon='23.9333385' />
+<node id='5410350726' timestamp='2018-02-13T17:53:47Z' visible='true' version='1' lat='54.8875929' lon='23.9336182' />
+<node id='5410350727' timestamp='2018-02-13T17:53:47Z' visible='true' version='1' lat='54.8876744' lon='23.9337934' />
+<node id='60002117' timestamp='2024-06-24T14:36:35Z' visible='true' version='26' lat='54.8843295' lon='23.9264108' />
+<node id='6277545756' action='modify' timestamp='2022-09-21T15:30:50Z' visible='true' version='2' lat='54.88695561993' lon='23.9314063089' />
+<node id='3238131414' timestamp='2022-06-12T09:11:47Z' visible='true' version='2' lat='54.8864314' lon='23.9300676' />
+<node id='3238131420' timestamp='2022-06-12T09:11:47Z' visible='true' version='2' lat='54.8861555' lon='23.9295493' />
+<node id='3238131418' timestamp='2022-06-12T09:11:47Z' visible='true' version='2' lat='54.8861187' lon='23.9294803' />
+<node id='2021291480' timestamp='2022-12-19T00:40:43Z' visible='true' version='6' lat='54.8858985' lon='23.9292091' />
+<node id='800120136' timestamp='2024-06-24T14:36:35Z' visible='true' version='4' lat='54.8872161' lon='23.9308333' />
+<node id='800120138' timestamp='2024-06-24T14:36:35Z' visible='true' version='4' lat='54.8872579' lon='23.9307684' />
+<node id='800120140' timestamp='2024-06-24T14:36:35Z' visible='true' version='5' lat='54.8871773' lon='23.9306115' />
+<node id='1523592794' timestamp='2023-03-21T12:48:42Z' visible='true' version='5' lat='54.8871675' lon='23.9300097' />
+<node id='1523592788' timestamp='2023-03-21T12:48:42Z' visible='true' version='5' lat='54.8871448' lon='23.9299676' />
+<node id='1523592782' timestamp='2023-03-21T12:48:42Z' visible='true' version='5' lat='54.8870579' lon='23.9298066' />
+<node id='3238131430' timestamp='2023-03-21T12:48:42Z' visible='true' version='2' lat='54.8868465' lon='23.9301513' />
+<node id='3238131429' timestamp='2023-03-21T12:48:42Z' visible='true' version='2' lat='54.8869111' lon='23.9302709' />
+<node id='1523592768' timestamp='2023-03-21T12:48:42Z' visible='true' version='5' lat='54.8868925' lon='23.9303012' />
+<node id='3221950012' timestamp='2023-03-21T12:48:42Z' visible='true' version='3' lat='54.8868148' lon='23.9301574' />
+<node id='3221950013' timestamp='2023-03-21T12:48:42Z' visible='true' version='3' lat='54.8867603' lon='23.9300564' />
+<node id='1523592731' timestamp='2023-03-21T12:48:42Z' visible='true' version='5' lat='54.8867261' lon='23.929993' />
+<node id='1523723905' timestamp='2023-03-21T12:48:42Z' visible='true' version='5' lat='54.8866833' lon='23.9300629' />
+<node id='1523592723' timestamp='2023-03-21T12:48:42Z' visible='true' version='6' lat='54.8866306' lon='23.9301487' />
+<node id='1523592751' timestamp='2023-03-21T12:48:42Z' visible='true' version='5' lat='54.8868421' lon='23.9305405' />
+<node id='1523592825' timestamp='2014-12-16T16:25:00Z' visible='true' version='4' lat='54.8875207' lon='23.9291093' />
+<node id='1523592836' timestamp='2014-12-16T16:25:00Z' visible='true' version='4' lat='54.8875952' lon='23.9292522' />
+<node id='2738171989' timestamp='2014-12-16T16:25:00Z' visible='true' version='2' lat='54.8873323' lon='23.9296664'>
+    <tag k='barrier' v='lift_gate' />
+  </node>
+<node id='2738172004' timestamp='2014-12-16T16:25:00Z' visible='true' version='2' lat='54.8871837' lon='23.9299039'>
+    <tag k='barrier' v='lift_gate' />
+  </node>
+<node id='1523592775' timestamp='2014-12-16T16:25:00Z' visible='true' version='4' lat='54.8870229' lon='23.9297475' />
+<node id='2738171999' timestamp='2014-12-16T16:25:00Z' visible='true' version='2' lat='54.8870594' lon='23.9296889' />
+<node id='10793677987' timestamp='2023-04-07T19:21:23Z' visible='true' version='1' lat='54.8870884' lon='23.9296428' />
+<node id='2418984850' timestamp='2014-12-16T16:25:00Z' visible='true' version='2' lat='54.8872184' lon='23.9294359' />
+<node id='10793677986' timestamp='2023-04-07T19:21:23Z' visible='true' version='1' lat='54.8872538' lon='23.9293799'>
+    <tag k='entrance' v='staircase' />
+  </node>
+<node id='3221949989' timestamp='2014-12-16T16:25:00Z' visible='true' version='2' lat='54.8874161' lon='23.9291228' />
+<node id='10793677985' timestamp='2023-04-07T19:21:23Z' visible='true' version='1' lat='54.8874297' lon='23.9291016'>
+    <tag k='addr:flats' v='1-30' />
+    <tag k='entrance' v='staircase' />
+  </node>
+<node id='1523592813' timestamp='2014-12-16T16:25:00Z' visible='true' version='4' lat='54.8874435' lon='23.9290801' />
+<node id='1523592806' timestamp='2014-12-16T16:25:00Z' visible='true' version='4' lat='54.8874256' lon='23.9290452' />
+<node id='1523592820' timestamp='2014-12-16T16:25:00Z' visible='true' version='4' lat='54.8874601' lon='23.9289914' />
+<node id='1523592846' timestamp='2014-12-16T16:25:00Z' visible='true' version='4' lat='54.8877651' lon='23.9287127' />
+<node id='1523592852' timestamp='2014-12-16T16:25:00Z' visible='true' version='4' lat='54.8878415' lon='23.928855' />
+<node id='1523628285' timestamp='2021-01-08T20:46:20Z' visible='true' version='4' lat='54.8856734' lon='23.9268736' />
+<node id='1523628279' timestamp='2021-01-08T20:46:20Z' visible='true' version='4' lat='54.8856242' lon='23.9269552' />
+<node id='1523628270' timestamp='2021-01-08T20:46:20Z' visible='true' version='4' lat='54.885589' lon='23.926891' />
+<node id='3221976678' timestamp='2021-01-08T20:46:20Z' visible='true' version='2' lat='54.8854055' lon='23.9271956'>
+    <tag k='entrance' v='yes' />
+  </node>
+<node id='1523628225' timestamp='2021-01-08T20:46:20Z' visible='true' version='4' lat='54.8853854' lon='23.9272289' />
+<node id='2724214050' timestamp='2021-01-08T20:46:20Z' visible='true' version='2' lat='54.8854937' lon='23.9274315' />
+<node id='2724214048' timestamp='2021-01-08T20:46:20Z' visible='true' version='2' lat='54.8854753' lon='23.9274621' />
+<node id='2724214046' timestamp='2021-01-08T20:46:20Z' visible='true' version='2' lat='54.8855024' lon='23.9275117' />
+<node id='2724214043' timestamp='2021-01-08T20:46:20Z' visible='true' version='2' lat='54.8854348' lon='23.927624' />
+<node id='2724214040' timestamp='2021-01-08T20:46:20Z' visible='true' version='2' lat='54.8857843' lon='23.9282607' />
+<node id='2724214058' timestamp='2021-01-08T20:46:20Z' visible='true' version='2' lat='54.8858174' lon='23.9282058' />
+<node id='2724214034' timestamp='2021-01-08T20:46:20Z' visible='true' version='2' lat='54.8858754' lon='23.9281095' />
+<node id='1523628372' timestamp='2021-01-08T20:46:20Z' visible='true' version='2' lat='54.8860993' lon='23.9285172' />
+<node id='1523628398' timestamp='2021-01-08T20:46:20Z' visible='true' version='5' lat='54.8861719' lon='23.9286495' />
+<node id='3241135004' timestamp='2021-01-08T20:46:20Z' visible='true' version='2' lat='54.8861807' lon='23.9286349' />
+<node id='3241135001' timestamp='2021-01-08T20:46:20Z' visible='true' version='2' lat='54.886244' lon='23.9285299' />
+<node id='3221949996' timestamp='2021-01-08T20:46:20Z' visible='true' version='3' lat='54.8863084' lon='23.928423' />
+<node id='1523628403' timestamp='2021-01-08T20:46:20Z' visible='true' version='4' lat='54.8863485' lon='23.928496' />
+<node id='3241135005' timestamp='2021-01-08T20:46:20Z' visible='true' version='2' lat='54.8864672' lon='23.928299' />
+<node id='1523628413' timestamp='2021-01-08T20:46:20Z' visible='true' version='3' lat='54.8866282' lon='23.9280318' />
+<node id='3221949995' timestamp='2021-01-08T20:46:20Z' visible='true' version='2' lat='54.8865192' lon='23.9278334' />
+<node id='3221949994' timestamp='2021-01-08T20:46:20Z' visible='true' version='2' lat='54.8862733' lon='23.9282416' />
+<node id='1523628408' timestamp='2021-01-08T20:46:20Z' visible='true' version='4' lat='54.8862351' lon='23.928172' />
+<node id='1523628416' timestamp='2021-01-08T20:46:20Z' visible='true' version='4' lat='54.8867075' lon='23.927388' />
+<node id='9522660215' timestamp='2022-02-20T21:00:00Z' visible='true' version='1' lat='54.8862375' lon='23.926532' />
+<node id='1523628391' timestamp='2021-01-08T20:46:20Z' visible='true' version='3' lat='54.8862006' lon='23.9264649' />
+<node id='1523628331' timestamp='2021-01-08T20:46:20Z' visible='true' version='3' lat='54.8859213' lon='23.9269285' />
+<node id='1523628315' timestamp='2021-01-08T20:46:20Z' visible='true' version='3' lat='54.8858382' lon='23.9267773' />
+<node id='1523628299' timestamp='2021-01-08T20:46:20Z' visible='true' version='3' lat='54.8857847' lon='23.9268662' />
+<node id='1523628292' timestamp='2012-08-18T15:14:09Z' visible='true' version='2' lat='54.8857228' lon='23.9267136' />
+<node id='1523628344' timestamp='2012-08-18T15:14:10Z' visible='true' version='2' lat='54.8860336' lon='23.9264975' />
+<node id='1523628339' timestamp='2012-08-18T15:14:10Z' visible='true' version='2' lat='54.8859847' lon='23.9263025' />
+<node id='1871529815' timestamp='2014-12-06T17:20:25Z' visible='true' version='2' lat='54.8855957' lon='23.9265882' />
+<node id='1523628251' timestamp='2014-12-06T17:20:25Z' visible='true' version='3' lat='54.885554' lon='23.9266696' />
+<node id='1523723851' timestamp='2015-03-19T07:31:35Z' visible='true' version='3' lat='54.8864569' lon='23.9293675' />
+<node id='1523723819' timestamp='2015-03-19T07:31:35Z' visible='true' version='3' lat='54.8863995' lon='23.9294583' />
+<node id='1523723801' timestamp='2015-03-19T07:31:35Z' visible='true' version='3' lat='54.8863313' lon='23.929328' />
+<node id='1523723817' timestamp='2015-03-19T07:31:35Z' visible='true' version='3' lat='54.8863888' lon='23.9292372' />
+<node id='1523723884' timestamp='2023-03-21T12:48:42Z' visible='true' version='3' lat='54.8866008' lon='23.9299101' />
+<node id='1523723857' timestamp='2023-03-21T12:48:42Z' visible='true' version='3' lat='54.8865482' lon='23.929996' />
+<node id='6969082830' timestamp='2023-03-21T12:48:42Z' visible='true' version='3' lat='54.8865895' lon='23.9300725'>
+    <tag k='artist_name' v='Tadas Šimkus' />
+    <tag k='artwork_type' v='graffiti' />
+    <tag k='name' v='Dviratininkas su rože' />
+    <tag k='name:en' v='A Cyclist with a Rose' />
+    <tag k='name:lt' v='Dviratininkas su rože' />
+    <tag k='start_date' v='2016' />
+    <tag k='tourism' v='artwork' />
+  </node>
+<node id='1523723788' timestamp='2017-06-05T19:02:50Z' visible='true' version='3' lat='54.8863138' lon='23.9290577' />
+<node id='1523723778' timestamp='2017-06-05T19:02:50Z' visible='true' version='3' lat='54.8862503' lon='23.9291544' />
+<node id='1523723748' timestamp='2017-06-05T19:02:50Z' visible='true' version='3' lat='54.8861812' lon='23.9290174' />
+<node id='1523723773' timestamp='2017-06-05T19:02:50Z' visible='true' version='3' lat='54.8862447' lon='23.9289207' />
+<node id='3238131428' timestamp='2017-06-05T19:02:50Z' visible='true' version='2' lat='54.8863023' lon='23.9290349' />
+<way id='6216203' timestamp='2024-08-24T03:04:50Z' visible='true' version='40'>
+    <nd ref='60002413' />
+    <nd ref='8846102653' />
+    <nd ref='761797462' />
+    <tag k='bicycle' v='no' />
+    <tag k='foot' v='no' />
+    <tag k='highway' v='primary' />
+    <tag k='lanes' v='4' />
+    <tag k='lit' v='yes' />
+    <tag k='maxspeed' v='50' />
+    <tag k='name' v='Vytauto pr.' />
+    <tag k='sidewalk' v='no' />
+    <tag k='smoothness' v='excellent' />
+    <tag k='source:maxspeed' v='LT:urban' />
+    <tag k='surface' v='asphalt' />
+    <tag k='trolley_wire' v='yes' />
+  </way>
+<way id='8105925' timestamp='2022-12-24T12:42:14Z' visible='true' version='45'>
+    <nd ref='364861087' />
+    <nd ref='1871529808' />
+    <nd ref='765082893' />
+    <nd ref='1871529809' />
+    <nd ref='364777543' />
+    <nd ref='914212072' />
+    <nd ref='765082895' />
+    <nd ref='914212061' />
+    <nd ref='2681216583' />
+    <tag k='highway' v='primary' />
+    <tag k='lanes' v='2' />
+    <tag k='maxspeed' v='50' />
+    <tag k='name' v='Kaunakiemio g.' />
+    <tag k='oneway' v='yes' />
+    <tag k='sidewalk:left' v='no' />
+    <tag k='sidewalk:right' v='separate' />
+    <tag k='source:maxspeed' v='LT:urban' />
+    <tag k='surface' v='asphalt' />
+    <tag k='trolley_wire' v='yes' />
+    <tag k='turn:lanes' v='through|through;right' />
+  </way>
+<way id='32802701' timestamp='2024-06-24T14:36:35Z' visible='true' version='17'>
+    <nd ref='364861087' />
+    <nd ref='10274352625' />
+    <nd ref='364861114' />
+    <tag k='highway' v='primary' />
+    <tag k='lanes' v='4' />
+    <tag k='maxspeed' v='50' />
+    <tag k='name' v='Prietilčio g.' />
+    <tag k='sidewalk' v='no' />
+    <tag k='source:maxspeed' v='LT:urban' />
+    <tag k='surface' v='asphalt' />
+  </way>
+<way id='53158445' action='modify' timestamp='2023-04-13T08:34:29Z' visible='true' version='18'>
+    <nd ref='6459875306' />
+    <nd ref='-29541' />
+    <nd ref='366580047' />
+    <nd ref='10806991440' />
+    <nd ref='60002115' />
+    <tag k='highway' v='primary' />
+    <tag k='lanes' v='3' />
+    <tag k='maxspeed' v='50' />
+    <tag k='name' v='M. K. Čiurlionio g.' />
+    <tag k='official_name' v='Mikalojaus Konstantino Čiurlionio gatvė' />
+    <tag k='oneway' v='yes' />
+    <tag k='source:maxspeed' v='LT:urban' />
+    <tag k='surface' v='asphalt' />
+    <tag k='trolley_wire' v='yes' />
+    <tag k='width' v='12' />
+  </way>
+<way id='53158446' action='modify' timestamp='2024-08-23T07:15:31Z' visible='true' version='14'>
+    <nd ref='366579899' />
+    <nd ref='664111860' />
+    <tag k='bicycle' v='no' />
+    <tag k='highway' v='primary_link' />
+    <tag k='lanes' v='1' />
+    <tag k='lit' v='yes' />
+    <tag k='maxspeed' v='50' />
+    <tag k='maxspeed:type' v='LT:urban' />
+    <tag k='name' v='Tunelio g.' />
+    <tag k='oneway' v='yes' />
+    <tag k='sidewalk' v='no' />
+    <tag k='surface' v='asphalt' />
+    <tag k='width' v='8' />
+  </way>
+<way id='60852898' timestamp='2022-06-17T11:23:58Z' visible='true' version='9'>
+    <nd ref='761797394' />
+    <nd ref='761890848' />
+    <nd ref='761797408' />
+    <nd ref='4355271638' />
+    <nd ref='9825157311' />
+    <nd ref='761890849' />
+    <nd ref='4355271637' />
+    <nd ref='761797410' />
+    <nd ref='4355271636' />
+    <nd ref='664140515' />
+    <nd ref='4360958789' />
+    <nd ref='4355271635' />
+    <nd ref='2419882842' />
+    <tag k='note' v='panaikintas' />
+    <tag k='was:highway' v='footway' />
+  </way>
+<way id='60852930' timestamp='2026-04-09T21:13:03Z' visible='true' version='5'>
+    <nd ref='3238153743' />
+    <nd ref='13719551990' />
+    <nd ref='8303866148' />
+    <nd ref='761797398' />
+    <nd ref='761890850' />
+    <nd ref='761797427' />
+    <nd ref='761797428' />
+    <nd ref='761797426' />
+    <tag k='highway' v='footway' />
+    <tag k='level' v='0' />
+  </way>
+<way id='60852962' timestamp='2010-06-01T22:11:04Z' visible='true' version='1'>
+    <nd ref='761797390' />
+    <nd ref='761797440' />
+    <nd ref='761797438' />
+    <nd ref='761797430' />
+    <nd ref='761797441' />
+    <tag k='highway' v='footway' />
+  </way>
+<way id='60852980' timestamp='2026-04-09T20:55:02Z' visible='true' version='6'>
+    <nd ref='761797445' />
+    <nd ref='761797446' />
+    <nd ref='761797447' />
+    <nd ref='13719527828' />
+    <tag k='access:conditional' v='no @ (Mo-Fr 23:00-04:00; Sa-Su 24:00-04:00)' />
+    <tag k='highway' v='footway' />
+    <tag k='layer' v='-1' />
+    <tag k='level' v='-1' />
+    <tag k='surface' v='paving_stones' />
+    <tag k='tunnel' v='yes' />
+  </way>
+<way id='60852985' timestamp='2026-10-09T17:11:49Z' visible='true' version='3'>
+    <nd ref='761797445' />
+    <nd ref='761797454' />
+    <tag k='highway' v='steps' />
+    <tag k='incline' v='up' />
+    <tag k='level' v='-1;0' />
+  </way>
+<way id='60852995' timestamp='2023-07-15T09:54:44Z' visible='true' version='8'>
+    <nd ref='761797446' />
+    <nd ref='9825157305' />
+    <tag k='handrail' v='yes' />
+    <tag k='highway' v='steps' />
+    <tag k='incline' v='up' />
+    <tag k='level' v='0;-1' />
+    <tag k='ramp' v='no' />
+    <tag k='surface' v='concrete' />
+    <tag k='tactile_paving' v='no' />
+  </way>
+<way id='60853000' timestamp='2023-07-12T09:06:21Z' visible='true' version='8'>
+    <nd ref='761797396' />
+    <nd ref='3238153736' />
+    <nd ref='6629286803' />
+    <tag k='highway' v='footway' />
+    <tag k='level' v='0' />
+    <tag k='lit' v='no' />
+    <tag k='smoothness' v='excellent' />
+    <tag k='surface' v='paving_stones' />
+  </way>
+<way id='60853003' timestamp='2024-06-24T14:36:35Z' visible='true' version='3'>
+    <nd ref='761797449' />
+    <nd ref='800120133' />
+    <tag k='highway' v='footway' />
+    <tag k='layer' v='-1' />
+    <tag k='tunnel' v='yes' />
+  </way>
+<way id='60853013' timestamp='2026-09-04T13:06:51Z' visible='true' version='4'>
+    <nd ref='761797451' />
+    <nd ref='761797464' />
+    <tag k='handrail' v='yes' />
+    <tag k='highway' v='steps' />
+    <tag k='incline' v='up' />
+  </way>
+<way id='60853018' timestamp='2024-10-22T10:47:06Z' visible='true' version='8'>
+    <nd ref='761797465' />
+    <nd ref='761797466' />
+    <tag k='handrail' v='yes' />
+    <tag k='highway' v='steps' />
+    <tag k='incline' v='down' />
+    <tag k='ramp' v='yes' />
+    <tag k='ramp:stroller' v='yes' />
+    <tag k='step_count' v='35' />
+    <tag k='surface' v='paving_stones' />
+    <tag k='tactile_paving' v='no' />
+  </way>
+<way id='60853022' timestamp='2026-04-09T20:55:02Z' visible='true' version='4'>
+    <nd ref='761797466' />
+    <nd ref='13719527827' />
+    <nd ref='761797448' />
+    <nd ref='761797468' />
+    <tag k='highway' v='footway' />
+    <tag k='layer' v='-1' />
+    <tag k='surface' v='paving_stones' />
+    <tag k='tunnel' v='yes' />
+  </way>
+<way id='60853025' timestamp='2024-10-22T10:48:51Z' visible='true' version='7'>
+    <nd ref='761797468' />
+    <nd ref='761797467' />
+    <tag k='handrail' v='no' />
+    <tag k='highway' v='steps' />
+    <tag k='incline' v='down' />
+    <tag k='ramp' v='no' />
+    <tag k='step_count' v='32' />
+    <tag k='surface' v='paving_stones' />
+    <tag k='tactile_paving' v='no' />
+  </way>
+<way id='60863506' timestamp='2023-04-13T08:34:29Z' visible='true' version='5'>
+    <nd ref='761890852' />
+    <nd ref='3238153725' />
+    <nd ref='761890860' />
+    <tag k='highway' v='footway' />
+  </way>
+<way id='60863509' timestamp='2024-06-24T14:36:35Z' visible='true' version='6'>
+    <nd ref='761890866' />
+    <nd ref='10806991435' />
+    <nd ref='761890860' />
+    <nd ref='5410350724' />
+    <nd ref='5410350725' />
+    <nd ref='5410350726' />
+    <nd ref='5410350727' />
+    <tag k='access' v='private' />
+    <tag k='highway' v='service' />
+    <tag k='oneway' v='yes' />
+    <tag k='service' v='driveway' />
+    <tag k='surface' v='asphalt' />
+  </way>
+<way id='62129317' timestamp='2024-06-24T14:36:35Z' visible='true' version='14'>
+    <nd ref='364861114' />
+    <nd ref='60002117' />
+    <tag k='highway' v='primary' />
+    <tag k='lanes' v='5' />
+    <tag k='lanes:backward' v='2' />
+    <tag k='lanes:forward' v='3' />
+    <tag k='maxspeed' v='60' />
+    <tag k='name' v='Prietilčio g.' />
+    <tag k='sidewalk:left' v='no' />
+    <tag k='sidewalk:right' v='separate' />
+    <tag k='source:maxspeed' v='sign' />
+    <tag k='surface' v='asphalt' />
+  </way>
+<way id='65597766' action='modify' timestamp='2022-06-18T15:59:29Z' visible='true' version='16'>
+    <nd ref='60002413' />
+    <nd ref='6277545756' />
+    <tag k='highway' v='primary' />
+    <tag k='lanes' v='3' />
+    <tag k='lit' v='yes' />
+    <tag k='maxspeed' v='50' />
+    <tag k='name' v='M. K. Čiurlionio g.' />
+    <tag k='official_name' v='Mikalojaus Konstantino Čiurlionio gatvė' />
+    <tag k='oneway' v='yes' />
+    <tag k='sidewalk:left' v='no' />
+    <tag k='sidewalk:right' v='separate' />
+    <tag k='source:maxspeed' v='LT:urban' />
+    <tag k='surface' v='asphalt' />
+    <tag k='trolley_wire' v='yes' />
+    <tag k='width' v='12' />
+  </way>
+<way id='65597767' timestamp='2024-03-27T20:48:32Z' visible='true' version='15'>
+    <nd ref='761797462' />
+    <nd ref='3238131414' />
+    <nd ref='3238131420' />
+    <nd ref='3238131418' />
+    <nd ref='2021291480' />
+    <tag k='highway' v='primary' />
+    <tag k='lanes' v='3' />
+    <tag k='maxspeed' v='50' />
+    <tag k='name' v='M. K. Čiurlionio g.' />
+    <tag k='official_name' v='Mikalojaus Konstantino Čiurlionio gatvė' />
+    <tag k='oneway' v='yes' />
+    <tag k='sidewalk:left' v='no' />
+    <tag k='sidewalk:right' v='separate' />
+    <tag k='source:maxspeed' v='LT:urban' />
+    <tag k='surface' v='asphalt' />
+    <tag k='trolley_wire' v='yes' />
+  </way>
+<way id='65606563' timestamp='2024-06-24T14:36:35Z' visible='true' version='2'>
+    <nd ref='800120133' />
+    <nd ref='800120136' />
+    <nd ref='800120138' />
+    <nd ref='800120140' />
+    <tag k='highway' v='steps' />
+  </way>
+<way id='138984024' timestamp='2020-05-06T18:46:31Z' visible='true' version='6'>
+    <nd ref='1523592794' />
+    <nd ref='1523592788' />
+    <nd ref='1523592782' />
+    <nd ref='3238131430' />
+    <nd ref='3238131429' />
+    <nd ref='1523592768' />
+    <nd ref='3221950012' />
+    <nd ref='3221950013' />
+    <nd ref='1523592731' />
+    <nd ref='1523723905' />
+    <nd ref='1523592723' />
+    <nd ref='1523592751' />
+    <nd ref='1523592794' />
+    <tag k='addr:city' v='Kaunas' />
+    <tag k='addr:housenumber' v='1' />
+    <tag k='addr:postcode' v='44354' />
+    <tag k='addr:street' v='Vytauto pr.' />
+    <tag k='building' v='yes' />
+  </way>
+<way id='138984030' timestamp='2024-03-23T11:01:41Z' visible='true' version='8'>
+    <nd ref='1523592825' />
+    <nd ref='1523592836' />
+    <nd ref='2738171989' />
+    <nd ref='2738172004' />
+    <nd ref='1523592788' />
+    <nd ref='1523592782' />
+    <nd ref='1523592775' />
+    <nd ref='2738171999' />
+    <nd ref='10793677987' />
+    <nd ref='2418984850' />
+    <nd ref='10793677986' />
+    <nd ref='3221949989' />
+    <nd ref='10793677985' />
+    <nd ref='1523592813' />
+    <nd ref='1523592806' />
+    <nd ref='1523592820' />
+    <nd ref='1523592825' />
+    <tag k='addr:city' v='Kaunas' />
+    <tag k='addr:housenumber' v='3' />
+    <tag k='addr:postcode' v='44354' />
+    <tag k='addr:street' v='Vytauto pr.' />
+    <tag k='building' v='retail' />
+  </way>
+<way id='138984035' timestamp='2020-05-08T19:09:52Z' visible='true' version='3'>
+    <nd ref='1523592846' />
+    <nd ref='1523592825' />
+    <nd ref='1523592836' />
+    <nd ref='1523592852' />
+    <nd ref='1523592846' />
+    <tag k='addr:city' v='Kaunas' />
+    <tag k='addr:housenumber' v='9' />
+    <tag k='addr:postcode' v='44354' />
+    <tag k='addr:street' v='Vytauto pr.' />
+    <tag k='building' v='yes' />
+  </way>
+<way id='138988530' timestamp='2024-01-28T18:52:21Z' visible='true' version='15'>
+    <nd ref='1523628285' />
+    <nd ref='1523628279' />
+    <nd ref='1523628270' />
+    <nd ref='3221976678' />
+    <nd ref='1523628225' />
+    <nd ref='2724214050' />
+    <nd ref='2724214048' />
+    <nd ref='2724214046' />
+    <nd ref='2724214043' />
+    <nd ref='2724214040' />
+    <nd ref='2724214058' />
+    <nd ref='2724214034' />
+    <nd ref='1523628372' />
+    <nd ref='1523628398' />
+    <nd ref='3241135004' />
+    <nd ref='3241135001' />
+    <nd ref='3221949996' />
+    <nd ref='1523628403' />
+    <nd ref='3241135005' />
+    <nd ref='1523628413' />
+    <nd ref='3221949995' />
+    <nd ref='3221949994' />
+    <nd ref='1523628408' />
+    <nd ref='1523628416' />
+    <nd ref='9522660215' />
+    <nd ref='1523628391' />
+    <nd ref='1523628331' />
+    <nd ref='1523628315' />
+    <nd ref='1523628299' />
+    <nd ref='1523628292' />
+    <nd ref='1523628344' />
+    <nd ref='1523628339' />
+    <nd ref='1871529815' />
+    <nd ref='1523628251' />
+    <nd ref='1523628285' />
+    <tag k='addr:city' v='Kaunas' />
+    <tag k='addr:housenumber' v='2' />
+    <tag k='addr:postcode' v='44354' />
+    <tag k='addr:street' v='Kaunakiemio g.' />
+    <tag k='building' v='yes' />
+    <tag k='name' v='Volfas Engelman alaus darykla' />
+    <tag k='name:en' v='Volfas Engelman brewery' />
+    <tag k='name:lt' v='Volfas Engelman alaus darykla' />
+    <tag k='wikidata' v='Q12678128' />
+    <tag k='wikipedia' v='lt:Volfas Engelman' />
+  </way>
+<way id='138999289' timestamp='2020-05-09T14:20:10Z' visible='true' version='7'>
+    <nd ref='1523723851' />
+    <nd ref='1523723819' />
+    <nd ref='1523723801' />
+    <nd ref='1523723817' />
+    <nd ref='1523723851' />
+    <tag k='addr:city' v='Kaunas' />
+    <tag k='addr:housenumber' v='15' />
+    <tag k='addr:postcode' v='44354' />
+    <tag k='addr:street' v='M. K. Čiurlionio g.' />
+    <tag k='building' v='yes' />
+  </way>
+<way id='138999290' timestamp='2019-11-12T13:11:49Z' visible='true' version='2'>
+    <nd ref='1523723905' />
+    <nd ref='1523723884' />
+    <nd ref='1523723857' />
+    <nd ref='6969082830' />
+    <nd ref='1523592723' />
+    <nd ref='1523723905' />
+    <tag k='building' v='yes' />
+  </way>
+<way id='138999291' timestamp='2017-02-03T09:00:30Z' visible='true' version='4'>
+    <nd ref='1523723788' />
+    <nd ref='1523723778' />
+    <nd ref='1523723748' />
+    <nd ref='1523723773' />
+    <nd ref='3238131428' />
+    <nd ref='1523723788' />
+    <tag k='addr:city' v='Kaunas' />
+    <tag k='addr:housenumber' v='5' />
+    <tag k='addr:street' v='M. K. Čiurlionio g.' />
+    <tag k='building' v='yes' />
+  </way>
+</osm>
