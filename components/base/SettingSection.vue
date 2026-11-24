@@ -2,15 +2,17 @@
   <!-- A collapsible section of the sidebar: one look for every section of the
        control and export panels (icon, title, chevron), open state remembered. -->
   <!-- (each section its own card, the header a tinted bar: with every section open the titles, fields and hints of
-       neighbouring sections ran together as one column) -->
+       neighbouring sections ran together as one column. The bar and the card's edge carry a soft tint of the brand
+       orange, open or closed; the full orange stays for the things you press. The bar brightens on hover: its title
+       no longer turns orange, which would be orange on orange) -->
   <section
     ref="root"
-    class="rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] shadow-sm dark:shadow-none overflow-hidden"
+    class="rounded-lg border border-brand/30 dark:border-brand/30 bg-white dark:bg-white/[0.03] shadow-sm dark:shadow-none overflow-hidden"
     data-setting-section
   >
     <div
-      class="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-white/[0.05]"
-      :class="open ? 'border-b border-gray-200 dark:border-white/10' : ''"
+      class="flex items-center gap-2 px-3 py-2 bg-brand/10 dark:bg-brand/[0.14] hover:bg-brand/[0.16] dark:hover:bg-brand/[0.22] transition-colors"
+      :class="open ? 'border-b border-brand/25 dark:border-brand/25' : ''"
     >
       <button
         type="button"
@@ -19,13 +21,13 @@
         @click="toggle"
       >
         <span class="flex items-center gap-2 min-w-0">
-          <component :is="icon" v-if="icon" :size="14" class="shrink-0" :class="accent ? 'text-brand' : 'text-gray-500 dark:text-gray-400 group-hover:text-brand'" />
-          <span class="font-display text-sm font-semibold text-gray-800 dark:text-gray-100 group-hover:text-brand transition-colors truncate">{{ title }}</span>
+          <component :is="icon" v-if="icon" :size="14" class="shrink-0 text-brand" />
+          <span class="font-display text-sm font-semibold text-gray-900 dark:text-white truncate">{{ title }}</span>
           <!-- (something here differs from the defaults) -->
           <span v-if="changed" class="w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500 shrink-0" :title="t('sections.changedTitle')"></span>
           <span v-if="$slots.aside" class="text-caption font-normal text-gray-500 dark:text-gray-400 shrink-0"><slot name="aside" /></span>
         </span>
-        <ChevronDown :size="14" class="shrink-0 text-gray-400 dark:text-gray-500 transition-transform duration-200" :class="open ? 'rotate-180' : ''" />
+        <ChevronDown :size="14" class="shrink-0 text-brand/70 transition-transform duration-200" :class="open ? 'rotate-180' : ''" />
       </button>
       <button
         v-if="changed && resettable"
