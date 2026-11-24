@@ -1,6 +1,6 @@
 # MapNG open items
 
-Last reviewed: 2026-11-24, night (0.3.6 Latest; main 8aebfb4; dev d1d1556, swept, ahead of main by the test-level fixes)
+Last reviewed: 2026-11-24, night (0.3.6 Latest; main = b39ed0e; dev 5026c75; test build v0.3.7-dev.7)
 
 The short "now" board: current work, what waits on someone, and checks owed on shipped work. The other tracking
 files: `refs/output/backlog.md` holds everything wanted later, by area; `refs/output/releases.md` what shipped;
@@ -125,8 +125,13 @@ Mesh Road joins. Riding along: the other 38 sweep areas re-framed, Zion's tunnel
 - **Sweep done (2026-11-24, smoke set x matrix, 135 cells):** 27 regressions at first, all from the river channel
   carve and the river-outline fallback; both narrowed (d1d1556); two cells re-recorded with 3 more spikes each in
   carved stream beds under the water (w_amsterdam@t30/ready, val_disere@mh/ready). Logs: scratch/sweep_logs.
-- **Next, waiting on the user:** main (dev d1d1556 is ready for it); then upload the four test levels and add
-  "Download Official Test Levels" (desktop; texts in 7 languages).
+- **Shipped (2026-11-24):** main at efc625c, then b39ed0e. The four levels are in the bucket's `test-levels/` with a
+  manifest (built from efc625c, checked offline: no missing material or texture), served by /api/test-levels
+  (worker/testLevels.js). Desktop: "Download official test levels" in the levels list (into the mods folder, checked
+  against the manifest's SHA-256, then listed); web: "Official test levels" in the footer. Tested end to end against
+  mapng.com (scratch/verify-pw/e2e_desktop_testlevels*.mjs). Desktop test build v0.3.7-dev.7 (5026c75).
+- **To refresh the levels after a change:** re-export with `--fix-stubs` (real reflection files), addLabels, check,
+  write the manifest and upload (refs/output/history.md "Test levels" has the steps; scripts/r2.sh).
 
 ## Priority list (2026-11-23, asked for by the user; details in the sections below)
 
@@ -808,7 +813,6 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
 
 ## Waiting on someone
 
-- **The user's go-ahead to upload the official test levels** (R2) and build their download (after the sweep).
 - **The next desktop test build (0.3.3-dev.6)** with the next batch of fixes: ask before the -dev tag (planned after
   the Fizz list, item 11).
 - **A BeamNG developer:** whether dev.7 ends the console errors and the low frame rate on a lake-country level.
