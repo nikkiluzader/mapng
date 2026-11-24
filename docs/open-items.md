@@ -1,6 +1,6 @@
 # MapNG open items
 
-Last reviewed: 2026-11-23, evening (main = dev at b9f6667, pushed on the user's word)
+Last reviewed: 2026-11-24, late (dev at 68d8151, test build 0.3.6-dev.6; main behind dev, waits for the user's go-ahead)
 
 The short "now" board: current work, what waits on someone, and checks owed on shipped work. The other tracking
 files: `refs/output/backlog.md` holds everything wanted later, by area; `refs/output/releases.md` what shipped;
@@ -8,6 +8,15 @@ files: `refs/output/backlog.md` holds everything wanted later, by area; `refs/ou
 these files; they are never copied.
 
 ## Priority list (2026-11-23, asked for by the user; details in the sections below)
+
+**Where 0.3.6 stands, 2026-11-24 (late):** scope closed by the user. In: Fizz_Mechanic's three targets (funicular
+slope, gallery heights, wing walls), earth on track bridge decks, lane lines past merging slip roads, the sweep's
+smoke areas on the corrected frame with new baselines. Out, named on the page: the three sidewalk cases, slip
+roads ending at the outer lane, batch code removal (first in 0.3.7). Test build v0.3.6-dev.6 tagged at 68d8151 on
+the user's word (workflow run 45300857415). Left: read that run; the user runs the signed Windows installer; a
+sweep on the final commit (the last one, c946085's baselines, predates the slip-road paint change, which the
+checks do not measure); the user's go-ahead for main; then the page out of draft, `LATEST_UPDATE` in
+`worker/updates.js`, the release.
 
 Before the 0.3.6 desktop release:
 
