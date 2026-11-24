@@ -263,6 +263,7 @@ export function buildCoverage(regionKey) {
     way(pts, { highway: 'residential', name: `Plot Street ${r + 1}`, sidewalk: 'both', lanes: '2' });
     streetNodes.push(y);
   }
+  let coastPlots = 0;
   wanted.forEach((w, i) => {
     const c = i % cols; const r = Math.floor(i / cols);
     const x0 = PLOT_X0 + c * PW; const y0 = PLOT_Y0 + r * PLOT;
@@ -294,7 +295,8 @@ export function buildCoverage(regionKey) {
       kind = 'on a side road before the junction'; at = [cx, y0 + 9];
     } else if (AT_COAST.test(t)) {
       // (out from the coast into the sea, beside this plot's row)
-      const yy = y0 + PLOT / 2; way([[COAST_X + 30, yy], [COAST_X - 60, yy]], tags);
+      // (each coast plot at its own place in the row: two in one row laid their lines on top of each other)
+      const yy = y0 + 6 + ((coastPlots++) % 4) * 14; way([[COAST_X + 30, yy], [COAST_X - 60, yy]], tags);
       kind = 'out from the coast'; at = [COAST_X - 20, yy];
     } else if (ACROSS_RIVER.test(t)) {
       // (across the whole valley, bank top to bank top: a dam with no drop under its crest is left to the ground)

@@ -5857,9 +5857,9 @@
    "count": 66000,
    "group": "water",
    "item": "piers",
-   "status": "partial",
+   "status": "built",
    "fetched": true,
-   "builds": "As an area: ground stood up 1.5 m over the sea; as a line: nothing",
+   "builds": "As an area: ground stood up 1.5 m over the sea; as a line: the same, widened to its width= (else 8 m)",
    "assets": [
     {"shape":"/levels/Industrial/art/shapes/buildings/port_base_additions_wave_blocks.dae","region":"any","usedToday":false,"maybe":true},
     {"shape":"/levels/east_coast_usa/art/shapes/rocks/eca_rock_big_wide.dae","region":"north-america","usedToday":false},
@@ -6114,9 +6114,9 @@
    "count": 53000,
    "group": "water",
    "item": "piers",
-   "status": "partial",
+   "status": "built",
    "fetched": true,
-   "builds": "As an area: ground stood up over the sea; as a line: nothing",
+   "builds": "As an area: ground stood up over the sea; as a line: the same, widened to its width= (else 3 m)",
    "assets": [
     {"shape":"/levels/east_coast_usa/art/shapes/rocks/eca_rock_medium_1.dae","region":"north-america","usedToday":false},
     {"shape":"/levels/west_coast_usa/art/shapes/rocks/eca_rock_medium_2.dae","region":"north-america","usedToday":false,"is":"3 m grey boulder","from":"catalogue"}

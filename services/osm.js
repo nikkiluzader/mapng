@@ -556,6 +556,10 @@ export const parseOverpassResponse = (data, bounds) => {
     } else if (!consumedWayIds.has(id) && (tags.power === "minor_line" || tags.power === "line") && !isClosedRing(w.nodes)) {
       // Overhead power lines: a pole (or tower) at every vertex (streetProps.js).
       rawFeatures.push({ id: id.toString(), type: "power_line", geometry: w.nodes, tags });
+    } else if (!consumedWayIds.has(id) && (tags.man_made === "breakwater" || tags.man_made === "groyne") && !tags.building && !isClosedRing(w.nodes)) {
+      // A breakwater or groyne mapped as a line: a rock mole along it (exportBeamNGLevel.js pierAreasOf). Dropped
+      // before, only the area form was built (coverage level, 2026-11-24)
+      rawFeatures.push({ id: id.toString(), type: "breakwater", geometry: w.nodes, tags });
     } else if (!consumedWayIds.has(id) && tags.man_made === "pier" && !tags.building && !isClosedRing(w.nodes)) {
       // A pier mapped as a line (an area stays land use): a deck over the water.
       rawFeatures.push({ id: id.toString(), type: "pier", geometry: w.nodes, tags });
@@ -612,7 +616,7 @@ export const parseOverpassResponse = (data, bounds) => {
     const isLinearPlatform = f.type === "platform" && !isClosedRing(f.geometry);
     // (a pier is a line too, man_made=pier on an open way: clipped as a polygon, a two-node jetty was dropped
     // and a longer one came back closed. Found by the coverage level, scripts/coverage, 2026-11-24)
-    if (f.type === "road" || f.type === "railway" || f.type === "barrier" || f.type === "coastline" || f.type === "power_line" || f.type === "cliff" || f.type === "pier" || isLinearWaterway || isLinearPlatform) {
+    if (f.type === "road" || f.type === "railway" || f.type === "barrier" || f.type === "coastline" || f.type === "power_line" || f.type === "cliff" || f.type === "pier" || f.type === "breakwater" || isLinearWaterway || isLinearPlatform) {
       const clippedSegments = clipLineString(f.geometry, bounds);
       clippedSegments.forEach((segment, index) => {
         if (segment.length > 1) {

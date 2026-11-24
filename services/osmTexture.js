@@ -2574,6 +2574,21 @@ export const generateGameTexture = async (terrainData, options = {}) => {
     skipArea: satellite ? (tags, unmatched) => unmatched || leftToGround(tags) || isWaterArea(tags)
       || (terrainData.landCover?.grid && OSM_ROCK.has(tags?.natural)) : null,
   });
+  // (over the sea and the shore drawn above)
+  ctx.save();
+  ctx.lineCap = "butt"; ctx.lineJoin = "miter";
+  // breakwaters and groynes mapped as lines: rock grey at their width (width=, else 8 m / 3 m), as the terrain
+  // paints them (osmTerrainMaterials.js paintMoles); they showed grass (coverage level, 2026-11-24)
+  ctx.strokeStyle = GAME_COLORS.bare || '#807b71';
+  for (const f of terrainData.osmFeatures || []) {
+    if (f?.type !== "breakwater" || !(f.geometry?.length >= 2)) continue;
+    const w = Number.parseFloat(f.tags?.width);
+    ctx.lineWidth = Math.max(1, (Number.isFinite(w) && w > 0.5 && w < 60 ? w : f.tags?.man_made === "groyne" ? 3 : 8) * METERS_TO_PX);
+    ctx.beginPath();
+    f.geometry.forEach((p, i) => { const q = toPixel(p.lat, p.lng); if (i) ctx.lineTo(q.x, q.y); else ctx.moveTo(q.x, q.y); });
+    ctx.stroke();
+  }
+  ctx.restore();
 
   // gentle large-scale variation, then a fine grain: ground, not a vector map
   const macro = document.createElement("canvas");

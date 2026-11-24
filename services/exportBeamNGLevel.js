@@ -12024,12 +12024,41 @@ function buildWaterBlockObjects(terrainData, squareSize, biome, stats = {}, dryZ
   }));
 }
 
-/** Piers, breakwaters, groynes and quays mapped as areas (closed ways) as world [x, y] rings. */
+/**
+ * Piers, breakwaters, groynes and quays mapped as areas (closed ways) as world [x, y] rings; and breakwaters and
+ * groynes mapped as lines, widened to their width= (else BREAKWATER_WIDTH_M) into a ring along the line.
+ */
+const BREAKWATER_WIDTH_M = { breakwater: 8, groyne: 3 };
 function pierAreasOf(terrainData, squareSize) {
-  return (terrainData.osmFeatures || [])
-    .filter((f) => ['pier', 'breakwater', 'groyne', 'quay'].includes(f?.tags?.man_made) && f.type !== 'pier' && f.geometry?.length > 3
+  const toW = (p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0).slice(0, 2);
+  const out = (terrainData.osmFeatures || [])
+    .filter((f) => ['pier', 'breakwater', 'groyne', 'quay'].includes(f?.tags?.man_made) && f.type !== 'pier' && f.type !== 'breakwater' && f.geometry?.length > 3
       && Math.abs(f.geometry[0].lat - f.geometry[f.geometry.length - 1].lat) < 1e-9 && Math.abs(f.geometry[0].lng - f.geometry[f.geometry.length - 1].lng) < 1e-9)
-    .map((f) => f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0).slice(0, 2)));
+    .map((f) => f.geometry.map(toW));
+  let lines = 0;
+  for (const f of terrainData.osmFeatures || []) {
+    if (f?.type !== 'breakwater' || !(f.geometry?.length >= 2)) continue;
+    const w = Number.parseFloat(f.tags?.width);
+    const half = (Number.isFinite(w) && w > 0.5 && w < 60 ? w : BREAKWATER_WIDTH_M[f.tags?.man_made] || 6) / 2;
+    const ring = lineToRing(f.geometry.map(toW), half);
+    if (ring) { out.push(ring); lines++; }
+  }
+  if (lines) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Breakwaters and groynes: ${lines} mapped as line(s), widened into moles (width= or ${BREAKWATER_WIDTH_M.breakwater} m / ${BREAKWATER_WIDTH_M.groyne} m).`);
+  return out;
+}
+// A line [x, y][] widened by half each side into a closed ring (mitred joins, square ends); null if too short.
+function lineToRing(pts, half) {
+  const p = pts.filter((q, i) => i === 0 || fastHypot(q[0] - pts[i - 1][0], q[1] - pts[i - 1][1]) > 0.05);
+  if (p.length < 2) return null;
+  const left = []; const right = [];
+  for (let i = 0; i < p.length; i++) {
+    const a = p[Math.max(0, i - 1)]; const b = p[Math.min(p.length - 1, i + 1)];
+    const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L = fastHypot(dx, dy) || 1;
+    const nx = -dy / L; const ny = dx / L;
+    left.push([p[i][0] + nx * half, p[i][1] + ny * half]); right.push([p[i][0] - nx * half, p[i][1] - ny * half]);
+  }
+  const ring = [...left, ...right.reverse()]; ring.push(ring[0]);
+  return ring;
 }
 
 /** The mapped coastlines as world [x, y] lines, in the ways' own order (land on the left). */

@@ -56,3 +56,16 @@ test('a railway platform mapped as an open line is kept as a platform line', () 
   assert.equal(pf.length, 1);
   assert.equal(pf[0].geometry.length, 2, 'still an open line of two nodes');
 });
+
+test('breakwaters and groynes mapped as lines are read (coverage level, 2026-11-24)', async () => {
+  const { parseOverpassResponse } = await import('../services/osm.js');
+  const b = { north: 40.01, south: 39.99, east: -74.99, west: -75.01 };
+  const els = [];
+  for (const [id, mm] of [[1, 'breakwater'], [2, 'groyne']]) {
+    const g = [{ lat: 40, lon: -75 + id * 0.001 }, { lat: 40.002, lon: -75 + id * 0.001 }];
+    els.push({ type: 'way', id, nodes: [id * 10, id * 10 + 1], geometry: g, tags: { man_made: mm } });
+  }
+  const f = parseOverpassResponse({ elements: els }, b).filter((x) => x.type === 'breakwater');
+  assert.deepEqual(f.map((x) => x.tags.man_made).sort(), ['breakwater', 'groyne']);
+  assert.ok(f.every((x) => x.geometry.length === 2), 'kept as lines');
+});

@@ -925,6 +925,26 @@ export function roadGroundMat(tags = {}, classMat = 5) {
   return classMat;
 }
 
+// Breakwaters and groynes on rock: an area's outline filled, a line's width painted along it (width=, else 8 m for a
+// breakwater, 3 m for a groyne, as the export stands them up). They grew grass (coverage level, 2026-11-24).
+const MOLE_WIDTH_M = { breakwater: 8, groyne: 3 };
+const ROCK = 4;
+function paintMoles(layerMap, terrainData, worldSize) {
+  const { width: size, bounds, osmFeatures = [] } = terrainData;
+  const mpp = worldSize / size;
+  const toPx = (lat, lng) => geoToTerrainPx(lat, lng, bounds, size);
+  for (const f of osmFeatures) {
+    const mm = f?.tags?.man_made;
+    if ((mm !== 'breakwater' && mm !== 'groyne') || !(f.geometry?.length >= 2)) continue;
+    const pts = f.geometry.map((p) => toPx(p.lat, p.lng));
+    if (f.type === 'breakwater') {
+      const w = Number.parseFloat(f.tags.width);
+      const halfPx = Math.max(1, ((Number.isFinite(w) && w > 0.5 && w < 60 ? w : MOLE_WIDTH_M[mm]) / 2) / mpp);
+      for (let i = 0; i + 1 < pts.length; i++) rasterizeSegment(layerMap, size, pts[i].px, pts[i].py, pts[i + 1].px, pts[i + 1].py, halfPx, ROCK);
+    } else if (pts.length >= 3) rasterizePolygon(layerMap, size, pts, ROCK);
+  }
+}
+
 function paintRoadFootprints(layerMap, terrainData, worldSize) {
   const { width: size, bounds, osmFeatures = [] } = terrainData;
   const metersPerPixel = worldSize / size;
@@ -1296,6 +1316,7 @@ export async function buildTerrainMaterials(terrainData, worldSize, exportLevelN
   }
   // roads over either: the satellite-classified map draws none of its own
   paintRoadFootprints(layerMap, terrainData, worldSize);
+  paintMoles(layerMap, terrainData, worldSize);
 
   // ── Material definitions ───────────────────────────────────────────────────
   const DETAIL_SIZE = 1024;
