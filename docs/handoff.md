@@ -59,8 +59,9 @@ replace the tracking files (see CLAUDE.md, "Tracking"); it is the short "start h
       2D preview); the choice stays stored. Corridor-shaped backdrop is a backlog idea.
 - [x] **Line curves, second round** (`b8fa986`): switches and path joins carried onto the curve (railways, paths,
       waterways only; for roads it changed 87 sweep cells, kept pinned), waterways rounded, power lines kept as drawn
-      on purpose, walls were already rounded by the export. Sweep 135/135, 116 identical. Game check: pending
-      (area `curve_kaunas`, GPXZ; no Mapterhorn in Lithuania).
+      on purpose, walls were already rounded by the export. Sweep 135/135, 116 identical. Game check done 2026-11-24 on area `curve_kaunas`
+      (GPXZ; no Mapterhorn in Lithuania): station tracks and switches curve smoothly, the footpath join is a smooth
+      curve (`scratch/curves/game/1_tracks.jpg`, `1b_switches.jpg`, `2_path.jpg`, cameras in `cams.png`).
 - [ ] **Next suggested (not agreed yet):** move the export's data step (backdrop download, `ensureExportData` in
       ExportPanel) out of the window into the desktop runner, for lominsa's window out-of-memory crash.
 - [x] **Rounded curves on railways and paths** (thecoachtoma, SPLATPLAYS; user's decision 2026-11-24: on by default,
@@ -73,9 +74,8 @@ replace the tracking files (see CLAUDE.md, "Tracking"); it is the short "start h
       counting short arc pieces several times (fixed in the same commit: it samples by length); Naldo's +3 floating
       slabs are old edge spots flipping sign. Paired sweeps on the fixed check: 104 of 135 identical, the rest a few
       counts either way. Baselines re-recorded `9deac69`.
-      **Open:** not looked at in the game yet (a railway curve and a footpath); curves through shared nodes bend
-      tightest at the node (about 17 deg steps over 0.3 m: roads did this before too, `throughCurve` sampling);
-      waterways, walls and power lines are still as drawn; tell Toma (the user posts).
+      **Open:** roads still bend tightest at a node another road ends at (carrying those nodes moved street junctions
+      and changed 87 sweep cells: needs its own study); tell Toma (the user posts).
 - [ ] **Discord requests 2026-11-24, recorded, not started:** Toma's three notes (backlog, section 1); splatplays'
       import formats (open items, "more OSM import formats": compressed .osm first).
 - [ ] **Sidewalks at banks and the water** (the first approach was scrapped; nothing on dev yet). See the section
