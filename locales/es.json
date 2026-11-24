@@ -602,6 +602,7 @@
       "backdropHint_mapterhorn": "Terreno lidar de Mapterhorn alrededor del mapa donde lo haya, 30 m global en el resto",
       "backdropHint_kron86": "El modelo de terreno de 1 m de Polonia (NMT) alrededor del mapa",
       "backdropNotHere": "Esta fuente no tiene datos para este mapa: alrededor se usa el terreno global de 30 m.",
+      "backdropRoadOff": "Sin fondo para un nivel a lo largo de una carretera: el terreno alrededor de una carretera larga queda casi todo lejos de ella y sería demasiado para descargar. El nivel termina en el corredor de la carretera.",
       "backdropHint_gpxz": "Terreno GPXZ alrededor del mapa (usa tu clave GPXZ)",
       "terrainSummary_ready": "Terreno: Listo para conducir. Se hacen todos los ajustes.",
       "terrainSummary_custom": "Terreno: Personalizado. Solo se hacen los ajustes que elegiste.",

@@ -602,6 +602,7 @@
       "backdropHint_mapterhorn": "Mapterhorn-Lidar-Gelände rund um die Karte, wo vorhanden, sonst global 30 m",
       "backdropHint_kron86": "Polens 1-m-Geländemodell (NMT) rund um die Karte",
       "backdropNotHere": "Diese Quelle hat für diese Karte keine Daten: Rundherum wird das globale 30-m-Gelände verwendet.",
+      "backdropRoadOff": "Kein Hintergrund bei einem Level entlang einer Straße: Das Land um eine lange Straße liegt meist weit von ihr entfernt und wäre zu viel zum Herunterladen. Das Level endet am Korridor der Straße.",
       "backdropHint_gpxz": "GPXZ-Gelände rund um die Karte (nutzt deinen GPXZ-Schlüssel)",
       "terrainSummary_ready": "Gelände: Fahrbereit. Alle Anpassungen werden vorgenommen.",
       "terrainSummary_custom": "Gelände: Eigene. Nur die gewählten Anpassungen werden vorgenommen.",

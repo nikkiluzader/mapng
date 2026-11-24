@@ -602,6 +602,7 @@
       "backdropHint_mapterhorn": "Relief lidar Mapterhorn autour de la carte là où il existe, 30 m mondial ailleurs",
       "backdropHint_kron86": "Le modèle de terrain à 1 m de la Pologne (NMT) autour de la carte",
       "backdropNotHere": "Cette source n'a pas de données pour cette carte : le relief mondial à 30 m est utilisé autour.",
+      "backdropRoadOff": "Pas d'arrière-plan pour un niveau le long d'une route : le terrain autour d'une longue route est surtout loin d'elle, trop à télécharger. Le niveau s'arrête au couloir de la route.",
       "backdropHint_gpxz": "Terrain GPXZ autour de la carte (utilise votre clé GPXZ)",
       "terrainSummary_ready": "Terrain : Prêt à rouler. Toutes les retouches sont faites.",
       "terrainSummary_custom": "Terrain : Personnalisé. Seules les retouches choisies sont faites.",

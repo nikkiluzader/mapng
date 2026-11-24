@@ -133,7 +133,8 @@
 
           <!-- Elevation around the map, beyond its edges -->
           <SettingCard :title="t('exportPanel.ui.cardSurroundings')">
-            <SettingRow :label="t('exportPanel.includeBackdrop')" :hint="backdropNotHere ? t('exportPanel.ui.backdropNotHere') : t(`exportPanel.ui.backdropHint_${beamNGBackdropSource}`)">
+            <p v-if="isRoadLevel" data-testid="backdrop-road-off" class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.backdropRoadOff') }}</p>
+            <SettingRow v-else :label="t('exportPanel.includeBackdrop')" :hint="backdropNotHere ? t('exportPanel.ui.backdropNotHere') : t(`exportPanel.ui.backdropHint_${beamNGBackdropSource}`)">
               <select v-model="beamNGBackdropSource" :class="SELECT_XS">
                 <option value="off">{{ t('exportPanel.ui.backdropOff') }}</option>
                 <option value="global30m">{{ t('exportPanel.ui.backdropGlobal') }}</option>
@@ -146,7 +147,7 @@
             </SettingRow>
             <!-- how fine a satellite picture the backdrop gets (services/backdropImagery.js) -->
             <SettingRow
-              v-if="beamNGBackdropSource !== 'off'"
+              v-if="!isRoadLevel && beamNGBackdropSource !== 'off'"
               indent
               :label="t('exportPanel.ui.backdropImagery')"
               :hint="backdropImageryHint"
@@ -157,10 +158,10 @@
                 <option v-for="id in BACKDROP_IMAGERY_IDS" :key="id" :value="id">{{ t(`exportPanel.ui.backdropImagery_${id}`) }}</option>
               </select>
             </SettingRow>
-            <p v-if="beamNGBackdropSource === 'global30m' && backdropPlan.limited" class="pl-4 text-caption leading-snug text-amber-700 dark:text-amber-300">
+            <p v-if="!isRoadLevel && beamNGBackdropSource === 'global30m' && backdropPlan.limited" class="pl-4 text-caption leading-snug text-amber-700 dark:text-amber-300">
               {{ t(desktopApp ? 'exportPanel.ui.backdropImageryLimitedDesktop' : 'exportPanel.ui.backdropImageryLimitedWeb', { mpp: backdropPlan.metresPerPixel.toFixed(1) }) }}
             </p>
-            <p v-else-if="beamNGBackdropSource === 'global30m' && backdropPlan.tiles > BACKDROP_MANY_TILES" class="pl-4 text-caption leading-snug text-amber-700 dark:text-amber-300">
+            <p v-else-if="!isRoadLevel && beamNGBackdropSource === 'global30m' && backdropPlan.tiles > BACKDROP_MANY_TILES" class="pl-4 text-caption leading-snug text-amber-700 dark:text-amber-300">
               {{ t('exportPanel.ui.backdropImagerySlow', { n: backdropPlan.tiles.toLocaleString() }) }}
             </p>
             <p v-if="exportDataStatus && exportDataStatus.status !== 'idle'" class="text-caption leading-snug" :class="exportDataStatus.status === 'failed' ? 'text-amber-700 dark:text-amber-300' : 'text-gray-500 dark:text-gray-400'">
@@ -1017,7 +1018,6 @@ const backdropImageryHint = computed(() => {
 });
 watch(backdropPlan, (p) => { store.backdropImagery = p; }, { immediate: true });
 // (the 2D preview draws the surrounding tiles when a backdrop is chosen)
-watch(beamNGBackdropSource, (v) => { store.backdropSource = v || 'off'; }, { immediate: true });
 const beamNGIncludeBuildings = legacyOn.buildings;
 const beamNGIncludeWater = computed(() => ['rivers', 'lakes', 'sea'].map((id) => (built(id) ? 1 : 0)).join(''));
 // Structures and the export's terrain shaping (advanced mode; basic builds
@@ -1133,8 +1133,14 @@ const isCustomUploadTerrain = computed(() => !!props.terrainData?.elevationUnitA
 const canUseGpxzBackdrop = computed(() => props.elevationSource === 'gpxz' && !!props.gpxzApiKey);
 // (the backdrop's source: the chosen one where it has data for this map, 30 m global where it has none)
 const backdropCovers = (source) => backdropSourceCovers(source, props.terrainData?.bounds, { gpxzOk: canUseGpxzBackdrop.value });
-const backdropInUse = computed(() => effectiveBackdropSource(beamNGBackdropSource.value, props.terrainData?.bounds, { gpxzOk: canUseGpxzBackdrop.value }));
-const backdropNotHere = computed(() => beamNGBackdropSource.value !== 'off' && backdropInUse.value !== beamNGBackdropSource.value);
+// (a level along a road has no backdrop: its box round a long road is mostly far from it, a 200 km road's about
+// 150 x 100 km of terrain and picture, which stalled at half way and ran the window out of memory (lominsa,
+// 2026-11-24). The choice stays stored for other maps)
+const isRoadLevel = computed(() => (props.terrainData?.road?.pts?.length || 0) > 1);
+const backdropInUse = computed(() => (isRoadLevel.value ? 'off' : effectiveBackdropSource(beamNGBackdropSource.value, props.terrainData?.bounds, { gpxzOk: canUseGpxzBackdrop.value })));
+const backdropNotHere = computed(() => !isRoadLevel.value && beamNGBackdropSource.value !== 'off' && backdropInUse.value !== beamNGBackdropSource.value);
+// (what the 2D preview reads: no backdrop drawn or fetched there for a road level either)
+watch([beamNGBackdropSource, isRoadLevel], ([v, road]) => { store.backdropSource = road ? 'off' : (v || 'off'); }, { immediate: true });
 
 // The export's data step (services/exportData.js): the backdrop's tiles and
 // the bridges' lidar survey downloaded ahead, in the background, as soon as

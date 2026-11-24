@@ -602,6 +602,7 @@
       "backdropHint_mapterhorn": "Teren z lidaru Mapterhorn wokół mapy tam, gdzie jest dostępny, w pozostałych miejscach globalny 30 m",
       "backdropHint_kron86": "Polski numeryczny model terenu 1 m (NMT) wokół mapy",
       "backdropNotHere": "To źródło nie ma danych dla tej mapy: wokół niej używany jest globalny teren 30 m.",
+      "backdropRoadOff": "Brak tła dla poziomu wzdłuż drogi: teren wokół długiej drogi leży w większości daleko od niej i byłoby go za dużo do pobrania. Poziom kończy się na korytarzu drogi.",
       "backdropHint_gpxz": "Teren GPXZ wokół mapy (używa Twojego klucza GPXZ)",
       "terrainSummary_ready": "Teren: Gotowy do jazdy. Wykonywane są wszystkie poprawki.",
       "terrainSummary_custom": "Teren: Własne. Tylko wybrane poprawki.",
