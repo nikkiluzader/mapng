@@ -28,6 +28,23 @@ when done, rewrite the "state" of the item you stop in. It does not replace the 
 - [x] **Batch code removal.** On dev (`21ab735`, `604dbd0`, `e833c48`). Checked: build, unit tests, a browser run
       with an old saved job, two tiles through Generate and per-tile export, the desktop app in development mode.
       Left: when the 0.3.7 update page is written it must say that old batch jobs can no longer be opened.
+- [x] **Very large levels (report MR-VYQGBY, lominsa's 220 km A16 road in 442 pieces).** On dev:
+      `f4a39b1` the progress card's bar moves for levels built in pieces (they now send `phase`/`phaseFraction`),
+      the "middle 2048 x 2048" notice only for square non-power-of-two terrains, step 1's big-area and shaking
+      notes measure the whole road/tile shape, desktop Cancel works while waiting for downloads;
+      `7e241c3` levels built in pieces are written through `services/zipStreamWriter.js` (ZIP64 when over 65,535
+      files or 4 GB; JSZip cannot write ZIP64, so MapNG's own level list could not read the big level) and each
+      piece is merged as soon as it is exported (`createChunkMerger` in `services/chunkMerge.js`) instead of all
+      442 held until the end; `abb0594` the road panel warns from 40 pieces (seven languages), never refuses on
+      desktop (user's decision 2026-11-24: let people try, the reports are useful).
+      Checked: unit tests (70,000 files; 5 GB through MapNG's reader), a six-piece level read by Python and by the
+      level list and loaded in the game, the road warning in the browser with the reported road. A sweep on
+      `7e241c3` was started (`scratch/fizz035/sweep_zip.json`): read it before main.
+      **Not done / not proven:** the window's out-of-memory crash itself (no log; likely the backdrop download in
+      the window for a 158 km level, `ensureExportData` in ExportPanel: move that step to the runner on desktop?);
+      no level over 65,535 files has been built end to end yet (only the writer is tested past it); the merged
+      report still holds every piece's report (70 MB for 442 pieces); whether BeamNG loads a ZIP64 zip is unknown;
+      the road end handle drags at most 20 km at a time (`error_tooFar`).
 - [ ] **Sidewalks at banks and the water** (the first approach was scrapped; nothing on dev yet). See the section
       below before starting.
 - [x] **Slip roads ending at the outer lane** (thecoachtoma's Kaunas junction). On dev (`c0f6a71`, `d62f6a1`), in
