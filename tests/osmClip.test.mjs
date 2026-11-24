@@ -46,3 +46,13 @@ test('a single mapped shrub (natural=shrub node) is kept as vegetation, as a tre
   const veg = parseOverpassResponse(data, bounds).filter((f) => f.type === 'vegetation');
   assert.deepEqual(veg.map((f) => f.tags.natural).sort(), ['shrub', 'tree']);
 });
+
+test('a railway platform mapped as an open line is kept as a platform line', () => {
+  const bounds = { north: 1, south: 0, east: 1, west: 0 };
+  const data = { elements: [
+    { type: 'way', id: 41, tags: { railway: 'platform' }, geometry: [[0.2, 0.5], [0.4, 0.5]].map(([lng, lat]) => ({ lat, lon: lng })) },
+  ] };
+  const pf = parseOverpassResponse(data, bounds).filter((f) => f.type === 'platform');
+  assert.equal(pf.length, 1);
+  assert.equal(pf[0].geometry.length, 2, 'still an open line of two nodes');
+});

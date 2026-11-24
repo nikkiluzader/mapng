@@ -562,7 +562,9 @@ export const parseOverpassResponse = (data, bounds) => {
         const linearWaterway = type === "water" && !!tags.waterway && !areaLike;
         // a cliff mapped as a line (top edge, face on its right): kept for the export's cliff sharpening
         if (!areaLike && tags.natural === "cliff" && nodes.length >= 2) { rawFeatures.push({ id: id.toString(), type: "cliff", geometry: nodes, tags }); continue; }
-        if (!areaLike && !linearWaterway && type !== "road" && type !== "barrier") continue;
+        // (a platform mapped as a line is kept too: platforms.js raises it beside its track, and the clip below has
+        // its own branch for it; it was dropped here. Found by the coverage level, scripts/coverage, 2026-11-24)
+        if (!areaLike && !linearWaterway && type !== "road" && type !== "barrier" && type !== "platform") continue;
         rawFeatures.push({ id: id.toString(), type, geometry: nodes, tags });
       }
     }
