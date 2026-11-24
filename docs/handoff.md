@@ -96,12 +96,10 @@ replace the tracking files (see CLAUDE.md, "Tracking"); it is the short "start h
 - [x] **0.3.7 release page draft** (`7edfe58`, `public/updates/0.3.7/`, not indexed, not linked): formats with the
       reasons for the ones not opened, Monaco .osm.pbf vs Shapefile in game, line curves, large levels. Still to add
       before release: the Perth fixes, whatever else lands.
-- [ ] **The coverage level** (user 2026-11-24): `scripts/coverage/` (README there has the steps and the runs).
-      Two tours of the 1024 m level done and reviewed (every official model textured, no black boxes, no missing
-      textures); reader fixes on dev (line piers, shrubs; line platforms not yet committed until the suite passes).
-      Next: the 2048 m layout (built, not yet exported) with the user's asks: twice the size, trees with room, the
-      sun held at noon with the simulation running, half a second per shot. Then: bridge ends and tunnel insides
-      (driver views) for the new layout, the other four regions, a test that fails when a tag lacks a plot.
+- [x] **The coverage level and the themed test levels** (user 2026-11-24): `scripts/coverage/` (README: steps,
+      runs, the water shot recipe). Toured and fixed (history.md "Test levels"; dev up to da2f0aa). Left: the sweep
+      before main, then the test-level upload and download (waits on the user), the other four regions, a test that
+      fails when a tag lacks a plot; follow-ups in the backlog (areas 5 and 6).
 - [ ] **Toma's three notes** (backlog, section 1), not started.
 - [ ] **Tile rotation** (user asked 2026-11-24 about 0.3.7): answered feasible but big (1-2 weeks; whole-map rotation
       first, tiles rotated apart from each other only as a shaped level); suggested as the first 0.3.8 item, the user

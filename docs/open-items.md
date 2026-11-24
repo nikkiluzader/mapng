@@ -1,6 +1,6 @@
 # MapNG open items
 
-Last reviewed: 2026-11-24, late (0.3.6 Latest; main = dev at 8aebfb4; test build v0.3.7-dev.4 at 25c91ef)
+Last reviewed: 2026-11-24, night (0.3.6 Latest; main 8aebfb4; dev da2f0aa, ahead of main by the test-level fixes)
 
 The short "now" board: current work, what waits on someone, and checks owed on shipped work. The other tracking
 files: `refs/output/backlog.md` holds everything wanted later, by area; `refs/output/releases.md` what shipped;
@@ -115,6 +115,16 @@ Mesh Road joins. Riding along: the other 38 sweep areas re-framed, Zion's tunnel
     mapped wall. Tried and reverted: points past a wall's end not counted as its water side (no change).
     The full state and what not to repeat: `docs/handoff.md`.
   Done when: a sweep shows no sidewalk cell worse than dev, then in game at Kingston and Naldo.
+
+## Now: test levels (2026-11-24; history.md "Test levels" has what was fixed)
+
+- **State:** the coverage level and the themed roads, structures and terrain levels toured in game after the fixes
+  (`scratch/coverage/runs/*2`, 605 shots); every issue the user and the tours raised is fixed on dev, except the
+  backlog follow-ups listed in area 5 and 6 (curved water steps, salt pans, bare rock colour, track corners, container
+  ribs and church windows, ruins' floor, optional shipped imposters on desktop).
+- **Next:** the sweep before any main push (the road, water, tree and reader changes touch every export); then, with
+  the user's go-ahead, upload the four test levels and add "Download Official Test Levels" (desktop; texts in 7
+  languages).
 
 ## Priority list (2026-11-23, asked for by the user; details in the sections below)
 
@@ -796,6 +806,7 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
 
 ## Waiting on someone
 
+- **The user's go-ahead to upload the official test levels** (R2) and build their download (after the sweep).
 - **The next desktop test build (0.3.3-dev.6)** with the next batch of fixes: ask before the -dev tag (planned after
   the Fizz list, item 11).
 - **A BeamNG developer:** whether dev.7 ends the console errors and the low frame rate on a lake-country level.
@@ -812,6 +823,9 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
 
 ## Checks owed on shipped work
 
+0. **The sweep for the test-level fixes** (dev 8588835..da2f0aa) before main: lane tapers, crossings, unpaved ground,
+   river channels, water kinds, woods density, land-cover trees, breakwater lines all change real exports. Watch
+   tree counts (woods about 2x) and export time.
 1. "Extremely heavy" card, the Mapterhorn base tile and the new size selector looked at in the running app.
 2. The new 3D model rows (Area, Tiles, Point spacing) in all seven languages.
 3. The two sweep areas BeamNG developers exported (dev_szczyrk, dev_pilchowice, added 2026-11-16) have baselines

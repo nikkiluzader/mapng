@@ -78,3 +78,10 @@ in game, 250 m round the camera; `mapngTestLabels.toggle()` hides them.
   not built; short rivers and canals on ground with no channel are a 0.2 m film of water that barely shows.
   Layout faults fixed for the next run: 20 m-high coast, lake across the tunnels, railway across the hill's foot (it
   came out on a viaduct), side roads ending in the next street's sidewalk.
+- **2026-11-24, all four levels after the fixes (coverage 301 shots, structures 215, terrain 89).** Everything the
+  first tours and the user's fly-throughs found is fixed (refs/output/history.md, "Test levels"); the follow-ups left
+  are in the backlog (areas 5 and 6). Water was also shot up close, one shot per kind: the camera north-east of the
+  water, about 0.4 x its size up, looking down past its middle, at time 0.12 (about 3 pm in late November at 40 N: the
+  sun low in the south-west, ahead of the camera), so the reflections and ripples show
+  (`scratch/coverage/plots/water_sun.jpg`). Distance shots do not judge water.
+

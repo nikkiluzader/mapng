@@ -4,7 +4,7 @@ Problems that have come up more than once or took long to pin down. Before chasi
 an odd test result, look here first. When one is solved, add it: what it looks like, the cause, how it was proven,
 the fix and where it lives, and the traps when testing it. Keep each entry short; link to code and history.
 
-Last updated: 2026-11-24.
+Last updated: 2026-11-24 (night).
 
 ---
 
@@ -24,7 +24,18 @@ black until textures are reloaded; the file on disk is fine, so the next load is
 billboard trees on first load (fixed in an earlier release); 2026-11-24 the power-line pole `powerpole4.dae` (West
 Coast USA) brought in by the Perth power-line fix: a row of black boxes along the map's north edge.
 
-**Fix (in every exported level):** the generated `mainLevel.lua` (in `services/exportBeamNGLevel.js`, search
+**Fix (since 2026-11-24): hidden behind the loading screen.** On a first load (no sprites cached yet) the level
+script holds the loading screen (`core_gamestate.requestEnterLoadingScreen('mapngSprites')`); the bake comes a
+fraction of a second after the level has loaded, the textures are reloaded behind the screen, and the hold is let go
+a second later (3 s at most with no bake, 20 s whatever happens, and when the level ends). A later load does not hold.
+Log lines: `New shape sprites were baked: reloading textures behind the loading screen`, `Loading screen let go: ...`.
+
+**Tried and not enough (2026-11-24):** a `.link` to the game's own imposter, beside the shape or under the zip's
+`temp/levels/<level>/` path, even with the shape's link dated 2013 like the game's files: the imposter check wants a
+real file. A real `.imposter.dds` beside the linked shape (dated no later than its link) does stop the bake, but a
+browser export cannot copy game files and 11 of 73 billboard shapes (the traffic-signal pole among them) ship none.
+
+**Earlier fix, still in place:** the generated `mainLevel.lua` (in `services/exportBeamNGLevel.js`, search
 "spriteWatch") watches `temp/levels/<level>/**/*.imposter.dds` after the level starts and calls `reloadTextures()`
 once when new ones appear, or when one was written in the last 10 minutes (a bake that finished during loading,
 added 2026-11-24). It logs `mapng | New shape sprites were baked: reloading textures`. Cost: a few seconds on a big
@@ -128,3 +139,21 @@ game, checked against all its archives), the flag model, the facade light textur
 
 **How to check a level:** load it in free-roam from an empty `temp/levels/<level>` and grep the log from its
 "Level loading" line for `Missing source texture` / `NO TEXTURE`; there should be none.
+
+---
+
+## The game stuck in an error loop after many loads (seen once, 2026-11-24)
+
+**Looked like:** the game seemed frozen; the log filled with `kdtreebox2d.lua:202: attempt to compare nil with number`
+(from `gameplay/markerInteraction.lua`, mission markers) and `Cannot setCamera, camera not found: gameCamera`, many a
+second, on the coverage level. **Context:** a game session about 17 hours old with dozens of test-level loads. A fresh
+start loaded the same level and ran the same tour with neither error. **What to do:** restart the game; if it comes
+back on a fresh session, the saved log tail is `scratch/coverage/crash_log_tail.txt`.
+
+## Test layouts that misled a check (2026-11-24)
+
+- A synthetic river over rolling ground lay buried under every hump (a river is held never to flow uphill): give a
+  test valley a steady fall (`testLevels.mjs` terrain).
+- Test roads crossing without a shared node made no junction: `run(..., through)` in `testLevels.mjs`.
+- Two coast plots in one row laid their lines on top of each other: each gets its own offset.
+- A 30 m square plot is no size for a canal, a track or a house: real sizes (`REAL_SIZE`, the water block).
