@@ -965,6 +965,60 @@ ipcMain.handle('levels:list', () => {
  * the system's Recycle Bin / Trash (so a mistake can be undone there), not
  * deleted outright. Only a MapNG level in the mods folder, never mid-rebuild.
  */
+// The official test levels (mapng.com/api/test-levels, worker/testLevels.js): each downloaded straight into the mods
+// folder, as <name>.zip.part checked against the manifest's size and SHA-256, then renamed (BeamNG reads a zip being
+// copied: docs/known-issues.md); the levels list shows them after. Progress on 'levels:testProgress'.
+const TEST_LEVEL_FILE = /^mapng_[a-z0-9_]{1,80}\.zip$/;
+let testLevelsBusy = false;
+ipcMain.handle('levels:downloadTestLevels', async (event) => {
+  if (testLevelsBusy) return { ok: false, error: 'busy' };
+  const folder = modsFolder();
+  if (!folder || !fs.existsSync(folder)) return { ok: false, error: 'no-mods-folder' };
+  testLevelsBusy = true;
+  const send = (p) => { try { event.sender.send('levels:testProgress', p); } catch { /* window closed */ } };
+  try {
+    const res = await net.fetch(`${API_ORIGIN}/api/test-levels`);
+    if (!res.ok) return { ok: false, error: `manifest ${res.status}` };
+    const manifest = await res.json();
+    const levels = (manifest?.levels || []).filter((l) => TEST_LEVEL_FILE.test(String(l.file)) && /^[0-9a-f]{64}$/.test(String(l.sha256)));
+    const total = levels.reduce((n, l) => n + (Number(l.size) || 0), 0);
+    let done = 0; const installed = [];
+    for (const lv of levels) {
+      const dest = path.join(folder, lv.file); const part = `${dest}.part`;
+      // (already there and the same: kept)
+      if (fs.existsSync(dest) && fs.statSync(dest).size === lv.size) {
+        const h = crypto.createHash('sha256').update(fs.readFileSync(dest)).digest('hex');
+        if (h === lv.sha256) { done += lv.size; installed.push(lv.file); send({ file: lv.file, done, total, skipped: true }); continue; }
+      }
+      const r = await net.fetch(`${API_ORIGIN}/api/test-levels/${lv.file}`);
+      if (!r.ok || !r.body) return { ok: false, error: `${lv.file} ${r.status}`, installed };
+      const hash = crypto.createHash('sha256');
+      const out = fs.createWriteStream(part);
+      const reader = r.body.getReader();
+      try {
+        for (;;) {
+          const { done: end, value } = await reader.read();
+          if (end) break;
+          hash.update(value);
+          if (!out.write(Buffer.from(value))) await new Promise((ok) => out.once('drain', ok));
+          done += value.length;
+          send({ file: lv.file, done, total });
+        }
+      } finally {
+        await new Promise((ok) => out.end(ok));
+      }
+      if (hash.digest('hex') !== lv.sha256) { fs.rmSync(part, { force: true }); return { ok: false, error: `${lv.file} checksum`, installed }; }
+      fs.renameSync(part, dest);
+      installed.push(lv.file);
+    }
+    return { ok: true, installed, version: manifest.version || null };
+  } catch (err) {
+    return { ok: false, error: String(err?.message || err) };
+  } finally {
+    testLevelsBusy = false;
+  }
+});
+
 ipcMain.handle('levels:delete', async (_event, zipName, levelName) => {
   const folder = modsFolder();
   if (!folder) throw new Error('No mods folder set.');

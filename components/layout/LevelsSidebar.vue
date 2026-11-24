@@ -40,6 +40,20 @@
       <span class="truncate" :title="folder || ''">{{ folder || t('levels.noFolder') }}</span>
     </div>
 
+    <!-- the official test levels, straight into the mods folder (desktop/main.js levels:downloadTestLevels) -->
+    <div v-if="desktopApp?.downloadTestLevels && folder" class="px-4 py-2 border-b border-gray-200 dark:border-gray-700 space-y-1">
+      <button
+        type="button"
+        class="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded text-xs font-medium border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:border-brand hover:text-brand disabled:opacity-60 transition-colors"
+        :title="t('levels.testLevelsHint')"
+        :disabled="testDl.busy"
+        @click="downloadTestLevels"
+      >
+        <Loader2 v-if="testDl.busy" :size="12" class="animate-spin" /><Download v-else :size="12" />{{ t('levels.testLevels') }}
+      </button>
+      <p v-if="testDl.text" class="text-micro text-center" :class="testDl.failed ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'">{{ testDl.text }}</p>
+    </div>
+
     <div class="flex-1 overflow-y-auto custom-scrollbar bg-gray-50/50 dark:bg-gray-800/50 p-3 space-y-2.5">
       <p v-if="!loading && !levels.length" class="text-caption text-gray-500 dark:text-gray-400 text-center py-8 px-4 leading-relaxed">
         {{ t('levels.empty') }}
@@ -291,6 +305,24 @@ const newer = (a, b) => {
 };
 const isUpdatable = (level) => !level.appVersion || newer(appVersion.value, level.appVersion);
 const updatableCount = computed(() => levels.value.filter(isUpdatable).length);
+
+// The official test levels: downloaded into the mods folder by the desktop app, then the list read again
+const testDl = reactive({ busy: false, text: '', failed: false });
+const mb = (n) => (Number(n || 0) / 1048576).toFixed(0);
+async function downloadTestLevels() {
+  if (!desktopApp?.downloadTestLevels || testDl.busy) return;
+  testDl.busy = true; testDl.failed = false; testDl.text = '';
+  try {
+    const r = await desktopApp.downloadTestLevels((p) => { testDl.text = t('levels.testLevelsProgress', { file: p.file, done: mb(p.done), total: mb(p.total) }); });
+    if (r?.ok) testDl.text = t('levels.testLevelsDone', { n: r.installed?.length || 0 });
+    else { testDl.failed = true; testDl.text = t('levels.testLevelsFailed', { error: r?.error || '?' }); }
+  } catch (err) {
+    testDl.failed = true; testDl.text = t('levels.testLevelsFailed', { error: err?.message || String(err) });
+  } finally {
+    testDl.busy = false;
+    await refresh();
+  }
+}
 
 async function refresh() {
   if (!desktopApp?.listLevels || loading.value) return;

@@ -1,4 +1,18 @@
 {
+  "testLevels": {
+    "title": "Oficjalne poziomy testowe",
+    "intro": "Poziomy, na których testowany jest MapNG, zrobione obecną wersją. Umieść plik zip w folderze modów BeamNG, aby w nim zagrać.",
+    "download": "Pobierz",
+    "close": "Zamknij",
+    "loading": "Wczytywanie listy…",
+    "error": "Nie udało się wczytać listy.",
+    "kind": {
+      "coverage": "Pokrycie: każdy obiekt i znacznik mapy, który buduje MapNG",
+      "roads": "Drogi: pasy, skrzyżowania, ronda, przejścia, nawierzchnie",
+      "structures": "Budowle: każdy typ mostu i tunelu",
+      "terrain": "Teren: przełęcz, strome ulice, rzeka w dolinie"
+    }
+  },
   "common": {
     "cancel": "Anuluj",
     "close": "Zamknij"
@@ -14,6 +28,7 @@
     "ru": "Rosyjski"
   },
   "sidebar": {
+    "testLevels": "Oficjalne poziomy testowe",
     "tagline": "Mapy ze świata rzeczywistego dla BeamNG.drive",
     "aboutTooltip": "Co to jest?",
     "resetTooltip": "Zresetuj MapNG",
@@ -1209,6 +1224,11 @@
     "contextGeneral": "Wsparcie jest opcjonalne i mile widziane."
   },
   "levels": {
+    "testLevels": "Pobierz oficjalne poziomy testowe",
+    "testLevelsHint": "Cztery poziomy, na których testowany jest MapNG (wszystkie obiekty, sytuacje drogowe, mosty i tunele, teren), pobrane do folderu modów i pokazane tutaj.",
+    "testLevelsProgress": "Pobieranie {file}: {done} z {total} MB",
+    "testLevelsDone": "{n} poziomy testowe są w folderze modów.",
+    "testLevelsFailed": "Nie udało się pobrać poziomów testowych: {error}",
     "title": "Moje poziomy",
     "open": "Pokaż moje poziomy MapNG",
     "close": "Ukryj",

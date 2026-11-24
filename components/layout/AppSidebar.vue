@@ -135,6 +135,8 @@
         </div>
       </div>
     </Teleport>
+    <!-- the official test levels, a download each (web; the desktop app has them in its levels list) -->
+    <TestLevelsDialog :open="testLevelsOpen" @close="testLevelsOpen = false" />
   </aside>
 </template>
 
@@ -146,8 +148,9 @@ import { resetApp, resetNeedsAsking, noteResetAsked, resetKeepsPlace, setResetKe
 import { desktopApp, DESKTOP_DOWNLOAD_URL } from '../../services/platform/desktop.js';
 import { useI18n } from 'vue-i18n';
 import BaseButton from '../base/BaseButton.vue';
+import TestLevelsDialog from '../ui/TestLevelsDialog.vue';
 import { getSupportedLocales, setI18nLanguage } from '../../i18n';
-import { CircleHelp, Heart, Sun, Moon, Code, Download, RotateCcw, Globe, Github, MessageCircle, Mail, Database, Shield, ShieldCheck, Activity, Share2, FlaskConical, BarChart3 } from 'lucide-vue-next';
+import { CircleHelp, Heart, Sun, Moon, Code, Download, RotateCcw, Globe, Github, MessageCircle, Mail, Database, Shield, ShieldCheck, Activity, Share2, FlaskConical, BarChart3, Boxes } from 'lucide-vue-next';
 import { openShareDialog } from '../../composables/useShareDialog.js';
 
 const { t, locale } = useI18n({ useScope: 'global' });
@@ -170,11 +173,14 @@ const localeShort = computed(() => (String(locale.value).startsWith('zh') ? '中
 // has no "get the desktop app" link.
 // (an info page opens in the app's own light or dark: public/pages.js reads ?theme=)
 const pageLink = (page) => `${desktopApp ? 'https://mapng.com' : ''}/${page}.html?theme=${props.isDarkMode ? 'dark' : 'light'}`;
+const testLevelsOpen = ref(false);
 const footerLinks = computed(() => [
   { key: 'discord', icon: MessageCircle, label: t('sidebar.discord'), href: 'https://discord.gg/j6ZvcF8rgk' },
   { key: 'github', icon: Github, label: t('sidebar.github'), href: 'https://github.com/nikkiluzader/mapng' },
   { key: 'contact', icon: Mail, label: t('sidebar.contact'), href: 'https://github.com/nikkiluzader/mapng/issues/new' },
   ...(desktopApp ? [] : [{ key: 'desktop', icon: Download, label: t('sidebar.desktopApp'), title: t('sidebar.desktopAppTooltip'), href: DESKTOP_DOWNLOAD_URL }]),
+  // (the official test levels: a download each; on desktop they are in the levels list instead)
+  ...(desktopApp ? [] : [{ key: 'testlevels', icon: Boxes, label: t('sidebar.testLevels'), onClick: () => { testLevelsOpen.value = true; } }]),
   { key: 'data', icon: Database, label: t('sidebar.yourData'), href: pageLink('data') },
   // (what limits the app and how to check it: public/security.html)
   { key: 'security', icon: ShieldCheck, label: t('sidebar.security'), href: pageLink('security') },

@@ -1,4 +1,18 @@
 {
+  "testLevels": {
+    "title": "Official test levels",
+    "intro": "The levels MapNG is tested on, made with the current version. Put a zip in BeamNG's mods folder to play it.",
+    "download": "Download",
+    "close": "Close",
+    "loading": "Loading the list…",
+    "error": "The list could not be loaded.",
+    "kind": {
+      "coverage": "Coverage: every asset and map tag MapNG builds",
+      "roads": "Roads: lanes, junctions, roundabouts, crossings, surfaces",
+      "structures": "Structures: every bridge type and tunnel",
+      "terrain": "Terrain: a mountain pass, steep streets, a valley river"
+    }
+  },
   "backupData": {
     "title": "This map was built from backup data.",
     "body": "Neither MapNG's own copy of OpenStreetMap nor the live servers could be read, so the roads and buildings came from Overture Maps. It has no lane counts (wide roads can come out as two lanes) and marks bridges only roughly (some come out short or missing). Generate again later for the full detail.",
@@ -19,6 +33,7 @@
     "ru": "Russian"
   },
   "sidebar": {
+    "testLevels": "Official test levels",
     "tagline": "Real-world maps for BeamNG.drive",
     "aboutTooltip": "What is this?",
     "resetTooltip": "Reset MapNG",
@@ -1214,6 +1229,11 @@
     "contextGeneral": "Support is optional, and appreciated."
   },
   "levels": {
+    "testLevels": "Download official test levels",
+    "testLevelsHint": "The four levels MapNG is tested on (every asset it builds, road situations, bridges and tunnels, terrain), downloaded into your mods folder and listed here.",
+    "testLevelsProgress": "Downloading {file}: {done} of {total} MB",
+    "testLevelsDone": "{n} test levels are in your mods folder.",
+    "testLevelsFailed": "The test levels could not be downloaded: {error}",
     "title": "My Levels",
     "open": "Show my MapNG levels",
     "close": "Hide",

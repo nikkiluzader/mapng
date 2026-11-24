@@ -1,4 +1,18 @@
 {
+  "testLevels": {
+    "title": "Livelli di prova ufficiali",
+    "intro": "I livelli su cui MapNG viene provato, creati con la versione attuale. Metti uno zip nella cartella mods di BeamNG per giocarlo.",
+    "download": "Scarica",
+    "close": "Chiudi",
+    "loading": "Caricamento dell'elenco…",
+    "error": "Impossibile caricare l'elenco.",
+    "kind": {
+      "coverage": "Copertura: ogni oggetto e tag di mappa che MapNG costruisce",
+      "roads": "Strade: corsie, incroci, rotonde, attraversamenti, pavimentazioni",
+      "structures": "Strutture: ogni tipo di ponte e galleria",
+      "terrain": "Terreno: un passo di montagna, strade ripide, un fiume in una valle"
+    }
+  },
   "common": {
     "cancel": "Annulla",
     "close": "Chiudi"
@@ -14,6 +28,7 @@
     "ru": "Russo"
   },
   "sidebar": {
+    "testLevels": "Livelli di prova ufficiali",
     "tagline": "Mappe reali per BeamNG.drive",
     "aboutTooltip": "Informazioni",
     "resetTooltip": "Reimposta MapNG",
@@ -1209,6 +1224,11 @@
     "contextGeneral": "Il supporto è facoltativo, ma molto apprezzato."
   },
   "levels": {
+    "testLevels": "Scarica i livelli di prova ufficiali",
+    "testLevelsHint": "I quattro livelli su cui MapNG viene provato (tutti gli oggetti, situazioni stradali, ponti e gallerie, terreno), scaricati nella tua cartella mods ed elencati qui.",
+    "testLevelsProgress": "Download di {file}: {done} di {total} MB",
+    "testLevelsDone": "{n} livelli di prova sono nella tua cartella mods.",
+    "testLevelsFailed": "Impossibile scaricare i livelli di prova: {error}",
     "title": "I miei livelli",
     "open": "Mostra i miei livelli MapNG",
     "close": "Nascondi",

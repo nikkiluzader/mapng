@@ -1,4 +1,18 @@
 {
+  "testLevels": {
+    "title": "Offizielle Testlevel",
+    "intro": "Die Level, mit denen MapNG getestet wird, mit der aktuellen Version erstellt. Lege eine ZIP-Datei in den Mods-Ordner von BeamNG, um sie zu spielen.",
+    "download": "Herunterladen",
+    "close": "Schließen",
+    "loading": "Liste wird geladen…",
+    "error": "Die Liste konnte nicht geladen werden.",
+    "kind": {
+      "coverage": "Abdeckung: jedes Objekt und jeder Karten-Tag, den MapNG baut",
+      "roads": "Straßen: Fahrstreifen, Kreuzungen, Kreisverkehre, Übergänge, Beläge",
+      "structures": "Bauwerke: jeder Brückentyp und Tunnel",
+      "terrain": "Gelände: ein Pass, steile Straßen, ein Fluss im Tal"
+    }
+  },
   "common": {
     "cancel": "Abbrechen",
     "close": "Schließen"
@@ -14,6 +28,7 @@
     "ru": "Russisch"
   },
   "sidebar": {
+    "testLevels": "Offizielle Testlevel",
     "tagline": "Echte Karten für BeamNG.drive",
     "aboutTooltip": "Was ist das?",
     "resetTooltip": "MapNG zurücksetzen",
@@ -1209,6 +1224,11 @@
     "contextGeneral": "Unterstützung ist freiwillig und immer willkommen."
   },
   "levels": {
+    "testLevels": "Offizielle Testlevel herunterladen",
+    "testLevelsHint": "Die vier Level, mit denen MapNG getestet wird (alle Objekte, Straßensituationen, Brücken und Tunnel, Gelände), werden in deinen Mods-Ordner geladen und hier aufgeführt.",
+    "testLevelsProgress": "{file} wird geladen: {done} von {total} MB",
+    "testLevelsDone": "{n} Testlevel liegen in deinem Mods-Ordner.",
+    "testLevelsFailed": "Die Testlevel konnten nicht geladen werden: {error}",
     "title": "Meine Level",
     "open": "Meine MapNG-Level anzeigen",
     "close": "Ausblenden",

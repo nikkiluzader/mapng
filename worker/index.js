@@ -39,6 +39,7 @@ import { handleShareCodes } from './shareCodes.js';
 import { handleMapterhornTiles } from './mapterhornCache.js';
 import { handleTerrariumTiles } from './terrariumRelay.js';
 import { assetPageOn, handleAssetPage } from './assetPage.js';
+import { handleTestLevels } from './testLevels.js';
 import { LATEST_UPDATE } from './updates.js';
 import { readWithRetry } from './retry.js';
 
@@ -382,6 +383,8 @@ const app = {
     // (not /assets.html: /assets/ is the app's own script folder)
     if (url.pathname === '/asset-review.html' || url.pathname === '/asset-review') return assetPageOn(env) ? env.ASSETS.fetch(request) : new Response('Not Found', { status: 404 });
     if (url.pathname.startsWith('/api/asset-page/')) return handleAssetPage(request, url, env);
+    // the official test levels: their manifest and zips (worker/testLevels.js)
+    if (url.pathname === '/api/test-levels' || url.pathname.startsWith('/api/test-levels/')) return handleTestLevels(request, url, env);
 
     if (url.pathname.startsWith('/api/terrarium/')) {
       return handleTerrariumTiles(request, url, { env });

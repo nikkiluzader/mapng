@@ -55,6 +55,12 @@ contextBridge.exposeInMainWorld('mapngDesktop', {
   },
   // the levels sidebar: { folder, appVersion, levels: [...] }
   listLevels: () => ipcRenderer.invoke('levels:list'),
+  // the official test levels into the mods folder: { ok, installed, error }; progress (p) => {} with { file, done, total }
+  downloadTestLevels: (onProgress) => {
+    const listener = (_e, p) => { try { onProgress?.(p); } catch { /* the page's own */ } };
+    ipcRenderer.on('levels:testProgress', listener);
+    return ipcRenderer.invoke('levels:downloadTestLevels').finally(() => ipcRenderer.removeListener('levels:testProgress', listener));
+  },
   showLevelInFolder: (zipName) => ipcRenderer.invoke('levels:showInFolder', zipName),
   // a level's export report (export_report.md, or .txt in older levels), as text (null when the zip or the report is not there)
   levelExportReport: (zipName) => ipcRenderer.invoke('levels:exportReport', zipName),
