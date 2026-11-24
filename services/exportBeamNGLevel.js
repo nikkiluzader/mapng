@@ -3720,6 +3720,13 @@ export function buildLineMarkingLayers(highway, tags = {}, styleHalfWidth = 3.5,
   return layers;
 }
 
+// How far an edge blend reaches onto the road surface: past the asphalt's own faded rim (its opacity map,
+// t_road_asphalt2_o, fades over its outer 1.2 %: 0.2 m on a 16 m road) and past the blend texture's clear road-side
+// strip (every edge texture is transparent over its road-side sixteenth), so its dirt or grass starts where the
+// asphalt stops. At 0.15 m a strip of ground showed between the shoulder and the edge (the user, 2026-11-24).
+const ASPHALT_RIM_FADE_M = 0.2; const EDGE_TEXTURE_CLEAR_SHARE = 1 / 16;
+export const edgeBlendOverlap = (width) => ASPHALT_RIM_FADE_M + EDGE_TEXTURE_CLEAR_SHARE * width + 0.05;
+
 function getLayeredRoadDecals(centerNodes, highway, tags, styleHalfWidth, parentName, options = {}) {
   const isUnpaved = UNPAVED_SURFACES.has(tags.surface) || highway === 'track';
   const laneMarkingsEnabled = shouldUseLaneMarkings(highway, tags);
@@ -3804,7 +3811,7 @@ function getLayeredRoadDecals(centerNodes, highway, tags, styleHalfWidth, parent
       offset = layer.offset * styleHalfWidth;
     } else if (layer.isEdge) {
       // Keep the hard edge close to the pavement and let the soft fade run outward.
-      offset = layer.offset * (styleHalfWidth + (width / 2) - 0.15);
+      offset = layer.offset * (styleHalfWidth + (width / 2) - edgeBlendOverlap(width));
     }
 
     // (where the way narrows to the next: the surface and its edges scaled
@@ -3813,7 +3820,7 @@ function getLayeredRoadDecals(centerNodes, highway, tags, styleHalfWidth, parent
     const edgeOffset = layer.isEdgeRelative || layer.isEdge;
     // (lines and the AI's path in a taper: carried onto the next piece's frame, offsetAt; the AI path narrowing too)
     // (an edge blend at the node's own half width, by the formula above: scaled by the ratio it jogged 0.24 m)
-    const edgeAt = (k) => (layer.isEdge ? layer.offset * (options.halfAt[k] + (width / 2) - 0.15) : offset * (options.halfAt[k] / styleHalfWidth));
+    const edgeAt = (k) => (layer.isEdge ? layer.offset * (options.halfAt[k] + (width / 2) - edgeBlendOverlap(width)) : offset * (options.halfAt[k] / styleHalfWidth));
     const baseNodes = options.halfAt && (scaled || edgeOffset)
       ? offsetNodes(centerNodes, (k) => (edgeOffset ? edgeAt(k) : offset), (k) => (scaled ? width * (options.halfAt[k] / styleHalfWidth) : width))
       : options.halfAt && options.aiAt && layer.name === 'ai_path'
