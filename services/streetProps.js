@@ -476,7 +476,12 @@ export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, he
   const nearMappedLine = lineIndex(mapped.powerLines || []);
   const placedAt = new Map();
   // Mapped low-voltage lines: a pole at every vertex, cross-arm across the line.
-  for (const line of mapped.powerLines || []) {
+  // (tallest first: a node two lines share keeps the first line's support, and a minor line's 8 m pole there brought
+  // the power line's wires down from its 13.5 m poles; laid first, the tall one stands and the low line's wires run
+  // up to it. SPLATPLAYS's Perth node where two power=line ways meet a minor_line)
+  const rank = (l) => ((l.supports || []).includes('tower') || (isTowerLine(l.tags) && !(l.supports || []).includes('pole')) ? 0 : l.tags?.power === 'line' ? 1 : 2);
+  const ordered = (mapped.powerLines || []).map((l, k) => [l, k]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(([l]) => l);
+  for (const line of ordered) {
     // (each vertex as its node is mapped, power=tower or power=pole; untagged ones as the rest of the line, a line
     // with none tagged by its own tags: lineSupportTypes. A power=line on poles gets the tall line pole)
     const poleType = line.tags?.power === 'line' ? 'line_pole' : choosePoleType({ lat, lon, tags: line.tags || {}, seed: `line:${line.id ?? line[0]?.join(',')}` });

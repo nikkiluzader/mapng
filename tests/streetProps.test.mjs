@@ -228,6 +228,10 @@ test('a pole beside a wall stands (the wall clearance is a tower\'s); two lines 
   const minor = Object.assign([[40, 0, 0], [40, 40, 0]], { tags: { power: 'minor_line' }, supports: ['pole', 'pole'] });
   const r = placeStreetProps({ carriageways: [], runs: [], mapped: { powerLines: [line, minor] }, heightAt: () => 0, countryPoles: false });
   assert.equal(r.poles.length, 4, 'three on the line (none skipped by the wall), one more for the minor line');
+  // (the minor line listed first: the shared node still gets the power line's tall pole)
+  const r2 = placeStreetProps({ carriageways: [], runs: [], mapped: { powerLines: [minor, line] }, heightAt: () => 0, countryPoles: false });
+  const atShared = r2.poles.filter((p) => Math.hypot(p.x - 40, p.y) < 1);
+  assert.equal(atShared.length, 1); assert.equal(atShared[0].type, 'line_pole', 'the taller support stands where they meet');
   assert.ok(!r.poles.some((p) => p.type === 'roof_anchor'));
   const towerLine = Object.assign([[0, 0, 0], [300, 0, 0], [600, 0, 0]], { tags: { power: 'line' }, supports: ['tower', 'tower', 'tower'], blocked: [false, false, false], nearWall: [false, 6, false] });
   const t = placeStreetProps({ carriageways: [], runs: [], mapped: { powerLines: [towerLine] }, heightAt: () => 0, countryPoles: false });
