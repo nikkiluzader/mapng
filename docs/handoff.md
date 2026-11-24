@@ -16,9 +16,9 @@ when done, rewrite the "state" of the item you stop in. It does not replace the 
 - **Released:** 0.3.6 is published as Latest (tag `v0.3.6` at `759ea31`). Do not move that tag.
 - **main:** `8e692fa` (0.3.6 + the sidebar section styling). Pushing main needs the user's word every time, as its
   own command: `git push origin <sha>:main`.
-- **dev:** ahead of main with the batch code removal and docs. Push dev freely.
-- **Test build:** `v0.3.7-dev.2` (tag at `c4c99b4`; both builds and the signing succeeded). It has the batch removal
-  and the FIRST version of the slip-road work. The permission check refuses a tag push unless the user has asked
+- **main = dev at `0a53144`** (pushed 2026-11-24 with the user's go-ahead): slip roads, very large levels (ZIP64
+  writer, progress card, Cancel), road-mode warning, map view for levels in pieces. Push dev freely.
+- **Test build:** `v0.3.7-dev.3` (tag at `cc7ed0d`, 2026-11-24). It has everything above. The permission check refuses a tag push unless the user has asked
   for that tag in so many words ("cut dev 2 now" worked; "proceed with your recommendations" did not): ask, then
   run bump, commit, and tag + push as separate commands (`node scripts/release/devRelease.mjs --write`, commit, tag, push dev and the tag).
 - **No work branches.** Everything is on dev. See "Branches and worktrees".
