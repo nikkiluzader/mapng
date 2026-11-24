@@ -16,8 +16,17 @@ Mesh Road joins. Riding along: the other 38 sweep areas re-framed, Zion's tunnel
 
 - **Done:** the sidebar's sections are cards with a soft orange header and edge (dev and main 8e692fa, the user:
   "that looks amazing"); test build v0.3.7-dev.1 (tag at 677fcc6, both builds and the signing succeeded).
-- **Batch code removal:** in progress in its own worktree (a separate agent, 2026-11-24 night); not merged, not
-  reviewed yet.
+- **Batch code removal: done on dev 2026-11-24** (21ab735 and a follow-up; 44 files, 7,403 lines out). The panel,
+  the progress window, the saved-job path, the desktop app's batch downloads folder and 200 text keys in each of
+  the 7 languages are gone; what an earlier version left in the browser (settings, an unfinished job, its download
+  cache) is thrown away once at start. `batchShape.js` stays (tiles); `batchExports.js` is now `assetExports.js`.
+  Checked: production build, 1,494 unit tests, a browser run with an old saved job seeded (no errors, the keys
+  gone), two tiles through Generate and the per-tile asset export, the desktop app in development mode through
+  Generate and an export. Left: stale comments that still name batch mode (`terrain.js:1131`,
+  `exportBeamNGLevel.js`, `groundMesh.js`, `levelLimits.js`, `terrainDetail.js`, `textureOnDemand.js`); exports now
+  unused but kept (`batchShape.js` snapTileOffsets / shapedLayout / pixelOwner, `levelLimits.js`
+  combinedLevelTier); the options the combined-level path passed into the export not audited; the 0.3.7 page must
+  say old batch jobs can no longer be opened.
 - **Sidewalks at the water: work branch `seawall-037`** (dev + the parked `seawall` branch, merged cleanly; 1,497
   tests pass). Sidewalk counts on Mapterhorn, dev -> the branch:
   `naldo` buried 47 -> 19 (the 100 m line of paving down the bank is gone), floating 18 -> 19;

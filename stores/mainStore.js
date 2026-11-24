@@ -48,7 +48,7 @@ export const useMainStore = defineStore('main', () => {
   for (const key of [
     'mapng_batch_mode', 'mapng_batch_cols', 'mapng_batch_rows', 'mapng_batch_tile_follow_center',
     'mapng_batch_tile_offsets', 'mapng_batch_tile_names', 'mapng_batch_state_v2', 'mapng_batch_state',
-    'mapng_batch_combined_level', 'mapng_batch_elevation', 'mapng_batch_elevation_migrated', 'mapng_batch_exports',
+    'mapng_batch_combined_level', 'mapng_batch_elevation', 'mapng_batch_elevation_mapterhornDefault', 'mapng_batch_exports',
     'mapng_batch_level_options', 'mapng_batch_mesh', 'mapng_batch_osm', 'mapng_batch_profile',
     'mapng_batch_shared_elevation', 'mapng_batch_show_tile_layout',
     'mapng_ui_sec_batchexports', 'mapng_ui_sec_batchlevel', 'mapng_ui_sec_batchperf2', 'mapng_ui_sec_batchres',
