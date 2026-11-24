@@ -56,9 +56,21 @@ replace the tracking files (see CLAUDE.md, "Tracking"); it is the short "start h
       the road end handle drags at most 20 km at a time (`error_tooFar`).
 - [ ] **Next suggested (not agreed yet):** move the export's data step (backdrop download, `ensureExportData` in
       ExportPanel) out of the window into the desktop runner, for lominsa's window out-of-memory crash.
-- [ ] **Discord requests 2026-11-24, recorded, not started:** smooth curves on every OSM line (Toma, splatplays),
-      Toma's three notes (backlog, section 1); splatplays' import formats (open items, "more OSM import formats":
-      compressed .osm first).
+- [x] **Rounded curves on railways and paths** (thecoachtoma, SPLATPLAYS; user's decision 2026-11-24: on by default,
+      a switch to keep lines as drawn). On dev `8e5b7ca`: `services/roadCurves.js` `lineProfile` (rail 500/150/40 m,
+      1 m inside a corner; paths 25-50 m, 0.75 m), shared nodes kept, street trams follow their road; Map data >
+      "Keep map lines as drawn" (`mapng_osmLinesAsDrawn`, generation key, share codes). Diagrams in `scratch/curves/`
+      (`throat_cmp.png`, `station_shift.png`, `pil_b004.png`, `naldo_cmp.png`; probe `dump.mjs`, `plot.py`,
+      `shift.py`, A/B exporter `exportAreaFlag.mjs` with `CURVES_SKIP=rail|path|all`).
+      **The sweep first showed 14 cells worse**: through-deck counts at Amsterdam and Pilchowice were the check
+      counting short arc pieces several times (fixed in the same commit: it samples by length); Naldo's +3 floating
+      slabs are old edge spots flipping sign. Paired sweeps on the fixed check: 104 of 135 identical, the rest a few
+      counts either way. Baselines re-recorded `9deac69`.
+      **Open:** not looked at in the game yet (a railway curve and a footpath); curves through shared nodes bend
+      tightest at the node (about 17 deg steps over 0.3 m: roads did this before too, `throughCurve` sampling);
+      waterways, walls and power lines are still as drawn; tell Toma (the user posts).
+- [ ] **Discord requests 2026-11-24, recorded, not started:** Toma's three notes (backlog, section 1); splatplays'
+      import formats (open items, "more OSM import formats": compressed .osm first).
 - [ ] **Sidewalks at banks and the water** (the first approach was scrapped; nothing on dev yet). See the section
       below before starting.
 - [x] **Slip roads ending at the outer lane** (thecoachtoma's Kaunas junction). On dev (`c0f6a71`, `d62f6a1`), in
