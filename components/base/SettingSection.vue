@@ -1,8 +1,17 @@
 <template>
   <!-- A collapsible section of the sidebar: one look for every section of the
        control and export panels (icon, title, chevron), open state remembered. -->
-  <section ref="root" class="space-y-2" data-setting-section>
-    <div class="flex items-center gap-2">
+  <!-- (each section its own card, the header a tinted bar: with every section open the titles, fields and hints of
+       neighbouring sections ran together as one column) -->
+  <section
+    ref="root"
+    class="rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] shadow-sm dark:shadow-none overflow-hidden"
+    data-setting-section
+  >
+    <div
+      class="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-white/[0.05]"
+      :class="open ? 'border-b border-gray-200 dark:border-white/10' : ''"
+    >
       <button
         type="button"
         class="flex-1 min-w-0 flex items-center justify-between gap-2 group text-left"
@@ -26,7 +35,7 @@
         @click="$emit('reset')"
       >{{ t('sections.reset') }}</button>
     </div>
-    <div v-if="open" class="space-y-2">
+    <div v-if="open" class="space-y-2 px-3 py-3">
       <slot />
     </div>
   </section>
