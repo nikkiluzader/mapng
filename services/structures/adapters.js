@@ -49,7 +49,7 @@ export function decksFromSolver(graph) {
       xy, z: zz, half: e.half, layer: Math.max(1, e.layer || 0), structure: e.structure || undefined,
       ...(Number.isFinite(minGap) ? { minGap, depth: structureDepth(minGap) } : {}),
       paint: e.paint || undefined, bridgeKind: e.bridgeKind || undefined, movable: e.movable || undefined, wikidata: e.wikidata || undefined,
-      osm: { id: e.wayId ?? null, name: null, highway: e.highway || null },
+      osm: { id: e.wayId ?? null, name: null, highway: e.highway || null, surface: e.surface || null },
       ...(e.rail ? { rail: e.rail } : {}),
       edge: s.edge, s0: s.s0, s1: s.s1,
     };

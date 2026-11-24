@@ -1180,6 +1180,8 @@ function generatePowerWireDAEs(wires) {
 
 export const BRIDGE_MATERIAL = 'mapng_bridge_concrete';
 export const BRIDGE_STONE_MATERIAL = 'mapng_bridge_stone';
+// the top of a deck that carries an unpaved road (a track, a gravel lane): compacted earth, not bare concrete
+export const BRIDGE_DIRT_MATERIAL = 'mapng_bridge_dirt';
 const steelMaterial = (paint) => `mapng_bridge_steel_${paint || 'grey'}`;
 
 /** Bridge concrete material (BeamNG's shared plain concrete). */
@@ -1199,6 +1201,17 @@ function getBridgeMaterialDefs() {
         normalMap: `${T}_nm.normal.png`,
         roughnessMap: `${T}_r.data.png`,
         pixelSpecular: true,
+      }, {}, {}, {}],
+      translucentBlendOp: 'None',
+    },
+    // compacted earth on a deck under an unpaved road (the road's own decal is drawn over it; it is soft-edged and
+    // half transparent, and on bare concrete a track's bridge read as a white slab with two faint ruts)
+    [BRIDGE_DIRT_MATERIAL]: {
+      name: BRIDGE_DIRT_MATERIAL, mapTo: BRIDGE_DIRT_MATERIAL, class: 'Material', version: 1.5, annotation: 'DIRT', groundType: 'DIRT',
+      Stages: [{
+        baseColorMap: '/assets/materials/tileable/soil/m_dirt/t_gm_dirt_d.dds',
+        normalMap: '/assets/materials/tileable/soil/m_dirt/t_gm_dirt_n.dds',
+        roughnessFactor: 0.95,
       }, {}, {}, {}],
       translucentBlendOp: 'None',
     },
@@ -1237,6 +1250,7 @@ function getBridgeMaterialDefs() {
  */
 async function generateBridgeDAEs(decks, groundAt, roadLines, groundRoads = [], tops = [], { onDeck = null } = {}) {
   const out = [];
+  let unpavedDecks = 0;
   // one Collada shape (visual mesh + a Colmesh-1 collision copy), origin-relative
   const toDae = ({ positions: pos, uvs }, origin, material = BRIDGE_MATERIAL) => {
     if (!pos.length) return null;
@@ -1283,7 +1297,11 @@ async function generateBridgeDAEs(decks, groundAt, roadLines, groundRoads = [], 
     // the road surface and the rest (parapets, sides, girders, piers) apart:
     // decals clip onto the first only
     const data = toDae(g.sides, origin);
-    const deckData = toDae(g.top, origin);
+    // (an unpaved road's deck: every part of it a track or an unpaved surface)
+    const roadParts = deck.parts.filter((p) => !p.rail);
+    const unpavedDeck = roadParts.length > 0 && roadParts.every((p) => p.osm?.highway === 'track' || UNPAVED_SURFACES.has(String(p.osm?.surface || '').toLowerCase()));
+    if (unpavedDeck) unpavedDecks++;
+    const deckData = toDae(g.top, origin, unpavedDeck ? BRIDGE_DIRT_MATERIAL : BRIDGE_MATERIAL);
     const extras = [];
     // its tower houses' piers (bridgeTowers.js)
     if (deck.towers?.length) {
@@ -1311,6 +1329,7 @@ async function generateBridgeDAEs(decks, groundAt, roadLines, groundRoads = [], 
     const deckData = toDae(g, origin);
     if (deckData) out.push({ key: `dam${String(i + 1).padStart(2, '0')}`, origin, data: null, deckData, extras: [], style: null, triangles: n / 3 });
   });
+  if (decks.length) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Bridge deck tops: ${unpavedDecks} of ${decks.length} under an unpaved road (compacted earth); the rest concrete under their road's surface.`);
   return out;
 }
 
