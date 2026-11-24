@@ -94,7 +94,7 @@ export const OSM_FILTER = {
     ['natural', 'tree'], ['natural', 'tree_row'], ['natural', 'shrub'],
     ['amenity', 'fuel'], ['amenity', 'charging_station'], ['man_made', 'fuel_pump'],
     ['highway', 'traffic_signals'], ['highway', 'stop'], ['highway', 'give_way'],
-    ['highway', 'street_lamp'], ['highway', 'turning_circle'], ['highway', 'turning_loop'], ['barrier', 'bollard'], ['barrier', 'block'], ['man_made', 'utility_pole'], ['man_made', 'obelisk'], ['amenity', 'bench'],
+    ['highway', 'street_lamp'], ['highway', 'turning_circle'], ['highway', 'turning_loop'], ['highway', 'mini_roundabout'], ['highway', 'crossing'], ['railway', 'level_crossing'], ['barrier', 'bollard'], ['barrier', 'block'], ['man_made', 'utility_pole'], ['man_made', 'obelisk'], ['amenity', 'bench'],
     ['emergency', 'fire_hydrant'], ['amenity', 'waste_basket'], ['power', 'pole'], ['power', 'tower'],
     ['traffic_calming', 'bump'], ['traffic_calming', 'hump'], ['traffic_calming', 'table'], ['traffic_calming', 'cushion'],
     ['amenity', 'fountain'], ['amenity', 'drinking_water'],

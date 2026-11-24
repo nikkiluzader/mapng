@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   solveTunnel, chainTunnelParts, tunnelGroundAt, tunnelHoleAt, tunnelReach, nearestOnTunnel,
-  buildTubeGeometry, buildPortalGeometry, buildWindowGeometry, buildTunnelObjects, hitsTunnel, isBoredTunnelTag, absorbBranch, fitBesideRoads,
+  buildTubeGeometry, buildPortalGeometry, buildWindowGeometry, buildTunnelObjects, hitsTunnel, isBoredTunnelTag, absorbBranch, fitBesideRoads, fitTwinBores,
   MAX_GRADE, LINING_M,
 } from '../services/beamngTunnels.js';
 
@@ -809,4 +809,22 @@ test('a chunked level: a tunnel cut by the chunk’s grid takes its end from the
   assert.ok(known.ok);
   for (const p of known.line) if (p.x >= 150) assert.ok(Math.abs(p.z - (1010 + (p.x - 150) * 0.02)) < 1e-6, `the neighbour's height at x = ${p.x}`);
   assert.ok(known.seam && known.seam.held > 0);
+});
+
+test('twin bores side by side: the wingwalls facing each other meet as one median, at the higher top (coverage level, 2026-11-24)', () => {
+  const twin = (x) => solveTunnel({ xy: road(-400, 400, x), half: 4 }, { groundAt: ridge, approaches: [{ xy: road(-400, -700, x) }, { xy: road(400, 700, x) }] });
+  const a = twin(0); const b = twin(24);
+  // the inner walls (a's right, b's left: travel is +y, right is +x) and the ground between their backs
+  const backOf = (t, side) => { let m = side > 0 ? -Infinity : Infinity; const pos = buildPortalGeometry(t, 'S').pos; for (let i = 0; i < pos.length; i += 3) if (pos[i + 1] < t.line[t.iS].y - 3) m = side > 0 ? Math.max(m, pos[i]) : Math.min(m, pos[i]); return m; };
+  const gapBefore = backOf(b, -1) - backOf(a, 1);
+  assert.ok(gapBefore > 0.5, `apart before: ${gapBefore.toFixed(2)} m of ground between the walls`);
+  const n = fitTwinBores([a, b]);
+  assert.ok(n > 0, 'stations joined');
+  const gapAfter = backOf(b, -1) - backOf(a, 1);
+  assert.ok(gapAfter <= 0, `they meet: ${gapAfter.toFixed(2)} m`);
+  // the outer walls untouched
+  assert.ok(Math.abs(backOf(twin(0), -1) - backOf(a, -1)) < 0.01, 'a\'s outer wall unchanged');
+  // a tunnel far off is left alone
+  const c = twin(200);
+  assert.equal(fitTwinBores([twin(0), c]), 0);
 });

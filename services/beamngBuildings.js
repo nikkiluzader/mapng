@@ -28,7 +28,7 @@
  * (metres, Z up) with one geometry group per material; their material names
  * match getBuildingMaterialDefs().
  */
-import { streetIndex, passageOpenings, passageCrossings, passageInside, parapet, stringCourse, shopfronts, entrance, garageDoors, hotelCanopy, hangingSign, CANOPY_COLOURS, PUB_SIGN_COLOURS, PUB_FASCIAS, chimney, roofPlant, churchTower, mosque, silo, naveRect, PARAPET, BATTLEMENTS, battlements, salientCorners, sentryBox, cornerTower, fortGate, castleCorners, mappedTower } from './buildingDetails.js';
+import { box as detailBox, streetIndex, passageOpenings, passageCrossings, passageInside, parapet, stringCourse, shopfronts, entrance, garageDoors, hotelCanopy, hangingSign, CANOPY_COLOURS, PUB_SIGN_COLOURS, PUB_FASCIAS, chimney, roofPlant, churchTower, mosque, silo, naveRect, PARAPET, BATTLEMENTS, battlements, salientCorners, sentryBox, cornerTower, fortGate, castleCorners, mappedTower } from './buildingDetails.js';
 import * as THREE from 'three';
 import { buildingUse, businessTagsByBuilding, isHistoricBuilding } from './buildingUses.js';
 import { planFountains, buildFountain, FOUNTAIN_MATERIAL_STAGES } from './fountains.js';
@@ -106,6 +106,8 @@ export const BUILDING_MATERIALS = {
   roofTin: 'mapng_bld_roof_tin',
   // fountains (services/fountains.js): their falling water (standing water is WaterBlocks)
   fountainSpray: 'mapng_fountain_spray',
+  // greenhouses: clear glass walls and roof
+  glass: 'mapng_bld_glass',
   // smooth stone: fountains
   marbleCut: 'mapng_bld_marble_cut',
   smoothConcrete: 'mapng_bld_smooth_concrete',
@@ -182,6 +184,7 @@ const MATERIAL_STAGES = {
   roofWood: pbr(`${TILE}/roofing/eca_bld_wood_rooftiles`, 't_eca_bld_wood_rooftiles'),
   roofTin: pbr(`${TILE}/metal/m_si_metal_roof`, 't_si_metal_roof', { metallic: true }),
   marbleCut: pbr(`${TILE}/stone/m_marble_cut`, 't_marble_cut'),
+  glass: { baseColorFactor: [0.8, 0.9, 0.88, 1], opacityFactor: 0.28, roughnessFactor: 0.08, metallicFactor: 0 },
   smoothConcrete: pbr(`${TILE}/concrete/m_concrete_floor_polish`, 't_concrete_smooth_large'),
   ...FOUNTAIN_MATERIAL_STAGES,
   ...POOL_MATERIAL_STAGES,
@@ -208,6 +211,8 @@ export function getBuildingMaterialDefs({ facadeEmissiveMap = null } = {}) {
       Stages: [stage, {}, {}, {}],
       translucentBlendOp: 'None',
       // (falling water: a thin sheet seen from both sides, added over what is behind it)
+      // (a greenhouse's glass: see-through, both sides drawn, no shadow inside)
+      ...(key === 'glass' ? { translucent: true, translucentBlendOp: 'LerpAlpha', translucentZWrite: false, doubleSided: true, castShadows: false } : {}),
       ...(key === 'fountainSpray' ? { translucent: true, translucentBlendOp: 'Add', translucentZWrite: false, doubleSided: true, castShadows: false } : {}),
       // (fences and nets: cut out by their opacity, both sides drawn)
       ...(SPORTS_MATERIAL_FLAGS[key] || {}),
@@ -365,6 +370,7 @@ Object.assign(WALL_TINTS, {
   blockwall: [[1, 1, 1], [0.95, 0.93, 0.88], [0.85, 0.85, 0.85], [0.9, 0.86, 0.78]],
   concrete: [[1, 1, 1], [0.9, 0.9, 0.9]],
   metalWhite: WALL_TINTS.metalwall,
+  glass: [[1, 1, 1]],
 });
 const ROOF_TINTS = {
   roofFlat: [[0.85, 0.85, 0.85], [0.62, 0.62, 0.64], [0.95, 0.93, 0.88], [0.45, 0.45, 0.46], [0.75, 0.7, 0.64]],
@@ -377,6 +383,8 @@ const ROOF_TINTS = {
   roofSlateTiles: [[1, 1, 1], [0.8, 0.82, 0.86], [0.65, 0.66, 0.7]],
   roofWood: [[1, 1, 1], [0.85, 0.8, 0.75]],
   roofTin: [[1, 1, 1], [0.75, 0.78, 0.8], [0.62, 0.3, 0.26], [0.45, 0.58, 0.48]],
+  glass: [[1, 1, 1]],
+  concrete: [[0.6, 0.58, 0.54], [0.5, 0.48, 0.45]],
 };
 const JITTER = 0.06;
 
@@ -519,7 +527,7 @@ export function fortKind(tags = {}) {
  */
 // (as services/dams.js paints a dam's faces: MASONRY and WEATHERED there)
 const DAM_WALL_TINT = { stone: [0.72, 0.7, 0.66], concrete: [0.62, 0.61, 0.59] };
-export function planBuilding(tags = {}, { area, seed, lat, lon, rectFill, levelsHint = null, partOfDam = null }) {
+export function planBuilding(tags = {}, { area, seed, lat, lon, rectFill, levelsHint = null, partOfDam = null, aspect = 2 }) {
   const cls = String(tags.building || tags['building:part'] || 'yes').toLowerCase();
   const style = regionStyle(lat, lon);
   const r = (k) => hash01(seed, k);
@@ -669,7 +677,10 @@ export function planBuilding(tags = {}, { area, seed, lat, lon, rectFill, levels
     if (!Number.isFinite(explicitH)) eaveH = Math.min(18, Math.max(fort === 'fortress' ? 8 : 10, floors * 3.6));
   }
   const fortTint = fort ? (tagged || pick(fort === 'fortress' ? [[0.96, 0.94, 0.9], [0.9, 0.89, 0.86]] : [[0.92, 0.9, 0.85], [0.84, 0.82, 0.78], [1, 0.97, 0.9]], r('fortTint'))) : null;
-  const worshipPitch = worship && roof === 'gabled' ? 45 : null;
+  // (a near-square church or chapel: a hipped roof, as square ones are; a 45 degree gable on a 24 m square stood a
+  // 12 m blank triangle over its walls and hid its tower: coverage level, 2026-11-24)
+  if (worship && roof === 'gabled' && aspect < WORSHIP_SQUARE_ASPECT && !String(tags['roof:shape'] || '')) roof = 'hipped';
+  const worshipPitch = worship && roof === 'gabled' ? 45 : worship && roof === 'hipped' ? 35 : null;
   const worshipTint = worship ? (tagged || pick([[1, 0.96, 0.9], [0.96, 0.92, 0.84], [0.92, 0.9, 0.86]], r('worshipTint'))) : null;
   const jitter = 1 + JITTER * (2 * r('jit') - 1);
   const shade = (c) => c.map((v) => Math.max(0, Math.min(1, v * jitter)));
@@ -680,7 +691,40 @@ export function planBuilding(tags = {}, { area, seed, lat, lon, rectFill, levels
     windows: kind === 'house' && !fort,
   };
   if (worship || fort) return plan;
+  const special = specialClassLook(plan, tags, { cls, r, explicitH, levels, rectFill, tagged, taggedRoof, shade });
+  if (special) return special;
   return useLook(plan, tags, { style, r, rectFill, area, tagged, taggedRoof, shade, guessedHeight: !Number.isFinite(levels) && !Number.isFinite(explicitH) });
+}
+
+const WORSHIP_SQUARE_ASPECT = 1.3;
+// Shipping containers' usual colours (rust red, blue, green, orange, grey, white)
+const CONTAINER_TINTS = [[0.62, 0.18, 0.12], [0.12, 0.3, 0.55], [0.2, 0.42, 0.25], [0.8, 0.45, 0.1], [0.55, 0.56, 0.58], [0.85, 0.85, 0.82]];
+const CONTAINER_H_M = 2.6;
+/**
+ * Building classes with a look of their own (coverage level, 2026-11-24: they looked like something else):
+ * a greenhouse of glass (walls and roof, one storey), a shipping container of corrugated metal in a container colour
+ * (2.6 m a level, flat), ruins as low weathered stone walls with no windows. Returns the plan changed, or null.
+ */
+function specialClassLook(plan, tags, { cls, r, explicitH, levels, rectFill, tagged, taggedRoof, shade }) {
+  const ruins = cls === 'ruins' || String(tags.ruins || '').toLowerCase() === 'yes' || String(tags.historic || '').toLowerCase() === 'ruins';
+  if (cls === 'greenhouse') {
+    const eaveH = Number.isFinite(explicitH) ? Math.max(2.2, explicitH - 1) : 2.8;
+    return { ...plan, kind: 'shed', floors: 1, eaveH, wall: 'glass', wallFamily: 'glass', band: null, office: false, shopFloor: false, windows: false,
+      roof: rectFill >= RECT_FILL ? 'gabled' : 'flat', pitch: 25, roofMat: 'glass', wallTint: [1, 1, 1], roofTint: [1, 1, 1] };
+  }
+  if (cls === 'container') {
+    const n = Number.isFinite(levels) && levels > 0 ? Math.round(levels) : 1;
+    const tint = tagged || pick(CONTAINER_TINTS, r('container'));
+    return { ...plan, kind: 'shed', floors: n, floorH: CONTAINER_H_M, eaveH: Number.isFinite(explicitH) ? explicitH : n * CONTAINER_H_M,
+      wall: 'metalWhite', wallFamily: 'metalwall', band: null, office: false, shopFloor: false, windows: false,
+      roof: 'flat', roofMat: 'roofMetal', wallTint: shade(tint), roofTint: shade(taggedRoof || tint) };
+  }
+  if (ruins) {
+    const eaveH = Number.isFinite(explicitH) ? Math.min(explicitH, 6) : 2 + 2.5 * r('ruin');
+    return { ...plan, kind: 'block', floors: 1, eaveH, wall: 'stoneMixed', wallFamily: 'stone', band: null, office: false, shopFloor: false, windows: false,
+      roof: 'flat', roofMat: 'concrete', wallTint: shade(tagged || [0.86, 0.84, 0.8]), roofTint: shade([0.5, 0.48, 0.45]) };
+  }
+  return null;
 }
 
 // ── What a building is used for: its own look ────────────────────────────────
@@ -1317,6 +1361,48 @@ function columnBox(m, mat, x, y, ux, uy, z0, z1, col) {
 }
 
 /** Builds one garage into the mesh builder. Returns the deck count. */
+// An open roof (building=roof, a carport the carport model did not take): its slab at its height on posts round the
+// outline, open underneath; built as a shed with four walls to the ground it was a closed box (coverage level,
+// 2026-11-24). Height: height= (to the roof's top), else OPEN_ROOF_H_M over the highest ground.
+const OPEN_ROOF_H_M = 3; const OPEN_ROOF_SLAB_M = 0.22; const OPEN_ROOF_POST_M = 0.12; const OPEN_ROOF_POST_EVERY_M = 6;
+export const OPEN_ROOF_CLASSES = new Set(['roof', 'carport']);
+function buildOpenRoof(m, ring, holes, base, z0, tags = {}) {
+  const tagged = parseMeters(tags.height);
+  const top = base + (Number.isFinite(tagged) ? Math.max(2.2, tagged) : OPEN_ROOF_H_M);
+  const under = top - OPEN_ROOF_SLAB_M;
+  const roofCol = [0.62, 0.63, 0.65]; const postCol = [0.75, 0.76, 0.78];
+  flatRoof(m, ring, holes, top, 'roofMetal', roofCol);
+  // the underside, facing down
+  const contour = ring.map(([x, y]) => new THREE.Vector2(x, y));
+  const tris = THREE.ShapeUtils.triangulateShape(contour, holes.map((h) => h.map(([x, y]) => new THREE.Vector2(x, y))));
+  const all = [...ring, ...holes.flat()];
+  for (const [i, j, k] of tris) {
+    let a = all[i]; let b = all[j]; let c = all[k];
+    if ((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]) > 0) [b, c] = [c, b];
+    m.tri('metalWhite', [a[0], a[1], under], [b[0], b[1], under], [c[0], c[1], under], [a[0] / 3, a[1] / 3], [b[0] / 3, b[1] / 3], [c[0] / 3, c[1] / 3], postCol);
+  }
+  // the slab's edge, and the posts: at each corner (set in) and along the edges
+  const ccw = ring.reduce((acc, p, i) => { const q = ring[(i + 1) % ring.length]; return acc + p[0] * q[1] - q[0] * p[1]; }, 0) > 0;
+  let posts = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i]; const b = ring[(i + 1) % ring.length];
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]); if (L < 0.05) continue;
+    const [p, q] = ccw ? [a, b] : [b, a];
+    m.quad('metalWhite', [p[0], p[1], under], [q[0], q[1], under], [q[0], q[1], top], [p[0], p[1], top], [0, 0], [L / 3, 0], [L / 3, OPEN_ROOF_SLAB_M / 3], [0, OPEN_ROOF_SLAB_M / 3], postCol);
+    const ux = (b[0] - a[0]) / L; const uy = (b[1] - a[1]) / L;
+    // (inward: the left of a counter-clockwise ring)
+    const nx = (ccw ? -uy : uy) * 0.25; const ny = (ccw ? ux : -ux) * 0.25;
+    const n = Math.max(1, Math.ceil(L / OPEN_ROOF_POST_EVERY_M));
+    for (let k = 0; k < n; k++) {
+      const t = k / n;
+      const c = [a[0] + (b[0] - a[0]) * t + nx + ux * (k === 0 ? 0.25 : 0), a[1] + (b[1] - a[1]) * t + ny + uy * (k === 0 ? 0.25 : 0)];
+      detailBox(m, 'metalWhite', c, [ux, uy], OPEN_ROOF_POST_M, OPEN_ROOF_POST_M, z0, under, postCol, { uvM: 3 });
+      posts++;
+    }
+  }
+  return posts;
+}
+
 function buildGarage(m, ring, holes, base, z0, g) {
   const { box, levels, a, b, laneV } = g;
   const { cx, cy, ux, uy } = box;
@@ -1650,6 +1736,15 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
       if (++tile.inBatch >= MESH_BATCH) flushTile(tile);
       continue;
     }
+    if (OPEN_ROOF_CLASSES.has(String(tags.building || '').toLowerCase())) {
+      const posts = buildOpenRoof(builder, ring, holes, zMax, zMin - FOUNDATION_M, tags);
+      stats.details.openRoofs = (stats.details.openRoofs || 0) + 1;
+      bump(stats.kinds, 'open roof');
+      if (globalThis.__MAPNG_BLD_DEBUG) globalThis.__MAPNG_BLD_DEBUG({ kind: 'openRoof', id: f.id, posts });
+      count++;
+      if (++tile.inBatch >= MESH_BATCH) flushTile(tile);
+      continue;
+    }
     const garage = isGarageFeature(f) ? planGarage(ring, tags) : null;
     if (garage) {
       buildGarage(builder, ring, holes, zMax, zMin - FOUNDATION_M, garage);
@@ -1663,7 +1758,8 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     const rectFill = box && box.area > 0 ? area / box.area : 0;
     // (on or against a dam; never a home or a hotel that happens to stand beside one)
     const onDam = damsPlanned.length && !DWELLING_CLASSES.has(String(tags.building || '').toLowerCase()) ? damBeside(damsPlanned, ring) : null;
-    const plan = planBuilding(tags, { area, seed, lat: c.lat, lon: c.lng, rectFill, levelsHint: levelsHints.get(f) ?? null, partOfDam: onDam ? damKind(onDam) : null });
+    const aspect = box && box.length > 0 && box.width > 0 ? Math.max(box.length, box.width) / Math.min(box.length, box.width) : 2;
+    const plan = planBuilding(tags, { area, seed, lat: c.lat, lon: c.lng, rectFill, levelsHint: levelsHints.get(f) ?? null, partOfDam: onDam ? damKind(onDam) : null, aspect });
     if (onDam) stats.onDams = (stats.onDams || 0) + 1;
     bump(stats.heightSource, plan.heightSource);
 

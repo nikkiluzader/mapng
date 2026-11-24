@@ -301,7 +301,7 @@ function clusterJunctions(junctions) {
  * where each approach is { x, y, dir, halfWidth, lanesIn, oneWay, highway, ... }.
  */
 export function findSignalApproaches({
-  roads, signalPoints = [], stopPoints = [], yieldPoints = [], crossingPoints = [], projector,
+  roads, signalPoints = [], stopPoints = [], yieldPoints = [], crossingPoints = [], crossingSignalPoints = [], projector,
 }) {
   const graph = buildRoadGraph(roads, projector);
   const crossingKeys = new Set(crossingPoints.map((pt) => makeRoadNodeKey(pt)).filter((key) => graph.nodes.has(key)));
@@ -311,6 +311,12 @@ export function findSignalApproaches({
   const signalJunctions = new Map();
   const hintsByArm = new Map();
   const midblock = [];
+  // (a signal-controlled crossing: lights of its own only away from junctions, mid-block; at a junction the junction's)
+  for (const signal of crossingSignalPoints) {
+    const node = snapToGraph(graph, signal.point, projector);
+    if (!node || isJunction(node) || junctionAhead(node, SIGNAL_TO_JUNCTION_MAX_M, null)) continue;
+    midblock.push({ node, tags: signal.tags || {} });
+  }
   for (const signal of signalPoints) {
     const node = snapToGraph(graph, signal.point, projector);
     if (!node) continue;

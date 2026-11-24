@@ -177,7 +177,10 @@ export function planPitches(features, project, { groundAt = null, drape = null }
     if (sport === 'track') {
       const b0 = orientedBox(ring);
       const ideal = b0 && (b0.s1 - b0.s0) > (b0.t1 - b0.t0) ? stadiumRing(b0, 0) : null;
-      if (ideal && Math.abs(signedArea(ideal) - area) / area < 0.08) { ring = ideal; stadium = true; area = signedArea(ideal); }
+      // (or an outline drawn as a plain rectangle round it: no running track is square-cornered, and the box kept its
+      // corners, a 176 x 92 m rectangle of tartan; coverage level, 2026-11-24)
+      const boxy = b0 && ring.length <= 5 && area >= 0.92 * (b0.s1 - b0.s0) * (b0.t1 - b0.t0);
+      if (ideal && (boxy || Math.abs(signedArea(ideal) - area) / area < 0.08)) { ring = ideal; stadium = true; area = signedArea(ideal); }
     }
     if (!stadium && poolShape(ring) === 'freeform' && ['track', 'cricket'].includes(sport)) {
       const sm = smoothRing(ring);
@@ -1024,7 +1027,8 @@ function volleyball(stone, full, p) {
   const hl = Math.min(9, (L - 1) / 2); const hw = Math.min(4.5, (W - 1) / 2);
   const beach = p.sport === 'beach_volleyball' || p.surface === 'sand';
   const col = beach ? [0.15, 0.35, 0.85] : PAINT;
-  for (const [a0, b0, a1, b1] of [[-hl, -hw, hl, -hw], [hl, -hw, hl, hw], [hl, hw, -hl, hw], [-hl, hw, -hl, -hw]]) lineST(full, p, sm + a0, tc + b0, sm + a1, tc + b1, 0.05, col, 0.03);
+  // (beach: tape 8 cm wide, the widest the rules allow, FIVB 5-8 cm; at 5 cm it vanished a few metres off)
+  for (const [a0, b0, a1, b1] of [[-hl, -hw, hl, -hw], [hl, -hw, hl, hw], [hl, hw, -hl, hw], [-hl, hw, -hl, -hw]]) lineST(full, p, sm + a0, tc + b0, sm + a1, tc + b1, beach ? 0.08 : 0.05, col, 0.03);
   if (!beach) for (const sg of [-1, 1]) lineST(full, p, sm + sg * 3, tc - hw, sm + sg * 3, tc + hw);
   courtNet(stone, full, p, hw + 1, 2.55, 2.43, 1, DARK_NET);
 }

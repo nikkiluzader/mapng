@@ -182,3 +182,34 @@ test('a bridge pier or tower mapped as a building is left to the bridges', async
   assert.equal(count, 1);
   assert.equal(stats.skipped.bridgeParts, 2);
 });
+
+import { planBuilding as planB } from '../services/beamngBuildings.js';
+test('greenhouses, containers, ruins and square chapels have looks of their own (coverage level, 2026-11-24)', () => {
+  const at = { area: 200, seed: 's', lat: 40, lon: -75, rectFill: 1 };
+  const g = planB({ building: 'greenhouse' }, at);
+  assert.equal(g.wall, 'glass'); assert.equal(g.roofMat, 'glass'); assert.ok(g.eaveH < 3.5);
+  const c = planB({ building: 'container', 'building:levels': '2' }, { ...at, area: 30 });
+  assert.equal(c.wall, 'metalWhite'); assert.equal(c.roof, 'flat'); assert.ok(Math.abs(c.eaveH - 5.2) < 1e-9);
+  const ru = planB({ building: 'ruins' }, at);
+  assert.equal(ru.wall, 'stoneMixed'); assert.equal(ru.windows, false); assert.ok(ru.eaveH <= 4.5 && !ru.shopFloor);
+  // a square chapel: hipped; a long church keeps its steep gable
+  assert.equal(planB({ building: 'chapel' }, { ...at, area: 576, aspect: 1 }).roof, 'hipped');
+  assert.equal(planB({ building: 'church' }, { ...at, area: 576, aspect: 2.2 }).roof, 'gabled');
+});
+
+test('building=roof: a roof on posts, open underneath (coverage level, 2026-11-24)', () => {
+  const { meshes, count } = buildTexturedBuildings([rect('r', 0, 0, 12, 8, { building: 'roof' })], project);
+  assert.equal(count, 1);
+  // nothing between 0.5 m and 2.5 m over the ground but the posts: every vertex there within a post's width of the edge
+  let mid = 0; let far = 0; let top = 0;
+  for (const mesh of meshes) {
+    const p = mesh.geometry.getAttribute('position').array;
+    for (let i = 0; i < p.length; i += 3) {
+      top = Math.max(top, p[i + 2]);
+      if (p[i + 2] > 100.5 && p[i + 2] < 102.5) { mid++; const x = p[i], y = p[i + 1]; if (Math.min(x, 12 - x, y, 8 - y) > 0.6) far++; }
+    }
+  }
+  assert.ok(Math.abs(top - 103) < 0.05, `the roof's top at 3 m: ${top - 100}`);
+  assert.equal(far, 0, 'no wall or post inside the outline: open underneath');
+  assert.equal(mid, 0, 'posts run from the ground to the slab: no vertices partway up');
+});

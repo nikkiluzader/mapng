@@ -179,3 +179,28 @@ test('on the drawn carriageway the arrows stand in the lanes its lines divide, b
   // the stencil at most a little wider than its lane (the glyph is a third of it)
   for (const a of arrows) assert.ok(a[1] <= 2.85 * 1.35 + 0.01);
 });
+
+test('a crossing node tagged as a zebra paints the zebra bars, in the Americas too (coverage level, 2026-11-24)', () => {
+  const lat = CENTER_LAT; const dLng = 0.001;
+  const road = { id: 'w1', type: 'road', tags: { highway: 'residential' }, geometry: [-2, -1, 0, 1, 2].map((k) => ({ lat, lng: CENTER_LNG + k * dLng })) };
+  for (const tags of [{ highway: 'crossing', crossing: 'zebra' }, { highway: 'crossing', crossing_ref: 'zebra' }, { highway: 'crossing', 'crossing:markings': 'zebra' }]) {
+    const decals = generateJunctionMarkingDecals(makeTerrainData([road, point(lat, CENTER_LNG, tags)]), SQUARE_SIZE);
+    assert.equal(decals.filter((d) => d.name.startsWith('jm_zebra')).length, 1, `zebra bars for ${JSON.stringify(tags)}`);
+    assert.equal(decals.filter((d) => d.name.startsWith('jm_crosswalk')).length, 0, 'no lines then');
+  }
+  const plain = generateJunctionMarkingDecals(makeTerrainData([road, point(lat, CENTER_LNG, { highway: 'crossing', crossing: 'marked' })]), SQUARE_SIZE);
+  assert.equal(plain.filter((d) => d.name.startsWith('jm_crosswalk')).length, 2, 'unsaid, the Americas\' two lines');
+});
+
+import { parseOverpassResponse } from '../services/osm.js';
+test('a crossing mapped only as a node on the road is read, and painted (coverage level, 2026-11-24)', () => {
+  const lat = CENTER_LAT; const dLng = 0.001;
+  const b = makeTerrainData([]).bounds;
+  const els = [-2, -1, 0, 1, 2].map((k, i) => ({ type: 'node', id: 100 + i, lat, lon: CENTER_LNG + k * dLng }));
+  els[2].tags = { highway: 'crossing', crossing: 'marked' };
+  els.push({ type: 'way', id: 9, nodes: els.map((e) => e.id), geometry: els.map((e) => ({ lat: e.lat, lon: e.lon })), tags: { highway: 'residential' } });
+  const features = parseOverpassResponse({ elements: els }, b);
+  assert.equal(features.filter((f) => f.type === 'crossing').length, 1, 'the node is kept');
+  const decals = generateJunctionMarkingDecals(makeTerrainData(features), SQUARE_SIZE);
+  assert.equal(decals.filter((d) => d.name.startsWith('jm_crosswalk')).length, 2, 'and painted');
+});

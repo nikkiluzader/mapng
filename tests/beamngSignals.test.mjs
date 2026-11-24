@@ -266,3 +266,23 @@ test('signal props: far side in North America, stop line elsewhere; kerb follows
   // Lenses (+X) face oncoming traffic: south for a northbound approach.
   assert.ok(Math.abs(us.yaw - (-Math.PI / 2)) < 1e-6);
 });
+
+test('a crossing with its own lights, mapped with no traffic_signals node, gets a mid-block signal; not at a junction (coverage level)', () => {
+  const alone = buildBeamNGSignalData(makeTerrainData([
+    road('ns', { highway: 'primary' }, [[0.009, J], [J, J], [0.001, J]]),
+    node('x', { highway: 'crossing', crossing: 'traffic_signals' }, J, J),
+  ]), SQ);
+  assert.equal(alone.instances.length, 2, 'both directions');
+  assert.equal(alone.controllers.length, 1);
+  const pelican = buildBeamNGSignalData(makeTerrainData([
+    road('ns', { highway: 'primary' }, [[0.009, J], [J, J], [0.001, J]]),
+    node('x', { highway: 'crossing', crossing_ref: 'pelican' }, J, J),
+  ]), SQ);
+  assert.equal(pelican.instances.length, 2, 'the UK\'s pelican too');
+  // beside an unsignalled junction: no lights of its own (the junction would have turned signalled)
+  const nearJunction = buildBeamNGSignalData(makeTerrainData([
+    ...crossroads(),
+    node('x', { highway: 'crossing', crossing: 'traffic_signals' }, J + 15 * M, J),
+  ]), SQ);
+  assert.equal(nearJunction.instances.length, 0);
+});

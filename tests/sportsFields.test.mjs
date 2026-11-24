@@ -352,3 +352,11 @@ test("a court's fence is the game's own chain-link pieces, end to end round it, 
   const sprops = []; sb[0].props = sprops; buildPitch(recorder(), recorder(), sb[0]);
   assert.equal(sprops.length, 0);
 });
+
+test('a track drawn as a plain rectangle round it is built as the oval (coverage level, 2026-11-24)', () => {
+  const [p] = planPitches([area('t', [[0, 0], [176, 0], [176, 92], [0, 92]], { leisure: 'track', sport: 'running' })], project, { groundAt });
+  assert.ok(p.stadium, 'the oval, not a rectangle of tartan');
+  // a field: still its rectangle
+  const [f] = planPitches([area('f', [[0, 0], [105, 0], [105, 68], [0, 68]], { leisure: 'pitch', sport: 'soccer' })], project, { groundAt });
+  assert.ok(!f.stadium);
+});

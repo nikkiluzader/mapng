@@ -1776,15 +1776,83 @@ function onForeignRoad(t, x, y, margin) {
 // a wingwall's thickness at line index i, side: its full thickness, or what room another road beside it leaves (the
 // wall's face never comes in past the tube's width), WING_T_MIN_M at least
 const WING_T_MIN_M = 1.5;
-const wingTAt = (t, i, side) => {
+const baseWingTAt = (t, i, side) => {
   const c = t.clear?.[side]?.[i] ?? Infinity;
   return Number.isFinite(c) ? clamp(c - BESIDE_GAP_M - t.W, Math.min(WING_T_MIN_M, t.wingT), t.wingT) : t.wingT;
 };
+// (thickened to meet a twin bore's wall halfway: fitTwinBores)
+const wingTAt = (t, i, side) => t.twinT?.[side]?.get(i) ?? baseWingTAt(t, i, side);
 // a wingwall's inner face offset at line index i, side (pulled in off another road)
 const wingDAt = (t, i, side) => {
   const c = t.clear?.[side]?.[i] ?? Infinity;
-  return Number.isFinite(c) ? clamp(c - wingTAt(t, i, side) - BESIDE_GAP_M, t.W, t.wingD) : t.wingD;
+  return Number.isFinite(c) ? clamp(c - baseWingTAt(t, i, side) - BESIDE_GAP_M, t.W, t.wingD) : t.wingD;
 };
+
+// Twin bores (a motorway's two tubes side by side): where two tunnels' wingwalls face each other across less than
+// TWIN_MERGE_M of ground, each wall is thickened to meet the other halfway, both at the higher of their two tops: one
+// concrete median between the trenches. Left apart, the two walls stood a few metres off each other with a sliver of
+// cut-back hillside between them, and seen from above they ran into each other (coverage level's twin tunnels,
+// 2026-11-24). Run once every tunnel's wings are final (after fitBesideRoads). Returns the stations merged.
+const TWIN_MERGE_M = 8;
+const WALL_TOP_CLEAR_M = 0.3;       // ground under a wingwall's back half kept this far under its top
+const TWIN_OVERLAP_M = 0.05;           // each half reaches this past the middle, so no seam of ground shows
+export function fitTwinBores(tunnels, log = () => {}) {
+  const list = (tunnels || []).filter((t) => t.kind !== 'gallery' && t.wings && t.line?.length >= 2);
+  if (list.length < 2) { log('Twin bores: fewer than two tunnels with wingwalls, nothing to join.'); return 0; }
+  const plans = [];
+  const pairs = new Set();
+  for (const t of list) {
+    const box = tunnelReach(t);
+    for (const u of list) {
+      if (u === t) continue;
+      const ub = tunnelReach(u);
+      if (ub[0] > box[2] || ub[2] < box[0] || ub[1] > box[3] || ub[3] < box[1]) continue;
+      const uReach = u.headHalf + (u.maxExtra || 0) + 2;
+      for (const side of [-1, 1]) {
+        for (const [i, top] of t.wings[side]) {
+          const p = t.line[i];
+          const outer = wingDAt(t, i, side) + extraAt(t, p, side) + wingTAt(t, i, side);
+          // out from t's wall's back, the first point inside u's wall (between its faces)
+          for (let o = outer; o <= outer + TWIN_MERGE_M + 1e-6; o += 0.25) {
+            const [x, y] = lateral(p, side * o);
+            const m = nearestOnTunnel(u, x, y, uReach);
+            if (!m) continue;
+            const sU = Math.sign(m.d) || 1;
+            // u's headwall (from its face back through its depth): the wall runs on to meet its side
+            if (m.into >= 0) {
+              if (m.into > (u.headDepth || 0) || Math.abs(m.d) > headHalfAt(u, m.i, sU) || nearerPortalKind(u, m.s) !== 'cut') continue;
+              const gap = o - outer;
+              // (the headwall does not grow: this wall closes the whole gap, up to the headwall's top at most)
+              const topAbs = Math.min(Math.max(p.z + top, m.z + headTopAt(u, m.s)), m.z + headTopAt(u, m.s) + 0.5);
+              plans.push({ t, side, i, T: wingTAt(t, i, side) + gap + TWIN_OVERLAP_M, top: Math.max(top, topAbs - p.z) });
+              pairs.add([String(t.osm?.[0]?.name ?? t.osm?.[0]?.id ?? '?'), String(u.osm?.[0]?.name ?? u.osm?.[0]?.id ?? '?')].sort().join(' + '));
+              break;
+            }
+            const k = u.wings[sU].has(m.i) ? m.i : u.wings[sU].has(m.i + 1) ? m.i + 1 : -1;
+            if (k < 0) continue;
+            const q = u.line[k];
+            const back = wingDAt(u, k, sU) + extraAt(u, q, sU) + wingTAt(u, k, sU);
+            if (Math.abs(m.d) > back) continue;
+            const gap = o - outer;
+            const topAbs = Math.max(p.z + top, q.z + u.wings[sU].get(k));
+            plans.push({ t, side, i, T: wingTAt(t, i, side) + gap / 2 + TWIN_OVERLAP_M, top: topAbs - p.z });
+            pairs.add([String(t.osm?.[0]?.name ?? t.osm?.[0]?.id ?? '?'), String(u.osm?.[0]?.name ?? u.osm?.[0]?.id ?? '?')].sort().join(' + '));
+            break;
+          }
+        }
+      }
+    }
+  }
+  for (const { t, side, i, T, top } of plans) {
+    t.twinT ||= { [-1]: new Map(), [1]: new Map() };
+    t.twinT[side].set(i, T);
+    t.wings[side].set(i, top);
+  }
+  log(plans.length
+    ? `Twin bores: ${plans.length} wingwall station(s) thickened to meet the next tunnel's wall (${[...pairs].join(', ')}).`
+    : `Twin bores: no two tunnels' wingwalls within ${TWIN_MERGE_M} m of each other.`);
+  return plans.length;
+}
 // a headwall's reach past the line at portal index i, side
 const headHalfAt = (t, i, side) => {
   const c = t.clear?.[side]?.[i] ?? Infinity;
@@ -2044,6 +2112,9 @@ export function tunnelGroundAt(t, x, y, h) {
     const top = t.wings[Math.sign(n.d) || 1].get(n.i) ?? 0;
     const wd = wingDAt(t, n.i, Math.sign(n.d) || 1); const wt = wingTAt(t, n.i, Math.sign(n.d) || 1);
     if (ad <= wd + wt / 2) return n.z;
+    // (under the wall's back half the ground stays under its top: graded up to it, the ground cover grew through the
+    // top of the thick median between twin bores; coverage level, 2026-11-24)
+    if (ad <= wd + wt) return clamp(h, n.z, n.z + top - WALL_TOP_CLEAR_M);
     const r = Math.max(0, ad - wd - wt);
     // (over the wall the ground is cut back at 1 to 1 for a few metres, then
     // steeply: a rock face steeper than 1 to 1 never met that slope, and a

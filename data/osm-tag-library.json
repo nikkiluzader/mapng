@@ -3497,7 +3497,7 @@
    "group": "roads",
    "item": "crosswalks",
    "status": "partial",
-   "fetched": false,
+   "fetched": true,
    "builds": "Painted crosswalk across the road",
    "assets": [
     {"shape":"/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_warn_zebra_warning.dae","region":"any","usedToday":false,"is":"Italian pedestrian-crossing warning triangle on post","from":"catalogue"},
@@ -3649,11 +3649,12 @@
    "count": 58000,
    "group": "roads",
    "item": "markings",
-   "status": "planned",
-   "fetched": false,
-   "builds": "A painted centre disc and arrows at the junction",
+   "code": "services/miniRoundabouts.js",
+      "status": "built",
+   "fetched": true,
+   "builds": "A white painted centre disc, domed 8 cm, on the junction node (diameter=* or 4 m)",
    "assets": [],
-   "generated": "Paint decal (and a low dome)",
+   "generated": "A domed paint mesh (services/miniRoundabouts.js)",
    "properties": {
     "direction": {
      "effect": "clockwise in left-driving countries",
@@ -8477,8 +8478,8 @@
    "group": "railways",
    "item": "levelCrossings",
    "status": "partial",
-   "fetched": false,
-   "builds": "The road carried level over the rails (from geometry); planned: barriers, lights and crossbucks",
+   "fetched": true,
+   "builds": "The road carried level over the rails (from geometry); a barrier on each road approach, its arm raised (generated: no native crossing equipment); none where crossing:barrier=no",
    "assets": [
     {"shape":"/levels/italy/art/shapes/buildings/italy_bld_boomgate_6.5m.dae","region":"europe","usedToday":false}
    ],
@@ -8486,7 +8487,7 @@
    "properties": {
     "crossing:barrier": {
      "effect": "no / half / full / double_half: which barrier arms stand at the crossing",
-     "used": false
+     "used": true
     },
     "crossing:light": {
      "effect": "yes: flashing warning lights",
@@ -8505,7 +8506,7 @@
      "used": false
     }
    },
-   "code": "services/railTrack.js",
+   "code": "services/levelCrossingBarriers.js",
    "note": "No native railway crossing equipment: the boom gates are car-park barriers"
   },
   "railway=light_rail": {
@@ -9433,7 +9434,12 @@
    "generated": "Water surface",
    "code": "services/beamngWater.js",
    "also": [
-    "water=lagoon"
+    "water=lagoon",
+    "water=fishpond",
+    "water=wastewater",
+    "water=reflecting_pool",
+    "water=salt_pool",
+    "water=moat"
    ]
   },
   "water=reservoir": {

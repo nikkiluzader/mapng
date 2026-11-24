@@ -44,7 +44,23 @@ const DEPTH_M = [1, 8];
 const ROAD_MARGIN_M = 1;
 const RIVER_MIN_HALF_M = 1.5;
 const MIN_PIECE_M = 15;
-const LAKE_WATER = new Set(['lake', 'pond', 'reservoir', 'oxbow', 'lagoon', 'basin', 'stream_pool', 'moat', 'pool', 'yes']);
+// (fish ponds, wastewater tanks, reflecting pools and salt pans too, since 2026-11-24: they were left as dry ground)
+const LAKE_WATER = new Set(['lake', 'pond', 'reservoir', 'oxbow', 'lagoon', 'basin', 'stream_pool', 'moat', 'pool', 'yes', 'fishpond', 'wastewater', 'reflecting_pool', 'salt_pool']);
+
+/**
+ * What kind of still water an outline is, for its look (exportBeamNGLevel.js STILL_WATER_LOOKS): one of river,
+ * reservoir, pond, basin, wastewater, reflecting_pool, lagoon, moat, fishpond, salt_pool, lake. Every kind looked the
+ * same (the user, 2026-11-24: "we should try different water properties for each").
+ */
+export function stillWaterKind(tags = {}, river = false) {
+  if (river) return 'river';
+  const w = norm(tags.water); const lu = norm(tags.landuse);
+  if (w === 'reservoir' || lu === 'reservoir') return 'reservoir';
+  if (w === 'basin' || lu === 'basin') return 'basin';
+  if (w === 'pond' || w === 'oxbow' || w === 'stream_pool' || w === 'pool') return 'pond';
+  if (['wastewater', 'reflecting_pool', 'lagoon', 'moat', 'fishpond', 'salt_pool'].includes(w)) return w;
+  return 'lake';
+}
 const RIVERBANK_WATER = new Set(['river', 'stream', 'canal', 'riverbank']);
 const LAKE_CELL_M = [2, 32];
 // A river outline drawn as area water (WaterBlock tiles, like a lake) and no
@@ -682,7 +698,7 @@ export function planLakes({ features = [], toWorld, heightAt, seaZ = null, minCe
     const owner = (tile) => members.find((k) => lakes[k].poly.contains(tile.cx, tile.cy)) ?? members[0];
     for (const tile of lakeTiles) {
       const k = owner(tile);
-      tiles.push({ ...tile, sx: tile.sx + LAKE_TILE_OVERLAP_M, sy: tile.sy + LAKE_TILE_OVERLAP_M, z: level, lake: k, name: lakes[k].tags.name || null });
+      tiles.push({ ...tile, sx: tile.sx + LAKE_TILE_OVERLAP_M, sy: tile.sy + LAKE_TILE_OVERLAP_M, z: level, lake: k, name: lakes[k].tags.name || null, kind: stillWaterKind(lakes[k].tags, lakes[k].river) });
     }
   }
   stats.tiles = tiles.length;
@@ -1247,6 +1263,51 @@ export function carveWaterUnderDecks({ rivers = [], lakes = [] }, grid, covered,
         if (!poly.contains(x, y) || keepUnder(x, y)) continue;
         const d = Math.min(distToRing(x, y, poly.outer), ...poly.holes.map((h) => distToRing(x, y, h)));
         lower(idx, level - HIDDEN_BED_M * Math.min(1, d / HIDDEN_SLOPE_M + 0.2));
+      }
+    }
+  }
+  return { pixels: edits.size, indices: () => edits.keys(), apply(set) { for (const [idx, v] of edits) set(idx, v); } };
+}
+
+// Rivers in ground with no channel: elevation data holds a river's surface, not its bed (lidar returns off the water;
+// 30 m data smooths a stream's channel away), so a ribbon a hand over the lowest ground across it was a film of water a
+// few cm deep at its edges that barely showed (coverage level, 2026-11-24). A channel is carved under every river
+// ribbon: its node's depth (DEPTH_M by width, CHANNEL_BED_MAX_M at most) under the surface in the middle, rising to the
+// surface at its edges over HIDDEN_SLOPE_M. Only ever lowers; ground standing more than HIDDEN_BANK_MAX_M over the water
+// (a ribbon overlapping a slope) and ground roads (keep(x, y)) are left as they are.
+export const CHANNEL_BED_MAX_M = 2;
+
+/**
+ * Terrain edits for river channels. rivers: planRivers' [{ nodes: [[x, y, surface, width, depth]] }]; grid as
+ * carveLakeBeds. Returns { pixels, indices(), apply(set) } (set(idx, raw)).
+ */
+export function carveRiverChannels(rivers = [], grid, keep = () => false) {
+  const { heightMap, width, height, worldSize, minHeight = 0 } = grid;
+  const toPixel = (x, y) => [(x / worldSize + 0.5) * width, ((0.5 - y / worldSize) * height - 1)];
+  const toWorld = (c, r) => [((c / width) - 0.5) * worldSize, (0.5 - (r + 1) / height) * worldSize];
+  const edits = new PixelEdits();
+  for (const { nodes } of rivers) {
+    for (let i = 0; i + 1 < (nodes?.length || 0); i++) {
+      const [ax, ay, az, aw, ad = DEPTH_M[0]] = nodes[i]; const [bx, by, bz, bw, bd = DEPTH_M[0]] = nodes[i + 1];
+      const reach = Math.max(aw, bw) / 2;
+      const [c0, r0] = toPixel(Math.min(ax, bx) - reach, Math.max(ay, by) + reach);
+      const [c1, r1] = toPixel(Math.max(ax, bx) + reach, Math.min(ay, by) - reach);
+      const vx = bx - ax; const vy = by - ay; const L2 = vx * vx + vy * vy || 1e-9;
+      for (let r = Math.max(0, Math.floor(r0)); r <= Math.min(height - 1, Math.ceil(r1)); r++) {
+        for (let c = Math.max(0, Math.floor(c0)); c <= Math.min(width - 1, Math.ceil(c1)); c++) {
+          const idx = r * width + c;
+          const [x, y] = toWorld(c, r);
+          const t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / L2));
+          const half = (aw + (bw - aw) * t) / 2;
+          const d = fastHypot(ax + vx * t - x, ay + vy * t - y);
+          if (d > half) continue;
+          const surface = az + (bz - az) * t;
+          const ground = heightMap[idx] - minHeight;
+          const depth = Math.min(CHANNEL_BED_MAX_M, ad + (bd - ad) * t);
+          const target = surface - depth * Math.min(1, (half - d) / HIDDEN_SLOPE_M);
+          if (ground <= target || ground > surface + HIDDEN_BANK_MAX_M || keep(x, y)) continue;
+          edits.set(idx, Math.min(edits.get(idx) ?? Infinity, target + minHeight));
+        }
       }
     }
   }

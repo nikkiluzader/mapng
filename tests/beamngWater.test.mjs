@@ -628,3 +628,44 @@ test('lake beds: a lake running off the map leaves the shore at most 1 in 100; o
   assert.ok(by.off.slope <= 0.01, `off the map: capped (${by.off.slope})`);
   assert.ok(by.off.depth <= 0.5 * 0.01 * by.off.reach + 1e-9 || by.off.depth === 1.5, `off the map: shallow (${by.off.depth})`);
 });
+
+import { carveRiverChannels, CHANNEL_BED_MAX_M } from '../services/beamngWater.js';
+test('a river on ground with no channel gets one carved: deep in the middle, at the surface at its edges (coverage level, 2026-11-24)', () => {
+  // flat ground at 10 m on a 1 m grid, 101 x 101 (world -50..50); a 6 m stream along y = 0, its surface 10.25
+  const W = 101; const hm = new Float32Array(W * W).fill(10);
+  const grid = { heightMap: hm, width: W, height: W, worldSize: W, minHeight: 0 };
+  const rivers = [{ nodes: [[-40, 0, 10.25, 6, 1], [40, 0, 10.25, 6, 1]] }];
+  const ch = carveRiverChannels(rivers, grid, (x) => x > 30);   // a road across at x > 30
+  assert.ok(ch.pixels > 0);
+  const out = Float32Array.from(hm); ch.apply((i, v) => { out[i] = v; });
+  const at = (x, y) => { const c = Math.round(x + W / 2); const r = Math.round((0.5 - y / W) * W - 1); return out[r * W + c]; };
+  assert.ok(at(0, 0) <= 10.25 - 0.99, `middle at the stream's depth: ${at(0, 0)}`);
+  assert.ok(at(0, 2.5) > at(0, 0) && at(0, 2.5) < 10.25, 'rising to the edge');
+  assert.equal(at(0, 5), 10, 'outside the ribbon untouched');
+  assert.equal(at(35, 0), 10, 'the road kept');
+  // a bank far over the water: left
+  const hm2 = new Float32Array(W * W).fill(20);
+  assert.equal(carveRiverChannels(rivers, { ...grid, heightMap: hm2 }).pixels, 0);
+  // never deeper than the cap
+  const deep = carveRiverChannels([{ nodes: [[-40, 0, 10.25, 40, 8], [40, 0, 10.25, 40, 8]] }], grid);
+  let min = Infinity; deep.apply((i, v) => { min = Math.min(min, v); });
+  assert.ok(min >= 10.25 - CHANNEL_BED_MAX_M - 1e-6);
+});
+
+import { stillWaterKind } from '../services/beamngWater.js';
+test('still water has a kind for its look; fish ponds, wastewater, reflecting pools and salt pans are water now (coverage level, 2026-11-24)', () => {
+  assert.equal(stillWaterKind({ natural: 'water', water: 'reservoir' }), 'reservoir');
+  assert.equal(stillWaterKind({ landuse: 'reservoir' }), 'reservoir');
+  assert.equal(stillWaterKind({ natural: 'water', water: 'pond' }), 'pond');
+  assert.equal(stillWaterKind({ natural: 'water', water: 'oxbow' }), 'pond');
+  assert.equal(stillWaterKind({ landuse: 'basin' }), 'basin');
+  assert.equal(stillWaterKind({ natural: 'water', water: 'reflecting_pool' }), 'reflecting_pool');
+  assert.equal(stillWaterKind({ natural: 'water' }), 'lake');
+  assert.equal(stillWaterKind({ natural: 'water', water: 'river' }, true), 'river');
+  const ring = (x0, y0, s) => [[x0, y0], [x0 + s, y0], [x0 + s, y0 + s], [x0, y0 + s], [x0, y0]].map(([x, y]) => ({ lat: y, lng: x }));
+  const { tiles } = planLakes({
+    features: ['fishpond', 'wastewater', 'reflecting_pool', 'salt_pool'].map((w, i) => ({ type: 'water', geometry: ring(i * 100, 0, 40), tags: { natural: 'water', water: w } })),
+    toWorld: (lat, lng) => [lng, lat], heightAt: () => 10,
+  });
+  assert.deepEqual([...new Set(tiles.map((t) => t.kind))].sort(), ['fishpond', 'reflecting_pool', 'salt_pool', 'wastewater']);
+});

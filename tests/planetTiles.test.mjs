@@ -17,7 +17,7 @@ test('the filter on reading keeps what the Overpass query asks for, and nothing 
   assert.equal(matchesOsmFilter({ type: 'relation', tags: { type: 'route', route: 'bus' } }), false);
   assert.equal(matchesOsmFilter({ type: 'relation', tags: { highway: 'pedestrian', type: 'multipolygon' } }), false);   // (the query asks for no relation by highway)
   assert.equal(matchesOsmFilter({ type: 'node', tags: { amenity: 'school' } }), false);
-  assert.equal(matchesOsmFilter({ type: 'node', tags: { highway: 'crossing' } }), false);
+  assert.equal(matchesOsmFilter({ type: 'node', tags: { highway: 'crossing' } }), true);   // (fetched since 2026-11-24: crossings mapped as nodes)
   assert.equal(matchesOsmFilter({ type: 'node' }), false);
 });
 

@@ -21,8 +21,9 @@ local function driverView(t)
     p = vec3(t.x, t.y, -200); hit = castRayStatic(p, vec3(0, 0, 1), 600)
     if hit then p = vec3(t.x, t.y, -200 + hit) end
   else
-    p = vec3(t.x, t.y, 1000); hit = castRayStatic(p, vec3(0, 0, -1), 1200)
-    if hit then p = vec3(t.x, t.y, 1000 - hit) end
+    local z0 = t.fromZ or 1000
+    p = vec3(t.x, t.y, z0); hit = castRayStatic(p, vec3(0, 0, -1), z0 + 200)
+    if hit then p = vec3(t.x, t.y, z0 - hit) end
   end
   if not hit then p = vec3(t.x, t.y, core_terrain.getTerrainHeight(vec3(t.x, t.y, 0)) or 0) end
   local cam = p + vec3(0, 0, 1.4)

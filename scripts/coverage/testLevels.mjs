@@ -46,17 +46,22 @@ export function makeBuilder(regionKey, size) {
   };
   const area = (cx, cy, w, h, tags) => way([[cx - w / 2, cy - h / 2], [cx + w / 2, cy - h / 2], [cx + w / 2, cy + h / 2], [cx - w / 2, cy + h / 2], [cx - w / 2, cy - h / 2]], tags);
   // (a straight run as nodes every `step` m, ends included)
-  const run = (x0, y0, x1, y1, step = 20) => {
+  // (through: points on the line it must include exactly, where another way joins it: evenly spaced nodes missed
+  // them, and roads that should meet crossed without a junction)
+  const run = (x0, y0, x1, y1, step = 20, through = []) => {
     const L = Math.hypot(x1 - x0, y1 - y0); const n = Math.max(1, Math.round(L / step)); const pts = [];
     for (let i = 0; i <= n; i++) pts.push([x0 + ((x1 - x0) * i) / n, y0 + ((y1 - y0) * i) / n]);
-    return pts;
+    const t = ([x, y]) => (((x - x0) * (x1 - x0) + (y - y0) * (y1 - y0)) / (L * L || 1));
+    for (const p of through) { const tp = t(p); const near = pts.findIndex((q) => Math.abs(t(q) - tp) * L < step / 3); if (near > 0 && near < pts.length - 1) pts[near] = [p[0], p[1]]; else if (near < 0) pts.push([p[0], p[1]]); }
+    return pts.sort((a, b) => t(a) - t(b));
   };
   const circle = (cx, cy, r, n = 24) => { const pts = []; for (let i = 0; i <= n; i++) { const a = (i / n) * 2 * Math.PI; pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]); } pts[n] = pts[0]; return pts; };
   // (what the level holds, for the labels, the report and the tour: tour = [camera distance, yaw])
   const label = (what, x, y, tour = [60, 0]) => placed.push({ what, kind: 'structure', at: [Math.round(x), Math.round(y)], tour });
   // (a driver's view for the tour, not a label: the camera at eye height on the road at (x, y), looking along
   // `heading` (radians, 0 = east); find: 'down' onto a deck or road from above, 'up' onto a tunnel floor from below)
-  const drive = (what, x, y, heading, find = 'down') => placed.push({ what, kind: 'driver', at: [Math.round(x * 10) / 10, Math.round(y * 10) / 10], heading, find });
+  // (fromZ: where a downward ray starts, just over the deck, so it cannot land on a pylon or a cable above it)
+  const drive = (what, x, y, heading, find = 'down', fromZ = null) => placed.push({ what, kind: 'driver', at: [Math.round(x * 10) / 10, Math.round(y * 10) / 10], heading, find, ...(fromZ != null ? { fromZ } : {}) });
   // (along a polyline: the point and heading at a fraction of its length)
   const along = (pts, f) => {
     const seg = []; let L = 0;
@@ -93,16 +98,21 @@ export async function writeLevelArea({ name, size, b, heightAt, landCover, meta 
 
 // ── roads: flat, every road situation our rules handle ──
 function roads(regionKey) {
-  const SIZE = 2048; const b = makeBuilder(regionKey, SIZE); const { way, node, run, circle, label, area } = b;
+  const SIZE = 2048; const b = makeBuilder(regionKey, SIZE); const { way, node, run, circle, label, area, drive } = b;
   const heightAt = () => 4;
   // 1. lane counts down and back up (y = 850): 4 -> 3 -> 2 -> 1 -> 4, one way per count, sharing their nodes
   {
     const steps = [[4, -900, -550], [3, -550, -300], [2, -300, -50], [1, -50, 200], [4, 200, 550]];
     for (const [lanes, x0, x1] of steps) {
-      way(run(x0, 850, x1, 850, 25), { highway: 'primary', lanes: String(lanes), name: `Lanes ${lanes}`, ...(lanes === 1 ? { oneway: 'yes' } : {}) });
+      // (one road: the same name throughout, as mapped; a second one below with no name at all)
+      way(run(x0, 850, x1, 850, 25), { highway: 'primary', lanes: String(lanes), name: 'Lane change road', ...(lanes === 1 ? { oneway: 'yes' } : {}) });
+      way(run(x0, 790, x1, 790, 25), { highway: 'primary', lanes: String(lanes), ...(lanes === 1 ? { oneway: 'yes' } : {}) });
       label(`lanes=${lanes}${lanes === 1 ? ' oneway' : ''}`, (x0 + x1) / 2, 850, [55, 0]);
     }
     for (const x of [-550, -300, -50, 200]) label(`lane change at x=${x}`, x, 850, [45, 0]);
+    label('unnamed lane change road', -200, 790, [60, 0]);
+    // driver's views through each lane change, both roads, 40 m before it
+    for (const x of [-550, -300, -50, 200]) { drive(`driver: lane change at x=${x}`, x - 40, 850, 0); drive(`driver: unnamed lane change at x=${x}`, x - 40, 790, 0); }
   }
   // 2. a one-way pair, 3 lanes each (y = 700, 680)
   way(run(-900, 700, 550, 700, 25), { highway: 'secondary', oneway: 'yes', lanes: '3', name: 'One-way east' });
@@ -121,15 +131,15 @@ function roads(regionKey) {
   {
     const y = 300; const arm = 90;
     // T with a stop sign on the minor arm
-    way(run(-900, y, -700, y, 15), { highway: 'secondary', name: 'T main' });
+    way(run(-900, y, -700, y, 15, [[-800, y]]), { highway: 'secondary', name: 'T main' });
     way([[-800, y - arm], [-800, y - 8, { highway: 'stop' }], [-800, y]], { highway: 'residential', name: 'T minor' });
     label('T junction, stop', -800, y, [55, 0]);
     // crossroads with signals
-    way(run(-600, y, -400, y, 15), { highway: 'secondary', name: 'Cross EW' });
-    way(run(-500, y - arm, -500, y + arm, 15), { highway: 'secondary', name: 'Cross NS' });
+    way(run(-600, y, -400, y, 15, [[-500, y]]), { highway: 'secondary', name: 'Cross EW' });
+    way(run(-500, y - arm, -500, y + arm, 15, [[-500, y]]), { highway: 'secondary', name: 'Cross NS' });
     node(-500, y, { highway: 'traffic_signals' }); label('crossroads, signals', -500, y, [55, 0]);
     // offset (staggered) crossroads
-    way(run(-300, y, -100, y, 15), { highway: 'tertiary', name: 'Stagger main' });
+    way(run(-300, y, -100, y, 15, [[-220, y], [-180, y]]), { highway: 'tertiary', name: 'Stagger main' });
     way([[-220, y - arm], [-220, y]], { highway: 'residential', name: 'Stagger south' });
     way([[-180, y], [-180, y + arm]], { highway: 'residential', name: 'Stagger north' });
     label('staggered crossroads', -200, y, [55, 0]);
@@ -142,21 +152,23 @@ function roads(regionKey) {
     for (let k = 0; k < 5; k++) { const a = (k / 5) * 2 * Math.PI + 0.3; way([[300, y], [300 + arm * Math.cos(a), y + arm * Math.sin(a)]], { highway: 'tertiary', name: `Five ${k}` }); }
     label('five-way junction', 300, y, [60, 0]);
     // skewed crossroads (30 degrees)
-    way(run(500, y, 700, y, 15), { highway: 'secondary', name: 'Skew main' });
+    way(run(500, y, 700, y, 15, [[600, y]]), { highway: 'secondary', name: 'Skew main' });
     way([[600 - 45, y - 78], [600, y], [600 + 45, y + 78]], { highway: 'residential', name: 'Skew minor' });
     label('skewed crossroads (60 degrees)', 600, y, [55, 0]);
   }
   // 5. roundabouts (y = 80): a mini node, a small one, a large one, a two-lane one, each with four arms
   {
     const y = 80; const arm = 80;
-    way(run(-900, y, -700, y, 15), { highway: 'residential', name: 'Mini EW' });
-    way(run(-800, y - arm, -800, y + arm, 15), { highway: 'residential', name: 'Mini NS' });
+    way(run(-900, y, -700, y, 15, [[-800, y]]), { highway: 'residential', name: 'Mini EW' });
+    way(run(-800, y - arm, -800, y + arm, 15, [[-800, y]]), { highway: 'residential', name: 'Mini NS' });
     node(-800, y, { highway: 'mini_roundabout' }); label('mini roundabout', -800, y, [45, 0]);
+    drive('driver: towards the mini roundabout', -835, y - 1.8, 0);
     for (const [cx, r, tags, what] of [[-450, 15, { lanes: '1' }, 'small roundabout r=15 m'], [-50, 40, { lanes: '1' }, 'large roundabout r=40 m'], [400, 35, { lanes: '2' }, 'two-lane roundabout r=35 m']]) {
       const ring = circle(cx, y, r, 32);
       way(ring, { highway: 'secondary', junction: 'roundabout', oneway: 'yes', ...tags, name: what });
       for (const k of [0, 8, 16, 24]) { const [px, py] = ring[k]; const dx = px - cx; const dy = py - y; const L = Math.hypot(dx, dy); way([[px, py], [px + (dx / L) * arm, py + (dy / L) * arm]], { highway: 'secondary', name: `${what} arm` }); }
       label(what, cx, y, [r * 2.2 + 30, 0]);
+      drive(`driver: into the ${what}`, cx - r - 45, y - 1.8, 0);
     }
   }
   // 6. turn lanes at a signalled junction (y = -150)
@@ -171,6 +183,7 @@ function roads(regionKey) {
     node(-200, y, { highway: 'crossing', crossing: 'zebra' }); way([[-200, y - 20], [-200, y], [-200, y + 20]], { highway: 'footway', footway: 'crossing', crossing: 'zebra' });
     node(0, y, { highway: 'crossing', crossing: 'traffic_signals' }); way([[0, y - 20], [0, y], [0, y + 20]], { highway: 'footway', footway: 'crossing', crossing: 'traffic_signals' });
     label('zebra crossing', -200, y, [40, 0]); label('signalled crossing', 0, y, [40, 0]);
+    drive('driver: towards the zebra crossing', -230, y - 1.8, 0); drive('driver: towards the signalled crossing', -30, y - 1.8, 0);
     // a level crossing on a two-lane road
     way(run(300, y, 700, y, 20).map(([x, yy]) => [x, yy, x === 500 ? { railway: 'level_crossing' } : undefined]), { highway: 'secondary', name: 'Level crossing road' });
     way(run(500, y - 200, 500, y + 100, 20).map(([x, yy]) => [x, yy, yy === y ? { railway: 'level_crossing' } : undefined]), { railway: 'rail', name: 'Crossing line' });
@@ -231,8 +244,10 @@ function structures(regionKey) {
     label(`bridge end west (${what})`, a, y, [30, 60]); label(`bridge end east (${what})`, c, y, [30, -120]);
     // driver's views: 40 m before each end looking onto the deck, both ways, and mid-span
     drive(`driver: eastbound onto ${what}`, a - 40, y, 0); drive(`driver: westbound onto ${what}`, c + 40, y, Math.PI);
-    drive(`driver: on ${what}, mid-span east`, GORGE_X, y, 0); drive(`driver: eastbound off ${what}`, c - 30, y, 0);
-    drive(`driver: westbound off ${what}`, a + 30, y, Math.PI);
+    // (on the deck: the ray from 8 m over the gorge's rim, under a pylon's top and the cables)
+    const deckZ = heightAt(a, y) + 8;
+    drive(`driver: on ${what}, mid-span east`, GORGE_X, y, 0, 'down', deckZ); drive(`driver: eastbound off ${what}`, c - 30, y, 0, 'down', deckZ);
+    drive(`driver: westbound off ${what}`, a + 30, y, Math.PI, 'down', deckZ);
   });
   // a long viaduct across the wide valley, a rail bridge beside it, a footbridge over the river
   {
@@ -270,13 +285,16 @@ function structures(regionKey) {
       way(pts.slice(inside[1]), tags);
       const [ax, ay] = pts[inside[0]]; const [bx, by] = pts[inside[1]];
       label(what, (ax + bx) / 2, (ay + by) / 2, [200, 0]);
-      label(`${what}: west portal`, ax, ay, [35, 60]); label(`${what}: east portal`, bx, by, [35, -120]);
+      // (named by where they lie: a westbound line's first portal is its east one)
+      const [wx, wy, ex, ey] = ax <= bx ? [ax, ay, bx, by] : [bx, by, ax, ay];
+      label(`${what}: west portal`, wx, wy, [35, 60]); label(`${what}: east portal`, ex, ey, [35, -120]);
       // driver's views both ways: the entrance portal (from 30 m out), 25 %, 50 %, 75 % in, the exit portal
       const tube = pts.slice(inside[0], inside[1] + 1);
       for (const [dirName, line] of [['forward', tube], ['back', [...tube].reverse()]]) {
         const [sx, sy, sh] = along(line, 0); drive(`driver ${dirName}: ${what} entrance portal`, sx - 30 * Math.cos(sh), sy - 30 * Math.sin(sh), sh, 'down');
         for (const f of [0.25, 0.5, 0.75]) { const [x, y, h] = along(line, f); drive(`driver ${dirName}: ${what} ${f * 100} %`, x, y, h, 'up'); }
-        const [ex, ey, eh] = along(line, 0.97); drive(`driver ${dirName}: ${what} exit portal`, ex, ey, eh, 'up');
+        // (the exit from 90 % in: nearer the portal the upward ray missed the tube's floor)
+        const [ex, ey, eh] = along(line, 0.9); drive(`driver ${dirName}: ${what} exit portal`, ex, ey, eh, 'up');
       }
     };
     const line = (y, x0, x1) => run(x0, y, x1, y, 20);
@@ -308,10 +326,13 @@ function terrain(regionKey) {
     // a hillside for the steep streets (west), rising 120 m over 600 m to the north
     // (blended in over 150 m: a hard edge at x = -400 was a 120 m cliff)
     h += Math.max(0, Math.min(1, (-400 - x) / 150)) * Math.max(0, Math.min(120, (y + 300) * 0.2));
-    // rolling hills (south)
-    h += Math.max(0, Math.min(1, (-350 - y) / 150)) * 18 * Math.sin(x / 70) * Math.cos(y / 90);
-    // a valley along y = -900 with a river
-    const dv = Math.abs(y + 880); if (dv < 120) h -= 15 * (1 - (dv / 120) ** 2);
+    // a valley along y = -880 with a river, its floor falling 10 m west to east (a river runs downhill: on a level
+    // floor crossed by the rolling hills it lay buried under every hump, its surface held at the lowest point so far)
+    const dv = Math.abs(y + 880);
+    // rolling hills (south), faded out before the valley
+    h += Math.max(0, Math.min(1, (-350 - y) / 150)) * Math.max(0, Math.min(1, (dv - 140) / 100)) * 18 * Math.sin(x / 70) * Math.cos(y / 90);
+    if (dv < 120) h -= 15 * (1 - (dv / 120) ** 2);
+    if (dv < 240) h -= 0.005 * (x + 1000) * (1 - (dv / 240) ** 2);
     return h;
   };
   // the pass: switchbacks up the mountain's south face to the saddle between the two peaks
@@ -327,15 +348,21 @@ function terrain(regionKey) {
     // on to the saddle
     for (let i = 1; i <= 15; i++) pts.push([pts.at(-1)[0] + 25, pts.at(-1)[1] + 25]);
     way(pts, { highway: 'secondary', name: 'Mountain pass' });
+    // driver's views up the pass and back down: every 8 % of its length, hairpins included
+    for (let f = 0.02; f < 1; f += 0.08) { const [x, y, h] = b.along(pts, f); b.drive(`driver up the pass ${Math.round(f * 100)} %`, x, y, h); }
+    const down = [...pts].reverse();
+    for (let f = 0.06; f < 1; f += 0.16) { const [x, y, h] = b.along(down, f); b.drive(`driver down the pass ${Math.round(f * 100)} %`, x, y, h); }
     label('pass: bottom', 150, -200, [60, 0]); label('pass: hairpins', 550, -128, [70, 0]); label('pass: top hairpins', 150, 70, [70, 0]);
     label('pass: up the east shoulder', pts.at(-1)[0] - 150, pts.at(-1)[1] - 150, [80, 0]);
   }
   // a ridge road from the summit west along the mountain's shoulder
   way(run(350, 350, -300, 500, 25), { highway: 'tertiary', name: 'Ridge road' }); label('steep ridge road (about 35 %)', 0, 430, [80, 0]);
+  { const r = run(350, 350, -300, 500, 25); for (const f of [0.1, 0.4, 0.7]) { const [x, y, h] = b.along(r, f); b.drive(`driver down the ridge road ${f * 100} %`, x, y, h); } }
   // steep streets: a grid on the western hillside (slope 20 %)
   {
-    for (let x = -950; x <= -500; x += 90) way(run(x, -300, x, 300, 20), { highway: 'residential', name: `Steep street ${x}`, sidewalk: 'both' });
-    for (let y = -300; y <= 300; y += 100) way(run(-950, y, -500, y, 20), { highway: 'residential', name: `Contour street ${y}`, sidewalk: 'both' });
+    const xs = []; for (let x = -950; x <= -500; x += 90) xs.push(x); const ys = []; for (let y = -300; y <= 300; y += 100) ys.push(y);
+    for (const x of xs) way(run(x, -300, x, 300, 20, ys.map((y) => [x, y])), { highway: 'residential', name: `Steep street ${x}`, sidewalk: 'both' });
+    for (const y of ys) way(run(-950, y, -500, y, 20, xs.map((x) => [x, y])), { highway: 'residential', name: `Contour street ${y}`, sidewalk: 'both' });
     label('steep street grid (20 %)', -725, 0, [150, 0]);
   }
   // a straight road across rolling hills: cuts and embankments

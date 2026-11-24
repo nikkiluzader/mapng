@@ -798,6 +798,22 @@ function collectCrossingPoints(osmFeatures) {
  * metric frame (signalApproaches.js). Shared by the signal export and the
  * stop-bar paint, so the AI stops where the bar is painted.
  */
+// A pedestrian crossing with its own lights (highway=crossing + crossing=traffic_signals, or the UK's pelican, puffin,
+// toucan, pegasus by crossing_ref), mapped with no traffic_signals node: it got its lines and no lights (coverage
+// level, 2026-11-24). Placed as a mid-block signal; at a junction the junction's own signals stand.
+const CROSSING_SIGNAL_REFS = new Set(['pelican', 'puffin', 'toucan', 'pegasus', 'signals']);
+export function collectCrossingSignalPoints(osmFeatures = []) {
+  const out = [];
+  for (const f of osmFeatures) {
+    if (!Array.isArray(f?.geometry) || f.geometry.length !== 1) continue;
+    const t = f.tags || {};
+    if (String(t.highway ?? '').toLowerCase() !== 'crossing') continue;
+    const signals = String(t.crossing ?? '').toLowerCase() === 'traffic_signals' || CROSSING_SIGNAL_REFS.has(String(t.crossing_ref ?? '').toLowerCase());
+    if (signals) out.push({ id: f.id, kind: 'traffic_light', point: f.geometry[0], tags: t });
+  }
+  return out;
+}
+
 export function collectJunctionApproaches(terrainData) {
   const osmFeatures = Array.isArray(terrainData?.osmFeatures) ? terrainData.osmFeatures : [];
   const bounds = terrainData?.bounds;
@@ -811,6 +827,7 @@ export function collectJunctionApproaches(terrainData) {
     stopPoints: candidates.filter((c) => c.kind === 'stop'),
     yieldPoints: candidates.filter((c) => c.kind === 'yield'),
     crossingPoints: collectCrossingPoints(osmFeatures),
+    crossingSignalPoints: collectCrossingSignalPoints(osmFeatures),
     projector,
   });
   return { ...result, projector, roadFeatures };

@@ -909,6 +909,22 @@ const RAIL_VERGE_M = 1.0;
  * where the ground would grow grass. In three passes over all roads, so no
  * road's verge or sidewalk covers another's carriageway.
  */
+// The ground under a road by its surface where it says one, else its class's: an unpaved road sat on asphalt (its
+// colour under the half-transparent decal, and the tyres' feel). 1 Grass, 2 Dirt, 3 Sand, 5 asphalt, 6 Gravel,
+// 7 Concrete, 9 Lawn (coverage level, 2026-11-24).
+export function roadGroundMat(tags = {}, classMat = 5) {
+  const s = String(tags.surface ?? '').trim().toLowerCase();
+  if (!s) return classMat;
+  // (Lawn, not Grass: on Grass the long field grass grew over the track and hid it; a grass track is a mown strip)
+  if (s === 'grass' || s === 'grass_paver') return LAWN;
+  if (s === 'sand') return 3;
+  if (s === 'gravel' || s === 'fine_gravel' || s === 'compacted' || s === 'pebblestone') return 6;
+  if (['dirt', 'earth', 'ground', 'mud', 'unpaved', 'woodchips', 'clay'].includes(s)) return 2;
+  if (['concrete', 'concrete:plates', 'concrete:lanes', 'paving_stones', 'sett', 'cobblestone', 'unhewn_cobblestone', 'bricks'].includes(s)) return 7;
+  if (s === 'asphalt' || s === 'paved' || s === 'chipseal') return 5;
+  return classMat;
+}
+
 function paintRoadFootprints(layerMap, terrainData, worldSize) {
   const { width: size, bounds, osmFeatures = [] } = terrainData;
   const metersPerPixel = worldSize / size;
@@ -959,7 +975,7 @@ function paintRoadFootprints(layerMap, terrainData, worldSize) {
       sidewalkM = Math.max(sides.left, sides.right);
       if (sidewalkM <= CURB_ONLY_M) sidewalkM = 0;
     }
-    roads.push({ style, halfWidthM, sidewalkM, pts: feature.geometry.map((pt) => toPx(pt.lat, pt.lng)) });
+    roads.push({ style: { ...style, mat: roadGroundMat(tags, style.mat) }, halfWidthM, sidewalkM, pts: feature.geometry.map((pt) => toPx(pt.lat, pt.lng)) });
   }
   const paint = (road, halfM, mat, onlyOver = null) => {
     const halfPx = Math.max(1, halfM / metersPerPixel);

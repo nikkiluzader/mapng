@@ -26,7 +26,7 @@ plan=json.load(open(f'scratch/levelprobe/data/{area}/coverage_plan.json'))['plac
 # (structures name their own camera: tour = [distance, yaw], from the layout itself)
 for q in plan:
     if q.get('kind')=='driver':
-        T.append({'label':q['what'],'x':q['at'][0],'y':q['at'][1],'z':None,'kind':'driver','heading':q['heading'],'find':q['find']})
+        T.append({'label':q['what'],'x':q['at'][0],'y':q['at'][1],'z':None,'kind':'driver','heading':q['heading'],'find':q['find'],**({'fromZ':q['fromZ']} if q.get('fromZ') is not None else {})})
 for q in plan:
     if q.get('kind')=='structure':
         d,yaw=(q.get('tour') or [60,0])

@@ -216,6 +216,10 @@ const V_BAND_LOW = 1 - 63 / 512;
 const PAVED_SETS = ['bricks', 'pavers', 'sett', 'cobble'];
 export const SIDEWALK_MATERIALS = {
   curb: 'mapng_curbs', slab: 'mapng_sidewalk', paved: 'mapng_corner_asphalt', wood: 'mapng_pier_wood', metal: 'mapng_gangway_aluminium',
+  // (white road paint on a mesh: a mini roundabout's centre, services/miniRoundabouts.js)
+  paint: 'mapng_road_paint_white',
+  // (a level crossing's barrier arm, its stripes: services/levelCrossingBarriers.js)
+  barrierWhite: 'mapng_barrier_white', barrierRed: 'mapng_barrier_red',
   ...Object.fromEntries(PAVED_SETS.map((set) => [set, PLAZA_MATERIAL(set)])),
 };
 /** The game's own crosswalk paint with square bars, Italy's (its definition lives with that level). */
@@ -252,6 +256,16 @@ export function getSidewalkMaterialDefs({ look = DEFAULT_SIDEWALK_LOOK } = {}) {
       annotation: 'ASPHALT',
       groundType: 'ASPHALT',
     },
+    // white road paint over asphalt (the corner asphalt's texture, whitened): a mini roundabout's domed centre
+    [SIDEWALK_MATERIALS.paint]: {
+      ...def(SIDEWALK_MATERIALS.paint, {
+        baseColorMap: '/assets/materials/decalroad/asphalt/road_rubber_sticky/t_road_asphalt1_b.color.png',
+        baseColorFactor: [1.7, 1.7, 1.66, 1],
+        normalMap: '/assets/materials/tileable/road/road_asphalt_light/t_road_asphalt1_nm.normal.png',
+        roughnessFactor: 0.6,
+      }),
+      annotation: 'ASPHALT', groundType: 'ASPHALT',
+    },
     [SIDEWALK_MATERIALS.wood]: {
       ...def(SIDEWALK_MATERIALS.wood, {
         baseColorFactor: [0.5, 0.42, 0.34, 1],
@@ -262,6 +276,14 @@ export function getSidewalkMaterialDefs({ look = DEFAULT_SIDEWALK_LOOK } = {}) {
     },
     [SIDEWALK_MATERIALS.metal]: {
       ...def(SIDEWALK_MATERIALS.metal, { baseColorFactor: [0.68, 0.7, 0.72, 1], metallicFactor: 0.85, roughnessFactor: 0.45 }),
+      annotation: 'METAL', groundType: 'METAL',
+    },
+    [SIDEWALK_MATERIALS.barrierWhite]: {
+      ...def(SIDEWALK_MATERIALS.barrierWhite, { baseColorFactor: [0.92, 0.92, 0.9, 1], metallicFactor: 0.2, roughnessFactor: 0.45 }),
+      annotation: 'METAL', groundType: 'METAL',
+    },
+    [SIDEWALK_MATERIALS.barrierRed]: {
+      ...def(SIDEWALK_MATERIALS.barrierRed, { baseColorFactor: [0.75, 0.05, 0.04, 1], metallicFactor: 0.2, roughnessFactor: 0.45 }),
       annotation: 'METAL', groundType: 'METAL',
     },
     [SIDEWALK_MATERIALS.curb]: def(SIDEWALK_MATERIALS.curb, {

@@ -19,13 +19,14 @@ import { planDams, damAt, damGuardrails, damTopGeometry, assignDamAxes, settleDa
 import { planFountains, fountainFootprints, fountainWaterBlocks } from './fountains.js';
 import { streetIndex } from './buildingDetails.js';
 import { planPitches, pitchFootprints } from './sportsFields.js';
+import { levelCrossingBarriers, buildLevelCrossingMeshes } from './levelCrossingBarriers.js';
 import { findBridgeTowers, towerPierGeometry, towerHouseTags } from './bridgeTowers.js';
 import { buildTexturedBuildings, buildingContext, screenBuilding, getBuildingMaterialDefs, garageExtras, isGarageFeature, FACADE_EMISSIVE_FILE, BUILDING_TILE_M, letterName } from './beamngBuildings.js';
 import { isCarportFeature, planCarports } from './beamngCarports.js';
 import { placeTrafficCalming } from './trafficCalming.js';
 import { placeBollards } from './bollards.js';
 import { planGates, gateLeaves, splitAtCuts, isGateBarrier } from './gates.js';
-import { carveLakeBeds, carveWaterUnderDecks, fillRemnants, levelUnderDecks, lowerSeabed, planLakes, planRivers } from './beamngWater.js';
+import { CHANNEL_BED_MAX_M, carveLakeBeds, carveRiverChannels, carveWaterUnderDecks, fillRemnants, levelUnderDecks, lowerSeabed, planLakes, planRivers } from './beamngWater.js';
 import { tunnelDryZones, tunnelsBelow, planSeaBlocks, clipRiverNodes, clipLakeTile, splitLakeTile, hasInlandBelowSea } from './beamngWaterClip.js';
 import { placeCurveWarnings } from './curveWarningSigns.js';
 import { chooseTreeGroupAllowed, chooseTreeItem, sanitizeTreeKindsOff, sanitizeTreeModelsOff, sanitizeTreeSwaps, treeHintFromTags, treeItemHeight, treeSwapMap, understoryGroup } from './beamngTrees.js';
@@ -71,6 +72,7 @@ import { benchFacing, boxed } from './benchFacing.js';
 import { wingWallRuns, buildWingWallMesh } from './structures/wingWalls.js';
 import { mergingLinks, keptThroughMerge, mergingLinkEnds, cutAtOuterLane, fanInShift } from './mergingLinks.js';
 import { buildMonumentMeshes, monumentKind, monumentHeight } from './monuments.js';
+import { buildMiniRoundaboutMeshes, miniRoundaboutDiameter } from './miniRoundabouts.js';
 import { solveProfilesSteps, gradeLimit } from './structures/profileSolve.js';
 import { appendAll, keepInPlace } from './keepInPlace.js';
 import { classifyStructures } from './structures/structureRules.js';
@@ -120,7 +122,7 @@ import {
 } from './beamngBridges.js';
 import {
   lowBoxSquareAt, solveTunnel, chainTunnelParts, absorbBranch, nearestOnTunnel, onCuttingFloor, isBoredTunnelTag, isGalleryTag, tunnelRoadZ, tunnelApronLength, tunnelGroundAt, tunnelHoleAt, lowMouthHoleAt, tunnelReach,
-  hitsTunnel, buildTubeGeometry, buildPortalGeometry, buildWindowGeometry, buildTunnelObjects, fitBesideRoads, LIGHT_SPACING_M, LINING_M, extraAt,
+  hitsTunnel, buildTubeGeometry, buildPortalGeometry, buildWindowGeometry, buildTunnelObjects, fitBesideRoads, fitTwinBores, LIGHT_SPACING_M, LINING_M, extraAt,
   galleryRoofHalf, GALLERY_TOP_M,
 } from './beamngTunnels.js';
 import {
@@ -2655,6 +2657,47 @@ const GLOBAL_DECAL_MATERIALS = {
   dirtRoad: 'm_dirt_road',
 };
 
+// Unpaved roads by their surface (every one was the same dirt: coverage level, 2026-11-24). The game's own decal-road
+// materials: the shared dirt set (art/shapes/common/decalroads), gravel as the game lays it (a pale base with its
+// sparse-stone overlay on top), mud with its ruts; sand and a mown-grass track as MapNG materials over Jungle Rock
+// Island's and the shared grass textures (their definitions live with those levels).
+export const UNPAVED_ROAD_MATERIALS = {
+  sand: {
+    name: 'mapng_road_sand', mapTo: 'mapng_road_sand', class: 'Material', persistentId: 'b1f6c2a4-6e1d-4f7a-9c3b-2a8d5e7f1c01',
+    Stages: [{
+      ambientOcclusionMap: '/levels/jungle_rock_island/art/road/t_sand_variation_ao.data.png',
+      baseColorMap: '/levels/jungle_rock_island/art/road/t_sand_variation_b.color.png',
+      normalMap: '/levels/jungle_rock_island/art/road/t_sand_variation_nm.normal.png',
+      opacityFactor: 0.6, opacityMap: '/levels/jungle_rock_island/art/road/t_sand_variation_o.data.png',
+      roughnessMap: '/levels/jungle_rock_island/art/road/t_sand_variation_r.data.png',
+    }, {}, {}, {}],
+    annotation: 'SAND', materialTag0: 'RoadAndPath', translucent: true, translucentZWrite: true, version: 1.5,
+  },
+  grass: {
+    name: 'mapng_road_grass', mapTo: 'mapng_road_grass', class: 'Material', persistentId: 'b1f6c2a4-6e1d-4f7a-9c3b-2a8d5e7f1c02',
+    Stages: [{
+      ambientOcclusionMap: '/assets/materials/decalroad/vegetation/m_mown_grass_variation/t_mown_grass_variation_ao.data.png',
+      baseColorFactor: [0.72, 0.675, 0.62, 1],
+      baseColorMap: '/assets/materials/decalroad/vegetation/m_mown_grass_variation/t_mown_grass_variation_b.color.png',
+      normalMap: '/assets/materials/decalroad/vegetation/m_mown_grass_variation/t_mown_grass_variation_nm.normal.png',
+      opacityFactor: 0.6, opacityMap: '/assets/materials/decalroad/vegetation/m_mown_grass_variation/t_mown_grass_variation_o.data.png',
+      roughnessMap: '/assets/materials/decalroad/vegetation/m_mown_grass_variation/t_mown_grass_variation_r.data.png',
+    }, {}, {}, {}],
+    annotation: 'GRASS', castShadows: false, materialTag0: 'RoadAndPath', translucent: true, translucentZWrite: true, version: 1.5,
+  },
+};
+/** An unpaved surface's look: { material, overlay? } (overlay: drawn over it, gravel's stones). */
+export function unpavedLook(surface) {
+  const s = String(surface ?? '').trim().toLowerCase();
+  if (s === 'gravel' || s === 'pebblestone') return { material: 'm_dirt_variation_01', overlay: 'm_dirt_road_gravels' };
+  if (s === 'fine_gravel' || s === 'compacted') return { material: 'm_dirt_variation_02' };
+  if (s === 'mud') return { material: 'mud_tiretracks' };
+  if (s === 'woodchips') return { material: 'm_dirt_road_flows' };
+  if (s === 'sand') return { material: UNPAVED_ROAD_MATERIALS.sand.name };
+  if (s === 'grass') return { material: UNPAVED_ROAD_MATERIALS.grass.name };
+  return { material: GLOBAL_DECAL_MATERIALS.dirtRoad };
+}
+
 // Paved surfaces drawn as concrete slabs instead of asphalt.
 const CONCRETE_SURFACES = new Set(['concrete', 'concrete:plates', 'concrete:lanes']);
 
@@ -3254,14 +3297,41 @@ function parsePositiveInt(value) {
 // end to end, nearly straight on, under one name, and one is drawn wider,
 // the wider one narrows to the other over its last WIDTH_TAPER_RUN metres per
 // metre of difference (a side), at most WIDTH_TAPER_SHARE of its length.
-// ways: [{ name, half, xy: [[x, y]...] } | null] by index.
+// ways: [{ name, cls, ref, half, xy: [[x, y]...] } | null] by index (cls: the highway class).
 // Returns Map(index -> (x, y, half) => that way's half width at (x, y)).
 const WIDTH_TAPER_RUN = 8;
+// (faster roads ease a lane drop over far more: the MUTCD merge taper, L = W S^2 / 60 ft under 45 mph and W S above,
+// is ~55 m for a 3.6 m lane at 30 mph and ~100 m at 40-50 mph; per metre of narrowing a side, by class. A street's
+// width step stays the short curb jog)
+const WIDTH_TAPER_RUN_BY_CLASS = { motorway: 50, motorway_link: 30, trunk: 50, trunk_link: 30, primary: 30, primary_link: 20, secondary: 30, secondary_link: 20, tertiary: 20, tertiary_link: 15 };
 const WIDTH_TAPER_MIN_M = 3;
 const WIDTH_TAPER_SHARE = 0.45;
 const WIDTH_TAPER_STEP_M = 0.2;
 const WIDTH_TAPER_MEET_M = 0.75;
 const WIDTH_TAPER_ON_COS = Math.cos((30 * Math.PI) / 180);
+// A way's painted-line frame: its edge lines at base +- edge, its centre line at centre (the lanes split by direction).
+// (and its lanes: lanes, nF forward on the negative side, oneWay, reverse: for its lane dividers)
+const linesFrame = (w) => ({ base: w.lineBase ?? 0, edge: w.lineEdge ?? w.half, centre: w.lineCentre ?? (w.lineBase ?? 0), lanes: w.lanes || 0, nF: w.nF || 0, oneWay: !!w.oneWay, reverse: !!w.reverse });
+// A lane divider's place in a frame: the k of a dashed line at offset o (its lanes' split, line_sep_k), or 0 when o is
+// no divider (an edge line, the centre line).
+function dividerIndex(f, o) {
+  if (!(f.lanes >= 2)) return 0;
+  const w = (2 * f.edge) / f.lanes; const k = (o - (f.base - f.edge)) / w; const r = Math.round(k);
+  if (Math.abs(k - r) > 0.12 || r < 1 || r > f.lanes - 1 || (!f.oneWay && r === f.nF)) return 0;
+  return r;
+}
+// Where divider k goes on the next piece (n): its index there, or 0 when its lane ends (the outer lane closes: a
+// direction's dividers kept counted from the centre line, a one-way road's from its left edge; lanes drop on the right).
+function dividerOnto(f, n, k) {
+  if (!(n.lanes >= 2) || n.oneWay !== f.oneWay) return 0;
+  if (f.oneWay) {
+    const j = f.reverse ? k : f.lanes - k;            // from the left edge
+    if (j > n.lanes - 1) return 0;
+    return f.reverse ? j : n.lanes - j;
+  }
+  if (k < f.nF) { const j = f.nF - k; return j <= n.nF - 1 ? n.nF - j : 0; }
+  const j = k - f.nF; const nB = n.lanes - n.nF; return j <= nB - 1 ? n.nF + j : 0;
+}
 export function findWidthTapers(ways) {
   // (ends met by where they lie, not their node keys: two ways sharing an
   // OSM node came out under different keys, and the step stayed)
@@ -3293,14 +3363,18 @@ export function findWidthTapers(ways) {
     if (list.length !== 2) continue;
     const [a, b] = list;
     const wa = ways[a.k]; const wb = ways[b.k];
-    if (a.k === b.k || !wa.name || wa.name !== wb.name) continue;
+    // (one road: the same name; or, unnamed, the same class; or the same ref, as a numbered road changing its name.
+    // Unnamed pieces stepped: half of all rural roads and links carry no name)
+    const sameRoad = (wa.name && wa.name === wb.name) || (!wa.name && !wb.name && wa.cls && wa.cls === wb.cls) || (wa.ref && wa.ref === wb.ref);
+    if (a.k === b.k || !sameRoad) continue;
     if (a.out[0] * b.out[0] + a.out[1] * b.out[1] > -WIDTH_TAPER_ON_COS) continue;
     const [wide, narrow] = wa.half > wb.half ? [a, b] : [b, a];
     const step = ways[wide.k].half - ways[narrow.k].half;
     if (step < WIDTH_TAPER_STEP_M) continue;
-    const run = Math.min(Math.max(WIDTH_TAPER_MIN_M, WIDTH_TAPER_RUN * step), WIDTH_TAPER_SHARE * lengthOf(ways[wide.k].xy));
+    const perMetre = WIDTH_TAPER_RUN_BY_CLASS[ways[wide.k].cls] ?? WIDTH_TAPER_RUN;
+    const run = Math.min(Math.max(WIDTH_TAPER_MIN_M, perMetre * step), WIDTH_TAPER_SHARE * lengthOf(ways[wide.k].xy));
     if (!plans.has(wide.k)) plans.set(wide.k, []);
-    plans.get(wide.k).push({ atStart: wide.atStart, to: ways[narrow.k].half, run });
+    plans.get(wide.k).push({ atStart: wide.atStart, to: ways[narrow.k].half, toLines: linesFrame(ways[narrow.k]), run });
   }
   const out = new Map();
   for (const [k, list] of plans) {
@@ -3316,7 +3390,7 @@ export function findWidthTapers(ways) {
       }
       return best;
     };
-    out.set(k, (x, y, half) => {
+    const fn = (x, y, half) => {
       const st = stationOf(x, y);
       let h = half;
       for (const { atStart, to, run } of list) {
@@ -3325,7 +3399,42 @@ export function findWidthTapers(ways) {
         if (d < run) { const t = d / run; h = Math.min(h, to + (half - to) * (t * t * (3 - 2 * t))); }
       }
       return h;
-    });
+    };
+    // A line's lateral offset o in the taper: carried from this piece's frame (its edges at +-half, its centre line at
+    // shift) onto the next piece's, eased as the width is. At the joint the edge lines meet the next piece's edges and
+    // the centre line its centre line, the lanes between converging, as a lane closes (they all jumped: coverage level).
+    const own = linesFrame(ways[k]);
+    fn.mapOffset = (x, y, o) => {
+      const st = stationOf(x, y);
+      let best = null;
+      for (const p of list) { const d = p.atStart ? st : total - st; if (d < p.run && (!best || d / p.run < best.f)) best = { ...p, f: d / p.run }; }
+      if (!best) return o;
+      const e = 1 - best.f * best.f * (3 - 2 * best.f);   // 1 at the joint, 0 where the taper starts
+      const n = best.toLines;
+      // (a lane divider: onto the next piece's own divider; one whose lane ends is cut back, dropTrim, and stays put)
+      const k = dividerIndex(own, o);
+      if (k) {
+        const k2 = dividerOnto(own, n, k);
+        if (!k2) return o;
+        return o + ((n.base - n.edge + (k2 * 2 * n.edge) / n.lanes) - o) * e;
+      }
+      // (piecewise: the right edge to the centre line, the centre line to the left edge, each onto the next piece's)
+      const lo = own.base - own.edge; const hi = own.base + own.edge;
+      const to = o <= own.centre
+        ? (n.base - n.edge) + ((o - lo) * (n.centre - (n.base - n.edge))) / ((own.centre - lo) || 1)
+        : n.centre + ((o - own.centre) * ((n.base + n.edge) - n.centre)) / ((hi - own.centre) || 1);
+      return o + (to - o) * e;
+    };
+    // How far a divider at offset o is cut back at each end: the taper's length where its lane ends there (a
+    // dropped lane's dashed line ran on through the taper beside the edge closing in: the user, 2026-11-24)
+    fn.dropTrim = (o) => {
+      const t = { start: 0, end: 0 };
+      const kk = dividerIndex(own, o);
+      if (!kk) return t;
+      for (const p of list) if (!dividerOnto(own, p.toLines, kk)) t[p.atStart ? 'start' : 'end'] = Math.max(t[p.atStart ? 'start' : 'end'], p.run);
+      return t;
+    };
+    out.set(k, fn);
   }
   return out;
 }
@@ -3647,6 +3756,12 @@ function getLayeredRoadDecals(centerNodes, highway, tags, styleHalfWidth, parent
     const material = pick < 0.45 ? GLOBAL_DECAL_MATERIALS.edgeAsphaltGrass : pick < 0.8 ? GLOBAL_DECAL_MATERIALS.edgeDirtGrass : GLOBAL_DECAL_MATERIALS.edgeDirt;
     return { ...layer, material };
   }).flatMap((layer) => {
+    // (an unpaved road by its surface; gravel's stones as a layer over it)
+    if (layer.name === 'dirt') {
+      const look = unpavedLook(tags.surface);
+      return [{ ...layer, material: look.material },
+        ...(look.overlay ? [{ ...layer, name: 'dirt_overlay', material: look.overlay, widthScale: (layer.widthScale || 1) * 0.85, renderPriority: Math.max(1, (layer.renderPriority || 14) - 1), textureLength: (layer.textureLength || SURFACE_TEXTURE_LENGTH.dirt) / 2, drivability: undefined }] : [])];
+    }
     if (layer.name !== 'asphalt') return [layer];
     if (paving) {
       return pavingStrips(paving, 2 * styleHalfWidth).map((strip) => ({
@@ -3696,9 +3811,16 @@ function getLayeredRoadDecals(centerNodes, highway, tags, styleHalfWidth, parent
     // node by node, the lanes kept where they are)
     const scaled = !layer.width;
     const edgeOffset = layer.isEdgeRelative || layer.isEdge;
+    // (lines and the AI's path in a taper: carried onto the next piece's frame, offsetAt; the AI path narrowing too)
+    // (an edge blend at the node's own half width, by the formula above: scaled by the ratio it jogged 0.24 m)
+    const edgeAt = (k) => (layer.isEdge ? layer.offset * (options.halfAt[k] + (width / 2) - 0.15) : offset * (options.halfAt[k] / styleHalfWidth));
     const baseNodes = options.halfAt && (scaled || edgeOffset)
-      ? offsetNodes(centerNodes, (k) => (edgeOffset ? offset * (options.halfAt[k] / styleHalfWidth) : offset), (k) => (scaled ? width * (options.halfAt[k] / styleHalfWidth) : width))
-      : offsetNodes(centerNodes, offset, width);
+      ? offsetNodes(centerNodes, (k) => (edgeOffset ? edgeAt(k) : offset), (k) => (scaled ? width * (options.halfAt[k] / styleHalfWidth) : width))
+      : options.halfAt && options.aiAt && layer.name === 'ai_path'
+        ? offsetNodes(centerNodes, (k) => options.aiAt(k).offset, (k) => options.aiAt(k).width)
+        : options.halfAt && options.offsetAt
+          ? offsetNodes(centerNodes, (k) => options.offsetAt(k, offset), width)
+          : offsetNodes(centerNodes, offset, width);
     const shouldTrimAtJunction = layer.name.startsWith('line_') || layer.name.startsWith('edge_');
     let trimStartM = 0;
     let trimEndM = 0;
@@ -3722,6 +3844,12 @@ function getLayeredRoadDecals(centerNodes, highway, tags, styleHalfWidth, parent
         trimStartM = trimEndM;
         trimEndM = tmp;
       }
+    }
+    // (a lane divider whose lane ends in a taper at this way's start or end: cut back by the taper's length)
+    if (layer.name.startsWith('line_sep_') && options.dropTrim) {
+      const d = options.dropTrim(offset);
+      if (d.start && options.isRoadStart !== false) trimStartM = Math.max(trimStartM, d.start);
+      if (d.end && options.isRoadEnd !== false) trimEndM = Math.max(trimEndM, d.end);
     }
     const trimmedNodes = shouldTrimAtJunction
       ? trimNodesByDistance(baseNodes, trimStartM, trimEndM)
@@ -5712,6 +5840,7 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
   const besides = others.filter((r) => !usedByApproach.has(r) && !absorbedSide.has(r) && !r.bridge && !r.bridgeRoad && !out.bySeg.has(r.segIndex))
     .map((r) => ({ xy: r.xy, half: halfOf(drivableRoads[r.segIndex]) }));
   for (const t of out.tunnels) if (t.kind !== 'gallery') fitBesideRoads(t, besides, groundAt);
+  fitTwinBores(out.tunnels, (msg) => console.log(`[BeamNG Export Service] ${msg}`));
   if (!out.tunnels.length && (early || !galleryPaths.length)) return out;
 
   // Terrain: graded into the export's copy, then the portal squares opened.
@@ -5979,7 +6108,9 @@ export function pedestrianSurfaceLayers(surface, fullWidth, { americas = false }
   const s = String(surface ?? '').trim().toLowerCase();
   const fade = { distanceFade: ASPHALT_BASE.distanceFade, breakAngle: 2 };
   if (UNPAVED_SURFACES.has(s)) {
-    return [{ offset: 0, width: fullWidth * 1.1, material: GLOBAL_DECAL_MATERIALS.dirtRoad, textureLength: SURFACE_TEXTURE_LENGTH.dirt, ...fade }];
+    const look = unpavedLook(s);
+    return [{ offset: 0, width: fullWidth * 1.1, material: look.material, textureLength: SURFACE_TEXTURE_LENGTH.dirt, ...fade },
+      ...(look.overlay ? [{ offset: 0, width: fullWidth * 0.95, material: look.overlay, textureLength: SURFACE_TEXTURE_LENGTH.dirt / 2, ...fade }] : [])];
   }
   if (CONCRETE_SURFACES.has(s)) {
     return [{ offset: 0, width: fullWidth, material: GLOBAL_DECAL_MATERIALS.concrete, textureLength: SURFACE_TEXTURE_LENGTH.concrete, ...fade }];
@@ -6324,6 +6455,8 @@ export function usedPavingMaterials(groups) {
   const byName = new Map(Object.values(PAVING_MATERIALS).map((p) => [p.material.name, p.material]));
   // (the railways' tram-rail decal: level crossings and trams in their streets)
   byName.set(TRAMLINE_MATERIAL.name, TRAMLINE_MATERIAL);
+  // (the unpaved surfaces MapNG defines itself: sand, grass)
+  for (const m of Object.values(UNPAVED_ROAD_MATERIALS)) byName.set(m.name, m);
   const used = {};
   for (const group of groups) {
     for (const item of group.__items || []) {
@@ -7061,9 +7194,24 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   };
   // a street wider on one way than the next narrows to it over the wider
   // one's last metres instead of stepping (its curbs jogged out a metre)
+  // (each way's painted-line frame, as buildLineMarkingLayers lays it: edge lines at the driving width less their inset,
+  // the centre line where the lanes split by direction, all shifted by the cross-section's lane shift)
+  const lineFrameOf = (sf) => {
+    const w = widthsOf(sf); const tags = sf.sourceFeature.tags || {};
+    const lineBase = w.crossSection?.laneShift || 0;
+    const lineEdge = Math.max(0.5, w.drivingHalfWidth - EDGE_LINE_INSET_M);
+    const c = markingLaneCounts(sf.highway, tags);
+    const lineCentre = lineBase + (c.oneWay || !c.lanes ? 0 : -lineEdge + (2 * lineEdge * c.nF) / c.lanes);
+    return { lineBase, lineEdge, lineCentre, lanes: c.lanes, nF: c.nF, oneWay: c.oneWay, reverse: c.oneWay && isReverseOneWayRoad(tags) };
+  };
   const widthTapers = findWidthTapers(drivableRoads.map((sf) => (shouldGenerateDecalRoads(sf.highway, sf.sourceFeature.tags || {})
-    ? { name: sf.sourceFeature.tags?.name || '', half: widthsOf(sf).styleHalfWidth, xy: sf.geometry.map((pt) => geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0).slice(0, 2)) }
+    ? { name: sf.sourceFeature.tags?.name || '', cls: sf.highway || '', ref: sf.sourceFeature.tags?.ref || '', half: widthsOf(sf).styleHalfWidth, ...lineFrameOf(sf), xy: sf.geometry.map((pt) => geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0).slice(0, 2)) }
     : null)));
+  {
+    // (what the width step did: the roads narrowed to the next piece of themselves, by name or class and ref)
+    const names = [...widthTapers.keys()].map((k) => drivableRoads[k]?.sourceFeature?.tags?.name || drivableRoads[k]?.highway || '?');
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Width tapers: ${widthTapers.size} road piece(s) narrowed to the next piece of the same road${names.length ? ` (${[...new Set(names)].slice(0, 12).join(', ')}${names.length > 12 ? ', ...' : ''})` : ''}.`);
+  }
   for (let segIndex = 0; segIndex < drivableRoads.length; segIndex++) {
     if (segIndex % 200 === 199) yield;
     const segmentFeature = drivableRoads[segIndex];
@@ -7192,6 +7340,16 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
           }),
           drivingHalfWidth,
           halfAt,
+          ...(taper?.mapOffset ? {
+            offsetAt: (k, o) => taper.mapOffset(centerNodes[k][0], centerNodes[k][1], o),
+            dropTrim: taper.dropTrim,
+            // (the AI's path between the mapped edge lines, out to the driving edges: on the road's middle, not the centre line)
+            aiAt: (k) => {
+              const [x, y] = centerNodes[k]; const f = lineFrameOf(segmentFeature);
+              const lo = taper.mapOffset(x, y, f.lineBase - f.lineEdge); const hi = taper.mapOffset(x, y, f.lineBase + f.lineEdge);
+              return { offset: (lo + hi) / 2, width: hi - lo + 2 * EDGE_LINE_INSET_M };
+            },
+          } : {}),
           laneShift: crossSection.laneShift,
           markingStyle,
           urban: urbanRoad,
@@ -7599,8 +7757,21 @@ export function generateJunctionMarkingDecals(terrainData, squareSize, { carriag
   const zones = [];
   const stops = [];
 
-  // Transverse crosswalk: two full-width lines straddling the crossing point.
-  const paintCrosswalk = (road, index, pt) => {
+  // A crossing's paint style, for crossing nodes and ways alike: crossing:markings as mapped; a zebra by its older tags
+  // (crossing=zebra, the UK's crossing_ref=zebra); unsaid, the region's usual (two lines in the Americas, zebra bars
+  // elsewhere). Nodes always drew two lines and read no tag (coverage level, 2026-11-24).
+  const crossingStyle = (tags = {}) => {
+    const tagged = String(tags['crossing:markings'] ?? '').trim().toLowerCase();
+    if (tagged && tagged !== 'yes') return tagged;
+    if (String(tags.crossing ?? '').toLowerCase() === 'zebra' || String(tags.crossing_ref ?? '').toLowerCase() === 'zebra') return 'zebra';
+    return americasCrossings ? 'lines' : 'zebra';
+  };
+  // (bars for zebra and ladder; everything else mapped, lines and dots, as two lines)
+  const isBarStyle = (style) => style === 'zebra' || style.startsWith('ladder');
+
+  // Transverse crosswalk at a crossing node: two full-width lines straddling it, or the game's zebra bars across the
+  // road, by its style.
+  const paintCrosswalk = (road, index, pt, tags = {}) => {
     const key = makeRoadNodeKey(pt);
     if (paintedCrossingKeys.has(key)) return;
     const m = roadMetricsAt(road, index, pt);
@@ -7615,13 +7786,22 @@ export function generateJunctionMarkingDecals(terrainData, squareSize, { carriag
     const tangent = drawn?.dir ?? m.tangent;
     const halfW = drawn ? Math.max(1, drawn.half - JUNCTION_MARK_EDGE_INSET_M) : m.halfW;
     const perp = [-tangent[1], tangent[0]];
-    for (const side of [-1, 1]) {
-      pushLine(
-        'jm_crosswalk',
-        cx + tangent[0] * CROSSWALK_LINE_GAP_HALF_M * side,
-        cy + tangent[1] * CROSSWALK_LINE_GAP_HALF_M * side,
-        perp[0], perp[1], -halfW, halfW, CROSSWALK_LINE_WIDTH_M,
-      );
+    const style = crossingStyle(tags);
+    if (isBarStyle(style)) {
+      const decal = paintOn.crosswalks ? makeRoadDecal([nodeAt(cx - perp[0] * halfW, cy - perp[1] * halfW, CROSSWALK_ZEBRA_WIDTH_M), nodeAt(cx + perp[0] * halfW, cy + perp[1] * halfW, CROSSWALK_ZEBRA_WIDTH_M)], sanitizeBeamNGObjectName(`jm_zebra_${decals.length + 1}`), 'junction_markings', {
+        material: ZEBRA_CROSSING_MATERIAL, renderPriority: 1, breakAngle: 1, textureLength: CROSSWALK_ZEBRA_REPEAT_M,
+      }) : null;
+      if (decal) decals.push(decal);
+      if (style.startsWith('ladder')) for (const side of [-1, 1]) pushLine('jm_crosswalk', cx + tangent[0] * (CROSSWALK_ZEBRA_WIDTH_M / 2 + 0.1) * side, cy + tangent[1] * (CROSSWALK_ZEBRA_WIDTH_M / 2 + 0.1) * side, perp[0], perp[1], -halfW, halfW, CROSSWALK_LINE_WIDTH_M);
+    } else {
+      for (const side of [-1, 1]) {
+        pushLine(
+          'jm_crosswalk',
+          cx + tangent[0] * CROSSWALK_LINE_GAP_HALF_M * side,
+          cy + tangent[1] * CROSSWALK_LINE_GAP_HALF_M * side,
+          perp[0], perp[1], -halfW, halfW, CROSSWALK_LINE_WIDTH_M,
+        );
+      }
     }
     // Lines along the road stop at the crosswalk.
     zones.push({
@@ -7667,9 +7847,8 @@ export function generateJunctionMarkingDecals(terrainData, squareSize, { carriag
     const half = span / 2;
     // (unmarked as to its style: the region's usual crossing, two lines in
     // the Americas, zebra bars elsewhere; crossing:markings=yes says only that it is marked)
-    const tagged = String(tags['crossing:markings'] ?? '').trim().toLowerCase();
-    const style = tagged && tagged !== 'yes' ? tagged : (americasCrossings ? 'lines' : 'zebra');
-    if (style === 'lines' || style === 'lines:paired') {
+    const style = crossingStyle(tags);
+    if (!isBarStyle(style)) {
       for (const side of [-1, 1]) pushLine('jm_crosswalk', cx + perp[0] * CROSSWALK_LINE_GAP_HALF_M * side, cy + perp[1] * CROSSWALK_LINE_GAP_HALF_M * side, dir[0], dir[1], -half, half, CROSSWALK_LINE_WIDTH_M);
     } else {
       const decal = paintOn.crosswalks ? makeRoadDecal([nodeAt(a[0], a[1], CROSSWALK_ZEBRA_WIDTH_M), nodeAt(b[0], b[1], CROSSWALK_ZEBRA_WIDTH_M)], sanitizeBeamNGObjectName(`jm_zebra_${decals.length + 1}`), 'junction_markings', {
@@ -7702,7 +7881,7 @@ export function generateJunctionMarkingDecals(terrainData, squareSize, { carriag
       if (!Number.isFinite(pt?.lat) || !Number.isFinite(pt?.lng) || !insideMargin(pt)) continue;
       const entries = vertexIndex.get(makeRoadNodeKey(pt)) || [];
       for (const { road, index } of entries) {
-        paintCrosswalk(road, index, pt);
+        paintCrosswalk(road, index, pt, tags);
       }
     }
   }
@@ -7725,7 +7904,7 @@ export function generateJunctionMarkingDecals(terrainData, squareSize, { carriag
     if (distinctRoads.size > 1) continue;
 
     const { road, index } = entries[0];
-    paintCrosswalk(road, index, pt);
+    paintCrosswalk(road, index, pt, tags);
   }
 
   // Stop bars at the same stop points the AI uses (signals + stop signs, one
@@ -8233,6 +8412,24 @@ const WATER_BLOCK_TEMPLATE = {
   waterFogDensityOffset: 0.1,
   wetDarkening: 0.5,
   wetDepth: 0.2,
+};
+
+// Still water by kind (beamngWater.js stillWaterKind), over the template and the biome's look: a reservoir deep and
+// blue, a pond green and murky, a stormwater basin or a wastewater tank brown and still, a reflecting pool clear and
+// mirror-calm, a lagoon turquoise, a salt pan pale (the user, 2026-11-24: every kind looked the same). Colours and
+// ramps after the official levels' own water (Italy's quarry, East Coast's swamp, Industrial's creek, Gridmap's lake)
+// and the game's shared ramps in /assets/materials/tileable/water/depthcolor_ramp/. A plain lake keeps the biome's look.
+const STILL_WATER_LOOKS = {
+  reservoir: { baseColor: [24, 62, 96, 255], underwaterColor: [30, 60, 80, 240], clarity: 0.2, depthGradientTex: '/assets/materials/tileable/water/depthcolor_ramp/depthcolor_ramp_b.png', depthGradientMax: 40, overallRippleMagnitude: 0.8, waterFogDensity: 0.7 },
+  pond: { baseColor: [58, 74, 38, 255], underwaterColor: [50, 62, 36, 245], clarity: 0.06, depthGradientTex: '/assets/materials/tileable/water/depthcolor_ramp/depthcolor_ramp_mud1_b.png', depthGradientMax: 6, overallRippleMagnitude: 0.25, waterFogDensity: 1.6, reflectivity: 0.6 },
+  basin: { baseColor: [82, 72, 46, 255], underwaterColor: [70, 60, 40, 250], clarity: 0.04, depthGradientTex: '/assets/materials/tileable/water/depthcolor_ramp/mud_depthcolor_ramp_b.png', depthGradientMax: 4, overallRippleMagnitude: 0.15, waterFogDensity: 2 },
+  wastewater: { baseColor: [92, 86, 64, 255], underwaterColor: [80, 75, 55, 250], clarity: 0.03, depthGradientTex: '/assets/materials/tileable/water/depthcolor_ramp/mud_depthcolor_ramp_b.png', depthGradientMax: 4, overallRippleMagnitude: 0.1, reflectivity: 0.35, waterFogDensity: 2.5, specularPower: 60 },
+  reflecting_pool: { baseColor: [36, 52, 60, 255], underwaterColor: [40, 60, 70, 200], clarity: 0.45, depthGradientTex: '/assets/materials/tileable/water/depthcolor_ramp/depthcolor_ramp_b.png', depthGradientMax: 2, overallRippleMagnitude: 0.03, reflectivity: 1, fresnelBias: 0.3, fresnelPower: 8, specularPower: 600 },
+  lagoon: { baseColor: [28, 118, 122, 255], underwaterColor: [40, 110, 110, 220], clarity: 0.35, depthGradientTex: '/assets/materials/tileable/water/depthcolor_ramp/depthcolor_ramp_tropical_b.png', depthGradientMax: 12, overallRippleMagnitude: 0.7 },
+  moat: { baseColor: [46, 68, 42, 255], underwaterColor: [44, 58, 38, 245], clarity: 0.07, depthGradientTex: '/assets/materials/tileable/water/depthcolor_ramp/depthcolor_ramp_mud1_b.png', depthGradientMax: 5, overallRippleMagnitude: 0.2, waterFogDensity: 1.4 },
+  fishpond: { baseColor: [52, 82, 40, 255], underwaterColor: [48, 70, 38, 245], clarity: 0.05, depthGradientTex: '/assets/materials/tileable/water/depthcolor_ramp/depthcolor_ramp_mud1_b.png', depthGradientMax: 3, overallRippleMagnitude: 0.3, waterFogDensity: 1.6 },
+  salt_pool: { baseColor: [176, 150, 140, 255], underwaterColor: [170, 150, 140, 200], clarity: 0.3, depthGradientTex: '/assets/materials/tileable/water/depthcolor_ramp/depthcolor_ramp_SI_b.png', depthGradientMax: 2, overallRippleMagnitude: 0.1, reflectivity: 0.9 },
+  river: { depthGradientTex: '/assets/materials/tileable/water/depthcolor_ramp/depthcolor_ramp_italy_rivers_b.png', depthGradientMax: 6, overallRippleMagnitude: 0.8 },
 };
 
 const WATER_PLANE_TEMPLATE = {
@@ -11790,6 +11987,9 @@ function buildWaterBlockObjects(terrainData, squareSize, biome, stats = {}, dryZ
   // (a long strip cut where a tunnel's trench or tube crosses it, not left out whole)
   const pieces = dryZones?.length ? tiles.flatMap((tile) => splitLakeTile(tile, dryZones)) : tiles;
   stats.splitForTunnels = pieces.length - tiles.length;
+  // (each kind's look: the count of tiles per kind, for the log)
+  stats.byKind = {};
+  for (const t of pieces) stats.byKind[t.kind || 'lake'] = (stats.byKind[t.kind || 'lake'] || 0) + 1;
   return pieces.map((tile) => { const want = bedDepth(tile); return { tile, want, depth: clipLakeTile(tile, want, dryZones) }; })
     .filter(({ depth }) => depth > 0)
     .map(({ tile, depth, want }, index) => {
@@ -11803,6 +12003,7 @@ function buildWaterBlockObjects(terrainData, squareSize, biome, stats = {}, dryZ
     depthGradientTex: waterProfile.waterDepthGradientTex,
     foamTex: waterProfile.waterFoamTex,
     rippleTex: waterProfile.waterRippleTex,
+    ...(STILL_WATER_LOOKS[tile.kind] || {}),
     gridSize: Math.max(1, Math.floor(Math.min(100, tile.sx, tile.sy))),
     gridElementSize: roundTo(clamp(Math.min(tile.sx, tile.sy) / 32, 0.5, 4), 2),
     name: `lake_${tile.lake}_${index}`,
@@ -14389,6 +14590,12 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     try {
       await roadPart('railways');
       railways = buildLevelRailways(sg, exportTerrainData, squareSize, levelName);
+      // the barriers at the level crossings, arms raised (levelCrossingBarriers.js; their meshes go with the sidewalk tiles)
+      railways.barriers = levelCrossingBarriers(sg, [...(sg.railCrossings || []), ...(sg.railUnjoined || [])], {
+        tagsOf: (e) => sg.railSegments?.[e.seg]?.tags || {}, leftHand: !!exportTerrainData.roadRules?.leftHandTraffic, pathClasses: PATH_HIGHWAYS,
+        nodes: (exportTerrainData.osmFeatures || []).filter((f) => f.type === 'level_crossing' && f.geometry?.length).map((f) => { const [x, y] = geoToWorldPoint(f.geometry[0].lat, f.geometry[0].lng, exportTerrainData, squareSize, 0); return { x, y, tags: f.tags || {} }; }),
+        log: (msg) => console.log(`${BEAMNG_EXPORT_SERVICE_LOG} ${msg}`),
+      });
       if (railways.decals.length) decalRoads.push({ class: 'SimGroup', name: 'railways', persistentId: generatePersistentId(), __parent: 'Decal_Roads', __items: railways.decals });
       console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Railways: ${railways.stats.trackKm} km of track, ${railways.daes.length} object(s), ${railways.stats.triangles} triangles, ${railways.stats.crossings} level crossing(s), ${railways.stats.streetTramKm} km of tram in streets.`);
     } catch (err) {
@@ -14525,6 +14732,22 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     } catch (err) {
       console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Levelling under decks skipped: ${err?.message || err}`);
     }
+  }
+  // every river's channel (beamngWater.js carveRiverChannels): the elevation data holds its surface, not its bed
+  if (includeWater && riverPlan?.rivers?.length) {
+    try {
+      const chKeep = buildCarriagewayIndex(groundWithRings.map((cw) => ({ ...cw, half: (cw.half || 3) + 1 })));
+      const ch = carveRiverChannels(riverPlan.rivers, {
+        heightMap: exportTerrainData.heightMap, width: W0, height: H0, worldSize: W0 * squareSize, minHeight: Number(exportTerrainData.minHeight) || 0,
+      }, (x, y) => isOnOtherCarriageway(chKeep, x, y, 0, () => false));
+      const hmCh = heightMapEditor(exportTerrainData);
+      ch.apply((idx, v) => hmCh.set(idx, v));
+      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} River channels: ${ch.pixels} grid point(s) lowered under ${riverPlan.rivers.length} river piece(s) (bed to its depth under the surface, at most ${CHANNEL_BED_MAX_M} m; ground roads kept).`);
+    } catch (err) {
+      console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} River channels skipped: ${err?.message || err}`);
+    }
+  } else {
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} River channels: none carved (${includeWater ? 'no river pieces planned' : 'water off'}).`);
   }
   if (includeWater && shapeExtras && deckCover && riverPlan) {
     try {
@@ -15704,6 +15927,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   if (backdropWater) appendAll(waterObjects, backdropWater);
   Object.defineProperty(waterObjects, 'stats', { value: waterStats, enumerable: false });
   if (includeWater) {
+    const kinds = Object.entries(waterStats.lakes.byKind || {});
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Still water looks: ${kinds.length ? kinds.map(([k, n]) => `${n} ${k} tile(s)${STILL_WATER_LOOKS[k] ? '' : ' (the biome\'s look)'}`).join(', ') : 'no lake tiles'}.`);
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Water: ${waterStats.lakes.tiles ?? 0} lake tiles in ${waterStats.lakes.lakes ?? 0} lakes (${waterStats.lakes.riverAreas ?? 0} of them wide or tidal rivers), ${waterStats.rivers.pieces ?? 0} rivers; left out ${waterStats.rivers.dry ?? 0} dry washes, ${waterStats.rivers.underground ?? 0} culverts, ${waterStats.rivers.otherKinds ?? 0} drains/ditches, ${waterStats.lakes.dry ?? 0} dry lakes; ${waterStats.rivers.cutAtRoads ?? 0} cut at roads.`);
   }
   const cloudObjects = buildCloudObjects(biome);
@@ -16003,6 +16228,25 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       const by = {}; for (const m of items) by[m.kind] = (by[m.kind] || 0) + 1;
       console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Monuments: ${Object.entries(by).map(([k, n]) => `${n} ${k}`).join(', ')} built${skipped.road || skipped.building || skipped.water ? `; left out: ${skipped.road} on drawn roads, ${skipped.building} inside buildings, ${skipped.water} in water` : ''}.`);
     }
+  }
+  // mini roundabouts: the white, low-domed centre on their junction node (miniRoundabouts.js), on the road's surface
+  if (Array.isArray(sidewalks.meshes)) {
+    const minis = (exportTerrainData.osmFeatures || []).filter((f) => f.type === 'mini_roundabout' && f.geometry?.length);
+    if (minis.length) {
+      const items = minis.map((f) => {
+        const [x, y] = geoToWorldPoint(f.geometry[0].lat, f.geometry[0].lng, exportTerrainData, squareSize, 0);
+        return { x, y, z: getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize), diameter: miniRoundaboutDiameter(f.tags) };
+      });
+      const res = buildMiniRoundaboutMeshes(items);
+      appendAll(sidewalks.meshes, res.meshes);
+      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Mini roundabouts: ${res.count} painted, domed centre(s) built (${items.map((m) => `${m.diameter} m`).join(', ')}), ${res.triangles} triangles.`);
+    } else console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Mini roundabouts: none mapped.`);
+  }
+  // level-crossing barriers (planned with the railways), arms raised
+  if (Array.isArray(sidewalks.meshes) && railways?.barriers?.length) {
+    const res = buildLevelCrossingMeshes(railways.barriers);
+    appendAll(sidewalks.meshes, res.meshes);
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Level crossings: ${res.count} barrier(s) in the sidewalk tiles, ${res.triangles} triangles.`);
   }
   const sidewalkTileDaes = [];
   for (const t of await generateSidewalkTileDAEs(sidewalks.meshes, buildingTileSize(worldSize))) {
@@ -16729,9 +16973,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     '-- are reloaded. Later loads read the good file. Reload once after a bake.',
     '-- (docs/known-issues.md, "Black boxes at a distance". A bake made while the',
     '-- level was still loading was already counted when this started, so it was',
-    '-- never seen as new: files written in the last RECENT_S count as new too.)',
+    '-- never seen as new: files written since this load began count as new too.)',
     'local spriteWatch = nil',
-    'local RECENT_S = 600',
+    '-- (when this script was loaded: free-roam loads it as the level starts loading, so a sprite file written since',
+    '-- then was baked by this load; the old 10-minute window took a second load soon after the first for a new bake)',
+    'local scriptLoadedAt = os.time()',
     '',
     'local function spriteFiles()',
     '  if not core_levels or not getMissionFilename or not FS or not FS.findFiles then return {} end',
@@ -16750,36 +16996,61 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     '  for _, f in ipairs(spriteFiles()) do',
     '    local st = FS:stat(f)',
     '    local t = st and (st.modtime or st.createtime)',
-    '    if t and now - t < RECENT_S then return true end',
+    '    if t and t >= scriptLoadedAt - 1 and t <= now + 1 then return true end',
     '  end',
     '  return false',
+    'end',
+    '',
+    '-- The reload is done behind the loading screen, held up for it, so it is never seen (it blinked every texture',
+    '-- once in plain view: the user, 2026-11-24), on a first load only. The bake comes a fraction of a second after the',
+    '-- level has loaded; the hold is let go once the reload is done, after HOLD_NOBAKE_S',
+    '-- with no bake, after HOLD_MAX_S whatever happens, and when the level ends; a later bake is still reloaded.',
+    'local HOLD_TAG = "mapngSprites"',
+    'local HOLD_NOBAKE_S = 3',
+    'local HOLD_MAX_S = 20',
+    'local function releaseHold(w, why)',
+    '  if w and w.holding then',
+    '    w.holding = false',
+    '    log("I", "mapng", "Loading screen let go: " .. tostring(why))',
+    '    if core_gamestate and core_gamestate.requestExitLoadingScreen then pcall(core_gamestate.requestExitLoadingScreen, HOLD_TAG) end',
+    '  end',
     'end',
     '',
     'local function watchSprites(dt)',
     '  local w = spriteWatch',
     '  if not w then return end',
     '  w.age = w.age + dt',
+    '  if w.holding and w.age >= HOLD_MAX_S then releaseHold(w, "time limit") end',
+    '  if w.reloadedAt then',
+    '    if w.age >= w.reloadedAt + 1 then releaseHold(w, "textures reloaded"); spriteWatch = nil end',
+    '    return',
+    '  end',
     '  if w.age < w.nextCheck then return end',
-    '  w.nextCheck = w.age + 1',
+    '  w.nextCheck = w.age + 0.5',
     '  local n = countSprites()',
     '  if n ~= w.seen then',
     '    w.seen = n',
     '    w.changedAt = w.age',
     '  end',
-    '  if w.changedAt and w.age >= w.changedAt + 2 then',
-    '    spriteWatch = nil',
-    '    log("I", "mapng", "New shape sprites were baked: reloading textures")',
+    '  if w.changedAt and w.age >= w.changedAt + 1.5 then',
+    '    log("I", "mapng", "New shape sprites were baked: reloading textures" .. (w.holding and " behind the loading screen" or ""))',
     '    reloadTextures()',
-    '  elseif not w.changedAt and w.age >= 45 then',
-    '    spriteWatch = nil',
+    '    w.reloadedAt = w.age',
+    '  elseif not w.changedAt then',
+    '    if w.holding and w.age >= HOLD_NOBAKE_S then releaseHold(w, "no shape sprites baked") end',
+    '    if w.age >= 45 then spriteWatch = nil end',
     '  end',
     'end',
     '',
     'function M.onClientStartMission()',
     '  raAutoLoadPending = true',
     '  raAutoLoadWait = 0',
-    '  spriteWatch = { age = 0, nextCheck = 1, seen = countSprites() }',
+    '  spriteWatch = { age = 0, nextCheck = 0.5, seen = countSprites() }',
     '  if bakedJustNow() then spriteWatch.changedAt = 0 end',
+    '  -- (held only on a first load, no sprites in the cache yet: a later load reads them and bakes none)',
+    '  if (spriteWatch.seen == 0 or spriteWatch.changedAt) and core_gamestate and core_gamestate.requestEnterLoadingScreen then',
+    '    spriteWatch.holding = pcall(core_gamestate.requestEnterLoadingScreen, HOLD_TAG)',
+    '  end',
     '  loadRoadArchitectSessionIfAvailable()',
     'end',
     '',
@@ -16818,6 +17089,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     '-- would run our copy instead of its own.',
     'function M.onClientEndMission()',
     ...(heroRoads ? ['  if hero then hero.remove() end'] : []),
+    '  releaseHold(spriteWatch, "level ended")',
     '  spriteWatch = nil',
     '  extensions.unload("mainLevel")',
     'end',

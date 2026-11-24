@@ -34,7 +34,7 @@ test('paving strips cover the width, about a tile each', () => {
 test('pedestrian street surfaces: paving in strips, concrete and gravel whole, untagged pavers', () => {
   assert.equal(pedestrianSurfaceLayers('paving_stones', 7).length, 7);
   assert.equal(pedestrianSurfaceLayers('concrete', 7)[0].material, 'road1_concrete');
-  assert.equal(pedestrianSurfaceLayers('fine_gravel', 7)[0].material, 'm_dirt_road');
+  assert.equal(pedestrianSurfaceLayers('fine_gravel', 7)[0].material, 'm_dirt_variation_02');   // (its own fine-gravel look since 2026-11-24)
   assert.ok(pedestrianSurfaceLayers(undefined, 6).every((l) => l.material === PAVING_MATERIALS.pavers.material.name));
   assert.ok(pedestrianSurfaceLayers(undefined, 6, { americas: true }).every((l) => l.material === PAVING_MATERIALS.bricks.material.name));
 });

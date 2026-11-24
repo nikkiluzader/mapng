@@ -998,7 +998,13 @@ const getRoadPavementColor = (road) => {
   const tags = road?.tags || {};
   // a dirt road or track is no asphalt (surface tag; off-road racing lines
   // often carry none)
-  if (UNPAVED_ROAD.has(String(tags.surface ?? "").toLowerCase())) return COLORS.track;
+  // (by the surface where it says one: a grass track green, a sand road sandy, gravel grey; every unpaved road was the
+  // same brown, and the road's own decal over it barely showed: coverage level, 2026-11-24)
+  const sur = String(tags.surface ?? "").toLowerCase();
+  if (sur === "grass") return COLORS.grass;
+  if (sur === "sand") return COLORS.sand;
+  if (sur === "gravel" || sur === "fine_gravel" || sur === "compacted" || sur === "pebblestone") return COLORS.quarry;
+  if (UNPAVED_ROAD.has(sur)) return COLORS.track;
   if (tags.highway === "raceway" && !tags.surface && /motocross|supercross|enduro|bmx|speedway|autocross|rallycross/.test(String(tags.sport ?? "").toLowerCase())) return COLORS.track;
   if (tags.highway === 'service') {
     const subtype = String(tags.service ?? '').trim().toLowerCase();

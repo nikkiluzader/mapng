@@ -331,6 +331,26 @@ export const parseOverpassResponse = (data, bounds) => {
             id: el.id.toString(), type: "traffic_calming",
             geometry: [{ lat: el.lat, lng: el.lon }], tags: el.tags,
           });
+        } else if (el.tags.railway === "level_crossing") {
+          // a road over the railway: its crossing:barrier says whether barriers stand there (levelCrossingBarriers.js)
+          rawFeatures.push({
+            id: el.id.toString(), type: "level_crossing",
+            geometry: [{ lat: el.lat, lng: el.lon }], tags: el.tags,
+          });
+        } else if (el.tags.highway === "crossing") {
+          // a pedestrian crossing mapped as a node on the road: its paint (two lines, zebra bars) and, signal-controlled,
+          // its lights (exportBeamNGLevel.js, beamngSignals.js). Neither fetched nor read, a crossing with no crossing
+          // footway drawn to it was never painted (coverage level, 2026-11-24)
+          rawFeatures.push({
+            id: el.id.toString(), type: "crossing",
+            geometry: [{ lat: el.lat, lng: el.lon }], tags: el.tags,
+          });
+        } else if (el.tags.highway === "mini_roundabout") {
+          // a mini roundabout: its painted, low-domed centre on the junction node (services/miniRoundabouts.js)
+          rawFeatures.push({
+            id: el.id.toString(), type: "mini_roundabout",
+            geometry: [{ lat: el.lat, lng: el.lon }], tags: el.tags,
+          });
         } else if (el.tags.highway === "turning_circle" || el.tags.highway === "turning_loop") {
           // a cul-de-sac's round end (services/turningCircles.js)
           rawFeatures.push({
