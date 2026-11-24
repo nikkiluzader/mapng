@@ -93,7 +93,17 @@ grace period (`git branch <name> <sha>`):
 `seawall-037` 3dc1eb0, `seawall` 5009640, `step-walls-2` 390b697, `step-walls` 05a91eb (also deleted on origin),
 `hairpin-blend` cf6405a, `shaped-levels` 7463d7e (was merged). The two old checkouts `../mapng-old` and
 `../mapng-sweep` are gone too. One old stash is left untouched (`git stash list`). The two `dependabot/*` branches
-on origin are GitHub's, not ours.
+on origin were GitHub's automatic security-update pull requests (#37, #38: Vite 5.4.21 -> 8.3.8); closed and deleted
+on 2026-11-24 at the user's word.
+
+**Dependency alerts, parked by the user (2026-11-24: "ignore those for a while until I want to make a decision"):**
+10 open Dependabot alerts: 8 on Vite and 1 on esbuild (all about the local development server, several
+Windows-only; fixed from Vite 6.4.4), 1 on minimatch in `desktop/` (build-time). Not exposed: mapng.com's visitors
+and the desktop app's users. Do NOT update Vite, esbuild or minimatch on your own initiative, and do not merge a
+Dependabot pull request if one reappears: tell the user it is there. If they ask for the update: one step at a
+time (the newest Vite 6 first, or straight to 8 if they prefer), then `npx vite build`, `npm test`, the browser
+and desktop checks, and both Workers Builds checks after a push to dev (the builders cap open files at 1024:
+`vite.config` keeps `maxParallelFileOps` at 8 for that).
 
 ## Traps (things that went wrong, or nearly did, in the last sessions)
 
