@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MapNG 0.3.7: More File Formats, Smoother Curves, Very Large Levels</title>
+<meta name="description" content="MapNG 0.3.7: your own OSM data in more file formats (.osm.bz2, .xz, .gz, .o5m, history files, Shapefiles), smoother curves on railways, paths and rivers, very large levels that save and load, and fixes from testers' reports.">
+<meta name="robots" content="noindex">
+<link rel="canonical" href="https://mapng.com/updates/0.3.7/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MapNG 0.3.7: more file formats, smoother curves, very large levels">
+<meta property="og:description" content="More OSM file formats, smoother rail and path curves, very large levels.">
+<meta property="og:url" content="https://mapng.com/updates/0.3.7/">
+<meta property="og:image" content="https://mapng.com/updates/0.3.7/images/curves-tracks.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<script>
+  // the theme before the first paint: the app's link (?theme=), else this visit's, else the app's own choice, else the system's
+  (function () { var t; try { var q = new URLSearchParams(location.search).get('theme'); if (q === 'dark' || q === 'light') sessionStorage.setItem('mapng_page_theme', q); t = sessionStorage.getItem('mapng_page_theme') || localStorage.getItem('theme'); } catch (e) { /* storage blocked */ } if (t !== 'dark' && t !== 'light') t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; document.documentElement.setAttribute('data-theme', t); })();
+</script>
+<style>
+  /* BeamNG.drive's UI fonts, as the app (public/fonts, SIL OFL) */
+  @font-face { font-family: "Noto Sans"; src: url(/fonts/noto-sans-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass"; src: url(/fonts/overpass-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass Mono"; src: url(/fonts/overpass-mono-latin-wght-normal.woff2) format("woff2"); font-weight: 300 700; font-display: swap; }
+  :root {
+    --bg: #f7f7f8; --surface: #ffffff; --surface-2: #f2f2f4; --border: #e3e3e8;
+    --text: #1d1d22; --text-2: #4a4a55; --muted: #6e6e7a;
+    --brand: #ff6600; --brand-ink: #c2410c; --brand-tint: #fff4ec;
+    --ok: #15803d; --code-bg: #1d1d22; --code-text: #f4f4f6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+      --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+      --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+      --ok: #4ade80; --code-bg: #0b0b0e; --code-text: #ececf0;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+    --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+    --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+    --ok: #4ade80; --code-bg: #0b0b0e; --code-text: #ececf0;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--brand-ink); }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 0 16px; }
+  header.top { background: linear-gradient(90deg, #ff6600, #f59e0b); color: #fff; }
+  header.top .wrap { padding-top: 20px; padding-bottom: 36px; }
+  .brand { display: inline-flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; opacity: .95; }
+  .brand img { width: 22px; height: 22px; }
+  h1, h2, h3 { font-family: "Overpass", "Noto Sans", system-ui, sans-serif; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.15; margin: 22px 0 10px; letter-spacing: -0.01em; }
+  .lede { font-size: 18px; max-width: 640px; margin: 0; color: rgba(255,255,255,.95); }
+  main { padding: 0 0 64px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: -22px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .card b { display: block; font-size: 15px; margin-bottom: 2px; }
+  .card span { color: var(--text-2); font-size: 14px; }
+  .card .tick { color: var(--ok); font-weight: 700; margin-right: 4px; }
+  section { margin-top: 44px; }
+  h2 { font-size: 24px; line-height: 1.25; margin: 0 0 10px; }
+  h3 { font-size: 17px; margin: 22px 0 6px; }
+  p, li { color: var(--text-2); }
+  .note { background: var(--brand-tint); border-left: 3px solid var(--brand); border-radius: 0 8px 8px 0; padding: 10px 14px; color: var(--text); font-size: 15px; }
+  pre { background: var(--code-bg); color: var(--code-text); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-size: 14px; line-height: 1.5; }
+  code { font-family: "Overpass Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; }
+  p code, li code, td code { background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; color: var(--text); }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; color: var(--text); white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  td { color: var(--text-2); }
+  .flow { list-style: none; padding: 0; margin: 14px 0 0; counter-reset: step; }
+  .flow li { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px 12px 52px; margin: 0 0 22px; counter-increment: step; }
+  .flow li::before { content: counter(step); position: absolute; left: 14px; top: 12px; width: 26px; height: 26px; border-radius: 50%; background: var(--brand); color: #fff; font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+  .flow li:not(:last-child)::after { content: ""; position: absolute; left: 26px; bottom: -22px; width: 2px; height: 22px; background: var(--border); }
+  .flow b { color: var(--text); }
+  .flow .where { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .02em; color: var(--brand-ink); background: var(--brand-tint); border-radius: 999px; padding: 1px 8px; margin-left: 6px; vertical-align: 1px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 12px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .stat .v { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
+  .stat .k { font-size: 13px; color: var(--muted); }
+  .usage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 12px; }
+  .usage-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
+  .usage-card h3 { font-size: 14px; margin: 0 0 6px; }
+  .usage-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; font-size: 13px; margin: 4px 0; }
+  .usage-row .bar { grid-column: 1 / -1; height: 4px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
+  .usage-row .bar span { display: block; height: 100%; background: var(--brand); border-radius: 2px; }
+  .usage-row .n { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .never { columns: 2 240px; column-gap: 24px; padding-left: 20px; }
+  .never li { break-inside: avoid; margin-bottom: 6px; }
+  footer { border-top: 1px solid var(--border); margin-top: 56px; padding-top: 18px; font-size: 14px; color: var(--muted); }
+  footer p { color: var(--muted); }
+
+  /* this page's own pieces */
+  .pill { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .02em; border-radius: 999px; padding: 1px 9px; margin-right: 6px; vertical-align: 1px; white-space: nowrap; }
+  .pill.desk { color: var(--brand-ink); background: var(--brand-tint); }
+  .pill.web { color: var(--text); background: var(--surface-2); border: 1px solid var(--border); }
+  .pill.both { color: #fff; background: var(--brand); }
+  .measures { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 14px; }
+  .measure { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .measure h3 { margin: 6px 0 4px; font-size: 16px; }
+  .measure p { margin: 0; font-size: 14.5px; }
+  .measure .how { margin-top: 8px; font-size: 13px; color: var(--muted); }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-top: 12px; }
+  .two > div { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .two h3 { margin-top: 0; }
+  .two ul { padding-left: 18px; margin: 6px 0 0; }
+  .two li { font-size: 14.5px; margin-bottom: 4px; }
+  .limits li { margin-bottom: 8px; }
+  .toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; padding: 0; list-style: none; }
+  .toc a { display: inline-block; font-size: 14px; text-decoration: none; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; color: var(--text); }
+  .toc a:hover { border-color: var(--brand); }
+
+  /* this page: pictures and the summary tiles */
+  section { padding-top: 34px; }
+  section h2 { font-size: 24px; line-height: 1.25; margin: 0 0 10px; }
+  section p, section li { color: var(--text-2); }
+  section p { margin: 0 0 12px; max-width: 70ch; }
+  section ul { margin: 0 0 12px; padding-left: 20px; max-width: 70ch; }
+  section li { margin-bottom: 6px; }
+  figure { margin: 16px 0 20px; }
+  figure img { display: block; width: 100%; height: auto; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+  figcaption { font-size: 13.5px; color: var(--muted); margin-top: 6px; max-width: 78ch; }
+  .kicker { font: 700 11px/1 "Overpass", "Noto Sans", sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--brand-ink); margin-bottom: 8px; }
+  .cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  .btn { display: inline-block; padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 14px; text-decoration: none; border: 1px solid var(--border); color: var(--text); background: var(--surface); }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .note { border-left: 3px solid var(--brand); background: var(--brand-tint); padding: 10px 14px; margin: 14px 0; color: var(--text-2); max-width: 74ch; }
+  footer { border-top: 1px solid var(--border); margin-top: 40px; padding: 20px 0 0; font-size: 13.5px; color: var(--muted); }
+
+  /* 0.3.5: pictures still to come (draft) */
+  .ph { border: 2px dashed var(--border); border-radius: 8px; background: var(--surface-2); color: var(--muted); padding: 34px 18px; text-align: center; font-size: 14px; }
+  .ph b { display: block; color: var(--text-2); margin-bottom: 4px; }
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+  .pair figure { margin: 0; }
+  .draft-tag { display: inline-block; margin: 14px 0 0; padding: 4px 10px; border-radius: 999px; background: rgba(0,0,0,.25); color: #fff; font-size: 13px; font-weight: 600; }
+</style>
+<link rel="stylesheet" href="/pages.css">
+<script src="/pages.js" defer></script>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/favicon.svg" alt="">MapNG</a>
+    <h1>MapNG 0.3.7: more file formats, smoother curves, very large levels</h1>
+    <p class="lede">Load your own OpenStreetMap data in the formats the extract services actually serve. Railways, footpaths and rivers now curve the way roads already did. And levels hundreds of kilometres long now save, load and show up in the game's map.</p>
+    <span class="draft-tag">Draft: not released yet</span>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="cards">
+    <div class="card"><b><span class="tick">✓</span>More file formats</b><span>.osm.bz2, .xz, .gz, .o5m, history files, Shapefiles.</span></div>
+    <div class="card"><b><span class="tick">✓</span>Smoother curves</b><span>Railways, paths and rivers, not only roads.</span></div>
+    <div class="card"><b><span class="tick">✓</span>Very large levels</b><span>Hundreds of pieces in one level.</span></div>
+    <div class="card"><b><span class="tick">✓</span>Slip roads</b><span>They now meet the outer lane.</span></div>
+  </div>
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>
+    <a class="btn" href="/">Open MapNG in the browser</a>
+    <a class="btn" href="/updates/0.3.6/">What came in 0.3.6</a>
+  </div>
+
+  <section id="formats" data-nav="File formats">
+    <div class="kicker">Step 2: Sources, Map data</div>
+    <h2>Your own OSM data, in more formats</h2>
+    <p><b>Use your own OSM file</b> in Map data used to take .osm, .osm.pbf, Overpass JSON and GeoJSON. It now opens the files the big extract services hand out as they are, without converting them first. MapNG recognises a file by its contents, not only its name, and unpacks it layer by layer: an .o5m inside an .xz, or an .osm inside a .zip, opens too.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Format</th><th>Where it comes from</th><th>What you get</th></tr></thead>
+      <tbody>
+        <tr><td><code>.osm.bz2</code>, <code>.osm.xz</code>, <code>.osm.gz</code></td><td>planet.openstreetmap.org and Geofabrik (.bz2), BBBike (.gz, .xz)</td><td>Exactly what the .osm inside holds. The file's own checksums are checked, so a damaged download is refused rather than read wrong.</td></tr>
+        <tr><td><code>.o5m</code></td><td>osmconvert and some extract services</td><td>The same map as the .osm it was made from.</td></tr>
+        <tr><td><code>.osh</code> (history)</td><td>Full-history extracts</td><td>The newest version of everything; anything deleted in its last version is left out.</td></tr>
+        <tr><td>Shapefile (<code>.zip</code>)</td><td>Geofabrik's free shapefiles, ogr2ogr, QGIS</td><td>A simpler level: see below.</td></tr>
+      </tbody>
+    </table></div>
+    <h3>Shapefiles: a simpler level, by nature</h3>
+    <p>A Shapefile keeps only the columns its maker chose, not OpenStreetMap's tags, so MapNG rebuilds the tags from the two common layouts: Geofabrik's layers (one road class per road, a building type, a land use) and ogr2ogr's columns. The road network comes through almost one for one. In a test on Monaco, against the same day's .osm.pbf: 1,827 footways against 1,825, all 400 service roads, all 318 residential streets.</p>
+    <p>What a Shapefile never carries is lost: lanes, surfaces and widths, sidewalks, building heights and floors, turn lanes. Geofabrik's free set also has no coastline, no fences or walls, no race tracks, and only main railway lines. In the game that shows as every building the same height, streets at a default width, sidewalks assumed along every street (none are mapped to say otherwise), and no race kerbs. The sea is still there where the elevation brings the shore down to sea level; on the coarse worldwide elevation, the seabed along the coast is not lowered, because that uses the coastline. If you have the choice, the same area's .osm.pbf builds a much fuller level.</p>
+    <figure><img src="images/shapefile-vs-pbf.jpg" alt="Monaco in the game, built twice from the same day's data. Top: along the coast, the .osm.pbf level has towers of many heights, the Shapefile level low boxes all of one height. Bottom: the harbour front road, with red and white race kerbs and two lanes from the .osm.pbf, narrower with white sidewalk slabs along both sides from the Shapefile." loading="lazy"><figcaption>Monaco in the game, the same day's data twice: left from Geofabrik's .osm.pbf, right from Geofabrik's Shapefiles. Same roads and buildings, but no building heights, lanes, sidewalk tags or race kerbs in the Shapefile.</figcaption></figure>
+    <p>The other formats build exactly what their .osm would: a level from a tester's own map file compressed as .osm.xz came out with the same map data as the plain file, feature for feature, and the same file as .o5m matched it to within a centimetre.</p>
+    <h3>What MapNG does not open, and why</h3>
+    <p>These were asked for too. Each is refused with its reason, so a wrong file is easy to spot.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Format</th><th>Why it cannot build a level</th><th>Use instead</th></tr></thead>
+      <tbody>
+        <tr><td><code>.osc</code>, <code>.o5c</code> (change files)</td><td>A change file lists edits (create this, move that, delete the other), not a map. On its own it has none of the roads around the edits, and the edits only make sense applied to the map they were made against.</td><td>The map file itself, or an .osm.pbf from after the change.</td></tr>
+        <tr><td><code>.obf</code> (OsmAnd)</td><td>OsmAnd's own format for drawing its maps on a phone. It keeps OsmAnd's simplified drawing and routing data, not OpenStreetMap's tags and ways, so a road's lanes, width, bridges and the rest are not there to read.</td><td>An .osm.pbf of the same area (Geofabrik, BBBike).</td></tr>
+        <tr><td>Vector-tile <code>.pbf</code> / <code>.mvt</code></td><td>Map tiles share the .pbf ending with OSM extracts but are a different thing: each tile keeps only a handful of tags for drawing, and cuts every road, river and building at the tile's edge, often simplified, so the shapes are not the real ones.</td><td>An .osm.pbf extract (osmium, Geofabrik, BBBike).</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="curves" data-nav="Curves">
+    <div class="kicker">Generate</div>
+    <h2>Smoother curves on railways, paths and rivers</h2>
+    <p>OpenStreetMap draws a curve as straight pieces with a corner at each point. Roads were already rounded into smooth curves. Railways, footpaths, cycleways, rivers, canals and streams now are too, each within its own limit:</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Line</th><th>Widest curve</th><th>Never more than this inside a mapped corner</th></tr></thead>
+      <tbody>
+        <tr><td>Railways</td><td>500 m on main lines, 150 m on sidings, 40 m for trams</td><td>1 m</td></tr>
+        <tr><td>Footpaths, cycleways</td><td>25 to 50 m</td><td>0.75 m</td></tr>
+        <tr><td>Rivers, canals, streams, ditches</td><td>20 to 300 m</td><td>2 m on rivers, 0.5 m on ditches</td></tr>
+        <tr><td>Roads (as before)</td><td>30 to 800 m by class</td><td>3 m</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><b>What stays put:</b> junctions, level crossings, bridge and tunnel ends, and real sharp corners (a hairpin, a T junction) stay exactly where they are mapped.</li>
+      <li><b>Switches and path joins:</b> where a siding leaves the main line or a path joins another, the line curves smoothly through, and the joining line follows.</li>
+      <li><b>Left as drawn on purpose:</b> power lines (every mapped point is a tower, and the wire is straight between towers) and steps.</li>
+      <li><b>Keep map lines as drawn:</b> a new switch in Map data turns all rounding off, roads included, for maps whose data you have fixed by hand.</li>
+    </ul>
+    <figure><img src="images/curves-tracks.jpg" alt="Kaunas railway station in the game from above: a dozen tracks curving smoothly through the station throat, switches between them, platforms beside." loading="lazy"><figcaption>Kaunas station's tracks in the game: the throat curves smoothly, switches included.</figcaption></figure>
+  </section>
+
+  <section id="large" data-nav="Large levels">
+    <div class="kicker">Export</div>
+    <h2>Very large levels, saved and loaded</h2>
+    <p>A tester built a level along 220 km of motorway: 442 pieces. It exported, but MapNG could not list it, its report could not be read, and the game's map showed the road far off any picture. All fixed:</p>
+    <ul>
+      <li><b>No size limit in the level file.</b> A level is written piece by piece into one zip as it is built, in the larger zip format (ZIP64) once it passes 65,535 files or 4 GB, and each piece is let go once it is in.</li>
+      <li><b>The game's map view</b> gets one picture per piece, each at its place.</li>
+      <li><b>The progress card moves</b> for levels built in pieces, Cancel works while downloads are still running, and step 1's notes measure the whole shape.</li>
+      <li><b>Road mode</b> warns with the number of pieces on a very long road; on the desktop app it never refuses.</li>
+      <li><b>No backdrop for a level along a road.</b> The land round a long road is mostly far from it (about 150 by 100 km for a 200 km road), too much to download; the level ends at the road's corridor.</li>
+    </ul>
+  </section>
+
+  <section id="fixes" data-nav="Fixes">
+    <div class="kicker">From your reports</div>
+    <h2>Fixes</h2>
+    <ul>
+      <li><b>Slip roads meet the outer lane.</b> A slip road joining a wider street now runs into its outer lane, with the street's lines carried through, instead of stopping at its centre line.</li>
+      <li><b>Sidebar sections</b> are cards with a tinted header, easier to tell apart.</li>
+      <li><b>The old batch mode is gone.</b> Tiles in step 1 replaced it in 0.3.6; an unfinished batch job saved by an older version can no longer be opened.</li>
+    </ul>
+  </section>
+
+  <section id="next" data-nav="Next release">
+    <div class="kicker">Coming next</div>
+    <h2>Still being worked on</h2>
+    <ul>
+      <li>Sidewalks at the water and at raised roads, started again from scratch.</li>
+      <li>Long bridges planned once for the whole level, as tunnels are; road-to-bridge and road-to-tunnel joins.</li>
+      <li>Road junctions that still bend tightly where a side street meets a main road's bend.</li>
+      <li>A backdrop that follows a road level's corridor.</li>
+    </ul>
+  </section>
+
+  <footer>
+    <p>MapNG is free and open source: <a href="https://github.com/nikkiluzader/mapng">github.com/nikkiluzader/mapng</a>. Thanks to everyone on Discord who sent maps, screenshots and reports. Earlier updates: <a href="/updates/0.3.6/">0.3.6</a>, <a href="/updates/0.3.5/">0.3.5</a>.</p>
+  </footer>
+</main>
+</body>
+</html>
