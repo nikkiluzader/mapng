@@ -673,7 +673,7 @@ test('still water has a kind for its look; fish ponds, wastewater, reflecting po
 test('a canal or stream mapped only as its outline is water; with its line through it, the line\'s River (coverage level, 2026-11-24)', () => {
   const ring = (x0, y0, w, h) => [[x0, y0], [x0 + w, y0], [x0 + w, y0 + h], [x0, y0 + h], [x0, y0]].map(([x, y]) => ({ lat: y, lng: x }));
   const area = { type: 'water', geometry: ring(0, 0, 40, 8), tags: { natural: 'water', water: 'canal' } };
-  const plan = (feats) => planLakes({ features: feats, toWorld: (lat, lng) => [lng, lat], heightAt: (x) => 10 + x * 0.05 });
+  const plan = (feats) => planLakes({ features: feats, toWorld: (lat, lng) => [lng, lat], heightAt: () => 10 });
   assert.ok(plan([area]).tiles.length > 0, 'outline only: area water');
   const line = { type: 'water', geometry: [{ lat: 4, lng: -5 }, { lat: 4, lng: 45 }], tags: { waterway: 'canal' } };
   assert.equal(plan([area, line]).tiles.length, 0, 'with its line: left to the River');
@@ -683,7 +683,9 @@ test('a canal outline far wider than a canal, its line through it: the outline i
   const ring = (x0, y0, w, h) => [[x0, y0], [x0 + w, y0], [x0 + w, y0 + h], [x0, y0 + h], [x0, y0]].map(([x, y]) => ({ lat: y, lng: x }));
   const area = { type: 'water', geometry: ring(0, 0, 30, 30), tags: { natural: 'water', water: 'canal' } };
   const line = { type: 'water', geometry: [{ lat: 15, lng: -5 }, { lat: 15, lng: 35 }], tags: { waterway: 'canal' } };
-  assert.ok(planLakes({ features: [area, line], toWorld: (lat, lng) => [lng, lat], heightAt: (x) => 10 + x * 0.05 }).tiles.length > 0);
+  assert.ok(planLakes({ features: [area, line], toWorld: (lat, lng) => [lng, lat], heightAt: () => 10 }).tiles.length > 0);
+  // sloping (6 m across it): one level would flood its low end, left to the River
+  assert.equal(planLakes({ features: [area, line], toWorld: (lat, lng) => [lng, lat], heightAt: (x) => 10 + x * 0.2 }).tiles.length, 0);
 });
 
 test('a dock (waterway=dock area) is standing water (coverage level, 2026-11-24)', () => {

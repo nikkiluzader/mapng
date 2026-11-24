@@ -692,6 +692,10 @@ export function planLakes({ features = [], toWorld, heightAt, seaZ = null, minCe
         return c1 - c0 > RIVER_KINDS[pts.kind].width * FOREIGN_FROM && a1 - a0 <= (c1 - c0) + WIDTH_STEP_M;
       };
       if (lines.some((pts) => crosses(pts) && !otherWater(pts))) continue;
+      // (and only where its ground is flat enough to hold one level, as isRiverArea asks: a sloping outline as one
+      // flat sheet floods its low end or floats over it; 612 tiles of it across Kingston's sloping river pieces)
+      const g = groundInside(poly, heightAt);
+      if (!(g[Math.floor(g.length * 0.9)] - g[Math.floor(g.length * 0.1)] <= AREA_FLAT_M)) { stats.riverAreasSloping = (stats.riverAreasSloping || 0) + 1; continue; }
       stats.riverAreasWithoutLine = (stats.riverAreasWithoutLine || 0) + 1;
     }
     if (river) stats.riverAreas++;
@@ -1302,9 +1306,15 @@ export function carveWaterUnderDecks({ rivers = [], lakes = [] }, grid, covered,
 // 30 m data smooths a stream's channel away), so a ribbon a hand over the lowest ground across it was a film of water a
 // few cm deep at its edges that barely showed (coverage level, 2026-11-24). A channel is carved under every river
 // ribbon: its node's depth (DEPTH_M by width, CHANNEL_BED_MAX_M at most) under the surface in the middle, rising to the
-// surface at its edges over HIDDEN_SLOPE_M. Only ever lowers; ground standing more than HIDDEN_BANK_MAX_M over the water
-// (a ribbon overlapping a slope) and ground roads (keep(x, y)) are left as they are.
+// surface at its edges over HIDDEN_SLOPE_M. Only ever lowers; ground standing more than CHANNEL_FILM_M over the water
+// (a quay, a bank, a ribbon overlapping a slope) and ground roads (keep(x, y)) are left as they are.
 export const CHANNEL_BED_MAX_M = 2;
+// only ground lying about at the water's own level is dug (the film the elevation data makes of a river); a quay or
+// a bank standing higher is left as surveyed (cut at up to 4 m, a canal city's quay edges grew creases: the sweep's
+// w_amsterdam, 2026-11-24)
+const CHANNEL_FILM_M = 0.75;
+// and none within this of a ground road's edge (exportBeamNGLevel.js passes the roads)
+export const CHANNEL_ROAD_CLEAR_M = 8;
 
 /**
  * Terrain edits for river channels. rivers: planRivers' [{ nodes: [[x, y, surface, width, depth]] }]; grid as
@@ -1315,8 +1325,11 @@ export function carveRiverChannels(rivers = [], grid, keep = () => false) {
   const toPixel = (x, y) => [(x / worldSize + 0.5) * width, ((0.5 - y / worldSize) * height - 1)];
   const toWorld = (c, r) => [((c / width) - 0.5) * worldSize, (0.5 - (r + 1) / height) * worldSize];
   const edits = new PixelEdits();
-  for (const { nodes } of rivers) {
+  for (const { nodes, outline } of rivers) {
     for (let i = 0; i + 1 < (nodes?.length || 0); i++) {
+      // (a stretch whose width comes from a mapped outline: carveWaterUnderDecks digs its bed already; dug twice, a
+      // canal city's quays grew creases, 2026-11-24)
+      if (outline?.[i] && outline?.[i + 1]) continue;
       const [ax, ay, az, aw, ad = DEPTH_M[0]] = nodes[i]; const [bx, by, bz, bw, bd = DEPTH_M[0]] = nodes[i + 1];
       const reach = Math.max(aw, bw) / 2;
       const [c0, r0] = toPixel(Math.min(ax, bx) - reach, Math.max(ay, by) + reach);
@@ -1334,7 +1347,7 @@ export function carveRiverChannels(rivers = [], grid, keep = () => false) {
           const ground = heightMap[idx] - minHeight;
           const depth = Math.min(CHANNEL_BED_MAX_M, ad + (bd - ad) * t);
           const target = surface - depth * Math.min(1, (half - d) / HIDDEN_SLOPE_M);
-          if (ground <= target || ground > surface + HIDDEN_BANK_MAX_M || keep(x, y)) continue;
+          if (ground <= target || ground > surface + CHANNEL_FILM_M || keep(x, y)) continue;
           edits.set(idx, Math.min(edits.get(idx) ?? Infinity, target + minHeight));
         }
       }

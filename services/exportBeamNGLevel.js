@@ -26,7 +26,7 @@ import { isCarportFeature, planCarports } from './beamngCarports.js';
 import { placeTrafficCalming } from './trafficCalming.js';
 import { placeBollards } from './bollards.js';
 import { planGates, gateLeaves, splitAtCuts, isGateBarrier } from './gates.js';
-import { CHANNEL_BED_MAX_M, carveLakeBeds, carveRiverChannels, carveWaterUnderDecks, fillRemnants, levelUnderDecks, lowerSeabed, planLakes, planRivers } from './beamngWater.js';
+import { CHANNEL_BED_MAX_M, CHANNEL_ROAD_CLEAR_M, carveLakeBeds, carveRiverChannels, carveWaterUnderDecks, fillRemnants, levelUnderDecks, lowerSeabed, planLakes, planRivers } from './beamngWater.js';
 import { tunnelDryZones, tunnelsBelow, planSeaBlocks, clipRiverNodes, clipLakeTile, splitLakeTile, hasInlandBelowSea } from './beamngWaterClip.js';
 import { placeCurveWarnings } from './curveWarningSigns.js';
 import { chooseTreeGroupAllowed, chooseTreeItem, sanitizeTreeKindsOff, sanitizeTreeModelsOff, sanitizeTreeSwaps, treeHintFromTags, treeItemHeight, treeSwapMap, understoryGroup } from './beamngTrees.js';
@@ -14781,9 +14781,13 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     }
   }
   // every river's channel (beamngWater.js carveRiverChannels): the elevation data holds its surface, not its bed
-  if (includeWater && riverPlan?.rivers?.length) {
+  // (terrain shaping on only: with it off the terrain stays as surveyed; run regardless, the sweep's untouched and
+  // noshape cells grew spikes and creases along every stream, 2026-11-24)
+  if (includeWater && shapeExtras && riverPlan?.rivers?.length) {
     try {
-      const chKeep = buildCarriagewayIndex(groundWithRings.map((cw) => ({ ...cw, half: (cw.half || 3) + 1 })));
+      // (8 m clear of every ground road's edge: a canal beside a quay street is already a sunken channel the survey
+      // shows, and dug deeper it made folds beside the street: the sweep's w_amsterdam, 2026-11-24)
+      const chKeep = buildCarriagewayIndex(groundWithRings.map((cw) => ({ ...cw, half: (cw.half || 3) + CHANNEL_ROAD_CLEAR_M })));
       const ch = carveRiverChannels(riverPlan.rivers, {
         heightMap: exportTerrainData.heightMap, width: W0, height: H0, worldSize: W0 * squareSize, minHeight: Number(exportTerrainData.minHeight) || 0,
       }, (x, y) => isOnOtherCarriageway(chKeep, x, y, 0, () => false));
@@ -14794,7 +14798,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} River channels skipped: ${err?.message || err}`);
     }
   } else {
-    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} River channels: none carved (${includeWater ? 'no river pieces planned' : 'water off'}).`);
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} River channels: none carved (${!includeWater ? 'water off' : !shapeExtras ? 'terrain shaping off: the terrain as surveyed' : 'no river pieces planned'}).`);
   }
   if (includeWater && shapeExtras && deckCover && riverPlan) {
     try {

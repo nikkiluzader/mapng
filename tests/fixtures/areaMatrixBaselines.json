@@ -1,7 +1,7 @@
 {
  "_note": "Area baselines for scripts/sweep/runSweep.mjs: re-record with --save after a change that improves an area (commit the file with it).",
  "recorded": "2026-11-24",
- "commit": "30a59cd",
+ "commit": "d4a5d59",
  "areas": {
   "normandy_flat@gpxz/untouched": {
    "steps": 0,
@@ -1203,7 +1203,7 @@
    "maxDeckLen": 254,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 13
+   "seconds": 14
   },
   "w_amsterdam@gpxz/untouched": {
    "steps": 0,
@@ -1227,7 +1227,7 @@
    "maxDeckLen": 389,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 13
+   "seconds": 15
   },
   "w_amsterdam@gpxz/ready": {
    "steps": 0,
@@ -1248,12 +1248,12 @@
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 54,
-   "maxDeckH": 6.21,
+   "maxDeckH": 6.71,
    "deckKm": 1.05,
    "maxDeckLen": 50,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 13
+   "seconds": 15
   },
   "w_amsterdam@t30/ready": {
    "steps": 0,
@@ -1262,7 +1262,7 @@
    "shortX": 0,
    "groundGaps": 0,
    "thruDeck": 4,
-   "spikes": 24,
+   "spikes": 27,
    "bumps": 0,
    "cross": 1,
    "junctions": 0,
@@ -1277,7 +1277,7 @@
    "maxDeckLen": 48,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 14
+   "seconds": 12
   },
   "w_amsterdam@t30/untouched": {
    "steps": 0,
@@ -1296,7 +1296,7 @@
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 48,
-   "maxDeckH": 2.81,
+   "maxDeckH": 4.25,
    "deckKm": 2.13,
    "maxDeckLen": 208,
    "tunnels": 0,
@@ -1320,7 +1320,7 @@
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 48,
-   "maxDeckH": 2.83,
+   "maxDeckH": 4.27,
    "deckKm": 2.26,
    "maxDeckLen": 212,
    "tunnels": 0,
@@ -1334,7 +1334,7 @@
    "shortX": 0,
    "groundGaps": 0,
    "thruDeck": 0,
-   "spikes": 9,
+   "spikes": 10,
    "bumps": 11,
    "cross": 7,
    "junctions": 5,
@@ -1351,7 +1351,7 @@
    "maxDeckLen": 17,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 13
+   "seconds": 11
   },
   "val_disere@gpxz/untouched": {
    "steps": 3,
@@ -1375,7 +1375,7 @@
    "maxDeckLen": 18,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 11
+   "seconds": 10
   },
   "val_disere@gpxz/noshape": {
    "steps": 2,
@@ -1401,7 +1401,7 @@
    "maxDeckLen": 26,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 12
+   "seconds": 11
   },
   "val_disere@t30/untouched": {
    "steps": 0,
@@ -1425,7 +1425,7 @@
    "maxDeckLen": 110,
    "tunnels": 0,
    "tunnelsLeft": 2,
-   "seconds": 11
+   "seconds": 9
   },
   "val_disere@t30/noshape": {
    "steps": 0,
@@ -1449,7 +1449,7 @@
    "maxDeckLen": 110,
    "tunnels": 0,
    "tunnelsLeft": 2,
-   "seconds": 12
+   "seconds": 10
   },
   "val_disere@t30/ready": {
    "steps": 0,
@@ -1473,7 +1473,7 @@
    "maxDeckLen": 17,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 13
+   "seconds": 12
   },
   "gt_chevril@gpxz/untouched": {
    "steps": 2,
@@ -2327,7 +2327,7 @@
    "maxDeckLen": 48,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 12
+   "seconds": 16
   },
   "w_amsterdam@mh/noshape": {
    "steps": 0,
@@ -2348,12 +2348,12 @@
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 53,
-   "maxDeckH": 2.94,
+   "maxDeckH": 4.2,
    "deckKm": 1.25,
    "maxDeckLen": 221,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 12
+   "seconds": 15
   },
   "w_amsterdam@mh/untouched": {
    "steps": 0,
@@ -2372,12 +2372,12 @@
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 53,
-   "maxDeckH": 3.1,
+   "maxDeckH": 4.21,
    "deckKm": 1.12,
    "maxDeckLen": 107,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 12
+   "seconds": 16
   },
   "normandy_flat@mh/ready": {
    "steps": 0,
@@ -2477,7 +2477,7 @@
    "maxDeckLen": 24,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 10
+   "seconds": 12
   },
   "val_disere@mh/noshape": {
    "steps": 1,
@@ -2503,7 +2503,7 @@
    "maxDeckLen": 28,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 11
+   "seconds": 13
   },
   "val_disere@mh/ready": {
    "steps": 0,
@@ -2512,7 +2512,7 @@
    "shortX": 0,
    "groundGaps": 0,
    "thruDeck": 0,
-   "spikes": 11,
+   "spikes": 14,
    "bumps": 13,
    "cross": 8,
    "junctions": 5,
@@ -2529,7 +2529,7 @@
    "maxDeckLen": 24,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 11
+   "seconds": 13
   },
   "gt_chevril@mh/noshape": {
    "steps": 1,
