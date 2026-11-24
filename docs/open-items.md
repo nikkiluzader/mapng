@@ -108,6 +108,17 @@ Known and not blocking 0.3.6 (say so on the page):
     baselines. Asked 2026-11-24 whether the map-frame fix cleared it: partly. `naldo` on Mapterhorn, the same area
     fetched again on the corrected frame: floating 30 -> 17, buried 47 -> 44 (baseline 8 and 2). The sweep's areas
     are still on the old frame; re-fetching them and re-recording baselines is owed.
+    **2026-11-24, the smoke set on the corrected frame:** all "ready" cells together, floating 284 -> 252, buried
+    351 -> 341. The frame is not the cure. Most of it sits in Kingston (buried, about 35 a cell), Naldo and
+    Amsterdam Centraal.
+    **Kingston's buried spots traced (2026-11-24):** they arrived in one commit, dc8cd53 (2026-11-19, "the old
+    builders removed"): buried 15 -> 42 on Mapterhorn, measured commit by commit on the old-frame data. That commit
+    also paved the walkway aprons out to a seawall again. Sections through the four clusters
+    (`scratch/fizz035/kingst_sw_sect.png`): each is paving laid down the shore's bank toward the water, 0.1 to
+    0.5 m under the ground. So at Kingston this is the aprons, the same ground the `seawall` branch works on, not a
+    general drift. Not yet looked at the same way: Naldo, Amsterdam Centraal.
+    Also seen: the game logs "Invalid ZIP file" once when a level's zip is copied into the mods folder while the
+    game watches it (the copy is caught half written; it mounts fine a moment later). A test artefact.
 
 Waiting on the user: a second update key pair (optional), so the first can be retired one day.
 
@@ -390,8 +401,10 @@ As of 2026-11-23:
     re-recorded; the other 38 catalogue areas not re-framed. (3) batch code removal: moved to the backlog as the first item of 0.3.7 (user's decision). (4) fixes seen in game: the gallery
     and the funicular (new area `fz_perce`, 2048 at 2 m, the whole 3.4 km tunnel: steepest 29.8 %, no filled dips,
     no gallery stretch; inside straight and steady at the lower end and the middle, the ground over it a plain
-    hillside; `scratch/fizz035/perce_*.jpg`). (5) the page's in-game pictures: the gallery and the track bridge added; a tiled
-    level, a road level and the thumbnail in the level list still missing.
+    hillside; `scratch/fizz035/perce_*.jpg`). (5) the page's in-game pictures: the gallery, the funicular and the track bridge added. The thumbnail: the
+    game lists a fresh level with `/levels/<name>/preview.png`, and that file is the MapNG card with the level's
+    name (`scratch/fizz035/thumb_preview.png`); the level list's own screen was not opened (the UI state would not
+    change by script). A road level's picture in game: still missing (no small road-level builder yet).
   - **Gallery fix seen in game 2026-11-24** (`fz_pigettes` as a 512 level, removed after): from the valley side a
     level roof on its columns, the road straight through; from the driver's seat the road runs in with no rise
     (`scratch/fizz035/pig_game_outside.jpg`, `pig_game_driver.jpg`).
