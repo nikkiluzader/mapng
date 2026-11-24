@@ -372,7 +372,10 @@ As of 2026-11-23:
       (3.96 m) agree, and every bridge way in five Tignes areas has the class of the roads at its ends. His
       picture shows a track about twice the deck's width: needs the place (which bridge) from him.
     - Seen on the way: a track's deck is bare concrete (no dirt on it).
-  - **Sweep owed** for the three fixes (tunnels, galleries, wing walls) before main. For later: Mesh Road joins and hairpins, the big tunnel box, water under small bridges.
+  - **Sweep, 2026-11-24, on b56d02d:** the 135-cell smoke matrix gives the same numbers in every cell as the last
+    clean one (`scratch/fizz035/sweep_fizz1.json` against `scratch/sweep_frame.json`); the ten flags against the
+    stored baselines are the same ten known ones. The smoke set has no avalanche gallery and no funicular, so it
+    shows nothing else moved; the fixes themselves are shown by `fz_pigettes`, the probes and the unit tests. For later: Mesh Road joins and hairpins, the big tunnel box, water under small bridges.
 
 ## Now: Fizz_Mechanic's 0.3.3 list (2026-11-19; on hold until after the 0.3.5 release, user 2026-11-20)
 
