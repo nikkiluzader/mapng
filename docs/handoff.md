@@ -41,6 +41,14 @@ when done, rewrite the "state" of the item you stop in. It does not replace the 
       level list and loaded in the game, the road warning in the browser with the reported road. The sweep on
       `7e241c3` is clean: 135 of 135 cells, identical to the previous clean sweep (`scratch/fizz035/sweep_zip.json`;
       it builds single levels only, so the pieces' path is covered by the tests and the six-piece level above).
+      **Road mode checked 2026-11-24:** a 5 km stretch of the reported road at 0.25 m (23 pieces) built with
+      `scratch/reports/MR-VYQGBY/roadsmall.mjs` (the app's own road setup): valid zip (1,177 files), listed with its
+      report by MapNG, loaded in the game, the corridor continuous across the pieces (`road_game.jpg`).
+      **Map view fix `8682cb7`:** the merged level kept the first chunk's info.json (one 512 m minimap tile at the
+      middle, its picture missing): in the game's map the road stood far off any picture (the user saw it). Now one
+      tile per piece at its place, and the level's size. Drawn with `scratch/reports/mapview.py`
+      (`scratch/reports/mapview_cmp.png`); levels on one grid were already right (`mapview_road1.png`). Not seen in
+      the game's own map screen yet.
       **Not done / not proven:** the window's out-of-memory crash itself (no log; likely the backdrop download in
       the window for a 158 km level, `ensureExportData` in ExportPanel: move that step to the runner on desktop?);
       no level over 65,535 files has been built end to end yet (only the writer is tested past it); the merged
