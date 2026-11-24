@@ -397,8 +397,12 @@ As of 2026-11-23:
   - **The five easy wins (user, 2026-11-24: do them, sidewalk drift last).** (1) earth on track bridge decks: done.
     (2) sweep areas on the corrected frame: the 15 smoke areas re-framed from their saved rasters
     (`REFRAME=1 fetchArea.mjs --catalog`, `scratch/levelprobe/reframe.sh`; the old heightmaps kept in
-    `scratch/levelprobe/oldframe/`), Mapterhorn fetched again; the matrix on them is running, baselines not yet
-    re-recorded; the other 38 catalogue areas not re-framed. (3) batch code removal: moved to the backlog as the first item of 0.3.7 (user's decision). (4) fixes seen in game: the gallery
+    `scratch/levelprobe/oldframe/`), Mapterhorn fetched again; the matrix on them ran twice with the same numbers in all 135 cells, and the
+    second run is recorded as the new baselines (2026-11-24). Against the old ones 51 values were worse, nearly all
+    small shifts from the ground moving about one sample. Two to look at: `zion` with shaping off now builds its
+    tunnel (it was left on the ground), and "spikes near structures" went 0 -> 927 (1 m lidar) and 0 -> 689
+    (Mapterhorn), read as the cliffs round the tunnel, not checked in pictures; `w_amsterdam@mh/noshape` longest
+    deck 95 -> 221 m, not looked at. The other 38 catalogue areas are not re-framed. (3) batch code removal: moved to the backlog as the first item of 0.3.7 (user's decision). (4) fixes seen in game: the gallery
     and the funicular (new area `fz_perce`, 2048 at 2 m, the whole 3.4 km tunnel: steepest 29.8 %, no filled dips,
     no gallery stretch; inside straight and steady at the lower end and the middle, the ground over it a plain
     hillside; `scratch/fizz035/perce_*.jpg`). (5) the page's in-game pictures: the gallery, the funicular and the track bridge added. The thumbnail: the
