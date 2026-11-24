@@ -32,12 +32,16 @@ REGION_OK = {
     'tropical': {'any', 'tropical'}, 'asia': {'any'},
 }
 TEX = re.compile(r'\.(dds|png|jpe?g)$', re.I)
+# official models seen textured in game although no materials file defines their materials (scripts/coverage)
+SEEN = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'seen_in_game.json'), encoding='utf-8'))['models']
 
 
 def game_index():
     """Every game file (real), the game's link files, its .dae files, and the materials it defines for every level
     (those in /art and /assets materials files load whatever level is played)."""
     real, links, zips, global_mats = set(), {}, {}, set()
+    vanilla_tex = set()   # textures the game's own materials name (to tell its dangling references from ours)
+    folder_mats = {}      # a game folder -> the materials its materials files define (loaded with a shape from it)
     for zp in glob.glob(os.path.join(GAME, '**', '*.zip'), recursive=True):
         try:
             z = zipfile.ZipFile(zp)
@@ -51,6 +55,21 @@ def game_index():
                 real.add(low)
                 if low.endswith('.dae'):
                     zips[low] = (zp, n)
+                if low.endswith('materials.json'):
+                    try:
+                        vanilla_tex.update(t.lower().lstrip('/') for t in re.findall(r'"(/?(?:levels|art|assets)/[^"]+?\.(?:dds|png|jpe?g))"', z.read(n).decode('utf-8', 'replace'), re.I))
+                    except (KeyError, zipfile.BadZipFile):
+                        pass
+                if low.endswith('materials.json'):
+                    try:
+                        d = json.loads(z.read(n))
+                        fm = folder_mats.setdefault(low.rsplit('/', 1)[0], set())
+                        for k, v in (d.items() if isinstance(d, dict) else []):
+                            fm.add(k.lower())
+                            if isinstance(v, dict) and isinstance(v.get('mapTo'), str):
+                                fm.add(v['mapTo'].lower())
+                    except (ValueError, KeyError, zipfile.BadZipFile):
+                        pass
                 if low.endswith('materials.json') and not low.startswith('levels/'):
                     try:
                         d = json.loads(z.read(n))
@@ -60,7 +79,7 @@ def game_index():
                         global_mats.add(k.lower())
                         if isinstance(v, dict) and isinstance(v.get('mapTo'), str):
                             global_mats.add(v['mapTo'].lower())
-    return real, links, zips, global_mats
+    return real, links, zips, global_mats, vanilla_tex, folder_mats
 
 
 def dae_materials(text):
@@ -86,7 +105,7 @@ def main():
     names = z.namelist(); lower = {n.lower(): n for n in names}
     level = next(n.split('/')[1] for n in names if re.match(r'levels/[^/]+/info\.json$', n))
     base = f'levels/{level}/'.lower()
-    real, glinks, gzips, global_mats = game_index()
+    real, glinks, gzips, global_mats, vanilla_tex, folder_mats = game_index()
 
     def level_link_target(p):
         n = lower.get(p + '.link')
@@ -137,16 +156,29 @@ def main():
                     for f in ('name', 'mapTo', 'internalName'):
                         if isinstance(v.get(f), str):
                             defined.add(v[f].lower())
-    undefined = {}; billboards = []
+    undefined = {}; billboards = []; fallback_ok = {}
     for p, o in official.items():
         src = gzips.get(o)
         if not src:
             undefined[o] = ['(model not found in the game files)']
             continue
         text = zipfile.ZipFile(src[0]).read(src[1]).decode('utf-8', 'replace')
-        miss = sorted(m for m in dae_materials(text) if m.lower() not in defined)
+        # (the game also loads the materials files in a shape's own folder with it, the link's target: seen in game,
+        # 2026-11-24, every model the level does not define materials for drew textured this way)
+        own = folder_mats.get(o.rsplit('/', 1)[0], set())
+        miss = sorted(m for m in dae_materials(text) if m.lower() not in defined and m.lower() not in own)
         if miss:
-            undefined[o] = miss
+            # (an undefined material falls back to the textures the model file names, relative to its folder: seen
+            # drawing correctly in game for all five such models, 2026-11-24. Warning only when those all exist)
+            folder = o.rsplit('/', 1)[0]
+            imgs = [re.sub(r'^\./', '', i.strip()) for i in re.findall(r'<init_from>([^<]+?\.(?:dds|png|jpe?g))</init_from>', text, re.I)]
+            def img_ok(i):
+                q = (i if i.startswith(('levels/', 'art/', 'assets/', '/')) else f'{folder}/{i}').lstrip('/').lower()
+                return q in real or TEX.sub('.dds', q) in real or q in glinks
+            if o in SEEN or (imgs and all(img_ok(i) for i in imgs)):
+                fallback_ok[o] = miss
+            else:
+                undefined[o] = miss
         if dae_has_billboard(text):
             billboards.append(o)
     for p in generated:
@@ -168,14 +200,15 @@ def main():
             p = tgt
         dds = TEX.sub('.dds', p)
         return p in real or dds in real or p in glinks
-    missing_tex = {}
+    missing_tex = {}; vanilla_dangling = {}
     for n in names:
         if not n.endswith('materials.json'):
             continue
         t = z.read(n).decode('utf-8', 'replace')
         for m in re.finditer(r'"(/?(?:levels|art|assets)/[^"]+?\.(?:dds|png|jpe?g))"', t, re.I):
             if not tex_ok(m.group(1)):
-                missing_tex.setdefault(m.group(1), set()).add(n.split(level + '/')[-1])
+                bucket = vanilla_dangling if m.group(1).lstrip('/').lower() in vanilla_tex else missing_tex
+                bucket.setdefault(m.group(1), set()).add(n.split(level + '/')[-1])
 
     report = {
         'level': level, 'region': region,
@@ -183,6 +216,8 @@ def main():
                    'tag library models in use for the region': len(want), 'of them placed': len(want) - len(missing_models),
                    'not placed': missing_models},
         'materials undefined': undefined,
+        'materials undefined, drawn from the model\'s own textures (warning)': fallback_ok,
+        'textures missing in the game itself too (its own materials name them)': {k: sorted(v) for k, v in vanilla_dangling.items()},
         'textures missing': {k: sorted(v) for k, v in missing_tex.items()},
         'billboard models (black boxes on a first load unless reloaded)': sorted(billboards),
     }
@@ -190,6 +225,7 @@ def main():
     print(f"  tag library models in use here: {len(want)}, placed: {len(want) - len(missing_models)}, not placed: {len(missing_models)}")
     print(f"  materials undefined: {len(undefined)} model(s)" + ''.join(f"\n    {k}: {v[:6]}" for k, v in list(undefined.items())[:12]))
     print(f"  textures missing: {len(missing_tex)}" + ''.join(f"\n    {k} (in {sorted(v)[:2]})" for k, v in list(missing_tex.items())[:12]))
+    print(f"  warnings: {len(fallback_ok)} model(s) drawn from their own textures (no material defined); {len(vanilla_dangling)} texture(s) missing in the game itself too")
     print(f"  billboard models: {len(billboards)}")
     if out_json:
         with open(out_json, 'w', encoding='utf-8') as f:

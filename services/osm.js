@@ -337,7 +337,9 @@ export const parseOverpassResponse = (data, bounds) => {
             id: el.id.toString(), type: "turning_circle",
             geometry: [{ lat: el.lat, lng: el.lon }], tags: el.tags,
           });
-        } else if (el.tags.natural === "tree" || el.tags.natural === "tree_row") {
+        // (a single mapped shrub too: fetched with the trees and planted as a bush by the export, it was dropped here.
+        // Found by the coverage level, scripts/coverage, 2026-11-24)
+        } else if (el.tags.natural === "tree" || el.tags.natural === "tree_row" || el.tags.natural === "shrub") {
           const tags = el.tags.natural === "tree_row"
             ? { ...el.tags, tree_row: "yes", source_feature: "tree_row" }
             : el.tags;
@@ -586,7 +588,9 @@ export const parseOverpassResponse = (data, bounds) => {
     }
     const isLinearWaterway = f.type === "water" && !!f.tags?.waterway && f.tags?.area !== "yes" && !isClosedRing(f.geometry);
     const isLinearPlatform = f.type === "platform" && !isClosedRing(f.geometry);
-    if (f.type === "road" || f.type === "railway" || f.type === "barrier" || f.type === "coastline" || f.type === "power_line" || f.type === "cliff" || isLinearWaterway || isLinearPlatform) {
+    // (a pier is a line too, man_made=pier on an open way: clipped as a polygon, a two-node jetty was dropped
+    // and a longer one came back closed. Found by the coverage level, scripts/coverage, 2026-11-24)
+    if (f.type === "road" || f.type === "railway" || f.type === "barrier" || f.type === "coastline" || f.type === "power_line" || f.type === "cliff" || f.type === "pier" || isLinearWaterway || isLinearPlatform) {
       const clippedSegments = clipLineString(f.geometry, bounds);
       clippedSegments.forEach((segment, index) => {
         if (segment.length > 1) {

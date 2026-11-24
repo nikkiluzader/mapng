@@ -23,11 +23,16 @@ const [area, pngOut] = process.argv.slice(2);
 const dir = `${AREAS_DIR}/${area}/`;
 const meta = JSON.parse(fs.readFileSync(dir + 'meta.json'));
 const osm = JSON.parse(fs.readFileSync(dir + 'osm.json'));
-const satPng = `${os.tmpdir()}/gametex_${area}_sat.png`;
-if (!fs.existsSync(satPng)) execFileSync('node', [`${REPO}/scripts/sweep/satellite.mjs`, '-', area, satPng], { stdio: 'inherit' });
-const img = await loadImage(fs.readFileSync(satPng));
-const satelliteCanvas = createCanvas(img.width, img.height);
-satelliteCanvas.getContext('2d').drawImage(img, 0, 0);
+// (a synthetic area, scripts/coverage: no satellite, as an export without imagery; the real place under its
+// coordinates has nothing to do with its layout)
+let satelliteCanvas = null;
+if (!meta.synthetic) {
+  const satPng = `${os.tmpdir()}/gametex_${area}_sat.png`;
+  if (!fs.existsSync(satPng)) execFileSync('node', [`${REPO}/scripts/sweep/satellite.mjs`, '-', area, satPng], { stdio: 'inherit' });
+  const img = await loadImage(fs.readFileSync(satPng));
+  satelliteCanvas = createCanvas(img.width, img.height);
+  satelliteCanvas.getContext('2d').drawImage(img, 0, 0);
+}
 // (as the app: the heights, for the shading taken out of the imagery and the
 // steep rock, and the land cover, ESA WorldCover, cached beside the area)
 const dem = fs.existsSync(dir + 'gpxz.f32') ? 'gpxz.f32' : 't30.f32';
@@ -36,6 +41,7 @@ let landCover = null;
 try {
   const n = Math.min(4096, Math.max(64, Math.ceil((meta.size * meta.mpp) / 10)));
   const lcf = `${dir}landcover_${n}.bin`;
+  if (meta.synthetic && !fs.existsSync(lcf)) throw new Error(`synthetic area without ${lcf}: run its builder`);
   if (!fs.existsSync(lcf)) {
     const { fetchWorldCoverGrid } = await import('../../services/worldCover.js');
     fs.writeFileSync(lcf, await fetchWorldCoverGrid(meta.bounds, n, n));
@@ -43,6 +49,6 @@ try {
   landCover = { grid: new Uint8Array(fs.readFileSync(lcf)), n };
 } catch (e) { console.warn('land cover unavailable:', e?.message || e); }
 const terrainData = { width: meta.size, height: meta.size, bounds: meta.bounds, heightMap, landCover, osmFeatures: fitTwinCarriageways(measureStreetWidths(roundRoadCorners(osm).features).features).features, processingMetersPerPixel: meta.mpp };
-const { blob } = await generateGameTexture(terrainData, { Roads: true, satelliteCanvas });
+const { blob } = await generateGameTexture(terrainData, { Roads: true, ...(satelliteCanvas ? { satelliteCanvas } : {}) });
 fs.writeFileSync(pngOut, Buffer.from(await blob.arrayBuffer()));
 console.log(`game texture ${fs.statSync(pngOut).size} bytes -> ${pngOut}`);

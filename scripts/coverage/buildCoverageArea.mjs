@@ -37,22 +37,34 @@ const SIZE = 1024; const MPP = 1; const HALF = (SIZE * MPP) / 2;
 // layout
 const COAST_X = -440; const RIVER_Y = -470; const HILL = { x: 0, y: 300, r: 100, h: 40 };
 const RAIL_Y = 200; const ROAD_TUNNEL_Y = 320; const RAIL_TUNNEL_Y = 280;
-const PLOT = 40; const PLOT_X0 = -400; const PLOT_X1 = 500; const PLOT_Y0 = -410; const PLOT_Y1 = 150;
+const PLOT = 40; const PW = 36; const PLOT_X0 = -400; const PLOT_X1 = 500; const PLOT_Y0 = -410; const PLOT_Y1 = 150;
 // property tags that only mean something on a road: put on a short street in their plot
 const ROAD_PROPERTY = /^(bridge|tunnel|sidewalk|maxspeed|priority_road|junction|lanes|surface|lit|oneway|cycleway|parking:lane|turn:lanes|width|hazard)=/;
 // a wildcard's stand-in value
 const STAND_IN = { shop: 'supermarket', amenity: 'bench', bridge: 'yes', tunnel: 'yes', sidewalk: 'both', maxspeed: '50', priority_road: 'designated', hazard: 'curve', man_made: 'tower', craft: 'carpenter', office: 'company', tourism: 'attraction', historic: 'memorial' };
 // tags whose node belongs on a road
-const ON_ROAD = /^(highway=(traffic_signals|crossing|stop|give_way|mini_roundabout|turning_circle|speed_camera|street_lamp|bus_stop|motorway_junction)|traffic_calming=|barrier=(gate|lift_gate|bollard|swing_gate|toll_booth|cattle_grid|kerb|block|cycle_barrier|chain|border_control))/;
+const ON_ROAD = /^(highway=(traffic_signals|crossing|mini_roundabout|turning_circle|speed_camera|street_lamp|bus_stop|motorway_junction)|traffic_calming=|barrier=(gate|lift_gate|swing_gate|sliding_gate|hampshire_gate|toll_booth|cattle_grid|border_control))/;
+// tags that stand on a footway through a fence (walkers' gates; bollards and chains are left out on drivable roads)
+const ON_PATH = /^barrier=(wicket_gate|kissing_gate|stile|turnstile|full-height_turnstile|bump_gate|entrance|bollard|block|kerb|cycle_barrier|chain)$/;
+// signs that need a junction ahead: on a side road, on its approach to the plot street
+const AT_JUNCTION = /^(highway=(stop|give_way)|traffic_sign=)/;
+// tags that describe what a building is used for: their areas are buildings
+const USE_OF_BUILDING = /^(amenity=(pub|fast_food|biergarten|nightclub|ice_cream|cafe|restaurant|bar)|tourism=(hotel|motel|hostel|guest_house)|shop=)/;
+// tags that belong in the water: built at the coast (pier, breakwater, groyne) or across the river (dam)
+const AT_COAST = /^man_made=(pier|breakwater|groyne|quay)$/;
+const ACROSS_RIVER = /^waterway=(dam|weir|lock_gate)$/;
 
 export function heightAt(x, y) {
-  let h = 20;
+  // (land a few metres above the sea, as a coastal town: a 20 m-high coast made every street ramp down to the coast
+  // road and the railway climb out of the sea on a viaduct)
+  let h = 4;
   const d2 = (x - HILL.x) ** 2 + (y - HILL.y) ** 2;
   h += HILL.h * Math.exp(-d2 / (2 * HILL.r * HILL.r));
   // the river valley: 5 m down, 50 m wide, easing out
-  const dv = Math.abs(y - RIVER_Y); if (dv < 60) h -= 5 * Math.max(0, 1 - (dv / 60) ** 2);
+  const dv = Math.abs(y - RIVER_Y); if (dv < 60) h -= 3.5 * Math.max(0, 1 - (dv / 60) ** 2);
   // the coast: down to the sea floor west of the coastline over 30 m
-  if (x < COAST_X + 30) h = Math.min(h, 20 - Math.min(26, (COAST_X + 30 - x) * 0.6));
+  // (a beach down to the sea over 30 m, then the sea floor down to 10 m)
+  if (x < COAST_X + 30) h = Math.min(h, x >= COAST_X ? (4 * (x - COAST_X)) / 30 : -Math.min(10, (COAST_X - x) * 0.3));
   return h;
 }
 
@@ -108,46 +120,64 @@ export function buildCoverage(regionKey) {
   way([[420, RIVER_Y - 20], [420, RIVER_Y + 20]], { highway: 'footway', bridge: 'yes', layer: '1' });
   way([[420, RIVER_Y + 20], [420, RIVER_Y + 30]], { highway: 'footway' });
   placed.push({ what: 'footbridge', at: [420, RIVER_Y] });
-  area(-180, 300, 90, 60, { natural: 'water', name: 'Coverage Lake' });
+  // (clear of the tunnel approaches and the power lines)
+  area(-250, 392, 80, 36, { natural: 'water', name: 'Coverage Lake' });
+  // (a wood and a scrub big enough for every tree kind of the mix: land cover alone plants no trees, it only keeps
+  // or drops those of mapped woods and the satellite's canopy, and a synthetic area has no satellite)
+  area(370, 372, 220, 70, { natural: 'wood', name: 'Coverage Wood' });
+  area(-330, 260, 120, 60, { natural: 'scrub', name: 'Coverage Scrub' });
   // (tunnels through the hill: a road and a railway)
   way([[-250, ROAD_TUNNEL_Y], [-110, ROAD_TUNNEL_Y]], { highway: 'secondary', name: 'Tunnel Road' });
   way([[-110, ROAD_TUNNEL_Y], [110, ROAD_TUNNEL_Y]], { highway: 'secondary', tunnel: 'yes', layer: '-1', name: 'Tunnel Road' });
   way([[110, ROAD_TUNNEL_Y], [250, ROAD_TUNNEL_Y]], { highway: 'secondary', name: 'Tunnel Road' });
-  // ── the railway: along y = RAIL_Y, a level crossing on the coast road, a siding, a rail tunnel ──
+  // ── the railway: along y = RAIL_Y from the flat at x = -400 (begun on the beach, 4 m up in 27 m, it came out ramped
+  // on a viaduct), a level crossing on a road of its own at x = -300, a siding, a rail tunnel ──
   {
-    const xs = [COAST_X - 20, COAST_X + 10]; for (let x = -400; x <= HALF + 20; x += 40) xs.push(x);
-    way(xs.map((x) => [x, RAIL_Y, x === COAST_X + 10 ? { railway: 'level_crossing' } : undefined]), { railway: 'rail', usage: 'main', gauge: '1435', name: 'Coverage Line' });
+    const xs = [-300];
+    for (let x = -400; x <= HALF + 20; x += 40) xs.push(x);
+    xs.sort((a, b) => a - b);
+    way(xs.map((x) => [x, RAIL_Y, x === -300 ? { railway: 'level_crossing' } : undefined]), { railway: 'rail', usage: 'main', gauge: '1435', name: 'Coverage Line' });
+    way([[-300, RAIL_Y - 40], [-300, RAIL_Y], [-300, RAIL_Y + 40]], { highway: 'tertiary', name: 'Crossing Road' });
   }
   way([[-40, RAIL_Y], [60, RAIL_Y - 12], [200, RAIL_Y - 12]], { railway: 'rail', service: 'siding' });
   node(-40, RAIL_Y, { railway: 'switch' });
   way([[-250, RAIL_TUNNEL_Y], [-100, RAIL_TUNNEL_Y]], { railway: 'rail', usage: 'branch' });
   way([[-100, RAIL_TUNNEL_Y], [100, RAIL_TUNNEL_Y]], { railway: 'rail', usage: 'branch', tunnel: 'yes', layer: '-1' });
   way([[100, RAIL_TUNNEL_Y], [250, RAIL_TUNNEL_Y]], { railway: 'rail', usage: 'branch' });
-  way([[COAST_X + 40, RAIL_Y - 8], [COAST_X + 140, RAIL_Y - 8]], { railway: 'platform' });
+  way([[-260, RAIL_Y - 8], [-160, RAIL_Y - 8]], { railway: 'platform' });
   // ── power: on towers, on poles, a minor line meeting the pole line at a shared node ──
-  line(-450, 470, 480, 470, 240, { power: 'line', voltage: '220000' }, () => ({ power: 'tower' }));
-  line(-450, 430, 480, 430, 80, { power: 'line' }, () => ({ power: 'pole' }));
+  line(-400, 470, 480, 470, 220, { power: 'line', voltage: '220000' }, () => ({ power: 'tower' }));
+  line(-400, 430, 480, 430, 80, { power: 'line' }, () => ({ power: 'pole' }));
   way([[120, 430, { power: 'pole' }], [120, 380, { power: 'pole' }], [160, 360, { power: 'pole' }]], { power: 'minor_line' });
 
   // ── the plots: one per tag MapNG builds ──
   const lib = JSON.parse(fs.readFileSync(path.join(REPO, 'data/osm-tag-library.json'), 'utf8'));
   const wanted = [];
+  // (tags the layout's own structures already carry, not repeated in a plot: an inland coastline would cut the land)
+  const BUILT_ELSEWHERE = new Set(['natural=coastline']);
   for (const [tag, e] of Object.entries(lib.tags)) {
     if (e.status !== 'built' && e.status !== 'partial') continue;
+    if (BUILT_ELSEWHERE.has(tag)) continue;
     wanted.push({ tag, on: e.on, group: e.group });
     for (const also of e.also || []) wanted.push({ tag: also, on: e.on, group: e.group, also: tag });
   }
   // (a few the plots need with their values spelled out: every sport on a pitch, every surface of a road)
+  // (every placed-object rule of data/tag-models.json, as a mapped point with the sub-tags its rule asks for)
+  const models = JSON.parse(fs.readFileSync(path.join(REPO, 'data/tag-models.json'), 'utf8'));
+  for (const [id, o] of Object.entries(models.objects || {})) {
+    const extra = Object.fromEntries(Object.entries(o.when || {}).map(([k, vals]) => [k, vals[0]]));
+    wanted.push({ tag: o.tag, on: ['node'], extra, rule: id });
+  }
   const SPORTS = ['soccer', 'tennis', 'basketball', 'baseball', 'american_football', 'volleyball', 'running', 'golf', 'skateboard', 'multi'];
   for (const sport of SPORTS) wanted.push({ tag: 'leisure=pitch', on: ['area'], extra: { sport, lit: 'yes' } });
-  const cols = Math.floor((PLOT_X1 - PLOT_X0) / PLOT); const rows = Math.floor((PLOT_Y1 - PLOT_Y0) / PLOT);
+  const cols = Math.floor((PLOT_X1 - PLOT_X0) / PW); const rows = Math.floor((PLOT_Y1 - PLOT_Y0) / PLOT);
   if (wanted.length > cols * rows) throw new Error(`${wanted.length} plots wanted, the grid holds ${cols * rows}: widen it`);
   // (the streets: one along the south side of each plot row, with sidewalks)
   const streetNodes = [];
   for (let r = 0; r < rows; r++) {
     const y = PLOT_Y0 + r * PLOT;
-    const pts = []; for (let c = 0; c <= cols; c++) pts.push([PLOT_X0 + c * PLOT, y]);
-    for (let c = 0; c < cols; c++) pts.push([PLOT_X0 + c * PLOT + PLOT / 2, y]);
+    const pts = []; for (let c = 0; c <= cols; c++) pts.push([PLOT_X0 + c * PW, y]);
+    for (let c = 0; c < cols; c++) pts.push([PLOT_X0 + c * PW + PW / 2, y]);
     pts.sort((a, b) => a[0] - b[0]);
     pts.unshift([COAST_X + 10, y]);   // (joined to the coast road)
     way(pts, { highway: 'residential', name: `Plot Street ${r + 1}`, sidewalk: 'both', lanes: '2' });
@@ -155,23 +185,52 @@ export function buildCoverage(regionKey) {
   }
   wanted.forEach((w, i) => {
     const c = i % cols; const r = Math.floor(i / cols);
-    const x0 = PLOT_X0 + c * PLOT; const y0 = PLOT_Y0 + r * PLOT;
-    const cx = x0 + PLOT / 2; const cy = y0 + PLOT / 2 + 3;
+    const x0 = PLOT_X0 + c * PW; const y0 = PLOT_Y0 + r * PLOT;
+    const cx = x0 + PW / 2; const cy = y0 + PLOT / 2 + 3;
     const [k, v] = w.tag.split('='); const tags = { [k]: v === '*' ? (STAND_IN[k] || 'yes') : v, name: `cov ${w.tag}`, ...(w.extra || {}) };
-    if (k === 'building' || tags.building) Object.assign(tags, { 'building:levels': String(1 + (i % 4)) });
-    // (a water= tag describes a water area)
+    // (no building:levels: each class's own default height is what is being tested)
+    // (a closed highway=* way is a loop unless tagged as an area: the plots' highway areas are plazas)
+    if (k === 'highway' && w.on.includes('area')) tags.area = 'yes';
+    // (a water= tag describes a water area; a river's, canal's or stream's area has its waterway line through it,
+    // as mapped: the water is built along the line, the area shapes its banks)
     if (k === 'water') tags.natural = 'water';
-    let kind;
-    if (ROAD_PROPERTY.test(w.tag)) {
+    if (k === 'water' && ['river', 'canal', 'stream'].includes(v)) way([[x0 + 2, cy], [x0 + PW - 2, cy]], { waterway: v, name: `cov line for ${w.tag}` });
+    if (USE_OF_BUILDING.test(w.tag)) tags.building ||= 'yes';
+    const t = `${k}=${tags[k]}`;
+    let kind; let at = [cx, cy];
+    if (w.rule) {
+      // (a placed-object rule: a point beside the plot street, as most are mapped)
+      node(cx, y0 + 9, tags); kind = `object rule ${w.rule}`; at = [cx, y0 + 9];
+    } else if (ON_PATH.test(t)) {
+      // (a footway from the street through a fence, the barrier on the footway where it crosses the fence)
+      way([[x0 + 3, cy], [cx, cy], [x0 + PW - 3, cy]], { barrier: 'fence' });
+      way([[cx, y0], [cx, cy, tags], [cx, y0 + PLOT - 4]], { highway: 'footway' });
+      kind = 'on a footway through a fence';
+    } else if (AT_JUNCTION.test(t)) {
+      // (a side road meeting the plot street; the sign on its last metres before the junction)
+      if (k === 'traffic_sign') Object.assign(tags, { traffic_sign: 'maxspeed', maxspeed: '50' });
+      way([[cx, y0 + PLOT - 6], [cx, y0 + 9, tags], [cx, y0]], { highway: 'residential', name: `cov side road ${i}` });
+      kind = 'on a side road before the junction'; at = [cx, y0 + 9];
+    } else if (AT_COAST.test(t)) {
+      // (out from the coast into the sea, beside this plot's row)
+      const yy = y0 + PLOT / 2; way([[COAST_X + 6, yy], [COAST_X - 45, yy]], tags);
+      kind = 'out from the coast'; at = [COAST_X - 20, yy];
+    } else if (ACROSS_RIVER.test(t)) {
+      // (across the whole valley, bank top to bank top: a dam with no drop under its crest is left to the ground)
+      const xx = 360 + (i % 3) * 8; way([[xx, RIVER_Y - 58], [xx, RIVER_Y + 58]], tags);
+      kind = 'across the river'; at = [xx, RIVER_Y];
+    } else if (t === 'man_made=fuel_pump') {
+      area(cx, cy, 24, 24, { amenity: 'fuel', name: 'cov fuel station for the pump' }); node(cx, cy, tags); kind = 'node in a fuel station';
+    } else if (ROAD_PROPERTY.test(w.tag)) {
       // (on a short road of its own, joined to the plot street: a roundabout as a closed loop)
       if (w.tag === 'junction=roundabout') { const r0 = 10; const pts = []; for (let a = 0; a <= 12; a++) pts.push([cx + r0 * Math.cos((a / 12) * 2 * Math.PI), cy + r0 * Math.sin((a / 12) * 2 * Math.PI)]); pts[12] = pts[0]; way(pts, { highway: 'residential', ...tags }); }
       else way([[cx, y0], [cx, y0 + PLOT - 6]], { highway: 'residential', ...tags, ...(k === 'bridge' ? { layer: '1' } : k === 'tunnel' ? { layer: '-1' } : {}) });
       kind = 'on a road';
     } else if (w.on.includes('node') && ON_ROAD.test(w.tag)) { node(cx, y0, tags); kind = 'node on the street'; }
     else if (w.on.includes('area')) { area(cx, cy, 24, 24, tags); kind = 'area'; }
-    else if (w.on.includes('way')) { way([[x0 + 4, cy], [x0 + PLOT - 4, cy]], tags); kind = 'way'; }
+    else if (w.on.includes('way')) { way([[x0 + 3, cy], [x0 + PW - 3, cy]], tags); kind = 'way'; }
     else { node(cx, cy, tags); kind = 'node'; }
-    placed.push({ what: w.tag + (w.extra ? ` ${JSON.stringify(w.extra)}` : ''), kind, at: [Math.round(cx), Math.round(cy)], also: w.also });
+    placed.push({ what: w.tag + (w.extra && Object.keys(w.extra).length ? ` ${JSON.stringify(w.extra)}` : ''), kind, at: at.map(Math.round), plot: [Math.round(cx), Math.round(cy)], also: w.also, rule: w.rule });
   });
   return { region: regionKey, label: R.label, center: { lat: R.lat, lng: R.lng }, bounds, elements, placed };
 }
@@ -194,10 +253,13 @@ async function writeArea(regionKey) {
   for (let r = 0; r < lcN; r++) for (let c = 0; c < lcN; c++) {
     const x = (c + 0.5) * 10 - HALF; const y = HALF - (r + 0.5) * 10;
     if (x < COAST_X) lc[r * lcN + c] = 80;
-    else if (y > 180) lc[r * lcN + c] = CLASSES[Math.floor(((x + HALF) / (2 * HALF)) * CLASSES.length) % CLASSES.length];
+    // (the bands on land, from the top of the beach to the east edge: spread over the whole width, the trees' band
+    // fell in the sea)
+    else if (y > 180) lc[r * lcN + c] = x < -410 ? 30 : CLASSES[Math.min(CLASSES.length - 1, Math.floor(((x + 410) / (HALF + 410)) * CLASSES.length))];
     else lc[r * lcN + c] = 50;
   }
-  fs.writeFileSync(path.join(dir, 'landcover.bin'), Buffer.from(lc));
+  // (under both names the tools read: landcover.bin for the export, landcover_<n>.bin for the game texture painter)
+  for (const f of ['landcover.bin', `landcover_${lcN}.bin`]) fs.writeFileSync(path.join(dir, f), Buffer.from(lc));
   // every tree kind, equally (services/treeSpecies.js kinds)
   const KINDS = ['palm', 'live_oak', 'oak', 'broadleaf', 'conifer', 'juniper', 'eucalyptus', 'olive', 'cypress', 'tropical'];
   fs.writeFileSync(path.join(dir, 'tree_mix.json'), JSON.stringify({ shares: Object.fromEntries(KINDS.map((k) => [k, 1 / KINDS.length])), records: 1000 }, null, 1));

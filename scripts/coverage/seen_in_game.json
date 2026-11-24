@@ -1,0 +1,14 @@
+{
+  "about": "Official models whose materials no level or game materials file defines, but which drew fully textured in game (the engine falls back to the model file's own material data). Each was looked at in the coverage level; a new model with undefined materials still fails the check until it is looked at and added here with the date.",
+  "models": {
+    "levels/italy/art/shapes/buildings/italy_wall_stone.dae": "2026-11-24 stone wall, textured",
+    "levels/italy/art/shapes/buildings/italy_bld_boomgate_6.5m.dae": "2026-11-24 red and white post, arm raised",
+    "levels/utah/art/shapes/buildings/ut_picnic_table_a.dae": "2026-11-24 wooden table, textured",
+    "levels/italy/art/shapes/buildings/electric_box_big.dae": "2026-11-24 grey cabinet",
+    "levels/utah/art/shapes/buildings/ut_bbq_roof_a.dae": "2026-11-24 wooden shelter roof, textured",
+    "levels/italy/art/shapes/buildings/italy_castle_statue.dae": "2026-11-24 statue on a plinth, textured",
+    "levels/hirochi_raceway/art/shapes/objects/concrete_block.dae": "2026-11-24 plain concrete block",
+    "art/shapes/objects/bollard_yellow.dae": "2026-11-24 yellow bollard",
+    "levels/johnson_valley/art/shapes/building/s_watertank.dae": "2026-11-24 rooftop water tank, textured"
+  }
+}

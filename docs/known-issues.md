@@ -75,6 +75,23 @@ test level are not to be judged.
 
 ---
 
+## Test exports: no grass on unmapped ground (fixed 2026-11-24)
+
+**Looked like:** a level from `scripts/sweep/exportArea.mjs` with bare ground, short dirt-coloured tufts at most,
+where the browser and desktop app grow full grass. More than half the terrain stayed `DefaultMaterial`, which no
+ground cover grows on.
+**Cause:** unmapped ground becomes Grass where the base texture is green (`buildVegetationMask`,
+`services/exportBeamNGLevel.js`), read with `createImageBitmap` + `getImageData`. The Node polyfill
+(`scripts/sweep/polyfill.mjs`) had neither pixel read, so the mask came back null without a word and every test
+export (the sweep's too) had no grass there.
+**Fix:** the polyfill decodes a resized bitmap to pixels (sharp) and answers `getImageData` from the window drawn.
+Grass went from 3 % to 36 % of the coverage level.
+**Related trap (synthetic areas):** the test painter (`scripts/sweep/gametexnode.mjs`) fetched the real satellite
+image and land cover of the area's coordinates. For a synthetic area (`meta.synthetic`) it now paints without a
+satellite and reads the area's own land cover.
+
+---
+
 ## Edits to `services/` while a sweep runs
 
 **Looks like:** a sweep result that matches neither the old nor the new code. **Cause:** the sweep runs the working

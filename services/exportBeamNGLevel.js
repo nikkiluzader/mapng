@@ -15751,6 +15751,13 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     })
     : [];
   const barrierFolderItems = buildBarrierFolderItems(barrierObjects);
+  {
+    // (what the barrier step placed, by model, and the gates it opened: the export log names every step's result)
+    const byModel = {};
+    for (const o of barrierObjects) { const k = String(o.shapeName || o.shapeFile || '?').split('/').pop(); byModel[k] = (byModel[k] || 0) + 1; }
+    const models = Object.entries(byModel).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${v} ${k}`).join(', ');
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Barriers: ${includeNativeBarriers ? `${barrierObjects.length} object(s)${models ? ` (${models})` : ''}${barrierObjects.gateStats?.length ? `; open gates and openings: ${barrierObjects.gateStats.map(([k, v]) => `${v} ${k}`).join(', ')}` : ''}` : 'none (the game\'s barrier models are switched off for this export)'}.`);
+  }
   // divided fast roads: the game's jersey barriers down a narrow median
   for (const [i, line] of (sidewalks.medianRuns?.jersey || []).entries()) {
     for (let k = 0; k + 1 < line.length; k++) {
@@ -16327,6 +16334,12 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       dropped += list.length - keep.length; forestPlacements.set(type, keep);
     }
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Shape: ${dropped} tree(s) and prop(s) outside the footprint left out.`);
+  }
+  {
+    // (what the vegetation step planted, by item type, most first: the export log names every step's result)
+    const counts = [...forestPlacements].map(([type, list]) => [type, list.length]).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+    const total = counts.reduce((s, [, n]) => s + n, 0);
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Vegetation: ${total} tree(s), bush(es) and prop(s) of ${counts.length} type(s)${counts.length ? `: ${counts.slice(0, 25).map(([t, n]) => `${n} ${t}`).join(', ')}${counts.length > 25 ? `, and ${counts.length - 25} more type(s)` : ''}` : ''}.`);
   }
   const forestFiles = serializeForestFiles(forestPlacements);
   vegLap('forest files written');

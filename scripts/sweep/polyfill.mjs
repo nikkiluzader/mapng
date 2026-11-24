@@ -27,7 +27,28 @@ export function installCanvasPolyfill() {
       this._ctx = {
         fillStyle: '#000000',
         // (a real image drawn over the whole canvas: kept, resized by toBlob)
-        drawImage: (bmp) => { if (bmp?._buf) this._src = bmp._buf; },
+        drawImage: (bmp, ...a) => {
+          if (bmp?._buf) this._src = bmp._buf;
+          // (a decoded bitmap drawn as a window, drawImage(bmp, sx, sy, sw, sh, dx, dy, dw, dh) at 1:1: kept for
+          // getImageData, so the export's pixel reads (the vegetation mask) see the real picture)
+          if (bmp?._raw) this._win = { bmp, sx: a.length >= 8 ? a[0] : 0, sy: a.length >= 8 ? a[1] : 0, dx: a.length >= 8 ? a[4] : (a[0] || 0), dy: a.length >= 8 ? a[5] : (a[1] || 0) };
+        },
+        clearRect: () => { this._win = null; },
+        getImageData: (x, y, w, h) => {
+          const data = new Uint8ClampedArray(w * h * 4); const win = this._win;
+          if (win) {
+            const { bmp } = win;
+            for (let r = 0; r < h; r++) {
+              const syy = win.sy + (y + r - win.dy); if (syy < 0 || syy >= bmp.height) continue;
+              for (let c = 0; c < w; c++) {
+                const sxx = win.sx + (x + c - win.dx); if (sxx < 0 || sxx >= bmp.width) continue;
+                const si = (syy * bmp.width + sxx) * 4; const di = (r * w + c) * 4;
+                data[di] = bmp._raw[si]; data[di + 1] = bmp._raw[si + 1]; data[di + 2] = bmp._raw[si + 2]; data[di + 3] = bmp._raw[si + 3];
+              }
+            }
+          }
+          return { width: w, height: h, data };
+        },
         fillRect() {},
         putImageData() {},
         createImageData(w, h) {
@@ -66,11 +87,16 @@ export function installCanvasPolyfill() {
 
   // real images (the base texture handed in) decoded for their size, kept for
   // drawImage; the exporter's own stubs as before
-  globalThis.createImageBitmap = async (blob) => {
+  globalThis.createImageBitmap = async (blob, opts) => {
     if (typeof Blob !== 'undefined' && blob instanceof Blob) {
       const buf = Buffer.from(await blob.arrayBuffer());
       try {
         const m = await sharp(buf).metadata();
+        // (asked at a size: decoded to pixels at that size as well, for getImageData)
+        if (opts?.resizeWidth && opts?.resizeHeight) {
+          const raw = await sharp(buf).resize(opts.resizeWidth, opts.resizeHeight, { fit: 'fill' }).ensureAlpha().raw().toBuffer();
+          return { width: opts.resizeWidth, height: opts.resizeHeight, _buf: buf, _raw: raw, close() {} };
+        }
         return { width: m.width, height: m.height, _buf: buf, close() {} };
       } catch { /* not an image */ }
     }

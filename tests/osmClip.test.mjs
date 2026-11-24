@@ -18,3 +18,31 @@ test('a water outline crossing the map edge stays a closed ring after clipping',
   assert.deepEqual(g[0], g[g.length - 1], 'first point repeated at the end');
   assert.ok(g.every((p) => p.lng <= 1 + 1e-9), 'inside the bounds');
 });
+
+test('a pier mapped as an open line stays an open line: two-node jetties kept, longer ones not closed', () => {
+  const bounds = { north: 1, south: 0, east: 1, west: 0 };
+  const data = { elements: [
+    { type: 'way', id: 21, tags: { man_made: 'pier' }, geometry: [[0.2, 0.5], [0.4, 0.5]].map(([lng, lat]) => ({ lat, lon: lng })) },
+    { type: 'way', id: 22, tags: { man_made: 'pier' }, geometry: [[0.5, 0.5], [0.6, 0.5], [0.6, 0.6]].map(([lng, lat]) => ({ lat, lon: lng })) },
+    // (crossing the map edge: cut at it, as a line)
+    { type: 'way', id: 23, tags: { man_made: 'pier' }, geometry: [[0.8, 0.2], [1.3, 0.2]].map(([lng, lat]) => ({ lat, lon: lng })) },
+  ] };
+  const piers = parseOverpassResponse(data, bounds).filter((f) => f.type === 'pier');
+  const byWay = (id) => piers.filter((f) => String(f.id).split('_')[0] === id);
+  assert.equal(byWay('21').length, 1, 'the two-node jetty is kept');
+  assert.equal(byWay('21')[0].geometry.length, 2);
+  const bent = byWay('22')[0];
+  assert.equal(bent.geometry.length, 3, 'the bent pier keeps its three nodes, not closed back to its start');
+  const cut = byWay('23')[0];
+  assert.ok(cut && cut.geometry.every((p) => p.lng <= 1 + 1e-9), 'the pier over the edge is cut at the bounds');
+});
+
+test('a single mapped shrub (natural=shrub node) is kept as vegetation, as a tree is', () => {
+  const bounds = { north: 1, south: 0, east: 1, west: 0 };
+  const data = { elements: [
+    { type: 'node', id: 31, lat: 0.5, lon: 0.5, tags: { natural: 'shrub' } },
+    { type: 'node', id: 32, lat: 0.6, lon: 0.5, tags: { natural: 'tree' } },
+  ] };
+  const veg = parseOverpassResponse(data, bounds).filter((f) => f.type === 'vegetation');
+  assert.deepEqual(veg.map((f) => f.tags.natural).sort(), ['shrub', 'tree']);
+});
