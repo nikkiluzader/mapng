@@ -8400,8 +8400,10 @@ const WATER_BLOCK_TEMPLATE = {
   foamMaxDepth: 0.150000006,
   foamRippleInfluence: 0.0149999997,
   foamTex: '/assets/materials/tileable/water/water_effects/foam2_b.color.dds',
-  fresnelBias: 0.2,
-  fresnelPower: 20,
+  // (power 6, not Italy quarry's 20: at 20 the sky showed only at grazing angles, and from a driver's height every
+  // lake and pond read as a matte sheet of colour; checked in game, 2026-11-24. West Coast USA's lake: 0.1 / 10)
+  fresnelBias: 0.12,
+  fresnelPower: 6,
   fullReflect: false,
   // No occlusion query: the game keeps one for every water object to skip its planar reflection when the water is
   // out of sight, and MapNG's lakes and rivers have no planar reflection (fullReflect off). A level with 11,301 of
@@ -8435,7 +8437,8 @@ const STILL_WATER_LOOKS = {
   lagoon: { baseColor: [28, 118, 122, 255], underwaterColor: [40, 110, 110, 220], clarity: 0.35, depthGradientTex: '/assets/materials/tileable/water/depthcolor_ramp/depthcolor_ramp_tropical_b.png', depthGradientMax: 12, overallRippleMagnitude: 0.7 },
   moat: { baseColor: [46, 68, 42, 255], underwaterColor: [44, 58, 38, 245], clarity: 0.07, depthGradientTex: '/assets/materials/tileable/water/depthcolor_ramp/depthcolor_ramp_mud1_b.png', depthGradientMax: 5, overallRippleMagnitude: 0.2, waterFogDensity: 1.4 },
   fishpond: { baseColor: [52, 82, 40, 255], underwaterColor: [48, 70, 38, 245], clarity: 0.05, depthGradientTex: '/assets/materials/tileable/water/depthcolor_ramp/depthcolor_ramp_mud1_b.png', depthGradientMax: 3, overallRippleMagnitude: 0.3, waterFogDensity: 1.6 },
-  salt_pool: { baseColor: [176, 150, 140, 255], underwaterColor: [170, 150, 140, 200], clarity: 0.3, depthGradientTex: '/assets/materials/tileable/water/depthcolor_ramp/depthcolor_ramp_SI_b.png', depthGradientMax: 2, overallRippleMagnitude: 0.1, reflectivity: 0.9 },
+  // (pale: the small-island ramp it had is blue, and with a mirror's reflectivity the sky made it blue water)
+  salt_pool: { baseColor: [200, 186, 176, 255], underwaterColor: [190, 176, 166, 220], clarity: 0.2, depthGradientTex: '/assets/materials/tileable/water/depthcolor_ramp/depthcolor_ramp_mud1_b.png', depthGradientMax: 2, overallRippleMagnitude: 0.1, reflectivity: 0.45 },
   river: { depthGradientTex: '/assets/materials/tileable/water/depthcolor_ramp/depthcolor_ramp_italy_rivers_b.png', depthGradientMax: 6, overallRippleMagnitude: 0.8 },
 };
 

@@ -652,6 +652,7 @@ export function planLakes({ features = [], toWorld, heightAt, seaZ = null, minCe
   const lakes = [];   // { poly, level } for carveLakeBeds
   const stats = { lakes: 0, dry: 0, tiles: 0, riverAreas: 0 };
   let dams = null;
+  let riverLinesInside = null;
   for (const f of features) {
     if (f.type !== 'water' || !(f.geometry?.length > 3) || !isClosed(f.geometry)) continue;
     const t = f.tags || {};
@@ -663,8 +664,34 @@ export function planLakes({ features = [], toWorld, heightAt, seaZ = null, minCe
       if (!fullBehindDam(t, poly, heightAt, (dams ||= damPointsOf(features, toWorld)))) { stats.dry++; continue; }
       stats.fullBehindDam = (stats.fullBehindDam || 0) + 1;
     }
-    // (a river's outline only where it is area water; the rest are Rivers)
-    if (river && !isRiverArea(t, poly, heightAt)) continue;
+    // (a river's outline only where it is area water; the rest are Rivers. One with no waterway line running through
+    // it has no River to give it water: area water then, or a canal or stream mapped only as its outline stayed dry
+    // ground: coverage level, 2026-11-24)
+    if (river && !isRiverArea(t, poly, heightAt)) {
+      const lines = (riverLinesInside ||= features.filter((g) => g.tags?.waterway && RIVER_KINDS[norm(g.tags.waterway)] && g.geometry?.length >= 2)
+        .map((g) => Object.assign(g.geometry.map((q) => toWorld(q.lat, q.lng)), { kind: norm(g.tags.waterway) })));
+      // (along each segment every 2 m: a line drawn across the outline with its nodes outside it)
+      const crosses = (pts) => pts.some(([x, y], i) => {
+        if (poly.contains(x, y)) return true;
+        if (!i) return false;
+        const [px, py] = pts[i - 1]; const n = Math.ceil(fastHypot(x - px, y - py) / 2);
+        for (let k = 1; k < n; k++) if (poly.contains(px + ((x - px) * k) / n, py + ((y - py) * k) / n)) return true;
+        return false;
+      });
+      // (and its River would run through it: not where the outline is wider than FOREIGN_FROM times the line's usual
+      // width, which planRivers takes for other water and leaves the line out; then the outline is the water)
+      // (planRivers' own test: wider across than FOREIGN_FROM widths and no longer along the line than across)
+      const otherWater = (pts) => {
+        const [ax, ay] = pts[0]; const [bx, by] = pts[pts.length - 1]; const L = fastHypot(bx - ax, by - ay) || 1;
+        const ux = (bx - ax) / L; const uy = (by - ay) / L;
+        let a0 = Infinity; let a1 = -Infinity; let c0 = Infinity; let c1 = -Infinity;
+        for (const [x, y] of poly.outer) { const a = x * ux + y * uy; const c = -x * uy + y * ux; a0 = Math.min(a0, a); a1 = Math.max(a1, a); c0 = Math.min(c0, c); c1 = Math.max(c1, c); }
+        // (a hair of slack: planRivers measures along in 2 m steps, short of the outline's full length)
+        return c1 - c0 > RIVER_KINDS[pts.kind].width * FOREIGN_FROM && a1 - a0 <= (c1 - c0) + WIDTH_STEP_M;
+      };
+      if (lines.some((pts) => crosses(pts) && !otherWater(pts))) continue;
+      stats.riverAreasWithoutLine = (stats.riverAreasWithoutLine || 0) + 1;
+    }
     if (river) stats.riverAreas++;
     // the lake's level: the median ground inside it
     const inside = groundInside(poly, heightAt);

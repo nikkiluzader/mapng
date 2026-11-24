@@ -213,3 +213,15 @@ test('building=roof: a roof on posts, open underneath (coverage level, 2026-11-2
   assert.equal(far, 0, 'no wall or post inside the outline: open underneath');
   assert.equal(mid, 0, 'posts run from the ground to the slab: no vertices partway up');
 });
+
+test('ruins: roofless broken stone walls, no roof over them (coverage level, 2026-11-24)', () => {
+  const { meshes, count } = buildTexturedBuildings([rect('ru', 0, 0, 20, 14, { building: 'ruins' })], project);
+  assert.equal(count, 1);
+  let inside = 0; let top = 0;
+  for (const mesh of meshes) {
+    const p = mesh.geometry.getAttribute('position').array;
+    for (let i = 0; i < p.length; i += 3) { top = Math.max(top, p[i + 2]); if (Math.min(p[i], 20 - p[i], p[i + 1], 14 - p[i + 1]) > 1.2 && p[i + 2] > 100.5) inside++; }
+  }
+  assert.equal(inside, 0, 'nothing over the middle: no roof');
+  assert.ok(top > 101.5 && top < 105, `walls broken to a few metres: ${(top - 100).toFixed(1)} m`);
+});

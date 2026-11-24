@@ -709,19 +709,19 @@ function specialClassLook(plan, tags, { cls, r, explicitH, levels, rectFill, tag
   const ruins = cls === 'ruins' || String(tags.ruins || '').toLowerCase() === 'yes' || String(tags.historic || '').toLowerCase() === 'ruins';
   if (cls === 'greenhouse') {
     const eaveH = Number.isFinite(explicitH) ? Math.max(2.2, explicitH - 1) : 2.8;
-    return { ...plan, kind: 'shed', floors: 1, eaveH, wall: 'glass', wallFamily: 'glass', band: null, office: false, shopFloor: false, windows: false,
+    return { ...plan, bare: true, kind: 'shed', floors: 1, eaveH, wall: 'glass', wallFamily: 'glass', band: null, office: false, shopFloor: false, windows: false,
       roof: rectFill >= RECT_FILL ? 'gabled' : 'flat', pitch: 25, roofMat: 'glass', wallTint: [1, 1, 1], roofTint: [1, 1, 1] };
   }
   if (cls === 'container') {
     const n = Number.isFinite(levels) && levels > 0 ? Math.round(levels) : 1;
     const tint = tagged || pick(CONTAINER_TINTS, r('container'));
-    return { ...plan, kind: 'shed', floors: n, floorH: CONTAINER_H_M, eaveH: Number.isFinite(explicitH) ? explicitH : n * CONTAINER_H_M,
+    return { ...plan, bare: true, kind: 'shed', floors: n, floorH: CONTAINER_H_M, eaveH: Number.isFinite(explicitH) ? explicitH : n * CONTAINER_H_M,
       wall: 'metalWhite', wallFamily: 'metalwall', band: null, office: false, shopFloor: false, windows: false,
       roof: 'flat', roofMat: 'roofMetal', wallTint: shade(tint), roofTint: shade(taggedRoof || tint) };
   }
   if (ruins) {
     const eaveH = Number.isFinite(explicitH) ? Math.min(explicitH, 6) : 2 + 2.5 * r('ruin');
-    return { ...plan, kind: 'block', floors: 1, eaveH, wall: 'stoneMixed', wallFamily: 'stone', band: null, office: false, shopFloor: false, windows: false,
+    return { ...plan, bare: true, kind: 'block', floors: 1, eaveH, wall: 'stoneMixed', wallFamily: 'stone', band: null, office: false, shopFloor: false, windows: false,
       roof: 'flat', roofMat: 'concrete', wallTint: shade(tagged || [0.86, 0.84, 0.8]), roofTint: shade([0.5, 0.48, 0.45]) };
   }
   return null;
@@ -1403,6 +1403,36 @@ function buildOpenRoof(m, ring, holes, base, z0, tags = {}) {
   return posts;
 }
 
+// Ruins (building=ruins, ruins=yes, historic=ruins): roofless stone walls round the outline, broken to uneven heights
+// stretch by stretch with a gap here and there; a whole roofed block stood there before (coverage level, 2026-11-24).
+// Solid walls (each stretch a box), so they read from inside as from out.
+const RUIN_WALL_T_M = 0.5; const RUIN_STRETCH_M = 1.5; const RUIN_GAP_SHARE = 0.12;
+export const isRuin = (tags = {}) => String(tags.building || '').toLowerCase() === 'ruins' || String(tags.ruins || '').toLowerCase() === 'yes'
+  || (String(tags.historic || '').toLowerCase() === 'ruins' && !!tags.building);
+function buildRuin(m, ring, base, z0, wallH, tint, rnd) {
+  const ccw = ring.reduce((acc, p, i) => { const q = ring[(i + 1) % ring.length]; return acc + p[0] * q[1] - q[0] * p[1]; }, 0) > 0;
+  let pieces = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i]; const b = ring[(i + 1) % ring.length];
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]); if (L < 0.3) continue;
+    const ux = (b[0] - a[0]) / L; const uy = (b[1] - a[1]) / L;
+    const nx = (ccw ? -uy : uy) * RUIN_WALL_T_M / 2; const ny = (ccw ? ux : -ux) * RUIN_WALL_T_M / 2;
+    const n = Math.max(1, Math.round(L / RUIN_STRETCH_M));
+    for (let k = 0; k < n; k++) {
+      if (rnd('gap', i, k) < RUIN_GAP_SHARE && k > 0 && k < n - 1) continue;
+      const t = (k + 0.5) / n;
+      const c = [a[0] + (b[0] - a[0]) * t + nx, a[1] + (b[1] - a[1]) * t + ny];
+      // (the corners stand tallest, as they do)
+      const corner = k === 0 || k === n - 1;
+      const h = wallH * (corner ? 0.8 + 0.2 * rnd('h', i, k) : 0.35 + 0.65 * rnd('h', i, k));
+      // (a hair longer than the stretch: no slit between them; the end ones run to the corner)
+      detailBox(m, 'stoneMixed', c, [ux, uy], L / n / 2 + (corner ? RUIN_WALL_T_M / 2 : 0.01), RUIN_WALL_T_M / 2, z0, base + h, tint, { uvM: 3 });
+      pieces++;
+    }
+  }
+  return pieces;
+}
+
 function buildGarage(m, ring, holes, base, z0, g) {
   const { box, levels, a, b, laneV } = g;
   const { cx, cy, ux, uy } = box;
@@ -1736,6 +1766,16 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
       if (++tile.inBatch >= MESH_BATCH) flushTile(tile);
       continue;
     }
+    if (isRuin(tags) && !fortKind(tags)) {
+      const ruinH = Number.isFinite(parseMeters(tags.height)) ? Math.min(parseMeters(tags.height), 8) : 2.5 + 2 * hash01(seed, 'ruinH');
+      const pieces = buildRuin(builder, ring, zMax, zMin - FOUNDATION_M, ruinH, [0.86, 0.84, 0.8], (...k) => hash01(seed, 'ruin', ...k));
+      stats.details.ruins = (stats.details.ruins || 0) + 1;
+      bump(stats.kinds, 'ruin');
+      if (globalThis.__MAPNG_BLD_DEBUG) globalThis.__MAPNG_BLD_DEBUG({ kind: 'ruin', id: f.id, pieces });
+      count++;
+      if (++tile.inBatch >= MESH_BATCH) flushTile(tile);
+      continue;
+    }
     if (OPEN_ROOF_CLASSES.has(String(tags.building || '').toLowerCase())) {
       const posts = buildOpenRoof(builder, ring, holes, zMax, zMin - FOUNDATION_M, tags);
       stats.details.openRoofs = (stats.details.openRoofs || 0) + 1;
@@ -1939,7 +1979,8 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
       }
     }
     // roof plant on big flat roofs; water tanks on mid-rises where they stand
-    if (flat && box && area >= ROOF_PLANT_M2 && plan.kind !== 'house' && !worship && !plan.fort) {
+    // (none on a container, a greenhouse or a ruin: plant units stood on a shipping container's lid)
+    if (flat && box && area >= ROOF_PLANT_M2 && plan.kind !== 'house' && !worship && !plan.fort && !plan.bare) {
       const tanks = plan.tanks && plan.floors >= 4 && plan.floors <= 20 && !plan.office && rnd('tank') < 0.3;
       stats.details.roofPlant = (stats.details.roofPlant || 0) + roofPlant(detailB, ring, box, eave, area, crownMat, plan.wallTint, {
         tanks,
