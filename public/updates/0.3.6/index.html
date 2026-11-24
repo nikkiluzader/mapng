@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MapNG 0.3.6: Any Shape, Road Mode, Exact Alignment</title>
 <meta name="description" content="MapNG 0.3.6: maps of any shape from tiles, a road mode that builds a level along a road, long shapes built in pieces, terrain and map data aligned exactly, and a security pass on the app and its updates.">
-<meta name="robots" content="noindex">
 <link rel="canonical" href="https://mapng.com/updates/0.3.6/">
 <meta property="og:type" content="article">
 <meta property="og:title" content="MapNG 0.3.6: any shape, road mode, exact alignment">
@@ -166,11 +165,6 @@
     <a class="btn" href="/updates/0.3.5/">What came in 0.3.5</a>
   </div>
 
-  <!-- DRAFT (remove before release): this page is a preview and is not indexed. Still to add: a picture of a tiled
-       level and a road level in game (Game texture), with the edge wall; the level thumbnail as the game's list shows
-       it; the final list of fixes (updated 2026-11-24 with the funicular, gallery, wing wall and memory work). Sections marked "in progress" describe work that is
-       not finished. -->
-  <p class="note"><b>Preview.</b> This page is being written while 0.3.6 is being finished. Parts marked "in progress" are not done yet.</p>
 
   <section id="tiles" data-nav="Any shape">
     <div class="kicker">Step 1: Location</div>
@@ -217,7 +211,7 @@
   </section>
 
   <section id="chunks" data-nav="Long shapes">
-    <div class="kicker">In progress</div>
+    <div class="kicker">Step 3: Export</div>
     <h2>Long and diagonal shapes, built in pieces</h2>
     <p>A long diagonal road has a small area but a huge bounding box, and it used to be refused as "too big". Such shapes are now built in pieces of 2 km along the shape and joined into one level. Roads cut where two pieces meet are joined back into one road, and the game's traffic drives across.</p>
     <ul>
@@ -230,7 +224,7 @@
     <p>Each piece used to work out its road heights from its own part of the road network. A ramp or a tunnel seen whole by one piece and cut short by the next could meet metres apart. A finished piece now hands its road heights to the next one, which starts from them: its roads leave the join at the neighbour's height, and a tunnel continues on the neighbour's line.</p>
     <p>A tunnel that lies whole inside the level is planned once for the whole level: the straight grade between its two portals. Where a piece's edge cuts the tunnel, that end takes its height from the line. Before, such an end went "under the ground there", and a tunnel under a mountain climbed toward the surface.</p>
     <figure><img src="images/seam-roads-before-after.jpg" alt="Four height profiles of roads across a join between two pieces. Left column, before: a tunnel road with a 7.2 m step at the join and a street with a 6.5 m step. Right column, after: each is one continuous line through the join." loading="lazy"><figcaption>Behind the scenes, a test level through central Oslo: two roads across a join (dashed line), each piece solved alone (left) and with the neighbour's heights handed on (right). Road ends that met at different heights went from 23 to 2.</figcaption></figure>
-    <p class="note"><b>Not finished.</b> A piece that sees only part of a tunnel or a long bridge still decides on that part alone, and a street on a lid over a tunnel trench that lies exactly on a join can still dip there. Long levels through dense cities are better than they were, not yet clean everywhere.</p>
+    <p class="note"><b>Still rough in places.</b> A long bridge is still planned piece by piece, and a street on a lid over a tunnel trench that lies exactly on a join can still dip there. Long levels through dense cities are better than they were, not yet clean everywhere.</p>
   </section>
 
   <section id="alignment" data-nav="Exact alignment">
