@@ -39,9 +39,19 @@ test('a speed hump: Gridmap pieces squeezed to the width, chevrons and a sign ea
     assert.ok(Math.abs(s.scale[0] - 7.7 / 8.4) < 1e-9, 'squeezed across to the road');
   }
   assert.equal(chevrons.length, 2, 'two-way: chevrons for each direction');
-  const east = chevrons.find((c) => c.nodes[2][0] > c.nodes[0][0]);
+  const east = chevrons.find((c) => c.nodes.at(-1)[0] > c.nodes[0][0]);
   assert.ok(east.nodes.every((p) => p[1] < 0), 'eastbound paint on the right (south) half');
-  assert.ok(east.nodes[1][2] > 0.08, 'the paint rides over the hump');
+  assert.ok(Math.max(...east.nodes.map((p) => p[2])) > 0.075, 'the paint rides over the hump');
+  // the arrows fill the first 60 % of each texture tile: their span, from each decal's start, is centred on the
+  // hump and stays on its 2.65 m top panel, in both directions
+  for (const c of chevrons) {
+    const dir = Math.sign(c.nodes.at(-1)[0] - c.nodes[0][0]);
+    const start = c.nodes[0][0]; const T = c.textureLength;
+    const a0 = start; const a1 = start + dir * (T + 0.6 * T);
+    const lo = Math.min(a0, a1); const hi = Math.max(a0, a1);
+    assert.ok(Math.abs((lo + hi) / 2 - 50) < 0.02, `arrows centred on the hump (${dir > 0 ? 'east' : 'west'}bound)`);
+    assert.ok(lo >= 50 - 2.65 / 2 - 1e-6 && hi <= 50 + 2.65 / 2 + 1e-6, 'arrows on the top panel');
+  }
   assert.equal(signs.length, 2);
   const eastSign = signs.find((s) => s.position[0] < 50);
   assert.ok(Math.abs(eastSign.position[0] - 20) < 1e-9 && Math.abs(eastSign.position[1] + 5.5) < 1e-9, '30 m ahead, on the right kerb');

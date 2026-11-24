@@ -41,6 +41,14 @@ const PIECE_L = 4.2;
 const HUMP_H = 0.083;
 const TABLE_H = 0.107;
 const TABLE_RAMP_L = 0.7;
+// The paint over them: road_chevrons draws its arrow in the first 60 % of each texture tile and leaves the rest
+// empty (measured from t_road_chevrons_o.data.dds), so a decal of two tiles is shifted downstream by 0.2 tile to
+// centre its arrows; the tiles are sized so the arrows span the piece's top: the hump's light panel (2.65 m,
+// measured in game) and the table's flat top (4.2 m less its 0.7 m ramps). Laid as 3.78 m centred on the node, the
+// arrows ran 0.4 m upstream off the panel on each side of the road (coverage level, 2026-11-24).
+const CHEVRON_FILL = 0.6;
+const CHEVRON_TOP_L = { hump: 2.65, table: PIECE_L - 2 * TABLE_RAMP_L };
+const CHEVRON_NODES = 5;
 const SIGN_BEFORE_M = 30;        // the warning sign this far ahead of the first hump
 const SIGN_RUN_M = 150;          // humps this close, going the same way, share a sign
 const SIGN_KERB_M = 1.5;
@@ -214,13 +222,16 @@ export function placeTrafficCalming({ features = [], carriageways = [], toWorld,
       const off = oneway ? 0 : usable / 4;
       const width = oneway ? usable * 0.8 : usable * 0.4;
       const cx = x + side[0] * off; const cy = y + side[1] * off;
-      const len = PIECE_L * 0.9;
-      const nodes = [-0.5, 0, 0.5].map((f) => {
-        const u = f * len;
+      // (two tiles; the arrows' span, (2 - 0.4) tiles, is the piece's top; nodes enough to follow its curve)
+      const tile = (CHEVRON_TOP_L[spot.kind] ?? CHEVRON_TOP_L.hump) / (2 - (1 - CHEVRON_FILL));
+      const shift = ((1 - CHEVRON_FILL) / 2) * tile;
+      const nodes = [];
+      for (let k = 0; k < CHEVRON_NODES; k++) {
+        const u = -tile + (2 * tile * k) / (CHEVRON_NODES - 1) + shift;
         const nx = cx + d[0] * u; const ny = cy + d[1] * u;
-        return [nx, ny, heightAt(nx, ny) + calmingProfileAt(spot.kind, u), width];
-      });
-      chevrons.push({ kind: spot.kind, nodes, textureLength: len / 2 });
+        nodes.push([nx, ny, heightAt(nx, ny) + calmingProfileAt(spot.kind, u), width]);
+      }
+      chevrons.push({ kind: spot.kind, nodes, textureLength: tile });
 
       // by heading, not road piece: OSM splits a street at every junction
       const dirKey = Math.round((Math.atan2(d[1], d[0]) * 8) / Math.PI);

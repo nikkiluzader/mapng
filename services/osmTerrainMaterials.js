@@ -579,7 +579,7 @@ const YARD_LAWN_CLASSES = new Set([0, 1]);
 // photo (Florida's are straw-coloured in the imagery); in a desert town dry
 // ground is the gravel or dirt yard itself
 const YARD_LAWN_CLASSES_GREEN_REGION = new Set([0, 1, 2]);
-function areaMatIndex(feature) {
+export function areaMatIndex(feature) {
   const t = feature.tags || {};
   const nat = t.natural, lu = t.landuse, lei = t.leisure, am = t.amenity, sur = t.surface;
 
@@ -616,6 +616,9 @@ function areaMatIndex(feature) {
   if (lu === 'quarry') return 4;
   if (lu === 'railway') return 6;
   if (lu === 'reservoir' || lu === 'basin') return -1;
+  // (a railway platform's area is paving: left to the default it stayed Grass under the base texture's paving and
+  // grew grass. Found by the coverage level, 2026-11-24)
+  if ((t.railway === 'platform' || t.public_transport === 'platform') && !sur) return 7;
 
   // a pitch by its surface (clay, tartan, sand: further down), else turf
   if (lei === 'pitch' && sur && sur !== 'grass') { /* by surface below */ } else if (lei === 'pitch') return LAWN;
