@@ -168,7 +168,7 @@
 
   <!-- DRAFT (remove before release): this page is a preview and is not indexed. Still to add: a picture of a tiled
        level and a road level in game (Game texture), with the edge wall; the level thumbnail as the game's list shows
-       it; the final list of fixes. Sections marked "in progress" describe work that is
+       it; the final list of fixes (updated 2026-11-24 with the funicular, gallery, wing wall and memory work). Sections marked "in progress" describe work that is
        not finished. -->
   <p class="note"><b>Preview.</b> This page is being written while 0.3.6 is being finished. Parts marked "in progress" are not done yet.</p>
 
@@ -197,6 +197,8 @@
     <h3>Pick the anchor with one click</h3>
     <p>With more than one tile, an <b>Anchor</b> row lists every tile and <b>Centre</b>. The anchor is the point that sits on the location you typed or searched for. Click another tile, or Centre, and the anchor moves there. The tiles themselves stay exactly where they are on the map: the location follows the anchor. The same holds when you add, drag or remove a tile.</p>
     <figure><img src="images/tiles-anchor.jpg" alt="The Tiles controls with three tiles in a row. The Anchor row shows Tile 1, Tile 2, Tile 3 and Centre; Tile 3 is picked, and on the map the crosshair sits in the middle of the third tile." loading="lazy"><figcaption>Three tiles with the anchor on tile 3: the crosshair marks the anchor, and the chips above Generate show the whole map's size.</figcaption></figure>
+    <h3>One file per tile</h3>
+    <p>With several tiles, step 3's assets have a switch <b>One file per tile</b>. The heightmap, the pictures, the road mask, the GeoTIFF and the .ter are then made once for each tile and named <code>_tile1</code>, <code>_tile2</code> and so on. This is what batch jobs were for. The 3D models and the GeoJSON stay whole-map files.</p>
     <h3>One workflow</h3>
     <p>The "Single tile" and "Batch job" tabs at the top are gone. Batch mode was made for exporting assets, and people were using it to build huge levels, which it was never meant for. Tiles cover that now, and step 3 keeps its choice of what to export. If you had an unfinished batch job saved from an earlier version, MapNG opens it once more so you can finish or discard it.</p>
   </section>
@@ -226,6 +228,7 @@
     </ul>
     <h3>Roads that meet where pieces join</h3>
     <p>Each piece used to work out its road heights from its own part of the road network. A ramp or a tunnel seen whole by one piece and cut short by the next could meet metres apart. A finished piece now hands its road heights to the next one, which starts from them: its roads leave the join at the neighbour's height, and a tunnel continues on the neighbour's line.</p>
+    <p>A tunnel that lies whole inside the level is planned once for the whole level: the straight grade between its two portals. Where a piece's edge cuts the tunnel, that end takes its height from the line. Before, such an end went "under the ground there", and a tunnel under a mountain climbed toward the surface.</p>
     <figure><img src="images/seam-roads-before-after.jpg" alt="Four height profiles of roads across a join between two pieces. Left column, before: a tunnel road with a 7.2 m step at the join and a street with a 6.5 m step. Right column, after: each is one continuous line through the join." loading="lazy"><figcaption>Behind the scenes, a test level through central Oslo: two roads across a join (dashed line), each piece solved alone (left) and with the neighbour's heights handed on (right). Road ends that met at different heights went from 23 to 2.</figcaption></figure>
     <p class="note"><b>Not finished.</b> A piece that sees only part of a tunnel or a long bridge still decides on that part alone, and a street on a lid over a tunnel trench that lies exactly on a join can still dip there. Long levels through dense cities are better than they were, not yet clean everywhere.</p>
   </section>
@@ -266,9 +269,11 @@
     <div class="kicker">Website and desktop</div>
     <h2>A Reset button, readable progress, a proper thumbnail</h2>
     <ul>
-      <li><b>Reset.</b> The round arrow at the top of the sidebar puts MapNG back to a fresh start, on the website and in the desktop app (where it used to be a plain reload). It asks first, then clears every setting, the location, the tiles and any picked road, asks for your location again and starts in Tile mode with one 1024 tile. Your API key, your own Overpass server, the language, light or dark mode and your sharing choices are kept, and levels you have saved are not touched.</li>
+      <li><b>Reset.</b> The round arrow at the top of the sidebar puts MapNG back to a fresh start, on the website and in the desktop app (where it used to be a plain reload). It clears the settings, the tiles and any picked road and starts in Tile mode with one tile. It asks before it does so, at most once a week. A checkbox, on by default, keeps the map where it is; unticked, the map goes back to your location. Kept: your API key, your own Overpass server, the language, light or dark mode, your sharing choices, Basic or Advanced, the last output size, and the two map data choices for road widths and Overture buildings. Levels you have saved are not touched.</li>
       <li><b>Progress you can read.</b> The progress window for Generate and for the export no longer cuts lines off. The stage's name and every line wrap, the finished lines are all kept in a list you can scroll, and the window fits any screen.</li>
       <li><b>A MapNG thumbnail.</b> In the game's level list your level now shows a MapNG card with its own name, not a satellite picture.</li>
+      <li><b>A memory warning before Generate (desktop).</b> Step 1 says so when a map needs close to the computer's memory, more than it has, or more than is free right now.</li>
+      <li><b>A warning before a very dense export (website).</b> With 15,000 roads or more the export panel says the browser may run out of memory, and points to the desktop app.</li>
       <li><b>The real size above Generate.</b> The chips above the Generate button show the size of the whole map for several tiles and for a road, not one tile's.</li>
     </ul>
     <figure><img src="images/progress-card.jpg" alt="The progress window during an export: five stage tiles, the stage name on two lines, a list of finished steps with their times, and the running step written out in full over two lines." loading="lazy"><figcaption>The progress window with long lines, all shown in full.</figcaption></figure>
@@ -279,6 +284,10 @@
     <div class="kicker">Smaller things</div>
     <h2>Fixes</h2>
     <ul>
+      <li><b>Funicular tunnels keep one steady slope.</b> The track was held under the ground station by station, so it copied the hillside over it in waves, and the dips were filled over the tube into a bulge. It is now the highest line under the ground that only ever steepens. (Thanks for the report.)</li>
+      <li><b>Avalanche galleries no longer hump.</b> A fine survey can hold a gallery's roof. The roof is level across the lanes, as a road is, so the road was pulled up onto it: one 40 m gallery rose 4.3 m in the middle, 30 % at its ends. The road now runs straight through under the roof. (Thanks for the report.)</li>
+      <li><b>No more concrete lumps at small bridges.</b> A block of wall stood wherever a road near a bridge was 0.8 m over the ground beside it, also on gentle banks and as stubs a metre long. Walls are now built only along a really steep side, 4 m or longer. (Thanks for the report.)</li>
+      <li><b>Desktop: Generate at 8192 on a 16 GB computer.</b> Its memory peak was 8.65 GB, while the three map textures were encoded together. They are now encoded one at a time: 7.0 GB at the same speed.</li>
       <li><b>"Generate does nothing" with your own elevation file.</b> With an uploaded elevation file the app always offered Generate, then decided nothing had changed. A map data file loaded after generating was ignored the same way. Both now generate again. (Thanks for the report.)</li>
       <li><b>"Settings changed since generating"</b> now follows everything that changes the map, tiles and a picked road included.</li>
       <li>A shared road comes back with its ends where they were.</li>
@@ -290,12 +299,20 @@
     </ul>
   </section>
 
+  <section id="structures" data-nav="Structures">
+    <div class="kicker">Behind the scenes</div>
+    <h2>Three structure fixes, in pictures</h2>
+    <figure><img src="images/funicular-slope.jpg" alt="A long section of a 3.4 km funicular tunnel under a mountain. The red line, before, follows the ground's waves for the first 650 m and steps under a hollow; the blue line, after, is straight at 18 % and then at 28 %." loading="lazy"><figcaption>A funicular tunnel in the Alps: the track before (red) and now (blue), under the surveyed ground.</figcaption></figure>
+    <figure><img src="images/gallery-road.jpg" alt="Sections through an avalanche gallery, before and after. Before, the road and the roof arch 4 m upward through the gallery. After, the road is a straight gentle climb and the roof sits where the survey shows the real one." loading="lazy"><figcaption>An avalanche gallery along and across its road: before (left) the road climbed onto the surveyed roof; now (right) it runs under it.</figcaption></figure>
+    <figure><img src="images/wing-walls.jpg" alt="A small track bridge in the game, twice. Left: a square concrete slab beside the deck's end and a second block further along the track. Right: the same bridge with plain grassy banks." loading="lazy"><figcaption>A 10 m track bridge in game: before (left) and now (right).</figcaption></figure>
+  </section>
+
   <section id="next" data-nav="Next release">
     <div class="kicker">Coming next</div>
     <h2>Still being worked on</h2>
     <ul>
-      <li>Long tunnels and bridges planned once for the whole level, so every piece of a long level agrees on them.</li>
-      <li>Exporting heightmaps and textures per tile from the tiles workflow, which the old batch jobs did.</li>
+      <li>Long bridges planned once for the whole level, as tunnels now are. Today a long deck is still planned per piece.</li>
+      <li>Road-to-bridge and road-to-tunnel joins, Mesh Road joins and hairpins, bridge widths, and galleries that sit a little low along a lakeside road.</li>
       <li>Streets standing on a narrow ridge with jagged sides in steep towns, walls along tunnel approaches, and the other items carried over from <a href="/updates/0.3.5/#next">0.3.5's list</a>.</li>
     </ul>
   </section>

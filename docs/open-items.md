@@ -62,7 +62,9 @@ Before the 0.3.6 desktop release:
    the ground's colour at the edge); the wall now takes the texture's dark tone just outside the shape. Not looked
    at: the big map's picture in the game's own map view; a plain square ground-model level's rim (it keeps the
    edge's colours, there being no texture past it).
-6. **Release page.** 2026-11-23 evening: a road mode picture (US 129), the shape in the 2D and 3D previews, the
+6. **Release page.** Updated 2026-11-24: per-tile export, the tunnel line for the whole level, Reset as it now
+   works, the two memory warnings and the 8192 fix, the funicular, gallery and wing-wall fixes with three
+   before/after pictures, the "still being worked on" list. Still a draft (noindex). Earlier: 2026-11-23 evening: a road mode picture (US 129), the shape in the 2D and 3D previews, the
    edge wall, the buildings rule and the minimap, the load-time fix, the 3D alignment and upload fixes are on the
    draft. Left: in-game pictures (a tiled level and a road level with the edge wall, the thumbnail in the level
    list), the final fix list; then publish it.
@@ -103,6 +105,10 @@ Known and not blocking 0.3.6 (say so on the page):
    reports alone; Generate's floor before the textures is 4.8 GB at 8192 and the game texture's painting adds 1 GB.
 10. **Sidewalk drift, jagged terrain from our own steps, sawtooth on steep roads, the sea-wall branch,** and
     Fizz_Mechanic's held list.
+    "Sidewalk drift" is the sweep's count of sidewalk spots floating over or buried in the ground, over its stored
+    baselines. Asked 2026-11-24 whether the map-frame fix cleared it: partly. `naldo` on Mapterhorn, the same area
+    fetched again on the corrected frame: floating 30 -> 17, buried 47 -> 44 (baseline 8 and 2). The sweep's areas
+    are still on the old frame; re-fetching them and re-recording baselines is owed.
 
 Waiting on the user: a second update key pair (optional), so the first can be retired one day.
 
