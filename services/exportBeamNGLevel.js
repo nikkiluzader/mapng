@@ -7314,7 +7314,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   {
     const cwByOwner = new Map(carriageways.map((cw) => [cw.owner, cw]));
     const ends = mergingLinkEnds(carriageways);
-    let cut = 0; let kept = 0; let fanned = 0; const why = { noDecal: 0, noRoom: 0, atRoadEnd: 0 };
+    let cut = 0; let kept = 0; let fanned = 0; const why = { noDecal: 0, noRoom: 0, atRoadEnd: 0, freeway: 0 };
     for (const { link, road, end, atRoadEnd } of ends) {
       // (where roads fan in to a wide street's end, each slip road swings out to the street's outer lane on its own
       // side over its last FAN_EASE_M: everything drawn for it moves with it (surface, lines, edge blends), and a copy
@@ -7322,6 +7322,10 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
       // roads and a two-lane road met a four-lane street's end at one point, the street's corners standing out square)
       if (atRoadEnd) {
         const L0 = cwByOwner.get(link); const M0 = cwByOwner.get(road);
+        // (not a freeway's ramps: in an interchange the ramps of a single-point junction meet at its middle by
+        // design, and moved apart 4 to 5 m the junction under a Phoenix freeway came out differently laid; nobody
+        // has checked that against the real place. City streets' slip roads only, until someone has)
+        if (/^(motorway|trunk)/.test(String(L0.highway || ''))) { why.freeway++; kept++; continue; }
         const move = fanInShift(L0.nodes, end, M0.nodes, M0.half - L0.half);
         const mine = [];
         // (the link's groups, from the lists of this pass; a line the paint cut split is found in its group, by its owner)
@@ -7329,11 +7333,16 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
         for (const g of groupsOf) for (const d of g.__items || []) if (d.__owner === link && d.nodes?.length >= 2) mine.push([g, d]);
         if (!move || !mine.length) { why.atRoadEnd++; kept++; continue; }
         for (const [g, d] of mine) {
+          // (the traffic's own road, made at this link's other end: it stays on the mapped line)
+          if (d.__layer === 'merge') continue;
           if (d.__layer === 'asphalt' || d.__layer === 'paving') {
             if (Number.isFinite(d.drivability) && d.drivability > 0) {
-              const path = { ...d, name: `${d.name}_m`, persistentId: generatePersistentId(), material: GLOBAL_DECAL_MATERIALS.invisible, nodes: d.nodes.map((nd) => nd.slice()), startEndFade: [0, 0] };
+              const path = { ...d, name: `${d.name}_p${end}`, persistentId: generatePersistentId(), material: GLOBAL_DECAL_MATERIALS.invisible, nodes: d.nodes.map((nd) => nd.slice()), startEndFade: [0, 0] };
               Object.defineProperty(path, '__owner', { value: d.__owner, enumerable: false });
               Object.defineProperty(path, '__layer', { value: 'merge', enumerable: false });
+              // (for the structure checks: the road as mapped is this one, not the surface moved beside it)
+              Object.defineProperty(path, '__mergePath', { value: true, enumerable: false });
+              Object.defineProperty(d, '__mergeMoved', { value: true, enumerable: false, configurable: true });
               g.__items.push(path);
               d.drivability = -1;
             }
@@ -7358,7 +7367,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
       if (!parts) { why.noRoom++; kept++; continue; }
       const hidden = {
         ...piece.decal,
-        name: `${piece.decal.name}_m`,
+        name: `${piece.decal.name}_m${end}`,
         persistentId: generatePersistentId(),
         material: GLOBAL_DECAL_MATERIALS.invisible,
         nodes: parts.hidden,
@@ -7366,11 +7375,13 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
       };
       if (piece.decal.__owner !== undefined) Object.defineProperty(hidden, '__owner', { value: piece.decal.__owner, enumerable: false });
       Object.defineProperty(hidden, '__layer', { value: 'merge', enumerable: false });
+      // (for the structure checks, structures/metrics.js roadLinesFromDecals: the road as mapped is the surface plus this)
+      Object.defineProperty(hidden, '__mergeTail', { value: true, enumerable: false });
       piece.decal.nodes = parts.visible;
       piece.group.__items.push(hidden);
       cut++;
     }
-    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Slip roads merging into a wider road: ${ends.length} merge(s) looked at; ${cut} slip road surface(s) ended at the road's outer lane, an invisible road on to the mapped node; ${fanned} meeting a wide street at its end moved out to its outer lane over their last 30 m (the traffic's road left on the mapped line); ${kept} left as drawn (${why.atRoadEnd} at a street's end with no side to take, ${why.noDecal} no surface piece ending at the merge, ${why.noRoom} never clear of the road's lanes).`);
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Slip roads merging into a wider road: ${ends.length} merge(s) looked at; ${cut} slip road surface(s) ended at the road's outer lane, an invisible road on to the mapped node; ${fanned} meeting a wide street at its end moved out to its outer lane over their last 30 m (the traffic's road left on the mapped line); ${kept} left as drawn (${why.freeway} freeway ramps at a road's end, ${why.atRoadEnd} at a street's end with no side to take, ${why.noDecal} no surface piece ending at the merge, ${why.noRoom} never clear of the road's lanes).`);
   }
   if (mouths.length) appendAll(getOrCreateSplineGroup('road_mouths').__items, mouths);
   yield;

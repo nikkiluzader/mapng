@@ -89,15 +89,31 @@ export function roadLinesFromDecals(groups) {
   const byOwner = new Map();
   for (const cw of carriageways) if (!byOwner.has(cw.owner)) byOwner.set(cw.owner, cw);
   const lines = [];
+  // (slip roads merging into a wider road, services/mergingLinks.js: the road the checks look at is the road as
+  // mapped. Where a link's surface was moved out to a street's outer lane, that is the invisible road left on its
+  // line (__mergePath), not the moved surface (__mergeMoved); where its surface ends at the outer lane, the surface
+  // plus the invisible piece on to the node (__mergeTail). Read as drawn, a moved link "crossed" the street it joins
+  // with no clearance: 4 false short crossings in a freeway interchange)
+  const tails = [];
+  for (const g of groups || []) for (const d of g.__items || []) if (d.__mergeTail && d.nodes?.length >= 2) tails.push(d);
+  const same = (p, q) => Math.abs(p[0] - q[0]) < 0.01 && Math.abs(p[1] - q[1]) < 0.01;
   for (const g of groups || []) {
     for (const d of g.__items || []) {
       // (the base layer is named after its surface: asphalt, dirt, gravel...;
       // its decal name ends in _b)
-      if (!/_b$/.test(d.name || '') || d.__owner === undefined || !(d.nodes?.length >= 2)) continue;
+      const base = /_b$/.test(d.name || '') && !d.__mergeMoved;
+      if (!(base || d.__mergePath) || d.__owner === undefined || !(d.nodes?.length >= 2)) continue;
       const cw = byOwner.get(d.__owner);
+      if (!cw) continue;
+      let nodes = d.nodes;
+      for (const t of tails) {
+        if (t.__owner !== d.__owner) continue;
+        if (same(t.nodes[0], nodes[nodes.length - 1])) nodes = [...nodes, ...t.nodes.slice(1)];
+        else if (same(t.nodes[t.nodes.length - 1], nodes[0])) nodes = [...t.nodes.slice(0, -1), ...nodes];
+      }
       // (a decal drawn onto a deck projects onto objects: on a structure,
       // whatever its road's tags say)
-      if (cw) lines.push({ ...cw, nodes: d.nodes, ...(d.overObjects ? { carried: true } : {}) });
+      lines.push({ ...cw, nodes, ...(d.overObjects ? { carried: true } : {}) });
     }
   }
   return lines.length ? lines : carriageways;
