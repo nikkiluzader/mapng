@@ -67,6 +67,7 @@ import { leaveBridgeBuildings } from './bridgeBuildings.js';
 import { buildingsUnderDecks } from './buildingsUnderDecks.js';
 import { benchFacing, boxed } from './benchFacing.js';
 import { wingWallRuns, buildWingWallMesh } from './structures/wingWalls.js';
+import { mergingLinks, keptThroughMerge } from './mergingLinks.js';
 import { buildMonumentMeshes, monumentKind, monumentHeight } from './monuments.js';
 import { solveProfilesSteps, gradeLimit } from './structures/profileSolve.js';
 import { appendAll, keepInPlace } from './keepInPlace.js';
@@ -3801,8 +3802,9 @@ const isCutPaintLayer = (layerName) => typeof layerName === 'string'
 // another road's carriageway this far above or below (the solved road
 // heights) is a different level: a stacked deck, a road under a bridge
 const PAINT_CUT_LEVEL_M = 3;
-function cutPaintAtOtherRoads(paintDecals, index, drivableRoads, ownersAtNode, zones = [], heightOf = null) {
+function cutPaintAtOtherRoads(paintDecals, index, drivableRoads, ownersAtNode, zones = [], heightOf = null, merging = new Map()) {
   if (paintDecals.length === 0 || index.segments.length === 0) return;
+  let keptAtMerges = 0;
   const ignoredBy = new Map();
   const ignoreSetFor = (owner) => {
     if (ignoredBy.has(owner)) return ignoredBy.get(owner);
@@ -3818,7 +3820,10 @@ function cutPaintAtOtherRoads(paintDecals, index, drivableRoads, ownersAtNode, z
   let removed = 0;
   let pieces = 0;
   for (const { decal, group, owner } of paintDecals) {
-    const ignore = ignoreSetFor(owner);
+    let ignore = ignoreSetFor(owner);
+    // (a slip road merging into this road leaves its lane lines alone: services/mergingLinks.js)
+    const merges = keptThroughMerge(decal.__layer) ? merging.get(owner) : null;
+    if (merges?.size) { ignore = new Set([...ignore, ...merges]); keptAtMerges++; }
     const isLine = decal.__layer.startsWith('line_');
     const margin = isLine ? PAINT_CUT_MARGIN_M.line : PAINT_CUT_MARGIN_M.edge;
     // (a carriageway on another level never cuts it: both decks of a
@@ -3854,7 +3859,7 @@ function cutPaintAtOtherRoads(paintDecals, index, drivableRoads, ownersAtNode, z
     if (runs.length === 0) removed++;
     pieces += runs.length;
   }
-  console.log(`[BeamNG Export] Paint cut at crossing roads: ${paintDecals.length} lines/blends → ${pieces} pieces (${removed} removed entirely).`);
+  console.log(`[BeamNG Export] Paint cut at crossing roads: ${paintDecals.length} lines/blends → ${pieces} pieces (${removed} removed entirely). Slip roads merging into a wider road: ${[...merging.values()].reduce((n, set) => n + set.size, 0)} merge(s) on ${merging.size} road(s); ${keptAtMerges} lane line(s) of those roads not cut by the slip road lying across them.`);
 }
 
 // A street paved apart from the one it meets (brick into asphalt) stops where
@@ -7300,7 +7305,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
       return best < 400 ? zz : null;
     };
   })();
-  cutPaintAtOtherRoads(paintDecals, carriagewayIndex, drivableRoads, ownersAtNode, junctionMarkings.zones || [], solvedHeightOf);
+  cutPaintAtOtherRoads(paintDecals, carriagewayIndex, drivableRoads, ownersAtNode, junctionMarkings.zones || [], solvedHeightOf, mergingLinks(carriageways));
   const mouths = cutSurfaceAtOtherSurfaces(surfaceDecals, carriageways, carriagewayIndex, { americas: markingStyle === 'americas' });
   if (mouths.length) appendAll(getOrCreateSplineGroup('road_mouths').__items, mouths);
   yield;
