@@ -30,16 +30,20 @@ Mesh Road joins. Riding along: the other 38 sweep areas re-framed, Zion's tunnel
   Still to do, when the 0.3.7 page is written: a line that old batch jobs can no longer be opened.
 - **Sidewalks at the water: work branch `seawall-037`** (dev + the parked `seawall` branch, merged cleanly; 1,497
   tests pass). Sidewalk counts on Mapterhorn, dev -> the branch:
-  `naldo` buried 47 -> 19 (the 100 m line of paving down the bank is gone), floating 18 -> 19;
-  `kingst` buried 34 -> 28, floating 0 -> 58; `ams_centraal` floating 30 -> 31, buried 27 -> 32.
-  - **Kingston's promenade floats, cause not found yet.** 26 spots along x 250, y 146 to 392: the slab at 3.05 to
-    3.2 m, the ground under it flat at 2.73 m (`scratch/fizz035/kingst_seawall_sect.png`). The fill's plan there
-    (`scratch/fizz035/quayrun.mjs`, y 256): the wall at x 250.5, its top found half a metre in, so the levelled
-    band is two grid points wide (level 2.85); the survey's crest at x 249 is 3.06 m and the land behind 2.54 to
-    2.68. So the mapped walk runs on the crest (its slab at the crest's height), and something after the fill
-    takes the ground under it down to 2.73: not yet said what (the paving's grading, or the seam smoothing).
-    Tried: the paving taking each point's own level instead of the wall's median (on the branch, f. `levelAt`):
-    right in itself, no change to the count.
+  (first numbers: `naldo` buried 47 -> 19, the 100 m line of paving down the bank gone; `kingst` floating 0 -> 58.)
+  - **Kingston's promenade: fixed on the branch 2026-11-24 (late).** Two causes, both in how the level reaches
+    the paving: the levelled band knew its level only as far in as the top of the bank (two grid points here),
+    with the wall's median as the fallback elsewhere, and the mapped walk kept the survey's crest height for the
+    half of its width outside the paving's 3 m band. Now every grid point 4.5 m in from a levelled wall has its
+    own stretch's level (`LEVEL_BAND_M`, `levelAt` in `quayFill.js`) and a mapped walk's points inside that band
+    take it (`onLevel` in `pavedSidewalks.js`). Found with ground probes after each step
+    (`scratch/fizz035/proberun.mjs`, `quayrun.mjs`; the probe lines are still in the branch's export: take them
+    out before it merges). Sections before / after: `kingst_seawall_sect.png`, `kingst_seawall_sect_after.png`.
+    Counts on Mapterhorn, dev -> branch now: `kingst` floating 0 -> 7, buried 34 -> 23; `naldo` floating 18 -> 19,
+    buried 47 -> 19; `ams_centraal` floating 30 -> 31, buried 27 -> 32.
+  - **Left on the branch:** Kingston's walled sunken garden (210, 686: the fill raises its floor 2 m, slab up to
+    1.6 m over it; 3 places), single places at (298, 68), (210, -872), (322, -146); Amsterdam Centraal's two new
+    buried clusters at (108, -202) and (88, -206).
   - Also on the branch's list from before: the walled sunken garden (210, 686), sidewalks at bridge ends by the
     river wall. Naldo's slabs at the raised motorway approach are untouched by the branch.
   - `quayFill.js` and `gridIndexAt` use rows as H - 1 - r: check against the corrected map frame.
