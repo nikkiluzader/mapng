@@ -685,3 +685,9 @@ test('a canal outline far wider than a canal, its line through it: the outline i
   const line = { type: 'water', geometry: [{ lat: 15, lng: -5 }, { lat: 15, lng: 35 }], tags: { waterway: 'canal' } };
   assert.ok(planLakes({ features: [area, line], toWorld: (lat, lng) => [lng, lat], heightAt: (x) => 10 + x * 0.05 }).tiles.length > 0);
 });
+
+test('a dock (waterway=dock area) is standing water (coverage level, 2026-11-24)', () => {
+  const ring = (x0, y0, w, h) => [[x0, y0], [x0 + w, y0], [x0 + w, y0 + h], [x0, y0 + h], [x0, y0]].map(([x, y]) => ({ lat: y, lng: x }));
+  const { tiles } = planLakes({ features: [{ type: 'water', geometry: ring(0, 0, 60, 40), tags: { waterway: 'dock' } }], toWorld: (lat, lng) => [lng, lat], heightAt: () => 10 });
+  assert.ok(tiles.length > 0 && tiles.every((t) => t.kind === 'reservoir'));
+});

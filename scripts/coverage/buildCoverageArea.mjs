@@ -44,7 +44,7 @@ const PLOT = 60; const PW = 60; const PLOT_X0 = -840; const PLOT_X1 = 1000; cons
 const AREA_M = 30;   // a plot's area, in a 60 m plot
 // footprints at their real size where the usual 30 m square is far off (the user, 2026-11-24): a shipping container
 // is 12.2 x 2.44 m (a 40 ft box), a kiosk or a toilet block a few metres, a carport a car's bay or two
-const REAL_SIZE = { 'building=container': [12.2, 2.44], 'building=kiosk': [4, 3], 'building=toilets': [6, 4], 'building=carport': [6, 5.5], 'building=hut': [5, 4], 'building=shed': [4, 3], 'building=garage': [6, 3.5] };
+const REAL_SIZE = { 'building=house': [12, 10], 'building=detached': [12, 10], 'building=semidetached_house': [14, 10], 'building=terrace': [24, 9], 'building=bungalow': [14, 11], 'building=cabin': [8, 6], 'building=static_caravan': [12, 4], 'building=container': [12.2, 2.44], 'building=kiosk': [4, 3], 'building=toilets': [6, 4], 'building=carport': [6, 5.5], 'building=hut': [5, 4], 'building=shed': [4, 3], 'building=garage': [6, 3.5] };
 const TREE_GRID = { x0: -840, x1: 0, y0: -60, y1: 200, step: 30 };   // the arboretum: one tree per 30 m
 // property tags that only mean something on a road: put on a short street in their plot
 const ROAD_PROPERTY = /^(bridge|tunnel|sidewalk|maxspeed|priority_road|junction|lanes|surface|lit|oneway|cycleway|parking:lane|turn:lanes|width|hazard)=/;
@@ -245,7 +245,8 @@ export function buildCoverage(regionKey) {
   // (tags the layout's own structures already carry, not repeated in a plot: an inland coastline would cut the land)
   // (the platform plot too: a platform is raised beside its track, the station on the main line has one)
   // (and every still water kind: the water block above, at real sizes)
-  const BUILT_ELSEWHERE = new Set(['natural=coastline', 'railway=platform']);
+  // (and the running track: the sports block has it at its real size; in a 30 m plot a square outline made it a ring)
+  const BUILT_ELSEWHERE = new Set(['natural=coastline', 'railway=platform', 'leisure=track']);
   const elsewhere = (tag) => BUILT_ELSEWHERE.has(tag) || /^water=/.test(tag) || tag === 'landuse=reservoir' || tag === 'landuse=basin';
   for (const [tag, e] of Object.entries(lib.tags)) {
     if (e.status !== 'built' && e.status !== 'partial') continue;

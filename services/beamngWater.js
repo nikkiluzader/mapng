@@ -55,7 +55,7 @@ const LAKE_WATER = new Set(['lake', 'pond', 'reservoir', 'oxbow', 'lagoon', 'bas
 export function stillWaterKind(tags = {}, river = false) {
   if (river) return 'river';
   const w = norm(tags.water); const lu = norm(tags.landuse);
-  if (w === 'reservoir' || lu === 'reservoir') return 'reservoir';
+  if (w === 'reservoir' || lu === 'reservoir' || norm(tags.waterway) === 'dock') return 'reservoir';
   if (w === 'basin' || lu === 'basin') return 'basin';
   if (w === 'pond' || w === 'oxbow' || w === 'stream_pool' || w === 'pool') return 'pond';
   if (['wastewater', 'reflecting_pool', 'lagoon', 'moat', 'fishpond', 'salt_pool'].includes(w)) return w;
@@ -199,6 +199,8 @@ const isRiverbank = (t = {}) => RIVERBANK_WATER.has(norm(t.water)) || norm(t.wat
 // pool is built with it: services/fountains.js, pools.js; the sea, docks and
 // marinas are the sea's)
 const isLakeWater = (t = {}) => {
+  // (a dock: an enclosed harbour basin, standing water; left as bare ground before, coverage level 2026-11-24)
+  if (norm(t.waterway) === 'dock') return true;
   if (t.waterway) return false;
   if (norm(t.amenity) === 'fountain' || norm(t.leisure) === 'swimming_pool') return false;
   if (['sea', 'ocean'].includes(norm(t.place)) || norm(t.natural) === 'bay' || ['dock', 'harbour'].includes(norm(t.water)) || norm(t.leisure) === 'marina') return false;
