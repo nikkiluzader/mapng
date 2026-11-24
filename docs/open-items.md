@@ -9,6 +9,18 @@ these files; they are never copied.
 
 ## 0.3.7 (started 2026-11-24, night)
 
+- **Report MR-VYQGBY (desktop crash, read 2026-11-24).** App 0.3.6-dev.5 (c174537), Windows, 16 GB (6.7 free), AMD
+  RX 7600. "During export the app crashed." No log, a crash dump. The dump (read with `scratch/reports/dumpinfo.py`):
+  exception 0xE0000008, Chromium's out-of-memory, in the window process (renderer), asking for 256 KB: the window
+  ran out of memory, not the export runner. Which step it was in is not known (no log).
+  The map (`scratch/reports/decode.mjs` on the report's share code): road mode on the A16 motorway in Italy,
+  220 km, a 500 m corridor at 0.5 m per pixel, ground as models, satellite texture. Through the app's own layout
+  (`scratch/reports/MR-VYQGBY/layout.mjs`): a box of 157.7 x 110.8 km, 107 km² of corridor, **442 pieces**.
+  Found on the way: step 1's big-area and "objects shake far from the centre" notes measure one tile's side
+  (resolution x m per pixel: 4.1 km here), not the road's or the tiles' whole extent, so neither showed; the far
+  ends of this level sit about 78 km from its centre (BeamNG: objects shake past about 30 km). Road mode has no
+  limit on length or on the number of pieces. Not changed yet: proposed to the user.
+
 **A new session starts with `docs/handoff.md`** (the user asked for it 2026-11-24: the next sessions may run on
 another model; keep it current, tick items as they finish).
 
