@@ -194,18 +194,24 @@ export function moveObject(o, dx, dy, dz, key) {
 }
 
 /**
- * Merge chunk zips into one level: chunks [{ zip (JSZip), key, levelName (the chunk's), offsetM: { x, y }, minHeight }],
- * the level's name; returns a JSZip of the level. JSZip is passed in (works in the browser and in Node).
+ * The merge, a chunk at a time: createChunkMerger(sink, levelName, opts) -> { add(chunk), finish() }.
+ * sink: { put(path, data) -> Promise|void, has(path) -> bool } (a JSZip, or services/zipStreamWriter.js); chunk:
+ * { zip (JSZip), key, levelName (the chunk's), offsetM: { x, y }, minHeight }.
+ * add() writes the chunk's own files to the sink at once (its assets are most of the level's bytes) and keeps only
+ * the text the level's files are joined from (object and forest lines, decals, materials, sites, signals, probes);
+ * the chunk's zip can go after it. finish() joins and writes those. Heights: every chunk is set at its own height
+ * relative to refMinHeight (the first chunk's lowest point unless given): a whole-level shift only, which no file
+ * depends on. A level built in 442 pieces held all 442 chunk zips until the merge before this (a tester's road).
  */
-export async function mergeChunks(JSZip, chunks, levelName, { log = () => {}, bounds = null, levelInfo = null } = {}) {
-  const out = new JSZip();
-  for (const c of chunks) if (!Number.isFinite(Number(c.minHeight))) throw new Error(`chunk ${c.key} has no lowest height: it cannot be set at its height in the level`);
-  const levelMin = Math.min(...chunks.map((c) => Number(c.minHeight)));
+export function createChunkMerger(sink, levelName, { log = () => {}, bounds = null, levelInfo = null, refMinHeight = null } = {}) {
+  const put = (path, data) => sink.put(path, data);
   const gathered = new Map();   // path -> lines (items, forest) or decal instances
   const materials = new Map();  // path -> merged object
-  let first = true; let joined = null; let n = 0;
-  for (const c of chunks) {
-    const dx = c.offsetM.x; const dy = c.offsetM.y; const dz = Number(c.minHeight) - levelMin;
+  let first = true; let joined = null; let n = 0; let ref = Number.isFinite(Number(refMinHeight)) ? Number(refMinHeight) : null;
+  async function add(c) {
+    if (!Number.isFinite(Number(c.minHeight))) throw new Error(`chunk ${c.key} has no lowest height: it cannot be set at its height in the level`);
+    if (ref === null) ref = Number(c.minHeight);
+    const dx = c.offsetM.x; const dy = c.offsetM.y; const dz = Number(c.minHeight) - ref;
     const from = `levels/${c.levelName}/`;
     let objects = 0; let assets = 0;
     for (const name of Object.keys(c.zip.files)) {
@@ -220,7 +226,7 @@ export async function mergeChunks(JSZip, chunks, levelName, { log = () => {}, bo
           // (the level's settings for the whole level, not the first chunk's: its view distance)
           .map((o) => (o.class === 'LevelInfo' && levelInfo ? { ...o, ...levelInfo } : o));
         const path = `levels/${levelName}/${rel}`;
-        const list = gathered.get(path) || []; gathered.set(path, list.concat(lines.map((o) => JSON.stringify(o)))); objects += lines.length;
+        const list = gathered.get(path) || []; for (const o of lines) list.push(JSON.stringify(o)); gathered.set(path, list); objects += lines.length;
         continue;
       }
       if (JOINED.has(rel)) {
@@ -232,7 +238,8 @@ export async function mergeChunks(JSZip, chunks, levelName, { log = () => {}, bo
         const d = JSON.parse(await f.async('string'));
         const cur = gathered.get('decals') || { header: d.header, instances: {} };
         for (const [k, list] of Object.entries(d.instances || {})) {
-          cur.instances[k] = (cur.instances[k] || []).concat(list.map((i) => i.map((v, n) => (n === 3 ? v + dx : n === 4 ? v + dy : n === 5 ? v + dz : v))));
+          const into = cur.instances[k] || (cur.instances[k] = []);
+          for (const i of list) into.push(i.map((v, m) => (m === 3 ? v + dx : m === 4 ? v + dy : m === 5 ? v + dz : v)));
         }
         gathered.set('decals', cur); continue;
       }
@@ -247,7 +254,7 @@ export async function mergeChunks(JSZip, chunks, levelName, { log = () => {}, bo
       // the game's bundled models: once, at the level root
       if (rel.startsWith('map_assets/official_assets/')) {
         const path = `levels/${levelName}/${rel}`;
-        if (!out.file(path)) { out.file(path, await f.async('uint8array')); assets++; }
+        if (!sink.has(path)) { await put(path, await f.async('uint8array')); assets++; }
         continue;
       }
       // level-wide files (info, terrain anchor, scripts, previews): from the first chunk, at the root
@@ -258,59 +265,75 @@ export async function mergeChunks(JSZip, chunks, levelName, { log = () => {}, bo
           // (the anchor terrain's materials point at textures kept with the first chunk's assets)
           let text = isText ? await f.async('string') : null;
           if (text && rel === 'art/terrains/main.materials.json') text = text.split(`levels/${c.levelName}/art/terrains/`).join(`levels/${levelName}/chunks/${c.key}/art/terrains/`);
-          out.file(`levels/${levelName}/${rel}`, isText ? text.split(`levels/${c.levelName}/`).join(`levels/${levelName}/`) : await f.async('uint8array'));
+          await put(`levels/${levelName}/${rel}`, isText ? text.split(`levels/${c.levelName}/`).join(`levels/${levelName}/`) : await f.async('uint8array'));
         }
         continue;
       }
       // the chunk's own assets
       const path = `levels/${levelName}/chunks/${c.key}/${rel}`;
-      if (/\.(dae|json|lua|cs)$/.test(rel)) out.file(path, rewritePaths(await f.async('string'), c.levelName, levelName, c.key));
-      else out.file(path, await f.async('uint8array'));
+      if (/\.(dae|json|lua|cs)$/.test(rel)) await put(path, rewritePaths(await f.async('string'), c.levelName, levelName, c.key));
+      else await put(path, await f.async('uint8array'));
       assets++;
     }
     log(`chunk ${c.key}: moved by (${dx.toFixed(1)}, ${dy.toFixed(1)}, ${dz.toFixed(2)}) m; ${objects} object line(s), ${assets} asset file(s)`);
     first = false; n++;
   }
-  if (joined?.sites) {
-    const s = joined.sites; const all = s.parkingSpots.length; s.parkingSpots = capSpots(s.parkingSpots);
-    s.dir = `/levels/${levelName}/`;
-    out.file(`levels/${levelName}/city.sites.json`, JSON.stringify(s));
-    log(`sites: ${s.zones.length} zone(s), ${s.parkingSpots.length} parking spot(s)${all > s.parkingSpots.length ? ` (of ${all}, capped for the game's loader)` : ''}`);
-  }
-  if (joined?.signals) {
-    out.file(`levels/${levelName}/signals.json`, JSON.stringify(joined.signals, null, 2));
-    log(`signals: ${joined.signals.instances.length} instance(s), ${joined.signals.controllers.length} controller(s), ${joined.signals.sequences.length} sequence(s)`);
-  }
-  if (joined?.probes) {
-    if (bounds) joined.probes.geo = { ...(joined.probes.geo || {}), bounds, worldSize: joined.probes.geo?.worldSize };
-    out.file(`levels/${levelName}/mapng_probes.json`, JSON.stringify(joined.probes));
-  }
-  // A folder is listed once. Every chunk lists its own groups (MissionGroup's "Decal_Roads", a road's group, a
-  // tunnel's), and the same folder then stood in its parent's list once per chunk: the game loads a folder once for
-  // each line that names it, so a level of six chunks loaded its roads 6 x 6 x 4 times over (135,468 DecalRoads for
-  // 965, eight minutes for a 768 x 512 m level; seen in game 2026-11-23). The first line is kept.
-  {
-    const dropped = dedupeGroups(gathered);
-    log(`groups: ${dropped ? `${dropped} repeated group line(s) removed (each folder is listed once, or the game loads it once per line)` : 'no group is listed twice'}`);
-  }
-  // roads cut at the seams joined back into one each (the game's road graph then runs across)
-  {
-    const roads = [];
-    for (const [path, lines] of gathered) {
-      if (path === 'decals' || !path.endsWith('items.level.json')) continue;
-      lines.forEach((l, i) => { if (l.includes('"DecalRoad"')) { const o = JSON.parse(l); if (Array.isArray(o.nodes) && o.nodes.length >= 2) roads.push({ o, chunk: String(o.name).split('_c').at(-1), path, i }); } });
+  async function finish() {
+    if (joined?.sites) {
+      const s = joined.sites; const all = s.parkingSpots.length; s.parkingSpots = capSpots(s.parkingSpots);
+      s.dir = `/levels/${levelName}/`;
+      await put(`levels/${levelName}/city.sites.json`, JSON.stringify(s));
+      log(`sites: ${s.zones.length} zone(s), ${s.parkingSpots.length} parking spot(s)${all > s.parkingSpots.length ? ` (of ${all}, capped for the game's loader)` : ''}`);
     }
-    const { removed, joins, ambiguous, stepped, worstStep, steps } = joinSeamRoads(roads);
-    for (const r of roads) { const list = gathered.get(r.path); list[r.i] = removed.has(r.o) ? null : JSON.stringify(r.o); }
-    for (const [path, lines] of gathered) if (path !== 'decals') gathered.set(path, lines.filter((l) => l !== null));
-    log(`roads: ${roads.length} road piece(s) looked at; ${joins} pair(s) cut at a seam joined back into one road${ambiguous ? `; ${ambiguous} end(s) left as built, where more than two pieces meet (a junction on a seam)` : ''}; ${stepped ? `${stepped} pair(s) of ends at one place and NOT at one height (over 0.5 m, the worst ${worstStep.toFixed(2)} m): a step in the road at a seam` : 'no two ends at one place stand at different heights'}`);
-    for (const st of steps.slice(0, 12)) log(`roads: step of ${st.dz.toFixed(2)} m at (${st.x.toFixed(0)}, ${st.y.toFixed(0)}) between ${st.a} and ${st.b}`);
-    if (steps.length > 12) log(`roads: ... and ${steps.length - 12} more step(s)`);
+    if (joined?.signals) {
+      await put(`levels/${levelName}/signals.json`, JSON.stringify(joined.signals, null, 2));
+      log(`signals: ${joined.signals.instances.length} instance(s), ${joined.signals.controllers.length} controller(s), ${joined.signals.sequences.length} sequence(s)`);
+    }
+    if (joined?.probes) {
+      if (bounds) joined.probes.geo = { ...(joined.probes.geo || {}), bounds, worldSize: joined.probes.geo?.worldSize };
+      await put(`levels/${levelName}/mapng_probes.json`, JSON.stringify(joined.probes));
+    }
+    // A folder is listed once. Every chunk lists its own groups (MissionGroup's "Decal_Roads", a road's group, a
+    // tunnel's), and the same folder then stood in its parent's list once per chunk: the game loads a folder once for
+    // each line that names it, so a level of six chunks loaded its roads 6 x 6 x 4 times over (135,468 DecalRoads for
+    // 965, eight minutes for a 768 x 512 m level; seen in game 2026-11-23). The first line is kept.
+    {
+      const dropped = dedupeGroups(gathered);
+      log(`groups: ${dropped ? `${dropped} repeated group line(s) removed (each folder is listed once, or the game loads it once per line)` : 'no group is listed twice'}`);
+    }
+    // roads cut at the seams joined back into one each (the game's road graph then runs across)
+    {
+      const roads = [];
+      for (const [path, lines] of gathered) {
+        if (path === 'decals' || !path.endsWith('items.level.json')) continue;
+        lines.forEach((l, i) => { if (l.includes('"DecalRoad"')) { const o = JSON.parse(l); if (Array.isArray(o.nodes) && o.nodes.length >= 2) roads.push({ o, chunk: String(o.name).split('_c').at(-1), path, i }); } });
+      }
+      const { removed, joins, ambiguous, stepped, worstStep, steps } = joinSeamRoads(roads);
+      for (const r of roads) { const list = gathered.get(r.path); list[r.i] = removed.has(r.o) ? null : JSON.stringify(r.o); }
+      for (const [path, lines] of gathered) if (path !== 'decals') gathered.set(path, lines.filter((l) => l !== null));
+      log(`roads: ${roads.length} road piece(s) looked at; ${joins} pair(s) cut at a seam joined back into one road${ambiguous ? `; ${ambiguous} end(s) left as built, where more than two pieces meet (a junction on a seam)` : ''}; ${stepped ? `${stepped} pair(s) of ends at one place and NOT at one height (over 0.5 m, the worst ${worstStep.toFixed(2)} m): a step in the road at a seam` : 'no two ends at one place stand at different heights'}`);
+      for (const st of steps.slice(0, 12)) log(`roads: step of ${st.dz.toFixed(2)} m at (${st.x.toFixed(0)}, ${st.y.toFixed(0)}) between ${st.a} and ${st.b}`);
+      if (steps.length > 12) log(`roads: ... and ${steps.length - 12} more step(s)`);
+    }
+    for (const [path, lines] of gathered) {
+      if (path === 'decals') await put(`levels/${levelName}/main.decals.json`, JSON.stringify(lines, null, 2));
+      else await put(path, lines.length ? lines.join('\n') + '\n' : '');
+    }
+    for (const [path, obj] of materials) await put(path, JSON.stringify(obj, null, 2));
   }
-  for (const [path, lines] of gathered) {
-    if (path === 'decals') out.file(`levels/${levelName}/main.decals.json`, JSON.stringify(lines, null, 2));
-    else out.file(path, lines.length ? lines.join('\n') + '\n' : '');
-  }
-  for (const [path, obj] of materials) out.file(path, JSON.stringify(obj, null, 2));
+  return { add, finish };
+}
+
+/**
+ * Merge chunk zips into one level: chunks [{ zip (JSZip), key, levelName (the chunk's), offsetM: { x, y }, minHeight }],
+ * the level's name; returns a JSZip of the level (createChunkMerger with a JSZip as the sink). Heights from the lowest
+ * chunk, as before.
+ */
+export async function mergeChunks(JSZip, chunks, levelName, { log = () => {}, bounds = null, levelInfo = null } = {}) {
+  const out = new JSZip();
+  for (const c of chunks) if (!Number.isFinite(Number(c.minHeight))) throw new Error(`chunk ${c.key} has no lowest height: it cannot be set at its height in the level`);
+  const merger = createChunkMerger({ put: (p, d) => { out.file(p, d); }, has: (p) => !!out.file(p) }, levelName, { log, bounds, levelInfo, refMinHeight: Math.min(...chunks.map((c) => Number(c.minHeight))) });
+  for (const c of chunks) await merger.add(c);
+  await merger.finish();
   return out;
 }

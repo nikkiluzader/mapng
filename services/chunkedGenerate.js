@@ -70,7 +70,7 @@ export async function generateChunked({ fetch, center, W, H, mpp, footprint, gen
  * order (services/chunkedExport.js), then merged. fetch as for generateChunked; exportLevel(terrainData, center,
  * options) -> the export's result. Returns { zip (JSZip), chunks }.
  */
-export async function exportChunkedLevel({ JSZip, chunked, fetch, exportLevel, options, levelInfo = null, onProgress = () => {}, log = () => {}, signal = null }) {
+export async function exportChunkedLevel({ JSZip, chunked, fetch, exportLevel, options, levelInfo = null, onProgress = () => {}, log = () => {}, signal = null, sink = null }) {
   const { center, W, H, mpp, size, overlap, footprint, generationOptions } = chunked;
   const chunkOptions = { ...options };   // (no surrounding backdrop per chunk: includeBackdrop off below)
   return exportChunked({
@@ -78,6 +78,6 @@ export async function exportChunkedLevel({ JSZip, chunked, fetch, exportLevel, o
     generateChunk: (c, { bounds, center: cc }) => fetch(cc, c.size, { ...generationOptions, processingMetersPerPixel: mpp, targetBounds: bounds, footprint: { runs: c.runs } }),
     exportChunk: (td, cc, opts) => exportLevel(td, cc, opts),
     options: { ...chunkOptions, includeBackdrop: false },
-    levelInfo, onProgress, log, signal,
+    levelInfo, onProgress, log, signal, sink,
   });
 }

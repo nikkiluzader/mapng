@@ -3,7 +3,7 @@
 // along their shared edges (the seams meet exactly: the export's whole-road steps differ by up to ~0.8 m between two
 // chunks' views of the same overlap), then merged into one level (services/chunkMerge.js).
 import { chunkLayout, levelLattice, CHUNK_PX, OVERLAP_PX } from './chunkLayout.js';
-import { mergeChunks } from './chunkMerge.js';
+import { createChunkMerger } from './chunkMerge.js';
 import { seamRoadLookup } from './chunkSeamRoads.js';
 
 export const SEAM_EASE_PX = 64;
@@ -64,12 +64,19 @@ export function seamBlendFor(chunk, finished, ease = SEAM_EASE_PX) {
  * cache: the export never downloads); exportChunk(terrainData, center, options) -> the export's result (blob,
  * finalHeights, finalMinHeight); options: the export's options for every chunk.
  */
-export async function exportChunked({ JSZip, footprint, W, H, center, mpp, levelName, generateChunk, exportChunk, options = {}, size = CHUNK_PX, overlap = OVERLAP_PX, levelInfo = null, onProgress = () => {}, log = () => {}, signal = null }) {
+export async function exportChunked({ JSZip, footprint, W, H, center, mpp, levelName, generateChunk, exportChunk, options = {}, size = CHUNK_PX, overlap = OVERLAP_PX, levelInfo = null, onProgress = () => {}, log = () => {}, signal = null, sink = null }) {
   const L = levelLattice(center, mpp, W, H);
   const chunks = chunkLayout(footprint, W, H, { size, overlap });
   log(`${chunks.length} chunk(s) of ${size} px (overlap ${overlap}) over a ${W} x ${H} footprint grid`);
-  const finished = []; const parts = []; const times = []; const reports = []; const lines = [];
+  const finished = []; const times = []; const reports = []; const lines = [];
   const say = (m) => { lines.push(m); log(m); };
+  // (each chunk goes into the level as soon as it is exported, and its zip is let go: services/chunkMerge.js
+  // createChunkMerger. The sink is the caller's streamed zip (services/zipStreamWriter.js, ZIP64 when needed) or,
+  // without one, a JSZip returned as before)
+  const own = sink ? null : new JSZip();
+  const out = sink || { put: (p, d) => { own.file(p, d); }, has: (p) => !!own.file(p) };
+  const bounds = { north: L.latOf(0), south: L.latOf(H), west: L.lngOf(0), east: L.lngOf(W) };
+  const merger = createChunkMerger(out, levelName, { log: say, bounds, levelInfo });
   // (a failure says which chunk it was in, and at which step: one of many, each minutes long)
   const inChunk = async (c, k, what, run) => {
     try { return await run(); } catch (e) {
@@ -103,14 +110,13 @@ export async function exportChunked({ JSZip, footprint, W, H, center, mpp, level
     for (let i = finished.length - 1; i >= 0; i--) if (finished[i].y0 + finished[i].size < c.y0 - overlap) finished.splice(i, 1);
     // (a Blob in the browser; JSZip in Node reads its bytes)
     const bytes = typeof res.blob?.arrayBuffer === 'function' ? await res.blob.arrayBuffer() : res.blob;
-    parts.push({ zip: await JSZip.loadAsync(bytes), key: c.key, levelName: chunkLevel, offsetM: L.chunkOffsetM(c), minHeight: res.finalMinHeight });
+    await merger.add({ zip: await JSZip.loadAsync(bytes), key: c.key, levelName: chunkLevel, offsetM: L.chunkOffsetM(c), minHeight: res.finalMinHeight });
     times.push({ key: c.key, ms: Date.now() - t0 });
     say(`chunk ${c.key} (${k + 1}/${chunks.length}): ${((Date.now() - t0) / 1000).toFixed(1)} s${seamBlend ? ', seam blended toward finished neighbours' : ''}`);
   }
   signal?.throwIfAborted?.();
   onProgress({ step: 'merge' });
-  const bounds = { north: L.latOf(0), south: L.latOf(H), west: L.lngOf(0), east: L.lngOf(W) };
-  const zip = await mergeChunks(JSZip, parts, levelName, { log: say, bounds, levelInfo });
+  await merger.finish();
   // The level's own report: what the level is, how it was put together (the lines above), then every chunk's report.
   // (The merged zip used to hold the first chunk's report as if it were the level's.)
   const report = [
@@ -124,6 +130,6 @@ export async function exportChunked({ JSZip, footprint, W, H, center, mpp, level
     '',
     ...reports.flatMap((r) => [`## Chunk ${r.key}`, '', r.text.replace(/^# /gm, '### ').replace(/^## /gm, '#### '), '']),
   ].join('\n');
-  zip.file(`levels/${levelName}/export_report.md`, report);
-  return { zip, chunks: times, report };
+  await out.put(`levels/${levelName}/export_report.md`, report);
+  return { zip: own, chunks: times, report };
 }

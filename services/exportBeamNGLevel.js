@@ -11,6 +11,7 @@ import { buildGroundTiles } from './groundMesh.js';
 import { shapeRows, shapeOf, hasShape, inFootprint, keepSquareFor, footprintTest } from './batchShape.js';
 import { footprintClipper } from './footprintClip.js';
 import { padTerrainToSquare } from './padToSquare.js';
+import { createZipStreamWriter, memorySink } from './zipStreamWriter.js';
 import { buildTerrainMaterials, isVegetationColor } from './osmTerrainMaterials.js';
 import { createOSMGroup, createSurroundingMeshes, SCENE_SIZE } from './export3d.js';
 import { planPools, poolFootprints, poolWaterBlocks, squareOpens, POOL_WATER_BLOCK } from './pools.js';
@@ -13696,7 +13697,14 @@ async function exportChunkedFromOverview(overview, center, options) {
     if (plan.tunnels.length) levelTunnels = plan;
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunked: long tunnels: ${plan.tunnels.length ? `${plan.tunnels.length} planned once for the whole level from its overview (${plan.tunnels.slice(0, 8).map((t) => `${Math.round(t.length)} m, ${t.z0.toFixed(0)} to ${t.z1.toFixed(0)} m`).join('; ')}${plan.tunnels.length > 8 ? '; ...' : ''}): each chunk's end of a tunnel that its grid cuts takes its height from that line` : `none over ${LEVEL_TUNNEL_MIN_M} m lies whole inside the level: each chunk plans the tunnels it sees`}.`);
   } catch (e) { console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Chunked: long tunnels not planned for the whole level (${e?.message || e}); each chunk plans the tunnels it sees.`); }
-  const { zip, chunks, report } = await exportChunkedLevel({
+  // (the level is written as it is built: each piece's files go into the zip as soon as it is exported, ZIP64 when
+  // the level passes 65,535 files or 4 GB (services/zipStreamWriter.js). To the desktop runner's file, or to memory
+  // for the browser's download. JSZip, which cannot write ZIP64 and held every piece until the end, made a 442-piece
+  // level that MapNG's own level list could not read)
+  const memory = options.zipSink ? null : memorySink();
+  const writer = createZipStreamWriter(options.zipSink || memory);
+  const { chunks, report } = await exportChunkedLevel({
+    sink: { put: (p, d) => writer.add(p, d), has: (p) => writer.has(p) },
     signal: options.signal || null,
     JSZip, chunked: ch, fetch,
     exportLevel: (td, cc, opts) => exportBeamNGLevel(td, cc, opts),
@@ -13716,9 +13724,10 @@ async function exportChunkedFromOverview(overview, center, options) {
     },
     log: (m) => console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunked: ${m}`),
   });
-  let zipBlob = null;
-  if (options.zipSink) await streamZipToWritable(zip, options.zipSink, (f) => onProgress?.({ step: 'Compressing the level ZIP…', pct: 95 + Math.round(5 * (f || 0)), phase: 'zip', phaseFraction: Math.max(0, Math.min(1, f || 0)), phaseWeights: CHUNKED_PHASE_WEIGHTS }));
-  else zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', streamFiles: true });
+  onProgress?.({ step: 'Writing the level ZIP’s table of contents…', pct: 98, phase: 'zip', phaseFraction: 0.9, phaseWeights: CHUNKED_PHASE_WEIGHTS });
+  const written = await writer.finish();
+  console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunked: level ZIP: ${written.files} file(s), ${(written.bytes / 2 ** 20).toFixed(1)} MB${written.zip64 ? ', ZIP64 (over 65,535 files or 4 GB)' : ''}.`);
+  const zipBlob = memory ? memory.blob() : null;
   console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunked level written in ${((performance.now() - t0) / 1000).toFixed(1)} s: ${chunks.map((c) => `${c.key} ${(c.ms / 1000).toFixed(1)} s`).join(', ')}.`);
   onProgress?.({ step: 'Done', pct: 100, elapsedMs: performance.now() - t0 });
   return { blob: zipBlob, filename: `${levelName}.zip`, structureChecks: [], ingameProbes: null, report: report || '', reportJson: null, steps: chunks.map((c) => ({ step: `chunk ${c.key}`, ms: c.ms })), reused: [] };
