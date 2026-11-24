@@ -1,6 +1,6 @@
 # MapNG open items
 
-Last reviewed: 2026-11-24, night (main = dev at 759ea31; v0.3.6 tagged, its draft building)
+Last reviewed: 2026-11-24, night (0.3.6 published as Latest; main at 759ea31)
 
 The short "now" board: current work, what waits on someone, and checks owed on shipped work. The other tracking
 files: `refs/output/backlog.md` holds everything wanted later, by area; `refs/output/releases.md` what shipped;
@@ -17,8 +17,9 @@ the user's word (workflow run 45300857415). That run succeeded; both manifests v
 **Release, 2026-11-24:** the final sweep (135 cells, identical to the baselines) ran on the release code; main =
 dev at 759ea31, pushed on the user's word ("Go ahead on main"); both sites' build checks passed and
 mapng.com/updates/latest answers 0.3.6; the page is out of draft; tag v0.3.6 pushed (workflow run 45302898420
-builds the draft). Left: check the draft's files and AppImage, then ask the user before publishing; the user
-runs the signed Windows installer. Seen: a Dependabot check failed on the commit (a minimatch update in
+builds the draft). The draft checked (AppImage checksum and an end-to-end run, both manifests' signatures) and **published as
+Latest 2026-11-24 01:18 UTC on the user's word**. Left: the user runs the signed Windows installer; the first
+item of 0.3.7 is the batch code's removal (backlog section 0). Seen: a Dependabot check failed on the commit (a minimatch update in
 /desktop, its own run; not looked at).
 
 Before the 0.3.6 desktop release:
