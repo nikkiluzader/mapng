@@ -381,7 +381,18 @@ As of 2026-11-23:
     - Width: on this bridge the deck (3.6 m road + 0.45 m each side for the parapets) and the track drawn on it
       (3.96 m) agree, and every bridge way in five Tignes areas has the class of the roads at its ends. His
       picture shows a track about twice the deck's width: needs the place (which bridge) from him.
-    - Seen on the way: a track's deck is bare concrete (no dirt on it).
+    - A track's deck was bare concrete (its dirt decal is soft and half transparent). Done on dev 2026-11-24
+      (15435de): a deck whose roads are all tracks or unpaved gets a compacted-earth top (`mapng_bridge_dirt`, the
+      game's own gridmap dirt texture, ground type DIRT). Seen in game: `scratch/fizz035/tb_dirt_deck.jpg`.
+  - **The five easy wins (user, 2026-11-24: do them, sidewalk drift last).** (1) earth on track bridge decks: done.
+    (2) sweep areas on the corrected frame: the 15 smoke areas re-framed from their saved rasters
+    (`REFRAME=1 fetchArea.mjs --catalog`, `scratch/levelprobe/reframe.sh`; the old heightmaps kept in
+    `scratch/levelprobe/oldframe/`), Mapterhorn fetched again; the matrix on them is running, baselines not yet
+    re-recorded; the other 38 catalogue areas not re-framed. (3) batch code removal: not started, bigger than it
+    looked (about 5,000 lines wired into App.vue, the map and the store; it would also end "an unfinished saved
+    job opens once more", which the 0.3.6 page promises: the user's call). (4) fixes seen in game: the gallery
+    yes, the funicular not yet. (5) the page's in-game pictures: the gallery and the track bridge added; a tiled
+    level, a road level and the thumbnail in the level list still missing.
   - **Gallery fix seen in game 2026-11-24** (`fz_pigettes` as a 512 level, removed after): from the valley side a
     level roof on its columns, the road straight through; from the driver's seat the road runs in with no rise
     (`scratch/fizz035/pig_game_outside.jpg`, `pig_game_driver.jpg`). The funicular: not seen in game yet.
