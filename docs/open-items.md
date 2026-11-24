@@ -116,7 +116,13 @@ Known and not blocking 0.3.6 (say so on the page):
     also paved the walkway aprons out to a seawall again. Sections through the four clusters
     (`scratch/fizz035/kingst_sw_sect.png`): each is paving laid down the shore's bank toward the water, 0.1 to
     0.5 m under the ground. So at Kingston this is the aprons, the same ground the `seawall` branch works on, not a
-    general drift. Not yet looked at the same way: Naldo, Amsterdam Centraal.
+    general drift. What is mapped there: the bayfront promenade's footways (surface=concrete) and retaining walls.
+    **Naldo traced the same way** (`scratch/fizz035/naldo_sw_sect.png`): the 29 buried spots are one 100 m line of
+    paving down a bank by the water, 0.3 to 0.5 m under the ground, with nothing mapped within 14 m of it (a
+    street's own sidewalk or a pocket: not yet said which); the 13 floating spots, 3 to 4 m, are slabs running
+    down the face of a raised motorway approach between two bridge decks (ways 559782742, 559782750).
+    So "sidewalk drift" is three things, none of them a drift: the promenade (the `seawall` branch), paving down a
+    bank, and slabs at a raised approach's face. Amsterdam Centraal: clusters listed, not sectioned.
     Also seen: the game logs "Invalid ZIP file" once when a level's zip is copied into the mods folder while the
     game watches it (the copy is caught half written; it mounts fine a moment later). A test artefact.
 
