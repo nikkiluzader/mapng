@@ -38,9 +38,13 @@ const SIZE = 2048; const MPP = 1; const HALF = (SIZE * MPP) / 2;
 // layout
 // (the hill well clear of the main line: across the hill's foot the line rose 13 m and came out on a viaduct)
 const COAST_X = -900; const RIVER_Y = -940; const HILL = { x: 300, y: 720, r: 130, h: 55 };
+const WATER_PAD = { x0: 462, x1: 1015, y0: 485, y1: 650 };   // the still-water block, flat ground
 const RAIL_Y = 330; const ROAD_TUNNEL_Y = 760; const RAIL_TUNNEL_Y = 680;
 const PLOT = 60; const PW = 60; const PLOT_X0 = -840; const PLOT_X1 = 1000; const PLOT_Y0 = -840; const PLOT_Y1 = -120;
 const AREA_M = 30;   // a plot's area, in a 60 m plot
+// footprints at their real size where the usual 30 m square is far off (the user, 2026-11-24): a shipping container
+// is 12.2 x 2.44 m (a 40 ft box), a kiosk or a toilet block a few metres, a carport a car's bay or two
+const REAL_SIZE = { 'building=container': [12.2, 2.44], 'building=kiosk': [4, 3], 'building=toilets': [6, 4], 'building=carport': [6, 5.5], 'building=hut': [5, 4], 'building=shed': [4, 3], 'building=garage': [6, 3.5] };
 const TREE_GRID = { x0: -840, x1: 0, y0: -60, y1: 200, step: 30 };   // the arboretum: one tree per 30 m
 // property tags that only mean something on a road: put on a short street in their plot
 const ROAD_PROPERTY = /^(bridge|tunnel|sidewalk|maxspeed|priority_road|junction|lanes|surface|lit|oneway|cycleway|parking:lane|turn:lanes|width|hazard)=/;
@@ -63,7 +67,9 @@ export function heightAt(x, y) {
   // road and the railway climb out of the sea on a viaduct)
   let h = 4;
   const d2 = (x - HILL.x) ** 2 + (y - HILL.y) ** 2;
-  h += HILL.h * Math.exp(-d2 / (2 * HILL.r * HILL.r));
+  // (the hill's skirt eased out over the water block, flat under it: a reservoir on its slope fell 17 m across)
+  const pad = Math.max(WATER_PAD.x0 - x, x - WATER_PAD.x1, WATER_PAD.y0 - y, y - WATER_PAD.y1, 0);
+  h += HILL.h * Math.exp(-d2 / (2 * HILL.r * HILL.r)) * Math.min(1, pad / 40);
   // the river valley: 5 m down, 50 m wide, easing out
   const dv = Math.abs(y - RIVER_Y); if (dv < 60) h -= 3.5 * Math.max(0, 1 - (dv / 60) ** 2);
   // the coast: down to the sea floor west of the coastline over 30 m
@@ -91,6 +97,13 @@ export function buildCoverage(regionKey) {
     const ns = pts.map(([x, y, t]) => node(x, y, t));
     const w = { type: 'way', id: wid++, nodes: ns.map((n) => n.id), geometry: ns.map((n) => ({ lat: n.lat, lon: n.lon })), tags };
     elements.push(w); return w;
+  };
+  // a multipolygon: its outer ring and inner rings (holes) as untagged ways, members with their geometry, as Overpass
+  // returns them
+  const relation = (outer, inners, tags) => {
+    const ring = (pts, role) => { const w = way(pts, undefined); return { type: 'way', ref: w.id, role, geometry: w.geometry }; };
+    const r = { type: 'relation', id: rid++, members: [ring(outer, 'outer'), ...inners.map((h) => ring(h, 'inner'))], tags: { type: 'multipolygon', ...tags } };
+    elements.push(r); return r;
   };
   const area = (cx, cy, w, h, tags) => way([[cx - w / 2, cy - h / 2], [cx + w / 2, cy - h / 2], [cx + w / 2, cy + h / 2], [cx - w / 2, cy + h / 2], [cx - w / 2, cy - h / 2]], tags);
   const line = (x0, y0, x1, y1, step, tags, nodeTag) => {
@@ -185,17 +198,50 @@ export function buildCoverage(regionKey) {
     }
   }
 
+  // ── still water at real sizes (the user, 2026-11-24: each kind in a 30 m square looked alike; a lake runs to
+  // hundreds of metres, a canal is a long strip): a block north-east of the hill, the river kinds as long strips with
+  // their lines through them in the empty last plot row. The Coverage Lake above is the plain lake. ──
+  {
+    const WATER = [
+      ['reservoir', 560, 600, 160, 90], ['lagoon', 730, 605, 120, 70], ['salt_pool', 860, 610, 70, 40],
+      ['pond', 490, 520, 35, 22], ['basin', 560, 520, 45, 28], ['fishpond', 640, 520, 50, 25], ['reflecting_pool', 730, 520, 60, 8],
+    ];
+    for (const [w, x, y, sx, sy] of WATER) {
+      area(x, y, sx, sy, { natural: 'water', water: w, name: `cov water=${w} ${sx} x ${sy} m` });
+      structure(`water=${w}, ${sx} x ${sy} m`, x, y, [Math.max(sx, sy) * 0.8 + 25, 0]);
+    }
+    // a wastewater plant's round tank, 28 m across
+    { const pts = []; for (let a = 0; a <= 24; a++) pts.push([960 + 14 * Math.cos((a / 24) * 2 * Math.PI), 605 + 14 * Math.sin((a / 24) * 2 * Math.PI)]); pts[24] = pts[0];
+      way(pts, { natural: 'water', water: 'wastewater', name: 'cov water=wastewater round tank 28 m' }); structure('water=wastewater, round tank 28 m', 960, 605, [45, 0]); }
+    // a moat 8 m wide round a 30 m square keep (the outline with its keep as the hole)
+    { const o = [[804, 499], [856, 499], [856, 541], [804, 541], [804, 499]]; const k = [[815, 510], [845, 510], [845, 530], [815, 530], [815, 510]];
+      relation(o, [k], { natural: 'water', water: 'moat', name: 'cov water=moat 8 m round a keep' }); structure('water=moat, 8 m wide round a keep', 830, 520, [50, 0]); }
+    // an oxbow: a crescent 15 m wide, 40 m round
+    { const pts = []; for (let a = 0; a <= 12; a++) { const t = Math.PI * (0.15 + 0.7 * a / 12); pts.push([930 + 48 * Math.cos(t), 495 + 48 * Math.sin(t)]); }
+      for (let a = 12; a >= 0; a--) { const t = Math.PI * (0.15 + 0.7 * a / 12); pts.push([930 + 33 * Math.cos(t), 495 + 33 * Math.sin(t)]); }
+      pts.push(pts[0]); way(pts, { natural: 'water', water: 'oxbow', name: 'cov water=oxbow crescent 15 m wide' }); structure('water=oxbow, crescent', 930, 530, [55, 0]); }
+    // the river kinds: long strips with their lines, as mapped
+    for (const [w, x0, x1, half] of [['river', -760, -460, 15], ['canal', -400, -100, 7], ['stream', -40, 210, 2]]) {
+      const y = -150;
+      area((x0 + x1) / 2, y, x1 - x0, 2 * half, { natural: 'water', water: w, name: `cov water=${w} ${x1 - x0} x ${2 * half} m` });
+      way([[x0 - 10, y], [x1 + 10, y]], { waterway: w, name: `cov line for water=${w}` });
+      structure(`water=${w}, ${x1 - x0} x ${2 * half} m strip with its line`, (x0 + x1) / 2, y, [80, 0]);
+    }
+  }
+
   // ── the plots: one per tag MapNG builds ──
   const lib = JSON.parse(fs.readFileSync(path.join(REPO, 'data/osm-tag-library.json'), 'utf8'));
   const wanted = [];
   // (tags the layout's own structures already carry, not repeated in a plot: an inland coastline would cut the land)
   // (the platform plot too: a platform is raised beside its track, the station on the main line has one)
+  // (and every still water kind: the water block above, at real sizes)
   const BUILT_ELSEWHERE = new Set(['natural=coastline', 'railway=platform']);
+  const elsewhere = (tag) => BUILT_ELSEWHERE.has(tag) || /^water=/.test(tag) || tag === 'landuse=reservoir' || tag === 'landuse=basin';
   for (const [tag, e] of Object.entries(lib.tags)) {
     if (e.status !== 'built' && e.status !== 'partial') continue;
-    if (BUILT_ELSEWHERE.has(tag)) continue;
+    if (elsewhere(tag)) continue;
     wanted.push({ tag, on: e.on, group: e.group });
-    for (const also of e.also || []) wanted.push({ tag: also, on: e.on, group: e.group, also: tag });
+    for (const also of e.also || []) if (!elsewhere(also)) wanted.push({ tag: also, on: e.on, group: e.group, also: tag });
   }
   // (a few the plots need with their values spelled out: every sport on a pitch, every surface of a road)
   // (every placed-object rule of data/tag-models.json, as a mapped point with the sub-tags its rule asks for)
@@ -262,7 +308,7 @@ export function buildCoverage(regionKey) {
       else way([[cx, y0], [cx, y0 + PLOT - 22]], { highway: 'residential', ...tags, ...(k === 'bridge' ? { layer: '1' } : k === 'tunnel' ? { layer: '-1' } : {}) });
       kind = 'on a road';
     } else if (w.on.includes('node') && ON_ROAD.test(w.tag)) { node(cx, y0, tags); kind = 'node on the street'; }
-    else if (w.on.includes('area')) { area(cx, cy, AREA_M, AREA_M, tags); kind = 'area'; }
+    else if (w.on.includes('area')) { const [sx, sy] = REAL_SIZE[t] || [AREA_M, AREA_M]; area(cx, cy, sx, sy, tags); kind = REAL_SIZE[t] ? `area, ${sx} x ${sy} m` : 'area'; }
     else if (w.on.includes('way')) { way([[x0 + 3, cy], [x0 + PW - 3, cy]], tags); kind = 'way'; }
     else { node(cx, cy, tags); kind = 'node'; }
     placed.push({ what: w.tag + (w.extra && Object.keys(w.extra).length ? ` ${JSON.stringify(w.extra)}` : ''), kind, at: at.map(Math.round), plot: [Math.round(cx), Math.round(cy)], also: w.also, rule: w.rule });
