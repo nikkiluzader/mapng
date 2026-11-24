@@ -87,8 +87,7 @@ Known and not blocking 0.3.6 (say so on the page):
    .ter are made once per tile, named `_tile1`, `_tile2` (`components/panels/ExportPanel.vue` assetExport, the
    crop helper's own corner option). Checked in the browser on two 512 tiles (`scratch/verify-pw/e2e_pertile.mjs`):
    two files of 512 x 512, each exactly its half of the whole map's. Not per tile: the 3D models (they have their
-   own tiling), the GeoJSON (it is the whole map's data), a chunked level (its overview is too coarse). Left: the
-   batch code and its texts removed (the old panel still opens for an unfinished saved job).
+   own tiling), the GeoJSON (it is the whole map's data), a chunked level (its overview is too coarse). The batch code stays for 0.3.6 (first item of 0.3.7, backlog section 0).
 9. **Desktop Generate ran out of memory at 8192 on 16 GB (MR-PM849Z).** Fixed on dev 2026-11-24. Measured with
    `scratch/memprobe/gen_peak.mjs` (the runner's Generate alone, memory read 5 times a second by stage) at the
    report's place and size (Essex, 8192 at 2 m): the peak was 8.65 GB, in painting the three map textures while
@@ -388,9 +387,7 @@ As of 2026-11-23:
     (2) sweep areas on the corrected frame: the 15 smoke areas re-framed from their saved rasters
     (`REFRAME=1 fetchArea.mjs --catalog`, `scratch/levelprobe/reframe.sh`; the old heightmaps kept in
     `scratch/levelprobe/oldframe/`), Mapterhorn fetched again; the matrix on them is running, baselines not yet
-    re-recorded; the other 38 catalogue areas not re-framed. (3) batch code removal: not started, bigger than it
-    looked (about 5,000 lines wired into App.vue, the map and the store; it would also end "an unfinished saved
-    job opens once more", which the 0.3.6 page promises: the user's call). (4) fixes seen in game: the gallery
+    re-recorded; the other 38 catalogue areas not re-framed. (3) batch code removal: moved to the backlog as the first item of 0.3.7 (user's decision). (4) fixes seen in game: the gallery
     and the funicular (new area `fz_perce`, 2048 at 2 m, the whole 3.4 km tunnel: steepest 29.8 %, no filled dips,
     no gallery stretch; inside straight and steady at the lower end and the middle, the ground over it a plain
     hillside; `scratch/fizz035/perce_*.jpg`). (5) the page's in-game pictures: the gallery and the track bridge added; a tiled
