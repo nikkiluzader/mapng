@@ -1,6 +1,6 @@
 # Handoff: picking up the 0.3.7 work
 
-Last updated: 2026-11-24, night, by the session that shipped 0.3.6. Keep this file current as you work: tick items
+Last updated: 2026-11-24, late night, by the session that shipped 0.3.6. Keep this file current as you work: tick items
 when done, rewrite the "state" of the item you stop in. It does not replace the tracking files (see CLAUDE.md,
 "Tracking"); it is the short "start here" for the next session.
 
@@ -49,37 +49,55 @@ when done, rewrite the "state" of the item you stop in. It does not replace the 
 **Goal** (user, 2026-11-20): behind a retaining wall at the water, bring the pavement out to the wall and make it
 flat. **Done when:** a sweep shows no sidewalk cell worse than dev, then a look in the game at Kingston and Naldo.
 
-**Branch `seawall-037` at `cc90cc4`.** What it has on top of dev:
+**Branch `seawall-037` at `3dc1eb0`** (local only, not pushed). What it has on top of dev:
 - the old `seawall` branch merged (`services/quayFill.js`, changes in `pavedSidewalks.js`, `pavedWorker.js`,
-  `pavedArea.js`, `beamngSidewalks.js`, `exportBeamNGLevel.js`);
+  `pavedArea.js`, `beamngSidewalks.js`, `exportBeamNGLevel.js`), and dev merged in after the batch removal;
 - every grid point within 4.5 m of a levelled wall knows its own stretch's level (`levelAt`, `LEVEL_BAND_M`);
 - a mapped walk inside that band takes that level across its whole width (`onLevel` in `pavedSidewalks.js`);
-- land whose top lies more than 6 m in from the wall is left alone (`TOP_FAR_M`): a ramp or a garden's bank.
+- land whose top lies more than 6 m in from the wall is left alone (`TOP_FAR_M`): a ramp or a garden's bank;
+- the fill keeps off walks and steps that go down the bank (`walkAt`, `WALK_BELOW_M`);
+- the temporary probe lines are OUT of the export again (`scratch/fizz035/proberun.mjs` needs them: to probe, put a
+  `console.log` behind `globalThis.__MAPNG_PROBE` back in for the time of the probe and do not commit it).
+- Tests: 1,495 pass on the branch. Unit tests for each rule: `tests/quayFill.test.mjs`.
 
-**Numbers** (sidewalk spots floating / buried, Mapterhorn, terrain "ready"; from `<zip>.checks.json`, key
-`sidewalks`):
+**Seen in the game (2026-11-24):** Kingston's bayfront on a small level built from the branch (new area
+`sw_bayfront`, 512): the paving runs flat out to the sea wall, from over the water and at walking height
+(`scratch/fizz035/bay_game.jpg`). Nothing else on the branch has been seen in the game.
 
-| Area | dev | branch |
+**The sweep on the branch** (`scratch/fizz035/sweep_seawall.json`, against dev's `sweep_final.json`): 8 cells
+differ, 3 better, 6 flagged. Sidewalk spots floating / buried, terrain "ready":
+
+| Cell | dev | branch |
 |---|---|---|
-| kingst | 0 / 34 | 4 / 23 |
-| naldo | 18 / 47 | 18 / 19 |
-| ams_centraal | 30 / 27 | 31 / 32 |
+| naldo@mh | 18 / 47 | 18 / 19 (better) |
+| kingst@mh | 0 / 34 | 5 / 23 (buried better, floating worse) |
+| kingst@gpxz | 0 / 38 | 4 / 24 (same pattern) |
+| kingst@t30 | 0 / 12 | 10 / 21 (worse; spikes 10 -> 18) |
+| naldo@gpxz | 17 / 16 | 22 / 24 (worse) |
+| ams_centraal@gpxz | 21 / 25 | 24 / 39 (worse) |
+| ams_centraal@mh | 30 / 27 | 32 / 31 (worse) |
 
-**Open on the branch:**
-1. `ams_centraal`: two new buried clusters at (108, -202) and (88, -206). Sections dev beside branch:
-   `scratch/fizz035/ams_sw_cmp.png`. A road embankment slopes 1 in 2 down to a wall at the water; the fill
-   levels it out to the wall (a shelf with a 2.5 m drop) and the walk at the top ends up to 1 m under the new
-   ground. **Tried and reverted:** skipping banks that rise less than 0.6 m per metre. It undid Naldo's gain
-   (buried 19 -> 42) and made Kingston worse (4 / 23 -> 12 / 34). Do not re-try that rule as it was. An idea not
-   tried: keep the fill, but when it raises the ground under an existing walk at the top, the walk follows.
-2. `kingst`: single floating places at (298, 68), (210, 686), (322, -146). Not looked at.
-3. `naldo`: the 13 floating spots at (392..420, 108..140), 3 to 4 m: sidewalk slabs down the face of a raised
+So the branch is NOT ready for dev by the "no cell worse" bar. The user was asked whether to merge it as a net
+improvement anyway and has not answered: do not merge without their word.
+
+**Open on the branch, with what is known:**
+1. **Every remaining new spot sits 1 to 3 m inland of a mapped wall** (top views: `scratch/fizz035/kingst_left_top.png`,
+   `ams_left_top.png`, drawn with `scratch/fizz035/swtop.py`). Kingston's are at wall corners and ends, floating
+   0.4 m; Amsterdam's are in a narrow strip of paving between the wall and a second walk, buried 0.2 to 0.8 m.
+2. **Tried and reverted, do not repeat as they were:**
+   - skipping banks that rise less than 0.6 m per metre: undid Naldo (buried 19 -> 42), Kingston 4 / 23 -> 12 / 34;
+   - not counting points past a wall's END as its water side (the idea: the "water side put back" step lowers
+     land behind the next wall at a corner): no change in any of six cells, so that is not the cause.
+3. **Not looked at yet:** why the coarse terrains are worse (kingst@t30, naldo@gpxz, ams_centraal@gpxz). Start
+   there with a top view and sections of the worst new clusters, before any code.
+4. `naldo`: the 13 floating spots at (392..420, 108..140), 3 to 4 m: sidewalk slabs down the face of a raised
    motorway approach between two bridge decks. The branch does not touch this; it is a bridge-end problem.
-4. **Temporary probe lines are in the branch's `exportBeamNGLevel.js`** (search for `__MAPNG_PROBE`, 4 places):
-   remove them before merging.
-5. `quayFill.js` and `gridIndexAt` use grid rows as `H - 1 - r`. I checked that this matches `gradePaved`'s
-   convention for whole grid points, but nobody has checked it against the corrected map frame in general.
-6. Not run on the branch: the sweep matrix; anything in the game.
+5. `quayFill.js` and `gridIndexAt` use grid rows as `H - 1 - r`; checked equal to `gradePaved`'s convention for whole
+   grid points, not checked against the corrected map frame in general.
+
+**How the two fixes that worked were found** (use the same method): print the ground at a few points after each
+step of the export, and print what the paving reports as its slab height at those points before the grading. The
+slab and the ground disagreed because two parts of the code used two different levels.
 
 **How to measure one area** (about 30 s each):
 ```
@@ -92,14 +110,17 @@ then read `<name>.checks.json` -> `sidewalks` (`floating`, `buried`, `spots`). S
 (env `PROBE='[[x,y],...]'`); the fill's plan along a line: `scratch/fizz035/quayrun.mjs` (env `QY`, `QX0`, `QX1`).
 Python with matplotlib: `~/miniconda3/envs/laneextraction/bin/python`.
 
-**Before merging the branch to dev:** remove the probe lines; `npm test`; `npx vite build`; the smoke sweep matrix
+**Before merging the branch to dev:** the user's word; `npm test`; `npx vite build`; the smoke sweep matrix
 (`node scripts/sweep/runSweep.mjs --smoke --matrix --json <file>`, about 15 minutes, run it in the background)
 with no sidewalk value worse than the baselines; before/after sections sent to the user; then the game.
 
 ## Traps (things that went wrong, or nearly did, in the last sessions)
 
 - **Diagrams before code, and before any game check.** Draw the place (top view, sections) before changing
-  anything, and send before/after pictures. The user has reminded about this several times.
+  anything, and send before/after pictures. The user has reminded about this several times, the last time on
+  2026-11-24 in the middle of the sea-wall work: counts and sections alone had missed that every remaining spot
+  sits beside a wall; one top view showed it. Top views: `scratch/fizz035/swtop.py`; sections:
+  `scratch/devareas/sect.py`.
 - **Never `rm` with a variable or a glob.** The permission check refuses it. Use full literal paths.
 - **Never `pkill -f`.** It kills the shell. Find the exact PID (`ss -ltnp | grep :<port>`) and `kill <pid>`.
   A dev server started with `npx vite` leaves a child process: kill the PID that holds the port.

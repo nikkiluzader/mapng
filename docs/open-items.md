@@ -54,6 +54,15 @@ Mesh Road joins. Riding along: the other 38 sweep areas re-framed, Zion's tunnel
   - Also on the branch's list from before: the walled sunken garden (210, 686), sidewalks at bridge ends by the
     river wall. Naldo's slabs at the raised motorway approach are untouched by the branch.
   - `quayFill.js` and `gridIndexAt` use rows as H - 1 - r: check against the corrected map frame.
+  - **2026-11-24, late night:** the fill keeps off walks and steps that go down the bank (3dc1eb0; little gain at
+    Amsterdam); the probe lines are out. In game on a small level (`sw_bayfront`): the promenade flat out to the
+    sea wall (`scratch/fizz035/bay_game.jpg`). **The sweep on the branch: 3 cells better, 6 flagged**
+    (`scratch/fizz035/sweep_seawall.json`): better `naldo@mh` and Kingston's buried counts on both lidars; worse
+    `kingst@t30` (0 / 12 -> 10 / 21), `naldo@gpxz` (17 / 16 -> 22 / 24), `ams_centraal@gpxz` (21 / 25 -> 24 / 39),
+    and Kingston's floating count on both lidars (0 -> 4 and 5). Not for dev as it stands. Top views of every
+    remaining spot (`kingst_left_top.png`, `ams_left_top.png`, tool `swtop.py`): all of them 1 to 3 m inland of a
+    mapped wall. Tried and reverted: points past a wall's end not counted as its water side (no change).
+    The full state and what not to repeat: `docs/handoff.md`.
   Done when: a sweep shows no sidewalk cell worse than dev, then in game at Kingston and Naldo.
 
 ## Priority list (2026-11-23, asked for by the user; details in the sections below)
