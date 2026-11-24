@@ -108,6 +108,7 @@ export const DATA_FIELDS = [
   ['advancedMode', 'mapng_advanced_mode', 'bool', false],
   ['overtureBuildings', 'mapng_overtureBuildings', 'bool', true],
   ['measureRoadWidths', 'mapng_measureRoadWidths', 'bool', false],
+  ['osmLinesAsDrawn', 'mapng_osmLinesAsDrawn', 'bool', false],   // (services/roadCurves.js)
   ['workflow', 'mapng_workflow', ['level', 'assets', 'both'], 'level'],   // (what is being made: composables/useWorkflow.js)
 ];
 
@@ -357,6 +358,8 @@ export function describeSessionConfig(config, { hasGpxzKey = false } = {}) {
   if (typeof c.advancedMode === 'boolean') add('data', 'config.advancedMode', { valueKey: c.advancedMode ? 'config.on' : 'config.off' });
   // (downloads extra satellite tiles at Generate: said when a config switches it on)
   if (c.measureRoadWidths === true) add('data', 'controlPanel.measureRoadWidths', { valueKey: 'config.on' });
+  // (the lines' corners left as mapped: said when a config switches it on)
+  if (c.osmLinesAsDrawn === true) add('data', 'controlPanel.osmLinesAsDrawn', { valueKey: 'config.on' });
   if (usableMask(c.backgroundMask)) {
     const m = c.backgroundMask;
     add('data', 'config.backgroundAreas', { valueKey: 'config.backgroundAreasValue', params: { lines: (m.lines || []).length, areas: (m.shade || []).length, roads: (m.roads || []).length, strokes: (m.paint || []).length + (m.raw || []).length } });

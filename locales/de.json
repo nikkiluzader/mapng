@@ -797,6 +797,9 @@
     "osmTilesFirstHint": "Schnell und ohne Anfragelimit: der ganze Planet, von Zeit zu Zeit aus OpenStreetMap kopiert. Ausschalten, um zuerst die Live-Server von OpenStreetMap zu fragen (sie haben die heutigen Änderungen, sind aber langsamer und manchmal nicht erreichbar); MapNGs Kopie ist dann die Reserve.",
     "osmTilesFirstShort": "Schnell und ohne Abruflimit. Ausschalten, um zuerst die Live-Server zu fragen.",
     "measureRoadWidthsShort": "Liest die befestigte Breite aus dem Satellitenbild, wo eine Straße keine hat.",
+    "osmLinesAsDrawn": "Kartenlinien wie gezeichnet lassen",
+    "osmLinesAsDrawnShort": "Lässt die Ecken von Straßen, Bahnstrecken und Wegen genau wie kartiert.",
+    "osmLinesAsDrawnHint": "Aus (Standard): Generieren rundet die Ecken von Straßen, Bahnstrecken und Wegen zu glatten Kurven ab. Eine Kurve rückt nie weit in die kartierte Ecke hinein (etwa 3 m bei Straßen, 1 m bei Bahnstrecken, 0,75 m bei Wegen), und Kreuzungen, Weichen und Übergänge bleiben genau dort, wo sie kartiert sind. An: Jede Linie folgt OpenStreetMap Punkt für Punkt, für Karten, deren Daten du schon von Hand korrigiert hast.",
     "customOverpassShort": "Deine Overpass-URL mit Schlüssel. Bleibt nur in diesem Browser."
   },
   "terrainStats": {

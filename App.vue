@@ -206,6 +206,7 @@ startNetworkMonitor();
 import { appUpdated, codeFailed } from './services/appUpdate.js';
 import { isDiskFull, isOutOfMemory } from './services/errorText.js';
 import { useMeasureRoadWidths } from './composables/useMeasureRoadWidths.js';
+import { useOsmLinesAsDrawn } from './composables/useOsmLinesAsDrawn.js';
 import AboutModal from './components/modals/AboutModal.vue';
 import DisclaimerModal from './components/modals/DisclaimerModal.vue';
 import TechStackModal from './components/modals/TechStackModal.vue';
@@ -513,6 +514,7 @@ const signatureForKey = (key) => {
 // Build a cache key from the parameters that affect terrain generation.
 // If this key matches the last generation, we can skip re-fetching.
 const { on: measureRoadWidthsOn } = useMeasureRoadWidths();
+const { on: osmLinesAsDrawnOn } = useOsmLinesAsDrawn();
 // (the map data file loaded in Map data, kept here so the generation key follows it)
 const loadedOsmFile = shallowRef(getLoadedOsmFile());
 onOsmFileChange((f) => { loadedOsmFile.value = f; });
@@ -550,6 +552,8 @@ const buildGenerationKey = (c, res, osm, elevationSource, gpxzKey, uploadedEleva
     // out of this key, switching it after a Generate did nothing: the same map was shown again, "changing
     // this does not even let you re-generate map", a tester)
     measureWidths: !!osm && measureRoadWidthsOn.value,
+    // (Map data > Keep map lines as drawn: the roads', railways' and paths' corners rounded or not)
+    linesAsDrawn: !!osm && osmLinesAsDrawnOn.value,
     // (the Terrain choice's generation passes: changing one generates again)
     generationEdits: terrainGenerationOptions(store.advancedMode),
     // Include file identity so changing uploads always invalidates cached terrain.

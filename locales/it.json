@@ -797,6 +797,9 @@
     "osmTilesFirstHint": "Veloce e senza limiti di richieste: l'intero pianeta, copiato da OpenStreetMap di tanto in tanto. Disattiva per chiedere prima ai server live di OpenStreetMap (hanno le modifiche di oggi, ma sono più lenti e a volte non rispondono); la copia di MapNG resta come riserva.",
     "osmTilesFirstShort": "Veloce e senza limiti di richieste. Disattiva per chiedere prima ai server in tempo reale.",
     "measureRoadWidthsShort": "Legge la larghezza asfaltata dall'immagine satellitare per le strade che non ne hanno una.",
+    "osmLinesAsDrawn": "Mantieni le linee della mappa come disegnate",
+    "osmLinesAsDrawnShort": "Lascia gli angoli di strade, ferrovie e sentieri esattamente come mappati.",
+    "osmLinesAsDrawnHint": "Disattivato (predefinito): Genera arrotonda gli angoli di strade, ferrovie e sentieri in curve morbide. Una curva non entra mai molto nell'angolo mappato (circa 3 m per le strade, 1 m per le ferrovie, 0,75 m per i sentieri), e incroci, scambi e passaggi restano esattamente dove sono mappati. Attivato: ogni linea segue OpenStreetMap punto per punto, per mappe i cui dati hai già corretto a mano.",
     "customOverpassShort": "Il tuo URL Overpass con la chiave. Resta solo in questo browser."
   },
   "terrainStats": {

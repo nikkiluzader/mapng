@@ -62,6 +62,19 @@ test('through decks: a hill standing into a deck is found', () => {
   assert.equal(r.worst.by, 1.2);
 });
 
+// (a rounded railway is drawn in short arc pieces: the check once sampled every piece, so the same deck counted its
+// hits three to four times over. 2026-11-24, line rounding for railways and paths)
+test('through decks: the same deck drawn with few or many points gives the same samples and hits', () => {
+  const hill = (x) => (x > 15 && x < 25 ? 9 : 0);
+  const coarse = { parts: [{ xy: [[0, 0], [40, 0]], z: [10, 10], half: 4 }] };
+  const xy = []; const z = [];
+  for (let x = 0; x <= 40; x += 0.4) { xy.push([x, 0]); z.push(10); }
+  const fine = { parts: [{ xy, z, half: 4 }] };
+  const a = checkThroughDecks([coarse], hill); const b = checkThroughDecks([fine], hill);
+  assert.equal(b.samples, a.samples);
+  assert.equal(b.through, a.through);
+});
+
 test('spikes: an isolated pillar beside a deck is found, a retaining-wall step is not', () => {
   const width = 101; const height = 101; const worldSize = 100;
   const hm = new Float32Array(width * height);

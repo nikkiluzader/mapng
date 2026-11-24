@@ -313,6 +313,17 @@
             :disabled="!fetchOSM"
             :disabled-reason="t('controlPanel.ui.needsOsmOn')"
           />
+          <!-- (services/roadCurves.js: off, Generate rounds the corners of roads, railways and paths) -->
+          <SettingRow
+            check
+            data-testid="osm-lines-as-drawn"
+            v-model="osmLinesAsDrawn"
+            :label="t('controlPanel.osmLinesAsDrawn')"
+            :hint="t('controlPanel.osmLinesAsDrawnShort')"
+            :more="t('controlPanel.osmLinesAsDrawnHint')" :more-label="t('build.tune.more')" :less-label="t('build.tune.less')"
+            :disabled="!fetchOSM"
+            :disabled-reason="t('controlPanel.ui.needsOsmOn')"
+          />
         </SettingCard>
 
       </SettingSection>
@@ -453,6 +464,7 @@ import { provideSectionGroup } from '../../composables/useSectionGroup.js';
 provideSectionGroup();
 import { CUSTOM_OVERPASS_STORAGE_KEY, OVERTURE_BUILDINGS_STORAGE_KEY } from '../../services/osm.js';
 import { useMeasureRoadWidths } from '../../composables/useMeasureRoadWidths.js';
+import { useOsmLinesAsDrawn } from '../../composables/useOsmLinesAsDrawn.js';
 import { useWorkflow, WORKFLOWS } from '../../composables/useWorkflow.js';
 import { useOsmSource } from '../../composables/useOsmSource.js';
 import { useI18n } from 'vue-i18n';
@@ -581,6 +593,7 @@ watch(overtureBuildings, (newVal) => {
 });
 // (shared with the line in Fine-tuning that points here: composables/useMeasureRoadWidths.js keeps it)
 const { on: measureRoadWidths, showRequest: showMeasureRoadWidths } = useMeasureRoadWidths();
+const { on: osmLinesAsDrawn } = useOsmLinesAsDrawn();
 const { workflow } = useWorkflow();
 watch(showMeasureRoadWidths, async () => {
   step.value = 2;
@@ -640,8 +653,8 @@ watch(() => props.terrainData, (newData) => {
 const elevationChanged = computed(() => elevationSource.value !== 'mapterhorn' || (store.advancedMode && terrainMode.value !== 'ready'));
 const resetElevation = () => { elevationSource.value = 'mapterhorn'; setTerrainMode('ready'); };
 const overpassMore = ref(false);
-const mapDataChanged = computed(() => !fetchOSM.value || !overtureBuildings.value || !osmTilesFirst.value || measureRoadWidths.value);
-const resetMapData = () => { fetchOSM.value = true; overtureBuildings.value = true; osmTilesFirst.value = true; measureRoadWidths.value = false; };
+const mapDataChanged = computed(() => !fetchOSM.value || !overtureBuildings.value || !osmTilesFirst.value || measureRoadWidths.value || osmLinesAsDrawn.value);
+const resetMapData = () => { fetchOSM.value = true; overtureBuildings.value = true; osmTilesFirst.value = true; measureRoadWidths.value = false; osmLinesAsDrawn.value = false; };
 
 // The setup in one line (the wizard's bottom bar) and as the review step's
 // list (components/ui/GenerateSummary.vue); each part goes to its step.
@@ -982,6 +995,7 @@ const applyPendingConfig = () => {
     if (typeof config.elevationUnitOverride === 'string' && config.elevationUnitOverride) elevationUnitOverride.value = config.elevationUnitOverride;
     if (typeof config.overtureBuildings === 'boolean') overtureBuildings.value = config.overtureBuildings;
     if (typeof config.measureRoadWidths === 'boolean') measureRoadWidths.value = config.measureRoadWidths;
+    if (typeof config.osmLinesAsDrawn === 'boolean') osmLinesAsDrawn.value = config.osmLinesAsDrawn;
     if (WORKFLOWS.includes(config.workflow)) workflow.value = config.workflow;
     if (applyStoredSettings(config, localStorage)) {
       // (the code's terrain edits went into the old keys: the Terrain choice reads them back)

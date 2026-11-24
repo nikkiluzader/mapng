@@ -802,6 +802,9 @@
     "osmTilesFirstHint": "Fast and never rate limited: the whole planet, copied from OpenStreetMap every so often. Switch off to ask the live OpenStreetMap servers first (they have today's edits, and are slower and sometimes down); MapNG's copy is then the fallback.",
     "osmTilesFirstShort": "Fast and never rate limited. Switch off to ask the live servers first.",
     "measureRoadWidthsShort": "Reads the paved width off the satellite picture for roads that have none.",
+    "osmLinesAsDrawn": "Keep map lines as drawn",
+    "osmLinesAsDrawnShort": "Leaves the corners of roads, railways and paths exactly as mapped.",
+    "osmLinesAsDrawnHint": "Off (the default): Generate rounds the corners of roads, railways and paths into smooth curves. A curve never moves more than a little inside the mapped corner (about 3 m for roads, 1 m for railways, 0.75 m for paths), and junctions, track switches and crossings stay exactly where they are mapped. On: every line follows OpenStreetMap point to point, for maps whose data you have already fixed by hand.",
     "customOverpassShort": "Your Overpass URL with its key. Kept in this browser only."
   },
   "terrainStats": {

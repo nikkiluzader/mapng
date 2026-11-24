@@ -797,6 +797,9 @@
     "osmTilesFirstHint": "Rápida y sin límites de uso: todo el planeta, copiado de OpenStreetMap cada cierto tiempo. Desactívalo para preguntar primero a los servidores en vivo de OpenStreetMap (tienen los cambios de hoy, pero son más lentos y a veces no responden); la copia de MapNG queda como reserva.",
     "osmTilesFirstShort": "Rápido y sin límites de consulta. Desactívalo para preguntar primero a los servidores en vivo.",
     "measureRoadWidthsShort": "Lee el ancho pavimentado en la imagen de satélite para las carreteras que no lo tienen.",
+    "osmLinesAsDrawn": "Mantener las líneas del mapa como están dibujadas",
+    "osmLinesAsDrawnShort": "Deja las esquinas de carreteras, vías férreas y caminos exactamente como están mapeadas.",
+    "osmLinesAsDrawnHint": "Desactivado (predeterminado): Generar redondea las esquinas de carreteras, vías férreas y caminos en curvas suaves. Una curva nunca se mete mucho dentro de la esquina mapeada (unos 3 m en carreteras, 1 m en vías férreas, 0,75 m en caminos), y los cruces, los cambios de vía y los pasos se quedan exactamente donde están mapeados. Activado: cada línea sigue OpenStreetMap punto por punto, para mapas cuyos datos ya has corregido a mano.",
     "customOverpassShort": "Tu URL de Overpass con su clave. Se guarda solo en este navegador."
   },
   "terrainStats": {

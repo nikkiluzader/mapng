@@ -304,16 +304,25 @@ export function checkThroughDecks(decks, groundAt) {
       const { xy, z } = part;
       if (!xy || !z) continue;
       const under = part.depth ?? DECK_UNDERSIDE_M;
-      // samples along the part: per lane offset, ground, underside and top
+      // samples along the part, every DECK_SAMPLE_M of its length whatever its points: per lane offset, ground,
+      // underside and top. (Each segment once took at least one sample of its own, so a deck on a line drawn in
+      // short arc pieces, a rounded railway, was counted three to four times per metre and its hits with it.)
       const rows = [];
+      const segs = []; let total = 0;
       for (let i = 0; i + 1 < xy.length; i++) {
-        const [ax, ay] = xy[i]; const [bx, by] = xy[i + 1];
-        const L = fastHypot(bx - ax, by - ay);
+        const L = fastHypot(xy[i + 1][0] - xy[i][0], xy[i + 1][1] - xy[i][1]);
         if (L < 1e-6) continue;
-        const nx = -(by - ay) / L; const ny = (bx - ax) / L;
-        const steps = Math.max(1, Math.ceil(L / DECK_SAMPLE_M));
-        for (let k = (rows.length ? 1 : 0); k <= steps; k++) {
-          const f = k / steps;
+        segs.push({ i, s0: total, L }); total += L;
+      }
+      if (segs.length) {
+        const n = Math.max(1, Math.ceil(total / DECK_SAMPLE_M));
+        for (let k = 0, j = 0; k <= n; k++) {
+          const sAt = (total * k) / n;
+          while (j + 1 < segs.length && segs[j].s0 + segs[j].L < sAt) j++;
+          const { i, s0, L } = segs[j];
+          const f = Math.max(0, Math.min(1, (sAt - s0) / L));
+          const [ax, ay] = xy[i]; const [bx, by] = xy[i + 1];
+          const nx = -(by - ay) / L; const ny = (bx - ax) / L;
           const cx = ax + (bx - ax) * f; const cy = ay + (by - ay) * f;
           const top = z[i] + (z[i + 1] - z[i]) * f;
           rows.push([-part.half, 0, part.half].map((o) => ({ x: cx + nx * o, y: cy + ny * o, g: groundAt(cx + nx * o, cy + ny * o), top, bottom: top - under })));

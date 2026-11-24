@@ -797,6 +797,9 @@
     "osmTilesFirstHint": "Szybka i bez limitów zapytań: cała planeta, kopiowana z OpenStreetMap co pewien czas. Wyłącz, aby najpierw pytać serwery OpenStreetMap na żywo (mają dzisiejsze zmiany, ale są wolniejsze i czasem niedostępne); kopia MapNG jest wtedy rezerwą.",
     "osmTilesFirstShort": "Szybko i bez limitów zapytań. Wyłącz, aby najpierw pytać serwery na żywo.",
     "measureRoadWidthsShort": "Odczytuje szerokość jezdni ze zdjęcia satelitarnego dla dróg, które jej nie mają.",
+    "osmLinesAsDrawn": "Zostaw linie mapy tak, jak narysowano",
+    "osmLinesAsDrawnShort": "Zostawia narożniki dróg, torów i ścieżek dokładnie tak, jak są zmapowane.",
+    "osmLinesAsDrawnHint": "Wyłączone (domyślnie): Generuj zaokrągla narożniki dróg, torów i ścieżek w płynne łuki. Łuk nigdy nie wchodzi daleko w zmapowany narożnik (ok. 3 m dla dróg, 1 m dla torów, 0,75 m dla ścieżek), a skrzyżowania, rozjazdy i przejazdy zostają dokładnie tam, gdzie są zmapowane. Włączone: każda linia idzie za OpenStreetMap punkt po punkcie, dla map, których dane poprawiłeś już ręcznie.",
     "customOverpassShort": "Twój adres Overpass z kluczem. Zostaje tylko w tej przeglądarce."
   },
   "terrainStats": {

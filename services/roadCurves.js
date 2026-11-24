@@ -1,6 +1,7 @@
 import { makeRoadNodeKey } from './roadNetwork.js';
 import { NON_DRIVEABLE_HIGHWAYS, racewayHalfWidth } from './roadWidth.js';
 import { fastHypot } from './fastMath.js';
+import { activeRailKind } from './railways.js';
 
 /**
  * Round the corners of OSM roads into tangent arcs.
@@ -26,7 +27,20 @@ import { fastHypot } from './fastMath.js';
  *
  * Runs once on the OSM features at generation time, so the terrain leveler,
  * terrain textures, 3D preview and the export all follow the same curve.
+ *
+ * Railways and paths are rounded the same way (thecoachtoma and SPLATPLAYS, 2026-11-24: "smoother road and rail
+ * curves without insane amount of manual work"; the user: on by default, a switch to keep the lines as drawn).
+ * Each kind has its own largest radius and its own limit inside the mapped vertex (lineProfile); a switch shared by
+ * two tracks, a level crossing or a path meeting a road is a node two lines use, so it stays put and the line bends
+ * smoothly through it. A track laid in a street (a tram on a road way) follows its road's curve. Steps, corridors
+ * and areas stay as drawn. Map data > "Keep map lines as drawn" (OSM_LINES_AS_DRAWN_KEY) skips all of it.
  */
+
+// Map data > Keep map lines as drawn: no rounding at all, roads included (read where Generate shapes the roads).
+export const OSM_LINES_AS_DRAWN_KEY = 'mapng_osmLinesAsDrawn';
+export const osmLinesAsDrawn = () => {
+    try { return globalThis.localStorage?.getItem(OSM_LINES_AS_DRAWN_KEY) === 'true'; } catch { return false; }
+};
 
 // Largest curve radius (m) per highway class — generous design radii. Gentle vertices on sparsely mapped roads stand for long sweeping
 // curves, so they get up to this; MAX_CUT_M keeps sharp corners tight.
@@ -53,17 +67,49 @@ const ARC_STEP_RAD = (5 * Math.PI) / 180;
 const ARC_STEP_M = 1;
 const NODE_POINT_TYPES = new Set(['street_furniture', 'traffic_calming']);
 
-const isRoundableRoad = (f) => f?.type === 'road'
-    && Array.isArray(f.geometry) && f.geometry.length >= 2
-    && f.tags?.highway && !NON_DRIVEABLE_HIGHWAYS.has(f.tags.highway)
-    && f.tags.area !== 'yes';
+// Railways: largest radius (m) per kind (sidings, yards and spurs tighter), and at most RAIL_MAX_CUT_M inside a
+// mapped vertex: under a track's half width plus its shoulder, so the track stays on its mapped bed and beside its
+// platform. Main-line curves are mapped densely, so the big radius only rounds the kinks between the points.
+const RADIUS_BY_RAIL = {
+    rail: 500, light_rail: 200, subway: 300, tram: 40, narrow_gauge: 150, monorail: 150,
+    funicular: 300, preserved: 300, miniature: 25,
+};
+const RAIL_SERVICE_RADIUS_M = 150;
+const RAIL_MAX_CUT_M = 1;
+// Paths: a walker's or rider's line; at most PATH_MAX_CUT_M inside a vertex (a footway is about 2 m wide).
+const RADIUS_BY_PATH = { footway: 25, path: 30, cycleway: 50, bridleway: 30, pedestrian: 20 };
+const PATH_MAX_CUT_M = 0.75;
+
+const lineOk = (f) => Array.isArray(f?.geometry) && f.geometry.length >= 2 && f.tags?.area !== 'yes';
+// a track laid in a street (its road way carries it too): it follows the road's curve, not its own
+const isStreetTrack = (f) => f?.type === 'railway' && !!f.tags?.highway;
+/** How a line is rounded: { family, radius, maxCut }, or null when it stays as drawn. */
+export function lineProfile(f) {
+    if (!lineOk(f)) return null;
+    if (f.type === 'road') {
+        const hw = f.tags?.highway;
+        if (!hw) return null;
+        if (!NON_DRIVEABLE_HIGHWAYS.has(hw)) return { family: 'road', radius: RADIUS_BY_HIGHWAY[hw] ?? DEFAULT_RADIUS_M, maxCut: MAX_CUT_M };
+        const r = RADIUS_BY_PATH[hw];
+        return r ? { family: 'path', radius: r, maxCut: PATH_MAX_CUT_M } : null;
+    }
+    if (f.type === 'railway' && !isStreetTrack(f)) {
+        const kind = activeRailKind(f.tags || {});
+        if (!kind) return null;
+        const service = kind === 'rail' && !!f.tags?.service;
+        return { family: 'rail', radius: service ? RAIL_SERVICE_RADIUS_M : (RADIUS_BY_RAIL[kind] ?? 300), maxCut: RAIL_MAX_CUT_M };
+    }
+    return null;
+}
+// the lines whose nodes count as shared (a junction, a switch, a crossing): roads, paths and railways alike
+const countsForNodes = (f) => (f?.type === 'road' || (f?.type === 'railway' && !isStreetTrack(f))) && Array.isArray(f.geometry);
 
 /**
  * Tangent arc replacing the corner a → b → c, as lat/lng points from the
  * point on ab to the point on bc, or null when the corner is too gentle,
  * degenerate, or a hairpin (left to the export's spike filter).
  */
-function filletArc(a, b, c, radius, shareIn, shareOut, pinned = false) {
+function filletArc(a, b, c, radius, shareIn, shareOut, pinned = false, maxCut = MAX_CUT_M) {
     const mx = 111320 * Math.cos((b.lat * Math.PI) / 180);
     const my = 111320;
     const ax = (a.lng - b.lng) * mx;
@@ -82,7 +128,7 @@ function filletArc(a, b, c, radius, shareIn, shareOut, pinned = false) {
 
     const half = Math.tan(turn / 2);
     // Distance from vertex to arc middle is r·(1/cos(turn/2) − 1).
-    const cutLimited = MAX_CUT_M / (1 / Math.cos(turn / 2) - 1);
+    const cutLimited = maxCut / (1 / Math.cos(turn / 2) - 1);
     const tangent = Math.min(Math.min(radius, cutLimited) * half, shareIn * lenIn, shareOut * lenOut);
     if (pinned) return throughCurve(b, ux, uy, vx, vy, tangent, turn, mx, my);
     const r = tangent / half;
@@ -142,16 +188,17 @@ function throughCurve(b, ux, uy, vx, vy, tangent, turn, mx, my) {
 
 /**
  * @param {Array} osmFeatures
- * @returns {{ features: Array, stats: { roads: number, roundedVertices: number, roundedJoins: number } }}
+ * @returns {{ features: Array, stats: { roads, roundedVertices, roundedJoins, streetTracks, byFamily } }}
  */
 export function roundRoadCorners(osmFeatures) {
-    const stats = { roads: 0, roundedVertices: 0, roundedJoins: 0 };
+    const fam0 = () => ({ lines: 0, vertices: 0, kept: 0 });
+    const stats = { roads: 0, roundedVertices: 0, roundedJoins: 0, streetTracks: 0, byFamily: { road: fam0(), rail: fam0(), path: fam0() } };
     if (!Array.isArray(osmFeatures) || osmFeatures.length === 0) return { features: osmFeatures, stats };
 
     const nodeUse = new Map();
     const endUse = new Map();
     osmFeatures.forEach((f, fi) => {
-        if (f?.type !== 'road' || !Array.isArray(f.geometry)) return;
+        if (!countsForNodes(f)) return;
         const g = f.geometry;
         g.forEach((p, i) => {
             const k = makeRoadNodeKey(p);
@@ -162,14 +209,15 @@ export function roundRoadCorners(osmFeatures) {
             }
         });
     });
-    const radiusOf = (f) => RADIUS_BY_HIGHWAY[f.tags.highway] ?? DEFAULT_RADIUS_M;
+    const profiles = osmFeatures.map((f) => lineProfile(f));
 
     // Pass-through joins: two different roundable ways ending at a node nothing
     // else touches.
     const joinOf = new Map();
     for (const [k, ends] of endUse) {
         if (ends.length !== 2 || nodeUse.get(k) !== 2 || ends[0].fi === ends[1].fi) continue;
-        if (!ends.every((e) => isRoundableRoad(osmFeatures[e.fi]))) continue;
+        const p0 = profiles[ends[0].fi]; const p1 = profiles[ends[1].fi];
+        if (!p0 || !p1 || p0.family !== p1.family) continue;
         joinOf.set(k, ends);
     }
     // A vertex keeps its position when it is a junction, a dead end or
@@ -205,8 +253,8 @@ export function roundRoadCorners(osmFeatures) {
         const j1 = e1.atStart ? 1 : g1.length - 2;
         const j2 = e2.atStart ? 1 : g2.length - 2;
         const node = e1.atStart ? g1[0] : g1[g1.length - 1];
-        const radius = Math.min(radiusOf(osmFeatures[e1.fi]), radiusOf(osmFeatures[e2.fi]));
-        const arc = filletArc(g1[j1], node, g2[j2], radius, shareFor(g1, j1), shareFor(g2, j2));
+        const pa = profiles[e1.fi]; const pb = profiles[e2.fi];
+        const arc = filletArc(g1[j1], node, g2[j2], Math.min(pa.radius, pb.radius), shareFor(g1, j1), shareFor(g2, j2), false, Math.min(pa.maxCut, pb.maxCut));
         if (!arc) continue;
         const m = arc.length >> 1;
         joinHalves.set(`${e1.fi}:${e1.atStart}`, arc.slice(0, m + 1));
@@ -216,10 +264,13 @@ export function roundRoadCorners(osmFeatures) {
     }
 
     const out = osmFeatures.map((f, fi) => {
-        if (!isRoundableRoad(f)) return f;
-        stats.roads++;
+        const prof = profiles[fi];
+        if (!prof) return f;
+        const fam = stats.byFamily[prof.family];
+        fam.lines++;
+        if (prof.family === 'road') stats.roads++;
         const g = f.geometry;
-        const radius = radiusOf(f);
+        const { radius, maxCut } = prof;
         const geometry = [];
         let changed = false;
         // Neighbouring arcs meet at segment midpoints; keep that point once.
@@ -235,17 +286,31 @@ export function roundRoadCorners(osmFeatures) {
         if (startHalf) { push(...[...startHalf].reverse()); changed = true; } else push(g[0]);
         for (let i = 1; i < g.length - 1; i++) {
             const pinned = isFixed(g[i], false);
-            const arc = filletArc(g[i - 1], g[i], g[i + 1], radius, shareFor(g, i - 1), shareFor(g, i + 1), pinned);
+            const arc = filletArc(g[i - 1], g[i], g[i + 1], radius, shareFor(g, i - 1), shareFor(g, i + 1), pinned, maxCut);
             if (!arc) { push(g[i]); continue; }
             push(...arc);
             if (!pinned) movedNodes.set(makeRoadNodeKey(g[i]), arc[arc.length >> 1]);
-            stats.roundedVertices++;
+            else fam.kept++;
+            fam.vertices++;
+            if (prof.family === 'road') stats.roundedVertices++;
             changed = true;
         }
         const endHalf = joinHalves.get(`${fi}:false`);
         if (endHalf) { push(...endHalf); changed = true; } else push(g[g.length - 1]);
         return changed ? { ...f, geometry } : f;
     });
+
+    // a track laid in a street: its road's rounded line (osm.js names it after the road way, `<id>_rail`)
+    const roadGeometry = new Map();
+    out.forEach((f, i) => { if (f !== osmFeatures[i] && f.type === 'road') roadGeometry.set(String(f.id), f.geometry); });
+    if (roadGeometry.size) {
+        for (let i = 0; i < out.length; i++) {
+            const f = out[i];
+            if (!isStreetTrack(f)) continue;
+            const g = roadGeometry.get(String(f.id).replace('_rail', ''));
+            if (g) { out[i] = { ...f, geometry: g }; stats.streetTracks++; }
+        }
+    }
 
     if (movedNodes.size > 0) {
         for (let i = 0; i < out.length; i++) {

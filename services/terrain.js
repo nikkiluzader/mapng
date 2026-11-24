@@ -36,7 +36,7 @@ import { fetchMapterhornRaw, loadMapterhornTile } from "./mapterhorn.js";
 import { isGroundLevelRoad, smoothRoadsInHeightmap } from "./roadSmoother.js";
 import { snapRoadsToTerrain } from "./roadSnap.js";
 import { measureBenchWidths } from "./benchWidths.js";
-import { roundRoadCorners } from "./roadCurves.js";
+import { roundRoadCorners, osmLinesAsDrawn } from "./roadCurves.js";
 import { measureStreetWidths } from "./streetWidths.js";
 import { fitTwinCarriageways } from "./twinCarriageways.js";
 import { decodeTerrariumPixels, blendTerrariumTileSeams, sampleTerrariumHeights, wrapMosaicX } from "./terrariumSampling.js";
@@ -215,7 +215,19 @@ const globalTerrainSmoothRadius = (metersPerPixel) => {
 // tags one: a class default made Tokyo's 4 m lanes 8 m wide), before anything
 // draws or levels them, so the game texture, the preview and the export agree.
 // (then a divided road's carriageways fitted side by side: twinCarriageways.js)
-const shapeRoads = (osmFeatures) => fitTwinCarriageways(measureStreetWidths(roundRoadCorners(osmFeatures).features).features).features;
+// Roads, railways and paths rounded at their corners (roadCurves.js), unless Map data > Keep map lines as drawn.
+const roundLines = (osmFeatures) => {
+  if (osmLinesAsDrawn()) {
+    console.log('[Line curves] Kept as drawn (Map data > Keep map lines as drawn): no road, railway or path corner rounded.');
+    return osmFeatures;
+  }
+  const { features, stats } = roundRoadCorners(osmFeatures);
+  const b = stats.byFamily || {};
+  const part = (k, name) => { const f = b[k] || { lines: 0, vertices: 0, kept: 0 }; return `${name}: ${f.vertices} corner(s) rounded on ${f.lines} line(s) (${f.kept} of them shared with another line, kept in place, the line bending through)`; };
+  console.log(`[Line curves] ${part('road', 'roads')}; ${part('rail', 'railways')}; ${part('path', 'paths')}; ${stats.roundedJoins} bend(s) rounded across two ways' meeting; ${stats.streetTracks} street track(s) given their road's curve. Steps, corridors and areas left as drawn.`);
+  return features;
+};
+const shapeRoads = (osmFeatures) => fitTwinCarriageways(measureStreetWidths(roundLines(osmFeatures)).features).features;
 
 const decodeTerrariumHeight = (r, g, b) => {
   const h = r * 256 + g + b / 256 - 32768;

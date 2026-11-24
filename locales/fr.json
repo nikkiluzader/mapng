@@ -797,6 +797,9 @@
     "osmTilesFirstHint": "Rapide et sans limite de requêtes : la planète entière, copiée d'OpenStreetMap de temps en temps. Désactivez pour interroger d'abord les serveurs en direct d'OpenStreetMap (ils ont les modifications du jour, mais sont plus lents et parfois indisponibles) ; la copie de MapNG sert alors de secours.",
     "osmTilesFirstShort": "Rapide et sans limite de requêtes. Désactivez pour interroger d'abord les serveurs en direct.",
     "measureRoadWidthsShort": "Lit la largeur revêtue sur l'image satellite pour les routes qui n'en ont pas.",
+    "osmLinesAsDrawn": "Garder les lignes de la carte telles que dessinées",
+    "osmLinesAsDrawnShort": "Laisse les angles des routes, voies ferrées et chemins exactement comme cartographiés.",
+    "osmLinesAsDrawnHint": "Désactivé (par défaut) : Générer arrondit les angles des routes, voies ferrées et chemins en courbes douces. Une courbe ne rentre jamais beaucoup dans l'angle cartographié (environ 3 m pour les routes, 1 m pour les voies ferrées, 0,75 m pour les chemins), et les carrefours, aiguillages et passages restent exactement là où ils sont cartographiés. Activé : chaque ligne suit OpenStreetMap point par point, pour les cartes dont vous avez déjà corrigé les données à la main.",
     "customOverpassShort": "Votre URL Overpass avec sa clé. Conservée uniquement dans ce navigateur."
   },
   "terrainStats": {

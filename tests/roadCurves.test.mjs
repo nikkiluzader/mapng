@@ -81,10 +81,76 @@ test('two ways meeting mid-bend are rounded across the join and still meet; a si
   assert.ok(maxTurnDeg([...features[0].geometry, ...features[1].geometry.slice(1)]) <= 6);
 });
 
-test('real junctions and footpaths are left alone', () => {
+test('real junctions are left alone; a footpath is rounded within its own, tighter limit (since 2026-11-24)', () => {
   const ways = [road('a', [[0, 0], [100, 0]]), road('b', [[100, 0], [100, 100]]), road('c', [[100, 0], [200, 0]])];
   const { features } = roundRoadCorners(ways);
   features.forEach((f, i) => assert.equal(f, ways[i]));
   const path = road('p', [[0, 0], [100, 0], [100, 100]], 'footway');
-  assert.equal(roundRoadCorners([path]).features[0], path);
+  const g = roundRoadCorners([path]).features[0].geometry;
+  const mid = xy(g[g.length >> 1]);
+  assert.ok(Math.abs(Math.hypot(mid[0] - 100, mid[1]) - 0.75) < 0.1, `cut ${Math.hypot(mid[0] - 100, mid[1])}`);
+});
+
+// ── railways and paths (thecoachtoma, SPLATPLAYS 2026-11-24): rounded too, each within its own limit ──
+const rail = (id, pts, tags = {}) => ({ id, type: 'railway', tags: { railway: 'rail', ...tags }, geometry: pts.map(([x, y]) => ll(x, y)) });
+// how far a built line strays from the mapped polyline
+function strayM(built, mapped) {
+  const Q = mapped.map(xy);
+  let worst = 0;
+  for (const p of built.map(xy)) {
+    let best = Infinity;
+    for (let i = 0; i + 1 < Q.length; i++) {
+      const [ax, ay] = Q[i]; const [bx, by] = Q[i + 1]; const dx = bx - ax; const dy = by - ay;
+      const t = Math.max(0, Math.min(1, ((p[0] - ax) * dx + (p[1] - ay) * dy) / (dx * dx + dy * dy || 1)));
+      best = Math.min(best, Math.hypot(ax + dx * t - p[0], ay + dy * t - p[1]));
+    }
+    worst = Math.max(worst, best);
+  }
+  return worst;
+}
+
+test('a railway kink is rounded, never more than 1 m off the mapped track', () => {
+  const r = rail('t', [[0, 0], [60, 0], [120, 12], [180, 30]]);
+  const { features, stats } = roundRoadCorners([r]);
+  const g = features[0].geometry;
+  assert.equal(stats.byFamily.rail.vertices, 2);
+  assert.equal(stats.roundedVertices, 0, 'railway corners are not counted as road corners');
+  assert.ok(maxTurnDeg(g) <= 5.5, `max turn ${maxTurnDeg(g)}`);
+  assert.ok(strayM(g, r.geometry) <= 1.0001, `stray ${strayM(g, r.geometry)}`);
+  assert.deepEqual(g[0], r.geometry[0]); assert.deepEqual(g[g.length - 1], r.geometry[3]);
+});
+
+test('a switch shared by two tracks stays exactly where it is mapped, and a level crossing too', () => {
+  const main = rail('m', [[0, 0], [100, 0], [200, 8]]);
+  const siding = rail('s', [[100, 0], [180, 20]], { service: 'siding' });
+  const street = road('x', [[150, -50], [150, 4], [150, 60]]);
+  const { features } = roundRoadCorners([main, siding, street]);
+  const keys = (f) => new Set(f.geometry.map((p) => makeRoadNodeKey(p)));
+  assert.ok(keys(features[0]).has(makeRoadNodeKey(main.geometry[1])), 'the switch node kept on the main line');
+  assert.ok(keys(features[1]).has(makeRoadNodeKey(main.geometry[1])), 'and on the siding');
+});
+
+test('a footpath corner is rounded within 0.75 m; steps stay as drawn', () => {
+  const walk = road('w', [[0, 0], [30, 0], [30, 30]], 'footway');
+  const steps = road('st', [[0, 50], [10, 50], [10, 60]], 'steps');
+  const { features, stats } = roundRoadCorners([walk, steps]);
+  assert.equal(stats.byFamily.path.vertices, 1);
+  assert.ok(strayM(features[0].geometry, walk.geometry) <= 0.76, `stray ${strayM(features[0].geometry, walk.geometry)}`);
+  assert.equal(features[1], steps);
+});
+
+test('a tram laid in a street follows its road\'s rounded curve', () => {
+  const street = { ...road('42_seg_0', [[0, 0], [100, 0], [100, 100]]), tags: { highway: 'residential', railway: 'tram' } };
+  const tram = { id: '42_rail_seg_0', type: 'railway', tags: { railway: 'tram', highway: 'residential' }, geometry: street.geometry };
+  const { features, stats } = roundRoadCorners([street, tram]);
+  assert.equal(stats.streetTracks, 1);
+  assert.deepEqual(features[1].geometry, features[0].geometry);
+  assert.ok(features[0].geometry.length > 3);
+});
+
+test('a railway and a road ending at the same node are not rounded as one line', () => {
+  const r = rail('r', [[0, 0], [50, 0]]);
+  const s = road('s', [[50, 0], [100, 30]]);
+  const { stats } = roundRoadCorners([r, s]);
+  assert.equal(stats.roundedJoins, 0);
 });
