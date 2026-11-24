@@ -1,7 +1,7 @@
 {
  "_note": "Area baselines for scripts/sweep/runSweep.mjs: re-record with --save after a change that improves an area (commit the file with it).",
  "recorded": "2026-11-24",
- "commit": "8b93114",
+ "commit": "8e5b7ca",
  "areas": {
   "normandy_flat@gpxz/untouched": {
    "steps": 0,
@@ -149,7 +149,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 5
+   "seconds": 4
   },
   "naldo@gpxz/untouched": {
    "steps": 0,
@@ -157,7 +157,7 @@
    "steepGround": 56,
    "shortX": 5,
    "groundGaps": 15,
-   "thruDeck": 65,
+   "thruDeck": 55,
    "spikes": 1,
    "bumps": 30,
    "cross": 292,
@@ -181,7 +181,7 @@
    "steepGround": 69,
    "shortX": 4,
    "groundGaps": 3,
-   "thruDeck": 47,
+   "thruDeck": 39,
    "spikes": 11,
    "bumps": 13,
    "cross": 9,
@@ -208,13 +208,13 @@
    "shortX": 0,
    "groundGaps": 0,
    "thruDeck": 0,
-   "spikes": 14,
+   "spikes": 13,
    "bumps": 7,
    "cross": 29,
    "junctions": 1,
    "creases": 1011,
-   "swFloat": 17,
-   "swBuried": 16,
+   "swFloat": 20,
+   "swBuried": 18,
    "snapMovedPct": 1,
    "snapP90cm": 0,
    "lintErrors": 0,
@@ -233,7 +233,7 @@
    "steepGround": 63,
    "shortX": 4,
    "groundGaps": 0,
-   "thruDeck": 30,
+   "thruDeck": 29,
    "spikes": 3,
    "bumps": 3,
    "cross": 25,
@@ -257,7 +257,7 @@
    "steepGround": 73,
    "shortX": 4,
    "groundGaps": 5,
-   "thruDeck": 85,
+   "thruDeck": 79,
    "spikes": 0,
    "bumps": 19,
    "cross": 436,
@@ -281,13 +281,13 @@
    "steepGround": 1,
    "shortX": 0,
    "groundGaps": 0,
-   "thruDeck": 5,
+   "thruDeck": 6,
    "spikes": 3,
    "bumps": 16,
    "cross": 62,
    "junctions": 1,
    "creases": 801,
-   "swFloat": 14,
+   "swFloat": 15,
    "swBuried": 11,
    "lintErrors": 0,
    "lintWarnings": 0,
@@ -297,7 +297,7 @@
    "maxDeckLen": 1098,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 24
+   "seconds": 25
   },
   "kingst@gpxz/noshape": {
    "steps": 0,
@@ -323,7 +323,7 @@
    "maxDeckLen": 505,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 21
+   "seconds": 20
   },
   "kingst@gpxz/untouched": {
    "steps": 0,
@@ -338,7 +338,7 @@
    "junctions": 0,
    "creases": 83,
    "swFloat": 0,
-   "swBuried": 2,
+   "swBuried": 3,
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 5,
@@ -373,7 +373,7 @@
    "maxDeckLen": 491,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 20
+   "seconds": 21
   },
   "kingst@t30/untouched": {
    "steps": 0,
@@ -436,7 +436,7 @@
    "junctions": 0,
    "creases": 82,
    "swFloat": 0,
-   "swBuried": 12,
+   "swBuried": 13,
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 5,
@@ -445,7 +445,7 @@
    "maxDeckLen": 491,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 21
+   "seconds": 20
   },
   "deckpark_g@gpxz/untouched": {
    "steps": 4,
@@ -453,7 +453,7 @@
    "steepGround": 41,
    "shortX": 1,
    "groundGaps": 20,
-   "thruDeck": 58,
+   "thruDeck": 45,
    "spikes": 15,
    "bumps": 23,
    "cross": 394,
@@ -469,7 +469,7 @@
    "maxDeckLen": 573,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 29
+   "seconds": 28
   },
   "deckpark_g@gpxz/noshape": {
    "steps": 1,
@@ -477,7 +477,7 @@
    "steepGround": 96,
    "shortX": 1,
    "groundGaps": 12,
-   "thruDeck": 29,
+   "thruDeck": 24,
    "spikes": 18,
    "bumps": 18,
    "cross": 35,
@@ -495,7 +495,7 @@
    "maxDeckLen": 561,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 30
+   "seconds": 31
   },
   "deckpark_g@gpxz/ready": {
    "steps": 0,
@@ -504,19 +504,19 @@
    "shortX": 0,
    "groundGaps": 1,
    "thruDeck": 17,
-   "spikes": 28,
+   "spikes": 30,
    "bumps": 3,
    "cross": 42,
    "junctions": 0,
    "creases": 532,
-   "swFloat": 9,
+   "swFloat": 8,
    "swBuried": 13,
    "snapMovedPct": 0,
    "snapP90cm": 0,
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 7,
-   "maxDeckH": 9.46,
+   "maxDeckH": 9.45,
    "deckKm": 1.84,
    "maxDeckLen": 560,
    "tunnels": 2,
@@ -525,7 +525,7 @@
   },
   "deckpark_g@t30/noshape": {
    "steps": 0,
-   "steepStruct": 412,
+   "steepStruct": 413,
    "steepGround": 0,
    "shortX": 46,
    "groundGaps": 0,
@@ -545,11 +545,11 @@
    "maxDeckLen": 570,
    "tunnels": 0,
    "tunnelsLeft": 2,
-   "seconds": 25
+   "seconds": 26
   },
   "deckpark_g@t30/untouched": {
    "steps": 0,
-   "steepStruct": 412,
+   "steepStruct": 413,
    "steepGround": 0,
    "shortX": 46,
    "groundGaps": 0,
@@ -619,7 +619,7 @@
    "maxDeckLen": 50,
    "tunnels": 1,
    "tunnelsLeft": 0,
-   "seconds": 7
+   "seconds": 6
   },
   "zion@gpxz/noshape": {
    "steps": 0,
@@ -645,7 +645,7 @@
    "maxDeckLen": 59,
    "tunnels": 1,
    "tunnelsLeft": 0,
-   "seconds": 6
+   "seconds": 5
   },
   "zion@gpxz/untouched": {
    "steps": 1,
@@ -725,7 +725,7 @@
    "steepGround": 836,
    "shortX": 0,
    "groundGaps": 4,
-   "thruDeck": 16,
+   "thruDeck": 10,
    "spikes": 0,
    "bumps": 188,
    "cross": 885,
@@ -804,7 +804,7 @@
    "junctions": 1,
    "creases": 170,
    "swFloat": 2,
-   "swBuried": 3,
+   "swBuried": 2,
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 1,
@@ -885,7 +885,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 6
+   "seconds": 7
   },
   "w_sf_russian@gpxz/untouched": {
    "steps": 0,
@@ -943,14 +943,14 @@
    "steepGround": 958,
    "shortX": 0,
    "groundGaps": 0,
-   "thruDeck": 1,
+   "thruDeck": 2,
    "spikes": 0,
    "bumps": 12,
    "cross": 24,
    "junctions": 15,
    "creases": 607,
    "swFloat": 3,
-   "swBuried": 5,
+   "swBuried": 6,
    "snapMovedPct": 2,
    "snapP90cm": 0,
    "lintErrors": 0,
@@ -985,7 +985,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 1,
-   "seconds": 11
+   "seconds": 12
   },
   "w_sf_russian@t30/untouched": {
    "steps": 0,
@@ -1000,7 +1000,7 @@
    "junctions": 16,
    "creases": 0,
    "swFloat": 4,
-   "swBuried": 3,
+   "swBuried": 2,
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 0,
@@ -1017,14 +1017,14 @@
    "steepGround": 902,
    "shortX": 0,
    "groundGaps": 0,
-   "thruDeck": 1,
+   "thruDeck": 2,
    "spikes": 0,
    "bumps": 16,
    "cross": 83,
    "junctions": 24,
-   "creases": 313,
+   "creases": 314,
    "swFloat": 3,
-   "swBuried": 6,
+   "swBuried": 7,
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 2,
@@ -1033,7 +1033,7 @@
    "maxDeckLen": 175,
    "tunnels": 0,
    "tunnelsLeft": 1,
-   "seconds": 10
+   "seconds": 11
   },
   "w_barcelona@gpxz/noshape": {
    "steps": 0,
@@ -1081,7 +1081,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 14
+   "seconds": 13
   },
   "w_barcelona@gpxz/ready": {
    "steps": 0,
@@ -1105,7 +1105,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 13
+   "seconds": 12
   },
   "w_barcelona@t30/noshape": {
    "steps": 0,
@@ -1129,7 +1129,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 16
+   "seconds": 14
   },
   "w_barcelona@t30/ready": {
    "steps": 0,
@@ -1153,7 +1153,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 15
+   "seconds": 13
   },
   "w_barcelona@t30/untouched": {
    "steps": 0,
@@ -1177,7 +1177,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 16
+   "seconds": 14
   },
   "w_amsterdam@gpxz/noshape": {
    "steps": 0,
@@ -1203,7 +1203,7 @@
    "maxDeckLen": 254,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 15
+   "seconds": 13
   },
   "w_amsterdam@gpxz/untouched": {
    "steps": 0,
@@ -1227,7 +1227,7 @@
    "maxDeckLen": 389,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 15
+   "seconds": 13
   },
   "w_amsterdam@gpxz/ready": {
    "steps": 0,
@@ -1235,14 +1235,14 @@
    "steepGround": 0,
    "shortX": 0,
    "groundGaps": 3,
-   "thruDeck": 9,
+   "thruDeck": 6,
    "spikes": 26,
    "bumps": 1,
    "cross": 4,
    "junctions": 0,
-   "creases": 22,
-   "swFloat": 7,
-   "swBuried": 19,
+   "creases": 23,
+   "swFloat": 6,
+   "swBuried": 17,
    "snapMovedPct": 0,
    "snapP90cm": 0,
    "lintErrors": 0,
@@ -1253,7 +1253,7 @@
    "maxDeckLen": 50,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 14
+   "seconds": 12
   },
   "w_amsterdam@t30/ready": {
    "steps": 0,
@@ -1277,7 +1277,7 @@
    "maxDeckLen": 48,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 13
+   "seconds": 14
   },
   "w_amsterdam@t30/untouched": {
    "steps": 0,
@@ -1301,7 +1301,7 @@
    "maxDeckLen": 208,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 13
+   "seconds": 12
   },
   "w_amsterdam@t30/noshape": {
    "steps": 0,
@@ -1325,7 +1325,7 @@
    "maxDeckLen": 212,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 13
+   "seconds": 12
   },
   "val_disere@gpxz/ready": {
    "steps": 0,
@@ -1338,7 +1338,7 @@
    "bumps": 11,
    "cross": 7,
    "junctions": 5,
-   "creases": 941,
+   "creases": 942,
    "swFloat": 0,
    "swBuried": 7,
    "snapMovedPct": 11,
@@ -1351,7 +1351,7 @@
    "maxDeckLen": 17,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 15
+   "seconds": 13
   },
   "val_disere@gpxz/untouched": {
    "steps": 3,
@@ -1375,7 +1375,7 @@
    "maxDeckLen": 18,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 13
+   "seconds": 11
   },
   "val_disere@gpxz/noshape": {
    "steps": 2,
@@ -1401,7 +1401,7 @@
    "maxDeckLen": 26,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 14
+   "seconds": 11
   },
   "val_disere@t30/untouched": {
    "steps": 0,
@@ -1409,7 +1409,7 @@
    "steepGround": 512,
    "shortX": 0,
    "groundGaps": 0,
-   "thruDeck": 4,
+   "thruDeck": 2,
    "spikes": 0,
    "bumps": 9,
    "cross": 1183,
@@ -1433,7 +1433,7 @@
    "steepGround": 484,
    "shortX": 0,
    "groundGaps": 0,
-   "thruDeck": 8,
+   "thruDeck": 4,
    "spikes": 0,
    "bumps": 5,
    "cross": 28,
@@ -1462,7 +1462,7 @@
    "bumps": 13,
    "cross": 34,
    "junctions": 10,
-   "creases": 536,
+   "creases": 537,
    "swFloat": 1,
    "swBuried": 4,
    "lintErrors": 0,
@@ -1473,7 +1473,7 @@
    "maxDeckLen": 17,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 14
+   "seconds": 13
   },
   "gt_chevril@gpxz/untouched": {
    "steps": 2,
@@ -1497,7 +1497,7 @@
    "maxDeckLen": 24,
    "tunnels": 3,
    "tunnelsLeft": 0,
-   "seconds": 10
+   "seconds": 7
   },
   "gt_chevril@gpxz/noshape": {
    "steps": 1,
@@ -1512,7 +1512,7 @@
    "junctions": 2,
    "creases": 1197,
    "swFloat": 0,
-   "swBuried": 1,
+   "swBuried": 0,
    "snapMovedPct": 9,
    "snapP90cm": 39,
    "lintErrors": 0,
@@ -1523,7 +1523,7 @@
    "maxDeckLen": 35,
    "tunnels": 3,
    "tunnelsLeft": 0,
-   "seconds": 10
+   "seconds": 8
   },
   "gt_chevril@gpxz/ready": {
    "steps": 0,
@@ -1549,7 +1549,7 @@
    "maxDeckLen": 24,
    "tunnels": 3,
    "tunnelsLeft": 0,
-   "seconds": 11
+   "seconds": 9
   },
   "gt_chevril@t30/untouched": {
    "steps": 0,
@@ -1573,7 +1573,7 @@
    "maxDeckLen": 24,
    "tunnels": 0,
    "tunnelsLeft": 3,
-   "seconds": 7
+   "seconds": 9
   },
   "gt_chevril@t30/noshape": {
    "steps": 0,
@@ -1597,7 +1597,7 @@
    "maxDeckLen": 114,
    "tunnels": 0,
    "tunnelsLeft": 3,
-   "seconds": 8
+   "seconds": 9
   },
   "gt_chevril@t30/ready": {
    "steps": 0,
@@ -1621,7 +1621,7 @@
    "maxDeckLen": 62,
    "tunnels": 2,
    "tunnelsLeft": 1,
-   "seconds": 10
+   "seconds": 11
   },
   "gt_tignes@gpxz/noshape": {
    "steps": 5,
@@ -1777,7 +1777,7 @@
    "steepGround": 69,
    "shortX": 4,
    "groundGaps": 3,
-   "thruDeck": 49,
+   "thruDeck": 42,
    "spikes": 14,
    "bumps": 13,
    "cross": 10,
@@ -1804,13 +1804,13 @@
    "shortX": 0,
    "groundGaps": 0,
    "thruDeck": 0,
-   "spikes": 14,
+   "spikes": 13,
    "bumps": 7,
    "cross": 31,
    "junctions": 1,
    "creases": 991,
-   "swFloat": 18,
-   "swBuried": 47,
+   "swFloat": 21,
+   "swBuried": 49,
    "snapMovedPct": 1,
    "snapP90cm": 0,
    "lintErrors": 0,
@@ -1829,7 +1829,7 @@
    "steepGround": 56,
    "shortX": 5,
    "groundGaps": 14,
-   "thruDeck": 63,
+   "thruDeck": 53,
    "spikes": 4,
    "bumps": 30,
    "cross": 302,
@@ -1871,7 +1871,7 @@
    "maxDeckLen": 505,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 19
+   "seconds": 20
   },
   "kingst@mh/untouched": {
    "steps": 0,
@@ -1910,7 +1910,7 @@
    "junctions": 0,
    "creases": 136,
    "swFloat": 0,
-   "swBuried": 34,
+   "swBuried": 35,
    "snapMovedPct": 0,
    "snapP90cm": 0,
    "lintErrors": 0,
@@ -1929,7 +1929,7 @@
    "steepGround": 97,
    "shortX": 1,
    "groundGaps": 12,
-   "thruDeck": 29,
+   "thruDeck": 24,
    "spikes": 9,
    "bumps": 18,
    "cross": 35,
@@ -1947,7 +1947,7 @@
    "maxDeckLen": 570,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 27
+   "seconds": 32
   },
   "deckpark_g@mh/untouched": {
    "steps": 4,
@@ -1955,7 +1955,7 @@
    "steepGround": 42,
    "shortX": 1,
    "groundGaps": 18,
-   "thruDeck": 68,
+   "thruDeck": 52,
    "spikes": 2,
    "bumps": 23,
    "cross": 404,
@@ -1971,7 +1971,7 @@
    "maxDeckLen": 589,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 27
+   "seconds": 29
   },
   "deckpark_g@mh/ready": {
    "steps": 0,
@@ -1979,14 +1979,14 @@
    "steepGround": 0,
    "shortX": 0,
    "groundGaps": 1,
-   "thruDeck": 14,
-   "spikes": 24,
+   "thruDeck": 17,
+   "spikes": 25,
    "bumps": 3,
    "cross": 41,
    "junctions": 0,
    "creases": 523,
-   "swFloat": 7,
-   "swBuried": 11,
+   "swFloat": 6,
+   "swBuried": 12,
    "snapMovedPct": 0,
    "snapP90cm": 0,
    "lintErrors": 0,
@@ -1997,7 +1997,7 @@
    "maxDeckLen": 560,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 32
+   "seconds": 33
   },
   "zion@mh/noshape": {
    "steps": 0,
@@ -2136,7 +2136,7 @@
    "bumps": 13,
    "cross": 1,
    "junctions": 2,
-   "creases": 442,
+   "creases": 441,
    "swFloat": 3,
    "swBuried": 3,
    "snapMovedPct": 18,
@@ -2149,7 +2149,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 6
+   "seconds": 5
   },
   "w_sf_russian@mh/noshape": {
    "steps": 0,
@@ -2164,7 +2164,7 @@
    "junctions": 19,
    "creases": 422,
    "swFloat": 3,
-   "swBuried": 1,
+   "swBuried": 2,
    "snapMovedPct": 2,
    "snapP90cm": 0,
    "lintErrors": 0,
@@ -2183,14 +2183,14 @@
    "steepGround": 961,
    "shortX": 0,
    "groundGaps": 0,
-   "thruDeck": 1,
+   "thruDeck": 2,
    "spikes": 0,
    "bumps": 11,
    "cross": 24,
    "junctions": 16,
-   "creases": 412,
+   "creases": 413,
    "swFloat": 4,
-   "swBuried": 6,
+   "swBuried": 7,
    "snapMovedPct": 2,
    "snapP90cm": 0,
    "lintErrors": 0,
@@ -2225,7 +2225,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 1,
-   "seconds": 10
+   "seconds": 11
   },
   "w_barcelona@mh/ready": {
    "steps": 0,
@@ -2251,7 +2251,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 14
+   "seconds": 12
   },
   "w_barcelona@mh/untouched": {
    "steps": 0,
@@ -2275,7 +2275,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 15
+   "seconds": 13
   },
   "w_barcelona@mh/noshape": {
    "steps": 0,
@@ -2301,7 +2301,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 15
+   "seconds": 13
   },
   "w_amsterdam@mh/ready": {
    "steps": 0,
@@ -2327,7 +2327,7 @@
    "maxDeckLen": 48,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 15
+   "seconds": 12
   },
   "w_amsterdam@mh/noshape": {
    "steps": 0,
@@ -2353,7 +2353,7 @@
    "maxDeckLen": 221,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 14
+   "seconds": 13
   },
   "w_amsterdam@mh/untouched": {
    "steps": 0,
@@ -2377,7 +2377,7 @@
    "maxDeckLen": 107,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 14
+   "seconds": 13
   },
   "normandy_flat@mh/ready": {
    "steps": 0,
@@ -2427,7 +2427,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 4
+   "seconds": 3
   },
   "normandy_flat@mh/noshape": {
    "steps": 0,
@@ -2477,7 +2477,7 @@
    "maxDeckLen": 24,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 12
+   "seconds": 11
   },
   "val_disere@mh/noshape": {
    "steps": 1,
@@ -2503,7 +2503,7 @@
    "maxDeckLen": 28,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 12
+   "seconds": 11
   },
   "val_disere@mh/ready": {
    "steps": 0,
@@ -2516,7 +2516,7 @@
    "bumps": 13,
    "cross": 8,
    "junctions": 5,
-   "creases": 940,
+   "creases": 941,
    "swFloat": 0,
    "swBuried": 8,
    "snapMovedPct": 11,
@@ -2544,7 +2544,7 @@
    "junctions": 2,
    "creases": 1155,
    "swFloat": 0,
-   "swBuried": 1,
+   "swBuried": 0,
    "snapMovedPct": 11,
    "snapP90cm": 59,
    "lintErrors": 0,
@@ -2705,7 +2705,7 @@
    "maxDeckLen": 7,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 6
+   "seconds": 5
   },
   "tychonas@gpxz/ready": {
    "steps": 0,
@@ -2729,7 +2729,7 @@
    "maxDeckLen": 7,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 6
+   "seconds": 5
   },
   "tychonas@gpxz/untouched": {
    "steps": 0,
@@ -2805,7 +2805,7 @@
    "maxDeckLen": 7,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 6
+   "seconds": 5
   },
   "tychonas@mh/untouched": {
    "steps": 0,
@@ -2813,7 +2813,7 @@
    "steepGround": 463,
    "shortX": 0,
    "groundGaps": 0,
-   "thruDeck": 11,
+   "thruDeck": 10,
    "spikes": 0,
    "bumps": 52,
    "cross": 671,
@@ -2829,7 +2829,7 @@
    "maxDeckLen": 186,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 6
+   "seconds": 5
   },
   "tychonas@t30/noshape": {
    "steps": 0,
@@ -2853,7 +2853,7 @@
    "maxDeckLen": 7,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 7
+   "seconds": 5
   },
   "tychonas@t30/ready": {
    "steps": 0,
@@ -2877,7 +2877,7 @@
    "maxDeckLen": 7,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 7
+   "seconds": 6
   },
   "tychonas@t30/untouched": {
    "steps": 0,
@@ -2885,7 +2885,7 @@
    "steepGround": 430,
    "shortX": 0,
    "groundGaps": 0,
-   "thruDeck": 4,
+   "thruDeck": 3,
    "spikes": 0,
    "bumps": 6,
    "cross": 950,
@@ -2909,7 +2909,7 @@
    "steepGround": 39,
    "shortX": 3,
    "groundGaps": 9,
-   "thruDeck": 956,
+   "thruDeck": 862,
    "spikes": 66,
    "bumps": 15,
    "cross": 93,
@@ -2925,7 +2925,7 @@
    "maxDeckLen": 869,
    "tunnels": 4,
    "tunnelsLeft": 0,
-   "seconds": 18
+   "seconds": 15
   },
   "ams_centraal@gpxz/noshape": {
    "steps": 0,
@@ -2933,7 +2933,7 @@
    "steepGround": 4,
    "shortX": 1,
    "groundGaps": 6,
-   "thruDeck": 846,
+   "thruDeck": 722,
    "spikes": 57,
    "bumps": 2,
    "cross": 19,
@@ -2945,13 +2945,13 @@
    "snapP90cm": 0,
    "lintErrors": 0,
    "lintWarnings": 0,
-   "decks": 47,
+   "decks": 48,
    "maxDeckH": 21.82,
-   "deckKm": 5.45,
+   "deckKm": 5.42,
    "maxDeckLen": 850,
    "tunnels": 4,
    "tunnelsLeft": 0,
-   "seconds": 18
+   "seconds": 15
   },
   "ams_centraal@gpxz/ready": {
    "steps": 0,
@@ -2959,25 +2959,25 @@
    "steepGround": 0,
    "shortX": 0,
    "groundGaps": 1,
-   "thruDeck": 123,
-   "spikes": 135,
+   "thruDeck": 107,
+   "spikes": 136,
    "bumps": 2,
-   "cross": 41,
+   "cross": 42,
    "junctions": 1,
-   "creases": 169,
-   "swFloat": 21,
-   "swBuried": 25,
+   "creases": 170,
+   "swFloat": 20,
+   "swBuried": 26,
    "snapMovedPct": 1,
    "snapP90cm": 0,
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 73,
    "maxDeckH": 21.63,
-   "deckKm": 6.85,
+   "deckKm": 6.84,
    "maxDeckLen": 933,
    "tunnels": 4,
    "tunnelsLeft": 0,
-   "seconds": 21
+   "seconds": 18
   },
   "ams_centraal@mh/noshape": {
    "steps": 2,
@@ -2985,7 +2985,7 @@
    "steepGround": 17,
    "shortX": 1,
    "groundGaps": 1,
-   "thruDeck": 790,
+   "thruDeck": 716,
    "spikes": 4,
    "bumps": 1,
    "cross": 12,
@@ -2999,7 +2999,7 @@
    "lintWarnings": 0,
    "decks": 46,
    "maxDeckH": 10.55,
-   "deckKm": 4.75,
+   "deckKm": 4.73,
    "maxDeckLen": 854,
    "tunnels": 2,
    "tunnelsLeft": 2,
@@ -3007,27 +3007,27 @@
   },
   "ams_centraal@mh/untouched": {
    "steps": 4,
-   "steepStruct": 57,
-   "steepGround": 32,
+   "steepStruct": 43,
+   "steepGround": 34,
    "shortX": 2,
-   "groundGaps": 2,
-   "thruDeck": 837,
+   "groundGaps": 5,
+   "thruDeck": 783,
    "spikes": 6,
-   "bumps": 13,
+   "bumps": 15,
    "cross": 108,
    "junctions": 0,
-   "creases": 3,
+   "creases": 5,
    "swFloat": 0,
    "swBuried": 14,
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 46,
    "maxDeckH": 9.7,
-   "deckKm": 5.09,
+   "deckKm": 5.04,
    "maxDeckLen": 861,
    "tunnels": 2,
    "tunnelsLeft": 2,
-   "seconds": 17
+   "seconds": 16
   },
   "ams_centraal@mh/ready": {
    "steps": 2,
@@ -3035,25 +3035,25 @@
    "steepGround": 0,
    "shortX": 0,
    "groundGaps": 3,
-   "thruDeck": 232,
-   "spikes": 98,
+   "thruDeck": 224,
+   "spikes": 95,
    "bumps": 1,
-   "cross": 63,
+   "cross": 67,
    "junctions": 1,
    "creases": 209,
-   "swFloat": 30,
+   "swFloat": 28,
    "swBuried": 27,
    "snapMovedPct": 2,
    "snapP90cm": 0,
    "lintErrors": 0,
-   "lintWarnings": 2,
+   "lintWarnings": 0,
    "decks": 57,
-   "maxDeckH": 12.08,
-   "deckKm": 7.32,
-   "maxDeckLen": 1397,
+   "maxDeckH": 12.06,
+   "deckKm": 7.34,
+   "maxDeckLen": 1425,
    "tunnels": 4,
    "tunnelsLeft": 0,
-   "seconds": 20
+   "seconds": 19
   },
   "ams_centraal@t30/noshape": {
    "steps": 0,
@@ -3061,7 +3061,7 @@
    "steepGround": 0,
    "shortX": 2,
    "groundGaps": 33,
-   "thruDeck": 935,
+   "thruDeck": 877,
    "spikes": 1,
    "bumps": 0,
    "cross": 3,
@@ -3073,11 +3073,11 @@
    "lintWarnings": 0,
    "decks": 43,
    "maxDeckH": 9.29,
-   "deckKm": 7.1,
-   "maxDeckLen": 1045,
+   "deckKm": 7.03,
+   "maxDeckLen": 1044,
    "tunnels": 0,
    "tunnelsLeft": 4,
-   "seconds": 18
+   "seconds": 15
   },
   "ams_centraal@t30/untouched": {
    "steps": 0,
@@ -3085,7 +3085,7 @@
    "steepGround": 0,
    "shortX": 1,
    "groundGaps": 31,
-   "thruDeck": 1067,
+   "thruDeck": 995,
    "spikes": 0,
    "bumps": 0,
    "cross": 8,
@@ -3097,11 +3097,11 @@
    "lintWarnings": 0,
    "decks": 42,
    "maxDeckH": 8.93,
-   "deckKm": 7.25,
-   "maxDeckLen": 1866,
+   "deckKm": 7.19,
+   "maxDeckLen": 1865,
    "tunnels": 0,
    "tunnelsLeft": 4,
-   "seconds": 18
+   "seconds": 15
   },
   "ams_centraal@t30/ready": {
    "steps": 0,
@@ -3109,23 +3109,23 @@
    "steepGround": 0,
    "shortX": 0,
    "groundGaps": 0,
-   "thruDeck": 64,
-   "spikes": 100,
+   "thruDeck": 61,
+   "spikes": 98,
    "bumps": 1,
-   "cross": 53,
+   "cross": 58,
    "junctions": 1,
-   "creases": 164,
-   "swFloat": 20,
+   "creases": 165,
+   "swFloat": 19,
    "swBuried": 5,
    "lintErrors": 0,
    "lintWarnings": 2,
-   "decks": 52,
+   "decks": 51,
    "maxDeckH": 13.21,
    "deckKm": 5.78,
-   "maxDeckLen": 792,
+   "maxDeckLen": 798,
    "tunnels": 4,
    "tunnelsLeft": 0,
-   "seconds": 21
+   "seconds": 18
   },
   "dev_szczyrk@gpxz/untouched": {
    "steps": 0,
@@ -3133,7 +3133,7 @@
    "steepGround": 2866,
    "shortX": 0,
    "groundGaps": 0,
-   "thruDeck": 6,
+   "thruDeck": 4,
    "spikes": 0,
    "bumps": 29,
    "cross": 2860,
@@ -3205,7 +3205,7 @@
    "steepGround": 2243,
    "shortX": 0,
    "groundGaps": 0,
-   "thruDeck": 4,
+   "thruDeck": 2,
    "spikes": 0,
    "bumps": 121,
    "cross": 1636,
@@ -3236,7 +3236,7 @@
    "bumps": 49,
    "cross": 28,
    "junctions": 25,
-   "creases": 1535,
+   "creases": 1534,
    "swFloat": 0,
    "swBuried": 1,
    "snapMovedPct": 25,
@@ -3257,7 +3257,7 @@
    "steepGround": 2281,
    "shortX": 0,
    "groundGaps": 0,
-   "thruDeck": 4,
+   "thruDeck": 2,
    "spikes": 0,
    "bumps": 117,
    "cross": 2117,
@@ -3281,7 +3281,7 @@
    "steepGround": 2676,
    "shortX": 0,
    "groundGaps": 0,
-   "thruDeck": 4,
+   "thruDeck": 2,
    "spikes": 0,
    "bumps": 16,
    "cross": 2719,
@@ -3297,7 +3297,7 @@
    "maxDeckLen": 17,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 5
+   "seconds": 6
   },
   "dev_szczyrk@t30/noshape": {
    "steps": 0,
@@ -3305,7 +3305,7 @@
    "steepGround": 2457,
    "shortX": 0,
    "groundGaps": 0,
-   "thruDeck": 4,
+   "thruDeck": 2,
    "spikes": 0,
    "bumps": 11,
    "cross": 21,
@@ -3321,7 +3321,7 @@
    "maxDeckLen": 17,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 6
+   "seconds": 7
   },
   "dev_szczyrk@t30/ready": {
    "steps": 0,
@@ -3345,7 +3345,7 @@
    "maxDeckLen": 17,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 7
+   "seconds": 8
   },
   "dev_pilchowice@gpxz/untouched": {
    "steps": 0,
@@ -3353,7 +3353,7 @@
    "steepGround": 567,
    "shortX": 0,
    "groundGaps": 0,
-   "thruDeck": 27,
+   "thruDeck": 23,
    "spikes": 0,
    "bumps": 43,
    "cross": 836,
@@ -3364,12 +3364,12 @@
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 3,
-   "maxDeckH": 33.27,
-   "deckKm": 0.38,
-   "maxDeckLen": 204,
+   "maxDeckH": 33.21,
+   "deckKm": 0.37,
+   "maxDeckLen": 201,
    "tunnels": 0,
    "tunnelsLeft": 1,
-   "seconds": 7
+   "seconds": 6
   },
   "dev_pilchowice@gpxz/noshape": {
    "steps": 0,
@@ -3377,7 +3377,7 @@
    "steepGround": 433,
    "shortX": 0,
    "groundGaps": 1,
-   "thruDeck": 20,
+   "thruDeck": 19,
    "spikes": 0,
    "bumps": 4,
    "cross": 6,
@@ -3388,9 +3388,9 @@
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 3,
-   "maxDeckH": 33.52,
+   "maxDeckH": 33.46,
    "deckKm": 0.4,
-   "maxDeckLen": 204,
+   "maxDeckLen": 203,
    "tunnels": 0,
    "tunnelsLeft": 1,
    "seconds": 7
@@ -3402,7 +3402,7 @@
    "shortX": 0,
    "groundGaps": 0,
    "thruDeck": 0,
-   "spikes": 9,
+   "spikes": 10,
    "bumps": 13,
    "cross": 6,
    "junctions": 6,
@@ -3414,12 +3414,12 @@
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 4,
-   "maxDeckH": 31.97,
+   "maxDeckH": 32,
    "deckKm": 0.24,
    "maxDeckLen": 152,
    "tunnels": 1,
    "tunnelsLeft": 0,
-   "seconds": 9
+   "seconds": 8
   },
   "dev_pilchowice@mh/untouched": {
    "steps": 0,
@@ -3427,7 +3427,7 @@
    "steepGround": 133,
    "shortX": 0,
    "groundGaps": 3,
-   "thruDeck": 3,
+   "thruDeck": 2,
    "spikes": 0,
    "bumps": 24,
    "cross": 667,
@@ -3443,7 +3443,7 @@
    "maxDeckLen": 152,
    "tunnels": 1,
    "tunnelsLeft": 0,
-   "seconds": 8
+   "seconds": 7
   },
   "dev_pilchowice@mh/noshape": {
    "steps": 0,
@@ -3469,7 +3469,7 @@
    "maxDeckLen": 152,
    "tunnels": 1,
    "tunnelsLeft": 0,
-   "seconds": 8
+   "seconds": 7
   },
   "dev_pilchowice@t30/ready": {
    "steps": 0,
@@ -3482,18 +3482,18 @@
    "bumps": 8,
    "cross": 5,
    "junctions": 3,
-   "creases": 199,
+   "creases": 197,
    "swFloat": 0,
-   "swBuried": 3,
+   "swBuried": 4,
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 4,
-   "maxDeckH": 13.42,
+   "maxDeckH": 13.45,
    "deckKm": 0.77,
    "maxDeckLen": 537,
    "tunnels": 1,
    "tunnelsLeft": 0,
-   "seconds": 8
+   "seconds": 9
   },
   "dev_pilchowice@t30/untouched": {
    "steps": 0,
@@ -3501,7 +3501,7 @@
    "steepGround": 337,
    "shortX": 0,
    "groundGaps": 0,
-   "thruDeck": 37,
+   "thruDeck": 34,
    "spikes": 0,
    "bumps": 12,
    "cross": 615,
@@ -3512,12 +3512,12 @@
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 3,
-   "maxDeckH": 22.67,
+   "maxDeckH": 22.68,
    "deckKm": 0.51,
-   "maxDeckLen": 346,
+   "maxDeckLen": 344,
    "tunnels": 0,
    "tunnelsLeft": 1,
-   "seconds": 7
+   "seconds": 6
   },
   "dev_pilchowice@t30/noshape": {
    "steps": 0,
@@ -3536,9 +3536,9 @@
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 3,
-   "maxDeckH": 23.1,
+   "maxDeckH": 23.12,
    "deckKm": 0.53,
-   "maxDeckLen": 346,
+   "maxDeckLen": 347,
    "tunnels": 0,
    "tunnelsLeft": 1,
    "seconds": 7
@@ -3549,20 +3549,20 @@
    "steepGround": 337,
    "shortX": 0,
    "groundGaps": 0,
-   "thruDeck": 4,
-   "spikes": 4,
+   "thruDeck": 6,
+   "spikes": 5,
    "bumps": 11,
    "cross": 8,
    "junctions": 7,
-   "creases": 360,
+   "creases": 359,
    "swFloat": 0,
-   "swBuried": 1,
+   "swBuried": 3,
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 6,
    "maxDeckH": 32.2,
    "deckKm": 0.75,
-   "maxDeckLen": 191,
+   "maxDeckLen": 194,
    "tunnels": 1,
    "tunnelsLeft": 0,
    "seconds": 8
