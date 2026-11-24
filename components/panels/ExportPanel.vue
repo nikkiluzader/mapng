@@ -761,6 +761,7 @@ import { estimateLevelWeight } from '../../services/levelWeight.js';
 import { countMapPoints, estimateExportMemory, memoryFit } from '../../services/memoryEstimate.js';
 import { sanitizeTreeKindsOff, sanitizeTreeModelsOff, sanitizeTreeSwaps } from '../../services/beamngTrees.js';
 import { squareCropNotice } from '../../services/squareCrop.js';
+import { hasShape } from '../../services/batchShape.js';
 import { CHECKBOX, SELECT_XS } from '../base/controlStyles.js';
 import { prepareCroppedTerrainData } from '../../services/cropTerrain';
 import BaseSwitch from '../base/BaseSwitch.vue';
@@ -1119,7 +1120,15 @@ const webHeavy = computed(() => {
   let roads = 0; for (const f of props.terrainData?.osmFeatures || []) if (f?.type === 'road') roads++;
   return roads >= WEB_HEAVY_ROADS ? { roads } : null;
 });
-const squareCrop = computed(() => squareCropNotice(props.terrainData?.width, props.terrainData?.height, resolveProcessingMetersPerPixel(props.terrainData)));
+// (only a square terrain whose side is no power of two is cut to its middle: a rectangle, tiles, a road and a level
+// built in pieces are padded to a square with their shape kept (exportBeamNGLevel.js, padTerrainToSquare), nothing
+// cut. Read from a long road's coarse overview, the notice told a tester his level would be "the middle 2048 x 2048
+// px: 36 % of the area" and to generate again at 27 m per pixel)
+const squareCrop = computed(() => {
+  const td = props.terrainData;
+  if (!td || td.chunked || hasShape(td.footprint) || td.width !== td.height) return null;
+  return squareCropNotice(td.width, td.height, resolveProcessingMetersPerPixel(td));
+});
 const isCustomUploadTerrain = computed(() => !!props.terrainData?.elevationUnitApplied);
 const canUseGpxzBackdrop = computed(() => props.elevationSource === 'gpxz' && !!props.gpxzApiKey);
 // (the backdrop's source: the chosen one where it has data for this map, 30 m global where it has none)
@@ -1176,6 +1185,7 @@ const beamNGPendingDownloadName = ref('');
 const beamNGDesktopSaved = ref(null);
 const beamNGDesktopFailed = ref(null);   // { message, logPath }
 let desktopExportAbort = null;
+const CANCELLED = Symbol('cancelled');
 const cancelDesktopExport = () => desktopExportAbort?.abort();
 const showDesktopExportLog = () => desktopApp?.showItem(beamNGDesktopFailed.value?.logPath);
 // (the last export's options, for a report about it)
@@ -2557,12 +2567,19 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
     // export after it only processes what's in the cache
     const dataTd = toRaw(props.terrainData);
     let dataResult = null;
+    // (desktop: Cancel works from here on, the downloads too. It did nothing while a tester's export waited for its
+    // backdrop's downloads: the controller was made only for the hand-off to the exporter. The downloads in flight
+    // finish in the background and stay in the cache for the next try)
+    if (desktopApp) desktopExportAbort = new AbortController();
     if (dataTd && exportDataNeeds(dataTd, exportDataOptions.value)) {
       beamNGProgressStep.value = t('exportPanel.ui.dataWaiting');
-      dataResult = await ensureExportData(dataTd, exportDataOptions.value, {
+      const waiting = ensureExportData(dataTd, exportDataOptions.value, {
         run: runExportData,
         onProgress: (text) => { beamNGProgressStep.value = `${t('exportPanel.ui.dataWaiting')} ${text}`; },
       }).catch((err) => { console.warn(`${BEAMNG_EXPORT_UI_LOG} Downloading ahead failed; the export fetches what it needs:`, err?.message || err); return null; });
+      const cancelled = desktopExportAbort ? new Promise((resolve) => desktopExportAbort.signal.addEventListener('abort', () => resolve(CANCELLED), { once: true })) : null;
+      dataResult = await (cancelled ? Promise.race([waiting, cancelled]) : waiting);
+      if (dataResult === CANCELLED) { console.log(`${BEAMNG_EXPORT_UI_LOG} Export cancelled while waiting for the downloads.`); return; }
     }
     // (the lakes and rivers round the map, for the water out over the backdrop)
     if (dataResult?.surroundWater?.length) levelOptions.surroundingWater = dataResult.surroundWater;
@@ -2572,7 +2589,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
 
     if (desktopApp) {
       lastExportOptions = Object.fromEntries(Object.entries(levelOptions).filter(([, v]) => typeof v !== 'function'));
-      desktopExportAbort = new AbortController();
+      if (desktopExportAbort.signal.aborted) return;
       const saved = await exportLevelOnDesktop(td, props.center, levelOptions, { signal: desktopExportAbort.signal });
       if (saved?.cancelled) return;
       exportSucceeded = true;

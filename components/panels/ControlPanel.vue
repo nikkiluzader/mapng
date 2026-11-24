@@ -699,7 +699,13 @@ const processingMetersPerPixelNumber = computed(() => {
 
 const metersPerPixel = computed(() => processingMetersPerPixelNumber.value);
 // (services/levelLimits.js: when a big area's notes show)
-const sideKm = computed(() => ((Number(props.resolution) || 0) * metersPerPixel.value) / 1000);
+// (the whole map's longest side: a road's or several tiles' box, not one tile's. Measured on one tile, neither note
+// showed for a 220 km road whose level spanned 158 km: report MR-VYQGBY)
+const sideKm = computed(() => {
+  const g = nativeDims.value ? null : store.areaMode === 'road' ? roadApi.grid.value : store.tiles.length > 1 ? tileApi.grid.value : null;
+  const px = g ? Math.max(g.width || 0, g.height || 0) : (Number(props.resolution) || 0);
+  return (px * metersPerPixel.value) / 1000;
+});
 const sideKmText = computed(() => (sideKm.value >= 10 ? sideKm.value.toFixed(0) : sideKm.value.toFixed(1)));
 const bigArea = computed(() => sideKm.value >= BIG_AREA_KM);
 const farShake = computed(() => reachesShakeDistance(sideKm.value));

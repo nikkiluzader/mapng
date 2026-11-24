@@ -13629,6 +13629,8 @@ export function mapngLevelStamp({ terrainData, center, options = {}, levelName, 
  * The six stages the export card shows (components/ui/StageLoader.vue), each
  * the export phases (beginStep) it covers, in the order they run.
  */
+// a level built in pieces: the pieces (each generated and exported) and then the merge and its zip
+const CHUNKED_PHASE_WEIGHTS = { prepare: 90, zip: 10 };
 export const EXPORT_STEP_GROUPS = [
   { key: 'prepare', members: ['prepare', 'detail', 'lidar'] },
   { key: 'roads', members: ['roads', 'sidewalks', 'props'] },
@@ -13703,11 +13705,19 @@ async function exportChunkedFromOverview(overview, center, options) {
     // (each chunk's own steps stay in the log; the progress shows the chunk being made)
     options: { ...options, levelName, levelTunnels, zipSink: undefined, stepCache: null, onProgress: undefined },
     // (the lines the window shows: translated there by services/statusLines.js, statusLines.chunkGenerating / chunkExporting / chunksMerging)
-    onProgress: (p) => { if (p?.chunk) onProgress?.({ step: `Chunk ${p.chunk} of ${p.of}: ${p.step === 'generate' ? 'generating from the cache' : 'exporting'}…`, pct: Math.round((100 * (p.chunk - 1)) / p.of * 0.9) }); else onProgress?.({ step: 'Merging the chunks into one level…', pct: 92 }); },
+    // (the progress card draws its bar from the phase, the taskbar from pct: both are sent. Without a phase the card
+    // stood at 0 % for 70 minutes of a 442-piece level while the taskbar filled. The pieces are the 'prepare' stage,
+    // the merge and the zip the 'package' one; the status line says which piece)
+    onProgress: (p) => {
+      if (p?.chunk) {
+        const f = (p.chunk - 1 + (p.step === 'generate' ? 0 : 0.5)) / p.of;
+        onProgress?.({ step: `Chunk ${p.chunk} of ${p.of}: ${p.step === 'generate' ? 'generating from the cache' : 'exporting'}…`, pct: Math.round(f * 90), phase: 'prepare', phaseFraction: f, phaseWeights: CHUNKED_PHASE_WEIGHTS });
+      } else onProgress?.({ step: 'Merging the chunks into one level…', pct: 92, phase: 'zip', phaseFraction: 0, phaseWeights: CHUNKED_PHASE_WEIGHTS });
+    },
     log: (m) => console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunked: ${m}`),
   });
   let zipBlob = null;
-  if (options.zipSink) await streamZipToWritable(zip, options.zipSink, (f) => onProgress?.({ step: 'Compressing the level ZIP…', pct: 95 + Math.round(5 * (f || 0)) }));
+  if (options.zipSink) await streamZipToWritable(zip, options.zipSink, (f) => onProgress?.({ step: 'Compressing the level ZIP…', pct: 95 + Math.round(5 * (f || 0)), phase: 'zip', phaseFraction: Math.max(0, Math.min(1, f || 0)), phaseWeights: CHUNKED_PHASE_WEIGHTS }));
   else zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', streamFiles: true });
   console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunked level written in ${((performance.now() - t0) / 1000).toFixed(1)} s: ${chunks.map((c) => `${c.key} ${(c.ms / 1000).toFixed(1)} s`).join(', ')}.`);
   onProgress?.({ step: 'Done', pct: 100, elapsedMs: performance.now() - t0 });
