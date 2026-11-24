@@ -96,6 +96,16 @@ replace the tracking files (see CLAUDE.md, "Tracking"); it is the short "start h
 - [x] **0.3.7 release page draft** (`7edfe58`, `public/updates/0.3.7/`, not indexed, not linked): formats with the
       reasons for the ones not opened, Monaco .osm.pbf vs Shapefile in game, line curves, large levels. Still to add
       before release: the Perth fixes, whatever else lands.
+- [ ] **The coverage level** (user 2026-11-24: one synthetic export with every asset and generated model, so assets
+      are tested without real-world exports). Started: `scripts/coverage/` (README there): `buildCoverageArea.mjs`
+      (synthetic area per region, one plot per built tag), `check_coverage.py` (offline: models placed vs the tag
+      library, undefined materials, missing textures, billboard models). First run (na_east) found real faults, not
+      fixed yet: 5 official models with materials nobody defines (italy_wall_stone, italy_bld_boomgate_6.5m,
+      ut_picnic_table_a, electric_box_big, s_watertank); the beech foliage textures in
+      `services/beamngRuntimeMaterialCatalog.js` no longer in the game; the palm bark overlay texture. Next: confirm
+      them in game (free-roam, empty cache), fix them, raise model coverage (42 of 123 placed: more plots per tag
+      for the seeded variants, the other regions), then the in-game step as a script, and a test that fails when a
+      tag or model is added without coverage.
 - [ ] **Toma's three notes** (backlog, section 1), not started.
 - [ ] **Tile rotation** (user asked 2026-11-24 about 0.3.7): answered feasible but big (1-2 weeks; whole-map rotation
       first, tiles rotated apart from each other only as a shaped level); suggested as the first 0.3.8 item, the user
