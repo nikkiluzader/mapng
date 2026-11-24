@@ -54,6 +54,13 @@ replace the tracking files (see CLAUDE.md, "Tracking"); it is the short "start h
       no level over 65,535 files has been built end to end yet (only the writer is tested past it); the merged
       report still holds every piece's report (70 MB for 442 pieces); whether BeamNG loads a ZIP64 zip is unknown;
       the road end handle drags at most 20 km at a time (`error_tooFar`).
+- [x] **Road levels: no backdrop** (`f0580b8`, lominsa's 200 km road stalled at 50 % downloading it; user: "backdrops
+      make no sense for road exports"). Off for maps made in road mode (`isRoadLevel` in ExportPanel: export, data step,
+      2D preview); the choice stays stored. Corridor-shaped backdrop is a backlog idea.
+- [x] **Line curves, second round** (`b8fa986`): switches and path joins carried onto the curve (railways, paths,
+      waterways only; for roads it changed 87 sweep cells, kept pinned), waterways rounded, power lines kept as drawn
+      on purpose, walls were already rounded by the export. Sweep 135/135, 116 identical. Game check: pending
+      (area `curve_kaunas`, GPXZ; no Mapterhorn in Lithuania).
 - [ ] **Next suggested (not agreed yet):** move the export's data step (backdrop download, `ensureExportData` in
       ExportPanel) out of the window into the desktop runner, for lominsa's window out-of-memory crash.
 - [x] **Rounded curves on railways and paths** (thecoachtoma, SPLATPLAYS; user's decision 2026-11-24: on by default,
