@@ -54,7 +54,21 @@ export function makeBuilder(regionKey, size) {
   const circle = (cx, cy, r, n = 24) => { const pts = []; for (let i = 0; i <= n; i++) { const a = (i / n) * 2 * Math.PI; pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]); } pts[n] = pts[0]; return pts; };
   // (what the level holds, for the labels, the report and the tour: tour = [camera distance, yaw])
   const label = (what, x, y, tour = [60, 0]) => placed.push({ what, kind: 'structure', at: [Math.round(x), Math.round(y)], tour });
-  return { R, half, bounds, node, way, area, run, circle, label, elements, placed };
+  // (a driver's view for the tour, not a label: the camera at eye height on the road at (x, y), looking along
+  // `heading` (radians, 0 = east); find: 'down' onto a deck or road from above, 'up' onto a tunnel floor from below)
+  const drive = (what, x, y, heading, find = 'down') => placed.push({ what, kind: 'driver', at: [Math.round(x * 10) / 10, Math.round(y * 10) / 10], heading, find });
+  // (along a polyline: the point and heading at a fraction of its length)
+  const along = (pts, f) => {
+    const seg = []; let L = 0;
+    for (let i = 1; i < pts.length; i++) { const l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); seg.push(l); L += l; }
+    let d = f * L;
+    for (let i = 1; i < pts.length; i++) {
+      if (d <= seg[i - 1] || i === pts.length - 1) { const t = Math.min(1, d / (seg[i - 1] || 1)); const [ax, ay] = pts[i - 1]; const [bx, by] = pts[i]; return [ax + (bx - ax) * t, ay + (by - ay) * t, Math.atan2(by - ay, bx - ax)]; }
+      d -= seg[i - 1];
+    }
+    return [...pts.at(-1), 0];
+  };
+  return { R, half, bounds, node, way, area, run, circle, label, drive, along, elements, placed };
 }
 
 export async function writeLevelArea({ name, size, b, heightAt, landCover, meta = {} }) {
@@ -195,7 +209,7 @@ function roads(regionKey) {
 
 // ── structures: bridges over a gorge and a wide valley, overpasses on the flat, tunnels through a ridge ──
 function structures(regionKey) {
-  const SIZE = 2048; const b = makeBuilder(regionKey, SIZE); const { way, run, label } = b;
+  const SIZE = 2048; const b = makeBuilder(regionKey, SIZE); const { way, run, label, drive, along } = b;
   const GORGE_X = -450; const VALLEY_X = 150; const RIDGE_X = 700;
   const heightAt = (x, y) => {
     let h = 60;
@@ -215,6 +229,10 @@ function structures(regionKey) {
     way(run(c, y, x1, y, 20), { highway: 'secondary', name: `Gorge road ${what}` });
     label(`gorge bridge: ${what}`, GORGE_X, y, [120, -60]);
     label(`bridge end west (${what})`, a, y, [30, 60]); label(`bridge end east (${what})`, c, y, [30, -120]);
+    // driver's views: 40 m before each end looking onto the deck, both ways, and mid-span
+    drive(`driver: eastbound onto ${what}`, a - 40, y, 0); drive(`driver: westbound onto ${what}`, c + 40, y, Math.PI);
+    drive(`driver: on ${what}, mid-span east`, GORGE_X, y, 0); drive(`driver: eastbound off ${what}`, c - 30, y, 0);
+    drive(`driver: westbound off ${what}`, a + 30, y, Math.PI);
   });
   // a long viaduct across the wide valley, a rail bridge beside it, a footbridge over the river
   {
@@ -253,6 +271,13 @@ function structures(regionKey) {
       const [ax, ay] = pts[inside[0]]; const [bx, by] = pts[inside[1]];
       label(what, (ax + bx) / 2, (ay + by) / 2, [200, 0]);
       label(`${what}: west portal`, ax, ay, [35, 60]); label(`${what}: east portal`, bx, by, [35, -120]);
+      // driver's views both ways: the entrance portal (from 30 m out), 25 %, 50 %, 75 % in, the exit portal
+      const tube = pts.slice(inside[0], inside[1] + 1);
+      for (const [dirName, line] of [['forward', tube], ['back', [...tube].reverse()]]) {
+        const [sx, sy, sh] = along(line, 0); drive(`driver ${dirName}: ${what} entrance portal`, sx - 30 * Math.cos(sh), sy - 30 * Math.sin(sh), sh, 'down');
+        for (const f of [0.25, 0.5, 0.75]) { const [x, y, h] = along(line, f); drive(`driver ${dirName}: ${what} ${f * 100} %`, x, y, h, 'up'); }
+        const [ex, ey, eh] = along(line, 0.97); drive(`driver ${dirName}: ${what} exit portal`, ex, ey, eh, 'up');
+      }
     };
     const line = (y, x0, x1) => run(x0, y, x1, y, 20);
     { const p = line(800, RIDGE_X - 300, RIDGE_X + 300); tun(p, { highway: 'secondary' }, 'short tunnel', [p.findIndex(([x]) => x >= RIDGE_X - 60), p.findIndex(([x]) => x >= RIDGE_X + 60)]); }

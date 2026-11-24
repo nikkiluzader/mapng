@@ -13,7 +13,25 @@ local function boxOf(t)
   if not best then return nil end
   local b = best:getWorldBox(); return { c = (b.minExtents + b.maxExtents) * 0.5, r = (b.maxExtents - b.minExtents):length() * 0.5 }
 end
+-- a driver's view: eye height over the road at (x, y), looking along the heading; the road found by a ray down from
+-- above (a deck, an open road) or up from below (a tunnel's floor, under the hill)
+local function driverView(t)
+  local p, hit
+  if t.find == 'up' then
+    p = vec3(t.x, t.y, -200); hit = castRayStatic(p, vec3(0, 0, 1), 600)
+    if hit then p = vec3(t.x, t.y, -200 + hit) end
+  else
+    p = vec3(t.x, t.y, 1000); hit = castRayStatic(p, vec3(0, 0, -1), 1200)
+    if hit then p = vec3(t.x, t.y, 1000 - hit) end
+  end
+  if not hit then p = vec3(t.x, t.y, core_terrain.getTerrainHeight(vec3(t.x, t.y, 0)) or 0) end
+  local cam = p + vec3(0, 0, 1.4)
+  local dir = vec3(math.cos(t.heading), math.sin(t.heading), -0.03):normalized()
+  core_camera.setPosition(0, cam); core_camera.setRotation(0, quatFromDir(dir, vec3(0, 0, 1)))
+  return 'driver', cam, 0
+end
 local function frame(t)
+  if t.kind == 'driver' then return driverView(t) end
   local gz = core_terrain.getTerrainHeight(vec3(t.x, t.y, 0)) or 20
   local c, r = vec3(t.x, t.y, t.z or gz), 4
   local bx = boxOf(t); if bx then c, r = bx.c, math.max(0.8, bx.r) end

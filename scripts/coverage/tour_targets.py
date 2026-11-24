@@ -25,6 +25,9 @@ for t,p in forest.items(): T.append({'label':t,'x':p[0],'y':p[1],'z':p[2],'kind'
 plan=json.load(open(f'scratch/levelprobe/data/{area}/coverage_plan.json'))['placed']
 # (structures name their own camera: tour = [distance, yaw], from the layout itself)
 for q in plan:
+    if q.get('kind')=='driver':
+        T.append({'label':q['what'],'x':q['at'][0],'y':q['at'][1],'z':None,'kind':'driver','heading':q['heading'],'find':q['find']})
+for q in plan:
     if q.get('kind')=='structure':
         d,yaw=(q.get('tour') or [60,0])
         T.append({'label':q['what'],'x':q['at'][0],'y':q['at'][1],'z':None,'kind':'structure','dist':d,'yaw':yaw})

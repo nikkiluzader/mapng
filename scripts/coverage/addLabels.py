@@ -43,7 +43,8 @@ MODSCRIPT = 'setExtensionUnloadMode("mapngTestLabels", "manual")\nextensions.loa
 def main():
     zpath, area = sys.argv[1], sys.argv[2]
     plan = json.load(open(f'scratch/levelprobe/data/{area}/coverage_plan.json'))['placed']
-    labels = [{'x': (q.get('plot') or q['at'])[0], 'y': (q.get('plot') or q['at'])[1], 't': f"{i} {q['what']}"} for i, q in enumerate(plan)]
+    # (driver's views are tour stops, not labels)
+    labels = [{'x': (q.get('plot') or q['at'])[0], 'y': (q.get('plot') or q['at'])[1], 't': f"{i} {q['what']}"} for i, q in enumerate(plan) if q.get('kind') != 'driver']
     with zipfile.ZipFile(zpath) as z:
         level = next(n.split('/')[1] for n in z.namelist() if re.match(r'levels/[^/]+/info\.json$', n))
     with zipfile.ZipFile(zpath, 'a', zipfile.ZIP_DEFLATED) as z:
