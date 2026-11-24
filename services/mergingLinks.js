@@ -146,5 +146,54 @@ export function cutAtOuterLane(nodes, end, roadLines, offsetM, { stepM = 0.5 } =
   return null;
 }
 
+export const FAN_EASE_M = 30;   // a link meeting a wide street's end swings out to its outer lane over this length
+
+/**
+ * Where links fan in to a wide street's end, each link's last metres are moved sideways so that it arrives on the
+ * street's outer lane on its own side, its outer edge running on into the street's edge, instead of on the centre
+ * line where OSM's one node puts it. Returns a function (x, y) -> [x', y'] that moves any point of the link's own
+ * decals (surface, lines, edge blends), or null when there is nothing to move.
+ * linkNodes: the link's centre line; end: 0 or 1, the end at the street; roadNodes: the street's centre line (it
+ * starts or ends at that point); offsetM: street half - link half; easeM: the length the move fades out over.
+ */
+export function fanInShift(linkNodes, end, roadNodes, offsetM, easeM = FAN_EASE_M) {
+  if (!(linkNodes?.length >= 2) || !(roadNodes?.length >= 2) || !(offsetM > 0.2)) return null;
+  const seq = end ? [...linkNodes].reverse() : linkNodes;   // from the street outward
+  const at = seq[0];
+  // the street's direction at that point, pointing along the street away from the link's side of the node
+  const near = nearestOn(roadNodes, at[0], at[1]);
+  if (!near) return null;
+  // the link's side of the street's axis: where the link is, a little out from the node
+  let probe = seq[seq.length - 1]; let acc = 0;
+  for (let i = 0; i + 1 < seq.length; i++) {
+    const L = fastHypot(seq[i + 1][0] - seq[i][0], seq[i + 1][1] - seq[i][1]);
+    if (acc + L >= easeM / 2) { const t = (easeM / 2 - acc) / Math.max(1e-9, L); probe = [seq[i][0] + (seq[i + 1][0] - seq[i][0]) * t, seq[i][1] + (seq[i + 1][1] - seq[i][1]) * t]; break; }
+    acc += L;
+  }
+  const nx = -near.ty; const ny = near.tx;
+  const across = (probe[0] - at[0]) * nx + (probe[1] - at[1]) * ny;
+  if (Math.abs(across) < 0.5) return null;                 // (it comes in along the street's own axis: no side to take)
+  const side = Math.sign(across);
+  // arc length along the link from the street, for any point near it
+  const cum = [0];
+  for (let i = 0; i + 1 < seq.length; i++) cum.push(cum[i] + fastHypot(seq[i + 1][0] - seq[i][0], seq[i + 1][1] - seq[i][1]));
+  const along = (x, y) => {
+    let best = Infinity; let sAt = 0;
+    for (let i = 0; i + 1 < seq.length; i++) {
+      const ax = seq[i][0]; const ay = seq[i][1]; const vx = seq[i + 1][0] - ax; const vy = seq[i + 1][1] - ay;
+      const L2 = vx * vx + vy * vy; if (L2 < 1e-9) continue;
+      const t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / L2));
+      const d = fastHypot(ax + vx * t - x, ay + vy * t - y);
+      if (d < best) { best = d; sAt = cum[i] + Math.sqrt(L2) * t; }
+    }
+    return sAt;
+  };
+  const smooth = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
+  return (x, y) => {
+    const k = offsetM * (1 - smooth(along(x, y) / easeM)) * side;
+    return [x + nx * k, y + ny * k];
+  };
+}
+
 /** The paint a merging link leaves alone on the road it joins: the lines between lanes, not the road's edges. */
 export const keptThroughMerge = (layerName) => typeof layerName === 'string' && (layerName.startsWith('line_sep_') || layerName === 'line_center');

@@ -62,3 +62,24 @@ test('a link meeting the street at the street\'s own end is marked: nothing to c
   const narrow = { owner: 4, highway: 'tertiary', oneWay: false, half: 4, nodes: [[0, -80, 0], [0, 0, 0]] };
   assert.equal(mergingLinkEnds([stub, narrow, slip])[0].atRoadEnd, true);
 });
+
+import { fanInShift } from '../services/mergingLinks.js';
+
+// Where links fan in to a wide street's end, each one swings out to the street's outer lane on its own side: its end
+// lands (street half - link half) off the centre line, and far from the street nothing moves.
+test('a link meeting a wide street at its end is moved out to the outer lane, fading out along the link', () => {
+  const streetNodes = [[0, 0, 0], [0, 80, 0]];                         // the street runs north from the meeting point
+  const east = [[40, -50, 0], [20, -30, 0], [6, -12, 0], [0, 0, 0]];   // a link arriving from the south-east
+  const move = fanInShift(east, 1, streetNodes, 5);
+  const end = move(0, 0);
+  assert.ok(Math.abs(end[0] - 5) < 1e-6 && Math.abs(end[1]) < 1e-6, `the end lands 5 m out on the link's own side: ${end}`);
+  const far = move(40, -50);
+  assert.ok(Math.abs(far[0] - 40) < 1e-6 && Math.abs(far[1] + 50) < 1e-6, 'past the ease length nothing moves');
+  const mid = move(6, -12);
+  assert.ok(mid[0] > 6 && mid[0] < 11, `part-way, part of the move: ${mid[0].toFixed(2)}`);
+  // the mirror image arrives from the south-west and goes the other way
+  const west = east.map(([x, y, z]) => [-x, y, z]);
+  assert.ok(Math.abs(fanInShift(west, 1, streetNodes, 5)(0, 0)[0] + 5) < 1e-6);
+  // a link coming in along the street's own axis has no side to take
+  assert.equal(fanInShift([[0, -60, 0], [0, 0, 0]], 1, streetNodes, 5), null);
+});

@@ -67,7 +67,7 @@ import { leaveBridgeBuildings } from './bridgeBuildings.js';
 import { buildingsUnderDecks } from './buildingsUnderDecks.js';
 import { benchFacing, boxed } from './benchFacing.js';
 import { wingWallRuns, buildWingWallMesh } from './structures/wingWalls.js';
-import { mergingLinks, keptThroughMerge, mergingLinkEnds, cutAtOuterLane } from './mergingLinks.js';
+import { mergingLinks, keptThroughMerge, mergingLinkEnds, cutAtOuterLane, fanInShift } from './mergingLinks.js';
 import { buildMonumentMeshes, monumentKind, monumentHeight } from './monuments.js';
 import { solveProfilesSteps, gradeLimit } from './structures/profileSolve.js';
 import { appendAll, keepInPlace } from './keepInPlace.js';
@@ -7314,10 +7314,38 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   {
     const cwByOwner = new Map(carriageways.map((cw) => [cw.owner, cw]));
     const ends = mergingLinkEnds(carriageways);
-    let cut = 0; let kept = 0; const why = { noDecal: 0, noRoom: 0, atRoadEnd: 0 };
+    let cut = 0; let kept = 0; let fanned = 0; const why = { noDecal: 0, noRoom: 0, atRoadEnd: 0 };
     for (const { link, road, end, atRoadEnd } of ends) {
-      // (where roads fan in to a wide street's end, the slip roads belong on its outer lanes: not done yet, left as drawn)
-      if (atRoadEnd) { why.atRoadEnd++; kept++; continue; }
+      // (where roads fan in to a wide street's end, each slip road swings out to the street's outer lane on its own
+      // side over its last FAN_EASE_M: everything drawn for it moves with it (surface, lines, edge blends), and a copy
+      // of its surface, invisible, stays on the mapped line for the traffic. A tester's junction in Kaunas: two slip
+      // roads and a two-lane road met a four-lane street's end at one point, the street's corners standing out square)
+      if (atRoadEnd) {
+        const L0 = cwByOwner.get(link); const M0 = cwByOwner.get(road);
+        const move = fanInShift(L0.nodes, end, M0.nodes, M0.half - L0.half);
+        const mine = [];
+        // (the link's groups, from the lists of this pass; a line the paint cut split is found in its group, by its owner)
+        const groupsOf = new Set([...surfaceDecals, ...paintDecals].filter((q) => q.owner === link).map((q) => q.group));
+        for (const g of groupsOf) for (const d of g.__items || []) if (d.__owner === link && d.nodes?.length >= 2) mine.push([g, d]);
+        if (!move || !mine.length) { why.atRoadEnd++; kept++; continue; }
+        for (const [g, d] of mine) {
+          if (d.__layer === 'asphalt' || d.__layer === 'paving') {
+            if (Number.isFinite(d.drivability) && d.drivability > 0) {
+              const path = { ...d, name: `${d.name}_m`, persistentId: generatePersistentId(), material: GLOBAL_DECAL_MATERIALS.invisible, nodes: d.nodes.map((nd) => nd.slice()), startEndFade: [0, 0] };
+              Object.defineProperty(path, '__owner', { value: d.__owner, enumerable: false });
+              Object.defineProperty(path, '__layer', { value: 'merge', enumerable: false });
+              g.__items.push(path);
+              d.drivability = -1;
+            }
+          }
+          d.nodes = d.nodes.map((nd) => { const [x, y] = move(nd[0], nd[1]); return [roundTo(x, 3), roundTo(y, 3), ...nd.slice(2)]; });
+        }
+        // (the carriageway itself too: the sidewalks, curbs and turn arrows built from it later follow the road as it is
+        // drawn. Left on the mapped line, the sidewalk's slab lay across the lane the slip road had been moved onto)
+        L0.nodes = L0.nodes.map((nd) => { const [x, y] = move(nd[0], nd[1]); return [x, y, ...nd.slice(2)]; });
+        fanned++;
+        continue;
+      }
       const L = cwByOwner.get(link); const M = cwByOwner.get(road);
       const at = end ? L.nodes[L.nodes.length - 1] : L.nodes[0];
       // (the link's surface piece that ends at the merge: a way cut into pieces keeps only the last one's end there)
@@ -7342,7 +7370,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
       piece.group.__items.push(hidden);
       cut++;
     }
-    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Slip roads merging into a wider road: ${ends.length} merge(s) looked at; ${cut} slip road surface(s) ended at the road's outer lane, an invisible road on to the mapped node; ${kept} left as drawn (${why.atRoadEnd} meeting the road at its own end, ${why.noDecal} no surface piece ending at the merge, ${why.noRoom} never clear of the road's lanes).`);
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Slip roads merging into a wider road: ${ends.length} merge(s) looked at; ${cut} slip road surface(s) ended at the road's outer lane, an invisible road on to the mapped node; ${fanned} meeting a wide street at its end moved out to its outer lane over their last 30 m (the traffic's road left on the mapped line); ${kept} left as drawn (${why.atRoadEnd} at a street's end with no side to take, ${why.noDecal} no surface piece ending at the merge, ${why.noRoom} never clear of the road's lanes).`);
   }
   if (mouths.length) appendAll(getOrCreateSplineGroup('road_mouths').__items, mouths);
   yield;
