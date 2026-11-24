@@ -12949,8 +12949,15 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
       }
       return chooseTreeItem(group, { tags, lat: point.lat, lon: point.lng, seed, extra: signature(group), modelsOff });
     };
-    const ground = terrainData.groundClasses?.cls?.length === terrainData.groundClasses?.w * terrainData.groundClasses?.h
+    const satelliteGround = terrainData.groundClasses?.cls?.length === terrainData.groundClasses?.w * terrainData.groundClasses?.h
       ? terrainData.groundClasses : null;
+    // (no satellite classes: the land cover's own tree cells stand for the canopy. Without imagery, unmapped tree
+    // cover was left bare though the step said it planted where the land cover has trees: coverage level, 2026-11-24)
+    const ground = satelliteGround || (coverGrid ? (() => {
+      const cls = new Uint8Array(coverN * coverN).fill(255);
+      for (let i = 0; i < cls.length; i++) if (coverGrid[i] === WC.TREES || coverGrid[i] === WC.MANGROVES) cls[i] = CANOPY_CLASS;
+      return { cls, w: coverN, h: coverN, fromLandCover: true };
+    })() : null);
     const centroidOf = (feature) => {
       const g = feature.geometry || [];
       const n = Math.max(1, g.length);
@@ -13012,8 +13019,9 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
           (wetland !== null && wetland !== 'swamp' && wetland !== 'mangrove' && wetland !== 'tidalflat');
         // trees scattered over parks, cemeteries, greens, golf courses and
         // the yards of a residential area (none had any but mapped ones)
-        // (with the satellite's canopy, the real trees stand there instead)
-        const scatter = ground ? 0 : scatterDensityOf(tags, wetland);
+        // (with the satellite's canopy, the real trees stand there instead; the land cover's 10 m tree cells miss a
+        // park's single trees, so they are still scattered without a satellite)
+        const scatter = satelliteGround ? 0 : scatterDensityOf(tags, wetland);
         if (scatter > 0) {
           const centre = centroidOf(feature);
           const urban = isUrbanPlace({ id: `area:${feature.id}`, geometry: [centre] });
@@ -13183,7 +13191,7 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
           trees++;
         });
       }
-      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Canopy trees: ${trees} from ${patches.length} satellite canopy patch(es) outside OSM woods.`);
+      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Canopy trees: ${trees} from ${patches.length} ${ground.fromLandCover ? 'land cover (WorldCover tree class, no satellite)' : 'satellite'} canopy patch(es) outside OSM woods.`);
     }
   }
 

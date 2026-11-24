@@ -645,6 +645,7 @@ export const parseOverpassResponse = (data, bounds) => {
   };
 
   const proceduralTrees = [];
+  const WOOD_TREES_MAX = 2000;
   for (const f of clippedFeatures) {
     const tags = f.tags || {};
     const isWood = tags.natural === "wood" || tags.landuse === "forest" || tags.natural === "scrub";
@@ -659,13 +660,17 @@ export const parseOverpassResponse = (data, bounds) => {
       });
       const widthM = (maxLng - minLng) * 111000 * Math.cos((minLat * Math.PI) / 180);
       const heightM = (maxLat - minLat) * 111000;
-      const areaM2 = Math.abs(widthM * heightM * 0.5);
-      let treeSpacing = tags.natural === "scrub" ? 20 : isWetland ? 25 : 12;
-      const treeCount = Math.min(2000, Math.floor(areaM2 / (treeSpacing * treeSpacing)));
+      // (candidates over the whole box, then only those inside the outline kept: the box's area halved first, then the
+      // outside points dropped as well, a 24 m square wood had 2 trees; and 10 m apart, not 12: about 100 a hectare.
+      // At most WOOD_TREES_MAX planted per wood. Coverage level, 2026-11-24)
+      const boxM2 = Math.abs(widthM * heightM);
+      let treeSpacing = tags.natural === "scrub" ? 16 : isWetland ? 25 : 10;
+      const treeCount = Math.floor(boxM2 / (treeSpacing * treeSpacing));
+      let planted = 0;
       // (seeded by the area: the same map makes the same trees each time,
       // and a desktop rebuild from recorded sources matches the original)
       const rand = seededStream(`${f.id}`);
-      for (let i = 0; i < treeCount; i++) {
+      for (let i = 0; i < treeCount && planted < WOOD_TREES_MAX; i++) {
         const pt = { lat: minLat + rand() * (maxLat - minLat), lng: minLng + rand() * (maxLng - minLng) };
         if (isPointInPolygon(pt, f.geometry)) {
           let inHole = false;
@@ -675,6 +680,7 @@ export const parseOverpassResponse = (data, bounds) => {
             }
           }
           if (!inHole) {
+            planted++;
             proceduralTrees.push({
               id: `${f.id}_proc_tree_${i}`, type: "vegetation",
               geometry: [{ lat: pt.lat, lng: pt.lng }],
