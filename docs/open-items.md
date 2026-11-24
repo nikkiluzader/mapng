@@ -723,19 +723,6 @@ Finished points of this list and their measurements: refs/output/history.md, "Fi
   into a membrane (measured cells kept). Next: a two-sided statistical outlier filter (median/MAD per neighbourhood,
   weighted by point count) before the fill; Kriging only for uploads, later, if the membrane falls short.
 
-## Now: more OSM import formats
-
-- **More file formats for the OSM file import** (SPLATPLAYS, Discord #general 2026-11-21 05:10-05:12 UTC, after
-  .osm.pbf and GeoJSON shipped in 0.3.5, commit 393897a). Asked for: Shapefile, "generic pbf", o5m, .osm.bz2/gz/xz,
-  obf; and explicitly o5c, osc, osh. Status: not started. Where: services/osmFormats.js (decoders to Overpass JSON),
-  services/osmFile.js (format detection, the "not an OpenStreetMap file" message), the format names in 7 languages.
-  First take (not checked against the code yet):
-  - .osm.bz2 / .gz / .xz: cheapest, a decompress step in front of the existing readers (gzip via the browser's
-    DecompressionStream; bz2 and xz need a small decoder);
-  - o5m: a compact binary sibling of .osm; a decoder is moderate work;
-  - o5c, osc, osh: change and history files, not map snapshots; poor fit for a one-off level import;
-  - Shapefile, obf (OsmAnd): other data models; most work.
-
 ## Now: reports since 2026-11-22 (user, 2026-11-23: go through them and fix them)
 
 - **MR-QWXXKH (desktop 0.3.5, 2026-11-22): "Generate does not start"** with a custom elevation file and a custom

@@ -78,8 +78,17 @@ replace the tracking files (see CLAUDE.md, "Tracking"); it is the short "start h
       counts either way. Baselines re-recorded `9deac69`.
       **Open:** roads still bend tightest at a node another road ends at (carrying those nodes moved street junctions
       and changed 87 sweep cells: needs its own study); tell Toma (the user posts).
-- [ ] **Discord requests 2026-11-24, recorded, not started:** Toma's three notes (backlog, section 1); splatplays'
-      import formats (open items, "more OSM import formats": compressed .osm first).
+- [x] **OSM import formats** (SPLATPLAYS, `a266057`): .gz/.bz2/.xz (own bzip2 and xz decoders, `services/osmDecompress.js`),
+      .o5m (`services/osmO5m.js`), .osh (newest version per object, in `osmFile.js` readOsmXml), Shapefile zips
+      (`services/osmShapefile.js`: Geofabrik and ogr2ogr layouts). Refused with the reason: .osc/.o5c, .obf, vector
+      tiles. Tests `tests/osmImportFormats.test.mjs` with fixtures made by the real tools; probes in
+      `scratch/osmformats/`. **Not proven:** the .o5m reader against a real osmconvert file (compiling osmconvert was
+      refused by the permission check; tested against an encoder written to the same spec); relation member deltas
+      assumed per member type (the wiki is silent).
+- [ ] **Toma's three notes** (backlog, section 1), not started.
+- [ ] **Tile rotation** (user asked 2026-11-24 about 0.3.7): answered feasible but big (1-2 weeks; whole-map rotation
+      first, tiles rotated apart from each other only as a shaped level); suggested as the first 0.3.8 item, the user
+      to decide. Backlog: "thecoachtoma: ... rotate the map".
 - [ ] **Sidewalks at banks and the water** (the first approach was scrapped; nothing on dev yet). See the section
       below before starting.
 - [x] **Slip roads ending at the outer lane** (thecoachtoma's Kaunas junction). On dev (`c0f6a71`, `d62f6a1`), in
