@@ -203,11 +203,16 @@ export function moveObject(o, dx, dy, dz, key) {
  * relative to refMinHeight (the first chunk's lowest point unless given): a whole-level shift only, which no file
  * depends on. A level built in 442 pieces held all 442 chunk zips until the merge before this (a tester's road).
  */
-export function createChunkMerger(sink, levelName, { log = () => {}, bounds = null, levelInfo = null, refMinHeight = null } = {}) {
+export function createChunkMerger(sink, levelName, { log = () => {}, bounds = null, levelInfo = null, refMinHeight = null, sizeM = null } = {}) {
   const put = (path, data) => sink.put(path, data);
   const gathered = new Map();   // path -> lines (items, forest) or decal instances
   const materials = new Map();  // path -> merged object
   let first = true; let joined = null; let n = 0; let ref = Number.isFinite(Number(refMinHeight)) ? Number(refMinHeight) : null;
+  // (the game's map view: info.json's minimap is a list of picture tiles, each with its own size and corner. A level
+  // built in pieces kept the first chunk's info.json: one tile 512 m wide at the level's middle, pointing at a picture
+  // that is not at the level's root, so in the game's map the roads stood far off any picture (user, road mode,
+  // 2026-11-24). Every chunk's tile is kept, its picture under chunks/<key>/, its corner moved with the chunk)
+  let info = null; const minimap = [];
   async function add(c) {
     if (!Number.isFinite(Number(c.minHeight))) throw new Error(`chunk ${c.key} has no lowest height: it cannot be set at its height in the level`);
     if (ref === null) ref = Number(c.minHeight);
@@ -227,6 +232,15 @@ export function createChunkMerger(sink, levelName, { log = () => {}, bounds = nu
           .map((o) => (o.class === 'LevelInfo' && levelInfo ? { ...o, ...levelInfo } : o));
         const path = `levels/${levelName}/${rel}`;
         const list = gathered.get(path) || []; for (const o of lines) list.push(JSON.stringify(o)); gathered.set(path, list); objects += lines.length;
+        continue;
+      }
+      if (rel === 'info.json') {
+        const j = JSON.parse(await f.async('string'));
+        if (first) info = j;
+        for (const t of Array.isArray(j.minimap) ? j.minimap : []) {
+          if (!t?.file || !Array.isArray(t.offset)) continue;
+          minimap.push({ ...t, file: `chunks/${c.key}/${String(t.file).replace(/^\/+/, '')}`, offset: [Number(t.offset[0]) + dx, Number(t.offset[1]) + dy] });
+        }
         continue;
       }
       if (JOINED.has(rel)) {
@@ -279,6 +293,11 @@ export function createChunkMerger(sink, levelName, { log = () => {}, bounds = nu
     first = false; n++;
   }
   async function finish() {
+    if (info) {
+      const out = { ...info, ...(minimap.length ? { minimap } : {}), ...(Array.isArray(sizeM) ? { size: sizeM.map((v) => Math.round(v * 100) / 100) } : {}) };
+      await put(`levels/${levelName}/info.json`, JSON.stringify(out, null, 2));
+      log(`map view: ${minimap.length} picture tile(s), one per chunk, each at its own place${Array.isArray(sizeM) ? `; level size ${sizeM.map((v) => Math.round(v)).join(' x ')} m` : ''}`);
+    }
     if (joined?.sites) {
       const s = joined.sites; const all = s.parkingSpots.length; s.parkingSpots = capSpots(s.parkingSpots);
       s.dir = `/levels/${levelName}/`;
@@ -329,10 +348,10 @@ export function createChunkMerger(sink, levelName, { log = () => {}, bounds = nu
  * the level's name; returns a JSZip of the level (createChunkMerger with a JSZip as the sink). Heights from the lowest
  * chunk, as before.
  */
-export async function mergeChunks(JSZip, chunks, levelName, { log = () => {}, bounds = null, levelInfo = null } = {}) {
+export async function mergeChunks(JSZip, chunks, levelName, { log = () => {}, bounds = null, levelInfo = null, sizeM = null } = {}) {
   const out = new JSZip();
   for (const c of chunks) if (!Number.isFinite(Number(c.minHeight))) throw new Error(`chunk ${c.key} has no lowest height: it cannot be set at its height in the level`);
-  const merger = createChunkMerger({ put: (p, d) => { out.file(p, d); }, has: (p) => !!out.file(p) }, levelName, { log, bounds, levelInfo, refMinHeight: Math.min(...chunks.map((c) => Number(c.minHeight))) });
+  const merger = createChunkMerger({ put: (p, d) => { out.file(p, d); }, has: (p) => !!out.file(p) }, levelName, { log, bounds, levelInfo, sizeM, refMinHeight: Math.min(...chunks.map((c) => Number(c.minHeight))) });
   for (const c of chunks) await merger.add(c);
   await merger.finish();
   return out;

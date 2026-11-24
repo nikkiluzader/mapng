@@ -76,7 +76,7 @@ export async function exportChunked({ JSZip, footprint, W, H, center, mpp, level
   const own = sink ? null : new JSZip();
   const out = sink || { put: (p, d) => { own.file(p, d); }, has: (p) => !!own.file(p) };
   const bounds = { north: L.latOf(0), south: L.latOf(H), west: L.lngOf(0), east: L.lngOf(W) };
-  const merger = createChunkMerger(out, levelName, { log: say, bounds, levelInfo });
+  const merger = createChunkMerger(out, levelName, { log: say, bounds, levelInfo, sizeM: [W * mpp, H * mpp] });
   // (a failure says which chunk it was in, and at which step: one of many, each minutes long)
   const inChunk = async (c, k, what, run) => {
     try { return await run(); } catch (e) {

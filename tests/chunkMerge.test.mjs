@@ -109,3 +109,28 @@ test('a folder is listed once in the merged level (the game loads it once per li
   assert.equal(gathered.get('levels/x/main/MissionGroup/Decal_Roads/items.level.json').length, 4);     // the roads all stay
   assert.equal(gathered.get('decals').length, 2);
 });
+
+import JSZip from 'jszip';
+import { mergeChunks } from '../services/chunkMerge.js';
+
+// The game's map view draws info.json's minimap tiles where their corners say. A level built in pieces kept the first
+// chunk's single tile at the level's middle, its picture missing from the root: roads stood far off any picture.
+test('the merged level\'s map view has one picture tile per chunk, moved with it, and the level\'s size', async () => {
+  const chunk = async (key, levelName) => {
+    const z = new JSZip();
+    z.file(`levels/${levelName}/info.json`, JSON.stringify({ title: 'x', size: [512, 512], minimap: [{ file: 'art/terrains/terrain_b.color.png', size: [512, 512], offset: [-256, 256] }] }));
+    z.file(`levels/${levelName}/art/terrains/terrain_b.color.png`, new Uint8Array([1, 2, 3]));
+    return z;
+  };
+  const out = await mergeChunks(JSZip, [
+    { zip: await chunk('0_0', 'lv_c0_0'), key: '0_0', levelName: 'lv_c0_0', offsetM: { x: -128, y: 0 }, minHeight: 0 },
+    { zip: await chunk('1_0', 'lv_c1_0'), key: '1_0', levelName: 'lv_c1_0', offsetM: { x: 128, y: 0 }, minHeight: 0 },
+  ], 'lv', { sizeM: [768, 512] });
+  const info = JSON.parse(await out.file('levels/lv/info.json').async('string'));
+  assert.deepEqual(info.size, [768, 512]);
+  assert.deepEqual(info.minimap.map((t) => [t.file, t.offset]), [
+    ['chunks/0_0/art/terrains/terrain_b.color.png', [-384, 256]],
+    ['chunks/1_0/art/terrains/terrain_b.color.png', [-128, 256]],
+  ]);
+  for (const t of info.minimap) assert.ok(out.file(`levels/lv/${t.file}`), `picture ${t.file} is in the level`);
+});
