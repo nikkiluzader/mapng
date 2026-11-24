@@ -391,11 +391,13 @@ As of 2026-11-23:
     re-recorded; the other 38 catalogue areas not re-framed. (3) batch code removal: not started, bigger than it
     looked (about 5,000 lines wired into App.vue, the map and the store; it would also end "an unfinished saved
     job opens once more", which the 0.3.6 page promises: the user's call). (4) fixes seen in game: the gallery
-    yes, the funicular not yet. (5) the page's in-game pictures: the gallery and the track bridge added; a tiled
+    and the funicular (new area `fz_perce`, 2048 at 2 m, the whole 3.4 km tunnel: steepest 29.8 %, no filled dips,
+    no gallery stretch; inside straight and steady at the lower end and the middle, the ground over it a plain
+    hillside; `scratch/fizz035/perce_*.jpg`). (5) the page's in-game pictures: the gallery and the track bridge added; a tiled
     level, a road level and the thumbnail in the level list still missing.
   - **Gallery fix seen in game 2026-11-24** (`fz_pigettes` as a 512 level, removed after): from the valley side a
     level roof on its columns, the road straight through; from the driver's seat the road runs in with no rise
-    (`scratch/fizz035/pig_game_outside.jpg`, `pig_game_driver.jpg`). The funicular: not seen in game yet.
+    (`scratch/fizz035/pig_game_outside.jpg`, `pig_game_driver.jpg`).
   - **Sweep, 2026-11-24, on b56d02d:** the 135-cell smoke matrix gives the same numbers in every cell as the last
     clean one (`scratch/fizz035/sweep_fizz1.json` against `scratch/sweep_frame.json`); the ten flags against the
     stored baselines are the same ten known ones. The smoke set has no avalanche gallery and no funicular, so it
