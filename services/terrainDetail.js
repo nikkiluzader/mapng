@@ -7,7 +7,7 @@
 // downloads, which stay the real data), only on ground nothing is built on: roads, buildings, water, car parks,
 // pitches and plazas get none, and it fades out towards them.
 //
-// The relief is value noise in world coordinates (Web Mercator metres), so neighbouring tiles of a batch match, and
+// The relief is value noise in world coordinates (Web Mercator metres), so neighbouring tiles and pieces of a map match, and
 // it is deterministic: the same place gets the same ground every export. Amplitudes are small (decimetres; about a
 // metre on steep rock) and the shortest wavelength is 4 m, so driving off road gets texture, not obstacles.
 //

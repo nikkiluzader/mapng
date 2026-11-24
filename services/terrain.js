@@ -1128,7 +1128,7 @@ let gpxzRateLimitInfo = null;
 
 // Global request pacer shared across ALL concurrent GPXZ fetches.
 //
-// Per-tile pacing alone is not enough: batch mode runs several tiles'
+// Per-tile pacing alone is not enough: a map of several tiles or pieces can run several
 // fetchGPXZRaw() calls at once, so without a shared gate the aggregate request
 // rate is (fetchConcurrency × per-tile chunks) — far over the plan's rps and a
 // guaranteed source of 429s. This gate spaces request *starts* globally so the
@@ -1237,11 +1237,6 @@ export function gpxzDailyLimitReached(response) {
   if (left !== null && left !== undefined && left !== '' && Number(left) === 0) return true;
   const wait = Number(response?.headers?.get?.('retry-after'));
   return Number.isFinite(wait) && wait > 120;
-}
-
-/** Get the last known GPXZ rate limit info */
-export function getGPXZRateLimitInfo() {
-  return gpxzRateLimitInfo;
 }
 
 const NO_DATA_VALUE = -99999;

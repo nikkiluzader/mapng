@@ -22,11 +22,12 @@ Mesh Road joins. Riding along: the other 38 sweep areas re-framed, Zion's tunnel
   cache) is thrown away once at start. `batchShape.js` stays (tiles); `batchExports.js` is now `assetExports.js`.
   Checked: production build, 1,494 unit tests, a browser run with an old saved job seeded (no errors, the keys
   gone), two tiles through Generate and the per-tile asset export, the desktop app in development mode through
-  Generate and an export. Left: stale comments that still name batch mode (`terrain.js:1131`,
-  `exportBeamNGLevel.js`, `groundMesh.js`, `levelLimits.js`, `terrainDetail.js`, `textureOnDemand.js`); exports now
-  unused but kept (`batchShape.js` snapTileOffsets / shapedLayout / pixelOwner, `levelLimits.js`
-  combinedLevelTier); the options the combined-level path passed into the export not audited; the 0.3.7 page must
-  say old batch jobs can no longer be opened.
+  Generate and an export. Follow-up the same night (user: "if we dont need these, lets remove them too"): the stale comments reworded;
+  the functions nothing used any more removed with their tests (`snapTileOffsets`, `shapedLayout`, `pixelOwner`,
+  `combinedLevelTier`, `terrainFileGB`, `LEVEL_TESTED_MAX_PX`, `cloneRateLimitInfo`, `getGPXZRateLimitInfo`); the
+  options the old combined-level path passed into the export read one by one: all of them are the ordinary export
+  options the export panel passes too, nothing batch-only to take out. 1,489 unit tests, production build.
+  Still to do, when the 0.3.7 page is written: a line that old batch jobs can no longer be opened.
 - **Sidewalks at the water: work branch `seawall-037`** (dev + the parked `seawall` branch, merged cleanly; 1,497
   tests pass). Sidewalk counts on Mapterhorn, dev -> the branch:
   `naldo` buried 47 -> 19 (the 100 m line of paving down the bank is gone), floating 18 -> 19;

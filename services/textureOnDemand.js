@@ -1,7 +1,7 @@
 // Textures made when they are first wanted.
 //
 // Generate paints all three (the OSM, the hybrid and the game texture) for every map. A terrain that still
-// lacks one (made by an older version, a batch tile, a level opened for Modify) gets it painted here
+// lacks one (made by an older version, a level opened for Modify) gets it painted here
 // the first time something asks for it: the level export with another ground texture, a 2D asset's download, a
 // 3D model's texture, a preview's texture picker. Nothing is downloaded for it: the map data and the satellite
 // picture came with the Generate.

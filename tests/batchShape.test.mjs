@@ -1,54 +1,11 @@
-// services/batchShape.js: a shaped combined level's layout, overlap ownership and footprint.
+// services/batchShape.js: a shaped level's footprint, its row runs, and the selected square's bounds.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { computeGridBounds, snapTileOffsets, shapedLayout, pixelOwner, footprintRows, inFootprint, keepSquareFor, fillOutsideFootprint } from '../services/batchShape.js';
-
-test('offsets snap to whole pixels', () => {
-  assert.deepEqual(snapTileOffsets([{ index: 1, offsetX: 10.6, offsetY: -3.2 }], 2).map((o) => [o.offsetX, o.offsetY]), [[10, -4]]);
-});
-
-test('three tiles in a row: a 1536 x 512 footprint centred in a 2048 square', () => {
-  const tiles = [0, 1, 2].map((c) => ({ row: 0, col: c, index: c }));
-  const L = shapedLayout(tiles, { cols: 3, rows: 1, tilePx: 512, mpp: 1 });
-  assert.equal(L.size, 2048); assert.deepEqual(L.extent, { w: 1536, h: 512 });
-  assert.deepEqual(L.tiles.map((t) => [t.x, t.y]), [[256, 768], [768, 768], [1280, 768]]);
-  // the square's centre is the job's centre (the row is centred)
-  assert.deepEqual(L.centerOffsetM, { x: 0, y: -0 });
-});
-
-test('a moved tile goes where it was moved; the square grows to hold it', () => {
-  const tiles = [{ row: 0, col: 0, index: 0 }, { row: 0, col: 1, index: 1, offsetX: 0, offsetY: 300 }];
-  const L = shapedLayout(tiles, { cols: 2, rows: 1, tilePx: 512, mpp: 1 });
-  assert.equal(L.tiles[1].y, L.tiles[0].y - 300);
-  assert.equal(L.tiles[1].x - L.tiles[0].x, 512);
-  assert.deepEqual(L.extent, { w: 1024, h: 812 });
-  assert.equal(L.size, 1024);
-});
-
-test('overlapping tiles: each pixel from exactly one tile, the nearer centre', () => {
-  // tile 1 moved 200 px back over tile 0
-  const tiles = [{ row: 0, col: 0, index: 0 }, { row: 0, col: 1, index: 1, offsetX: -200 }];
-  const L = shapedLayout(tiles, { cols: 2, rows: 1, tilePx: 512, mpp: 1 });
-  const own = L.tiles.map((t) => pixelOwner(L, t));
-  let both = 0; let none = 0; let n0 = 0; let n1 = 0;
-  for (let y = L.tiles[0].y; y < L.tiles[0].y + 512; y += 7) {
-    for (let x = L.tiles[0].x; x < L.tiles[1].x + 512; x++) {
-      const in0 = x < L.tiles[0].x + 512; const in1 = x >= L.tiles[1].x;
-      const a = in0 && own[0](x, y); const b = in1 && own[1](x, y);
-      if (a && b) both++; if (!a && !b) none++; if (a) n0++; if (b) n1++;
-    }
-  }
-  assert.equal(both, 0); assert.equal(none, 0);
-  // the overlap (312 px wide) splits at its middle
-  const mid = (L.tiles[0].cx + L.tiles[1].cx) / 2;
-  assert.equal(own[0](Math.floor(mid) - 1, L.tiles[0].y), true); assert.equal(own[1](Math.ceil(mid) + 1, L.tiles[0].y), true);
-  // the footprint is the union, not two full tiles' worth
-  assert.deepEqual(L.extent, { w: 824, h: 512 });
-});
+import { computeGridBounds, footprintRows, inFootprint, keepSquareFor, fillOutsideFootprint } from '../services/batchShape.js';
 
 test('the footprint: squares inside and between touching tiles kept, past the edge not', () => {
-  const tiles = [0, 1].map((c) => ({ row: 0, col: c, index: c }));
-  const L = shapedLayout(tiles, { cols: 2, rows: 1, tilePx: 64, mpp: 1 });
+  // two 64 px tiles side by side, centred in a 128 square
+  const L = { size: 128, rects: [[0, 32, 64, 64], [64, 32, 64, 64]], tiles: [{ x: 0, y: 32 }, { x: 64, y: 32 }] };
   const keep = keepSquareFor({ size: L.size, rects: L.rects });
   const N = L.size; const t0 = L.tiles[0];
   const j = (y) => N - 1 - y;   // terrain j of the square whose south row is y

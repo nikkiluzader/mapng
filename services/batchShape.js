@@ -4,8 +4,8 @@
 // spawn keep to the footprint (exportBeamNGLevel.js groundShape).
 //
 // Rules:
-// - every tile sits on the shared grid of processing pixels: offsets are snapped to whole pixels when the job is made
-//   (snapTileOffsets), so each tile's terrain and its map data land exactly where they belong;
+// - every tile sits on the shared grid of processing pixels (services/tileLayout.js), so each tile's terrain and its
+//   map data land exactly where they belong;
 // - where tiles overlap, each pixel comes from one tile only, the one whose centre is nearest (the pixel lies deepest
 //   inside it, away from that tile's edge effects; a tie goes to the lower index);
 // - the footprint is the union of the tile squares, nothing more.
@@ -31,62 +31,6 @@ export function computeGridBounds(center, resolution, gridCols, gridRows, tileSp
     south: center.lat - totalHeight / 2 / metersPerDegLat,
     east: center.lng + totalWidth / 2 / metersPerDegLng,
     west: center.lng - totalWidth / 2 / metersPerDegLng,
-  };
-}
-
-/** The tile offsets (metres) snapped to whole pixels of `mpp` metres. */
-export function snapTileOffsets(offsets, mpp) {
-  const m = Number(mpp) > 0 ? Number(mpp) : 1;
-  return (offsets || []).map((o) => ({ ...o, offsetX: Math.round(Number(o.offsetX || 0) / m) * m, offsetY: Math.round(Number(o.offsetY || 0) / m) * m }));
-}
-
-/**
- * The layout: { size: N, tilePx: R, mpp, tiles: [{ key, index, x, y, cx, cy }], rects: [[x, y, R, R]...],
- * centerOffsetM: { x, y } (the square's centre from the job's centre, metres, north +), extent: { w, h } }.
- * tiles: the job's tiles ({ row, col, index, offsetX?, offsetY? } in metres from their grid spot); cols, rows: the grid.
- */
-export function shapedLayout(tiles, { cols, rows, tilePx, mpp }) {
-  const R = Math.max(1, Math.round(tilePx)); const m = Number(mpp) > 0 ? Number(mpp) : 1;
-  const placed = tiles.map((t) => {
-    // the tile's centre from the job's centre, in pixels (east, south)
-    const ex = (t.col - (cols - 1) / 2) * R + Math.round(Number(t.offsetX || 0) / m);
-    const sy = (t.row - (rows - 1) / 2) * R - Math.round(Number(t.offsetY || 0) / m);
-    return { key: `${t.row}:${t.col}`, index: t.index, ex, sy };
-  });
-  // the footprint's box (tile corners at centre ∓ R/2; R is even in practice, a power of two)
-  let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
-  for (const p of placed) { x0 = Math.min(x0, p.ex - R / 2); y0 = Math.min(y0, p.sy - R / 2); x1 = Math.max(x1, p.ex + R / 2); y1 = Math.max(y1, p.sy + R / 2); }
-  const w = x1 - x0; const h = y1 - y0;
-  let N = 1; while (N < Math.max(w, h)) N *= 2;
-  // the footprint centred in the square (whole pixels)
-  const ox = x0 - Math.floor((N - w) / 2); const oy = y0 - Math.floor((N - h) / 2);
-  const out = placed.map((p) => ({ key: p.key, index: p.index, x: p.ex - R / 2 - ox, y: p.sy - R / 2 - oy, cx: p.ex - ox, cy: p.sy - oy }));
-  return {
-    size: N, tilePx: R, mpp: m, tiles: out,
-    rects: out.map((t) => [t.x, t.y, R, R]),
-    // the square's centre (pixel N/2) from the job's centre
-    centerOffsetM: { x: (ox + N / 2) * m, y: -(oy + N / 2) * m },
-    extent: { w, h },
-  };
-}
-
-/**
- * Which tile each of a tile's pixels comes from: a function (x, y) -> true when tile `t` owns pixel (x, y) of the
- * square (it covers it and no covering tile has a nearer centre). Only the tiles overlapping `t` are looked at.
- */
-export function pixelOwner(layout, t) {
-  const R = layout.tilePx;
-  const others = layout.tiles.filter((o) => o !== t && o.x < t.x + R && o.x + R > t.x && o.y < t.y + R && o.y + R > t.y);
-  if (!others.length) return () => true;
-  return (x, y) => {
-    const px = x + 0.5; const py = y + 0.5;
-    const d = (px - t.cx) ** 2 + (py - t.cy) ** 2;
-    for (const o of others) {
-      if (x < o.x || x >= o.x + R || y < o.y || y >= o.y + R) continue;
-      const e = (px - o.cx) ** 2 + (py - o.cy) ** 2;
-      if (e < d || (e === d && o.index < t.index)) return false;
-    }
-    return true;
   };
 }
 

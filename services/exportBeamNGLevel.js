@@ -1059,7 +1059,7 @@ export function groundModelMaterialDefs(levelName, surfaces, terrainDefs, worldS
 /**
  * The ground as Collada tiles: { tiles: [{ key, data }], groundModels, summary }. terrain: the finished heights
  * ({ width, height, heightMap, minHeight }: z is height - minHeight, as the TerrainBlock's); layerMap and the terrain
- * materials say each square's surface and holes; keepSquare(i, j) false leaves a square out (a batch shape).
+ * materials say each square's surface and holes; keepSquare(i, j) false leaves a square out (a shaped level: tiles, a road's corridor).
  */
 async function generateGroundModelDAEs(terrain, sq, { layerMap, materialNames, materialDefs, keepSquare = null, isLevelEdge = null, maxError = undefined }) {
   // (a square's surface: its terrain material, so each keeps its own ground model and detail)
@@ -13654,7 +13654,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     // the raised sidewalks' height over the road: 'standard' (15 cm), 'low' (8 cm), 'flush' (3 cm)
     curbHeight: curbHeightChoice = 'standard',
     // (experimental) the ground as tiled models instead of a TerrainBlock (generateGroundModelDAEs); keepSquare(i, j)
-    // false leaves a terrain square out (a batch level's shape)
+    // false leaves a terrain square out (a shaped level: tiles, a road's corridor)
     groundAsModels = false,
     groundKeepSquare = null,
     // a shaped level (services/batchShape.js): { size, rects: [[x, y, w, h]...] } in the export grid's pixels (rows
@@ -14108,7 +14108,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
 
   // DecalRoads are the only road system (BeamNG's own levels use them, and the
   // AI navgraph is built from them). Legacy 'architect' / 'mesh' values from
-  // saved settings or batch configs are treated as 'decal'.
+  // saved settings are treated as 'decal'.
   const includeRoads = roadType !== 'none';
   // the global 30 m holds nothing smaller than tens of metres: small relief by land cover and sharpened OSM cliffs,
   // on unbuilt ground only, before the roads are laid (they level their corridors over it) and before the ground is

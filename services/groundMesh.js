@@ -1,5 +1,5 @@
 // The level's ground as models instead of a TerrainBlock (experimental "Ground as models"). A TerrainBlock must be a
-// power-of-two square; a level whose ground is models can have any shape (a long strip of batch tiles), as the
+// power-of-two square; a level whose ground is models can have any shape (a long strip of tiles, a road's corridor), as the
 // terrain-less community levels are built (RC2K: one model cut into tiles, collision on the mesh, physics materials
 // carrying the ground type).
 //
@@ -10,7 +10,7 @@
 //   - round the terrain holes (tunnel portals, pools), so the opening keeps its exact squares;
 //   - where the surface type changes (a road's asphalt next to grass), so the physics material changes exactly
 //     where the painted terrain did;
-//   - along the edge of the kept area (a batch shape) and the grid's last row and column.
+//   - along the edge of the kept area (a shaped level) and the grid's last row and column.
 // Every grid point the mesh keeps has its exact height; between them the ground is within GROUND_MAX_ERROR_M.
 //
 // Grid convention (the TerrainBlock's): terrain space (i, j), j from the south, grid point (i, j) at world
@@ -129,7 +129,7 @@ export function triangleOff(h, T, pa, pc, pb, maxError) {
  *
  * terrain: { width: W, height: H, heightMap (rows from the north), minHeight }; sq: metres per grid square;
  * layerMap: Uint8Array W·H in terrain space (255 a hole) or null; groundModelOf(layer): the ground model name of a
- * layer; keepSquare(i, j): false for a square outside the kept area (a batch shape), or null to keep all.
+ * layer; keepSquare(i, j): false for a square outside the kept area (a shaped level), or null to keep all.
  */
 export function buildGroundTiles({ width: W, height: H, heightMap, minHeight }, sq, {
   layerMap = null, groundModelOf = () => 'GRASS', keepSquare = null, tile = GROUND_TILE, maxError = GROUND_MAX_ERROR_M,

@@ -349,7 +349,7 @@
       </div>
       <!-- 2D Assets -->
       <!-- a map of several tiles: its pictures, heightmap, GeoTIFF and .ter as one file each for the whole map, or one
-           per tile (what the old batch jobs made) -->
+           per tile -->
       <div v-if="showAssets && tileParts.length > 1" class="rounded border border-gray-200 dark:border-gray-700 px-3 py-2 space-y-1" data-testid="assets-per-tile">
         <label class="flex items-center justify-between gap-2 text-xs text-gray-700 dark:text-gray-300">
           <span>{{ t('exportPanel.ui.perTile', { n: tileParts.length }) }}</span>

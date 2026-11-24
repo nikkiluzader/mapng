@@ -1,6 +1,4 @@
-import { getGPXZRateLimitInfo } from './terrain.js';
-
-export const getBuildTrace = () => {
+const getBuildTrace = () => {
   return {
     hash: typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : 'dev',
     time: typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : null,
@@ -8,11 +6,6 @@ export const getBuildTrace = () => {
 };
 
 export const getExportTimestamp = () => new Date().toISOString();
-
-export const cloneRateLimitInfo = () => {
-  const info = getGPXZRateLimitInfo();
-  return info ? { ...info } : null;
-};
 
 export const buildCommonTraceMetadata = ({
   mode,
