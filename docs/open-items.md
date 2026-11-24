@@ -7,6 +7,34 @@ files: `refs/output/backlog.md` holds everything wanted later, by area; `refs/ou
 `refs/output/history.md` finished narratives; `refs/output/decisions.md` choices made and why. Items move between
 these files; they are never copied.
 
+## 0.3.7 (started 2026-11-24, night)
+
+Order agreed with the user: batch code removal, then sidewalks at banks and the water, then slip roads ending at
+the outer lane; after those Fizz_Mechanic's remaining structure points, long bridges in levels built in pieces,
+Mesh Road joins. Riding along: the other 38 sweep areas re-framed, Zion's tunnel with shaping off and Amsterdam's
+221 m deck, thecoachtoma's width-change report, the optimization and UI passes.
+
+- **Done:** the sidebar's sections are cards with a soft orange header and edge (dev and main 8e692fa, the user:
+  "that looks amazing"); test build v0.3.7-dev.1 (tag at 677fcc6, both builds and the signing succeeded).
+- **Batch code removal:** in progress in its own worktree (a separate agent, 2026-11-24 night); not merged, not
+  reviewed yet.
+- **Sidewalks at the water: work branch `seawall-037`** (dev + the parked `seawall` branch, merged cleanly; 1,497
+  tests pass). Sidewalk counts on Mapterhorn, dev -> the branch:
+  `naldo` buried 47 -> 19 (the 100 m line of paving down the bank is gone), floating 18 -> 19;
+  `kingst` buried 34 -> 28, floating 0 -> 58; `ams_centraal` floating 30 -> 31, buried 27 -> 32.
+  - **Kingston's promenade floats, cause not found yet.** 26 spots along x 250, y 146 to 392: the slab at 3.05 to
+    3.2 m, the ground under it flat at 2.73 m (`scratch/fizz035/kingst_seawall_sect.png`). The fill's plan there
+    (`scratch/fizz035/quayrun.mjs`, y 256): the wall at x 250.5, its top found half a metre in, so the levelled
+    band is two grid points wide (level 2.85); the survey's crest at x 249 is 3.06 m and the land behind 2.54 to
+    2.68. So the mapped walk runs on the crest (its slab at the crest's height), and something after the fill
+    takes the ground under it down to 2.73: not yet said what (the paving's grading, or the seam smoothing).
+    Tried: the paving taking each point's own level instead of the wall's median (on the branch, f. `levelAt`):
+    right in itself, no change to the count.
+  - Also on the branch's list from before: the walled sunken garden (210, 686), sidewalks at bridge ends by the
+    river wall. Naldo's slabs at the raised motorway approach are untouched by the branch.
+  - `quayFill.js` and `gridIndexAt` use rows as H - 1 - r: check against the corrected map frame.
+  Done when: a sweep shows no sidewalk cell worse than dev, then in game at Kingston and Naldo.
+
 ## Priority list (2026-11-23, asked for by the user; details in the sections below)
 
 **Where 0.3.6 stands, 2026-11-24 (late):** scope closed by the user. In: Fizz_Mechanic's three targets (funicular
