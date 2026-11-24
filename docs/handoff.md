@@ -17,10 +17,10 @@ when done, rewrite the "state" of the item you stop in. It does not replace the 
 - **main:** `8e692fa` (0.3.6 + the sidebar section styling). Pushing main needs the user's word every time, as its
   own command: `git push origin <sha>:main`.
 - **dev:** ahead of main with the batch code removal and docs. Push dev freely.
-- **Test build:** `v0.3.7-dev.1` (tag at `677fcc6`). It does NOT contain the batch removal or the slip-road work.
-  The user said yes to `v0.3.7-dev.2` on 2026-11-24, but the permission check refused the tag command when it was
-  chained with the version bump and push: ask the user again, then run the steps one command at a time
-  (the user may need to approve the tag push themselves) (`node scripts/release/devRelease.mjs --write`, commit, tag, push dev and the tag).
+- **Test build:** `v0.3.7-dev.2` (tag at `c4c99b4`; both builds and the signing succeeded). It has the batch removal
+  and the FIRST version of the slip-road work. The permission check refuses a tag push unless the user has asked
+  for that tag in so many words ("cut dev 2 now" worked; "proceed with your recommendations" did not): ask, then
+  run bump, commit, and tag + push as separate commands (`node scripts/release/devRelease.mjs --write`, commit, tag, push dev and the tag).
 - **No work branches.** Everything is on dev. See "Branches and worktrees".
 
 ## Work list (the user's order)
@@ -48,7 +48,21 @@ when done, rewrite the "state" of the item you stop in. It does not replace the 
       (`scratch/fizz035/mapillary/sheet.jpg`, fetched with `scratch/fizz035/mapillary_near.mjs <lat> <lng> <radius>
       <out>`). A sweep was started on `d62f6a1` (`scratch/fizz035/sweep_slip.json`): READ IT before anything goes
       to main.
-      **Open on this item:** (1) the terrain under a moved slip road is still shaped and painted along the mapped
+      **The first sweep on it (`sweep_slip.json`) found two faults, fixed in `135507f`:** duplicate object names
+      where one link was treated at both ends (lint warnings in naldo, kingst, deckpark_g), and "crossings short of
+      clearance" 0 -> 4 at deckpark_g and 0 -> 2 at naldo (the checks read a moved link as crossing the road it
+      joins). Now the hidden roads are named `_m0` / `_m1` / `_p0` / `_p1`, and the checks read each slip road on
+      its mapped line (`roadLinesFromDecals` in `services/structures/metrics.js`, flags `__mergePath`,
+      `__mergeMoved`, `__mergeTail`). **The sideways move is limited to city streets' slip roads:** freeway and
+      trunk ramps at a road's end are left as drawn, because a single-point interchange in Phoenix came out
+      differently laid (`scratch/fizz035/dp_zoom_cmp.png`) and nobody has checked it against the real place. The
+      "surface ends at the outer lane" rule still applies to freeway ramps (16 in that area). A second sweep was
+      started on `135507f` (`scratch/fizz035/sweep_slip2.json`): READ IT; it must show no difference from
+      `sweep_final.json` beyond small shifts before anything goes to main.
+      **Test build `v0.3.7-dev.2` (tag at `c4c99b4`) has the FIRST version** (duplicate names, freeway ramps moved):
+      a `dev.3` is wanted once the second sweep is clean (ask the user first).
+      **Open on this item:** (0) freeway interchanges: draw two or three before and after with photos before
+      switching the move on for ramps; (1) the terrain under a moved slip road is still shaped and painted along the mapped
       line (up to 5 m away at the street, fading out over 30 m): not looked at on sloping ground; (2) the game's
       traffic was not watched driving the invisible roads; (3) the photos show no sidewalk at that street's edge
       (a grass verge, a dirt path set back), the level builds one: a separate question (sidewalks assumed on a
