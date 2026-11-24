@@ -1,8 +1,8 @@
 # Handoff: picking up the 0.3.7 work
 
-Last updated: 2026-11-24, late night, by the session that shipped 0.3.6. Keep this file current as you work: tick items
-when done, rewrite the "state" of the item you stop in. It does not replace the tracking files (see CLAUDE.md,
-"Tracking"); it is the short "start here" for the next session.
+Last updated: 2026-11-24, late, by Opus 5.5. Started by the Fable session that shipped 0.3.6; Opus now owns it and works
+from it. Keep it current as you work: tick items when done, rewrite the "state" of the item you stop in. It does not
+replace the tracking files (see CLAUDE.md, "Tracking"); it is the short "start here" for the next session.
 
 ## Read first, in this order
 
@@ -14,10 +14,10 @@ when done, rewrite the "state" of the item you stop in. It does not replace the 
 ## Where things stand
 
 - **Released:** 0.3.6 is published as Latest (tag `v0.3.6` at `759ea31`). Do not move that tag.
-- **main:** `8e692fa` (0.3.6 + the sidebar section styling). Pushing main needs the user's word every time, as its
-  own command: `git push origin <sha>:main`.
-- **main = dev at `0a53144`** (pushed 2026-11-24 with the user's go-ahead): slip roads, very large levels (ZIP64
-  writer, progress card, Cancel), road-mode warning, map view for levels in pieces. Push dev freely.
+- **main = dev at `0a53144`** (pushed 2026-11-24 with the user's go-ahead): 0.3.6, the sidebar styling, slip roads,
+  very large levels (ZIP64 writer, progress card, Cancel), road-mode warning, map view for levels in pieces. dev has
+  only docs and the dev.3 version bump on top. Pushing main needs the user's word every time, as its own command:
+  `git push origin <sha>:main`. Push dev freely.
 - **Test build:** `v0.3.7-dev.3` (tag at `cc7ed0d`, 2026-11-24). It has everything above. The permission check refuses a tag push unless the user has asked
   for that tag in so many words ("cut dev 2 now" worked; "proceed with your recommendations" did not): ask, then
   run bump, commit, and tag + push as separate commands (`node scripts/release/devRelease.mjs --write`, commit, tag, push dev and the tag).
@@ -54,6 +54,11 @@ when done, rewrite the "state" of the item you stop in. It does not replace the 
       no level over 65,535 files has been built end to end yet (only the writer is tested past it); the merged
       report still holds every piece's report (70 MB for 442 pieces); whether BeamNG loads a ZIP64 zip is unknown;
       the road end handle drags at most 20 km at a time (`error_tooFar`).
+- [ ] **Next suggested (not agreed yet):** move the export's data step (backdrop download, `ensureExportData` in
+      ExportPanel) out of the window into the desktop runner, for lominsa's window out-of-memory crash.
+- [ ] **Discord requests 2026-11-24, recorded, not started:** smooth curves on every OSM line (Toma, splatplays),
+      Toma's three notes (backlog, section 1); splatplays' import formats (open items, "more OSM import formats":
+      compressed .osm first).
 - [ ] **Sidewalks at banks and the water** (the first approach was scrapped; nothing on dev yet). See the section
       below before starting.
 - [x] **Slip roads ending at the outer lane** (thecoachtoma's Kaunas junction). On dev (`c0f6a71`, `d62f6a1`), in
@@ -85,9 +90,8 @@ when done, rewrite the "state" of the item you stop in. It does not replace the 
       "surface ends at the outer lane" rule still applies to freeway ramps (16 in that area). The second sweep
       on `135507f` is clean (`scratch/fizz035/sweep_slip2.json`): 135 of 135 cells pass; 4 cells differ from
       `sweep_final.json`, each by one count (Kingston buried 38 -> 39 and 34 -> 35, one steep stretch at
-      deckpark_g on 30 m). Not on main: that needs the user's word.
-      **Test build `v0.3.7-dev.2` (tag at `c4c99b4`) has the FIRST version** (duplicate names, freeway ramps moved):
-      a `dev.3` is wanted once the second sweep is clean (ask the user first).
+      deckpark_g on 30 m). 
+      **On main since 2026-11-24 (`0a53144`) and in test build `v0.3.7-dev.3`** (dev.2 had the first version).
       **Open on this item:** (0) freeway interchanges: draw two or three before and after with photos before
       switching the move on for ramps; (1) the terrain under a moved slip road is still shaped and painted along the mapped
       line (up to 5 m away at the street, fading out over 30 m): not looked at on sloping ground; (2) the game's
