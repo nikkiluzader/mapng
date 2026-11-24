@@ -19,8 +19,8 @@ replace the tracking files (see CLAUDE.md, "Tracking"); it is the short "start h
   only docs and the dev.3 version bump on top. Pushing main needs the user's word every time, as its own command:
   `git push origin <sha>:main`. Push dev freely.
 - **Test build:** `v0.3.7-dev.4` (tag at `25c91ef`, 2026-11-24): everything above plus line curves on railways,
-  paths and waterways (`8e5b7ca`, `b8fa986`) and no backdrop for road levels (`f0580b8`). Not on main yet (main is
-  at `0a53144`, dev.3's code). The permission check refuses a tag push unless the user has asked
+  paths and waterways (`8e5b7ca`, `b8fa986`) and no backdrop for road levels (`f0580b8`). On main since 2026-11-24
+  (`8aebfb4`, with the user's go-ahead). The permission check refuses a tag push unless the user has asked
   for that tag in so many words ("cut dev 2 now" worked; "proceed with your recommendations" did not): ask, then
   run bump, commit, and tag + push as separate commands (`node scripts/release/devRelease.mjs --write`, commit, tag, push dev and the tag).
 - **No work branches.** Everything is on dev. See "Branches and worktrees".

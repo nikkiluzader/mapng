@@ -1,6 +1,6 @@
 # MapNG open items
 
-Last reviewed: 2026-11-24, late (0.3.6 Latest; main at 0a53144; test build v0.3.7-dev.4 at 25c91ef)
+Last reviewed: 2026-11-24, late (0.3.6 Latest; main = dev at 8aebfb4; test build v0.3.7-dev.4 at 25c91ef)
 
 The short "now" board: current work, what waits on someone, and checks owed on shipped work. The other tracking
 files: `refs/output/backlog.md` holds everything wanted later, by area; `refs/output/releases.md` what shipped;
