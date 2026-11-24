@@ -19,6 +19,12 @@ Mesh Road joins. Riding along: the other 38 sweep areas re-framed, Zion's tunnel
 
 - **Done:** the sidebar's sections are cards with a soft orange header and edge (dev and main 8e692fa, the user:
   "that looks amazing"); test build v0.3.7-dev.1 (tag at 677fcc6, both builds and the signing succeeded).
+- **Slip roads at the outer lane: done on dev 2026-11-24** (c0f6a71, d62f6a1; thecoachtoma's Kaunas junction, moved
+  here from the backlog). A slip road merging part-way along a wider road ends its surface at the outer lane; slip
+  roads meeting a wide street's own end (his case, which the user pointed out and annotated) swing out to the
+  street's outer lanes over their last 30 m, their sidewalks and arrows with them; the traffic keeps an invisible
+  road on the mapped line. Seen in game and against Mapillary photos. Details, pictures and the five open points:
+  `docs/handoff.md`. Sweep on d62f6a1 running (`scratch/fizz035/sweep_slip.json`).
 - **Batch code removal: done on dev 2026-11-24** (21ab735 and a follow-up; 44 files, 7,403 lines out). The panel,
   the progress window, the saved-job path, the desktop app's batch downloads folder and 200 text keys in each of
   the 7 languages are gone; what an earlier version left in the browser (settings, an unfinished job, its download

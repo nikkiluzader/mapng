@@ -17,8 +17,10 @@ when done, rewrite the "state" of the item you stop in. It does not replace the 
 - **main:** `8e692fa` (0.3.6 + the sidebar section styling). Pushing main needs the user's word every time, as its
   own command: `git push origin <sha>:main`.
 - **dev:** ahead of main with the batch code removal and docs. Push dev freely.
-- **Test build:** `v0.3.7-dev.1` (tag at `677fcc6`). It does NOT contain the batch removal. Ask the user before
-  cutting `v0.3.7-dev.2` (`node scripts/release/devRelease.mjs --write`, commit, tag, push dev and the tag).
+- **Test build:** `v0.3.7-dev.1` (tag at `677fcc6`). It does NOT contain the batch removal or the slip-road work.
+  The user said yes to `v0.3.7-dev.2` on 2026-11-24, but the permission check refused the tag command when it was
+  chained with the version bump and push: ask the user again, then run the steps one command at a time
+  (the user may need to approve the tag push themselves) (`node scripts/release/devRelease.mjs --write`, commit, tag, push dev and the tag).
 - **No work branches.** Everything is on dev. See "Branches and worktrees".
 
 ## Work list (the user's order)
@@ -28,11 +30,30 @@ when done, rewrite the "state" of the item you stop in. It does not replace the 
       Left: when the 0.3.7 update page is written it must say that old batch jobs can no longer be opened.
 - [ ] **Sidewalks at banks and the water** (the first approach was scrapped; nothing on dev yet). See the section
       below before starting.
-- [ ] **Slip roads ending at the outer lane** (not started). Test case: area `toma_kaunas` (built from the tester's
-      own OSM file, `refs/toma/kaunas.osm`, with `scratch/fizz035/toma_osm.mjs`); top view tool
-      `scratch/fizz035/decalplot.py`. The small part is done (`services/mergingLinks.js`: a merging slip road no
-      longer cuts the street's lane lines). The real ask is geometry: the slip road should end at the edge of the
-      street's outer lane, with the game's traffic graph still joined. Needs a synthetic test scene and a sweep.
+- [x] **Slip roads ending at the outer lane** (thecoachtoma's Kaunas junction). On dev (`c0f6a71`, `d62f6a1`), in
+      `services/mergingLinks.js` and one block in `exportBeamNGLevel.js` (search "Slip roads merging into a wider
+      road"). Two cases, told apart by `mergingLinkEnds(...).atRoadEnd`:
+      - **part-way along a wider road** (the slip road's node is a join between two ways of the same street): the
+        slip road's surface ends where its centre reaches the outer lane (`cutAtOuterLane`); an invisible road
+        (`road_invisible`, same nav fields) carries on to the mapped node;
+      - **at a wide street's own end** (the case the tester meant: two slip roads and a two-lane road meet a
+        four-lane street's end at one node): each link is moved sideways over its last 30 m so its outer edge runs
+        into the street's edge (`fanInShift`). Its surface, lines, edge blends AND its carriageway record move (the
+        sidewalks and turn arrows are built from the carriageway later: left unmoved, a sidewalk slab lay across
+        the moved lane, which the user spotted). An invisible copy of the surface stays on the mapped line for
+        traffic; the moved surface is no longer drivable for the AI graph.
+      Checked: unit tests (`tests/mergingLinks.test.mjs`), top views before/after
+      (`scratch/fizz035/slip_west_cmp.png`, `slip_east_cmp.png`, `fan_sw_cmp.png`), in game on the small level
+      (`slip_game.jpg`, `slip_game_sw_cmp.jpg`), Mapillary photos of the real place
+      (`scratch/fizz035/mapillary/sheet.jpg`, fetched with `scratch/fizz035/mapillary_near.mjs <lat> <lng> <radius>
+      <out>`). A sweep was started on `d62f6a1` (`scratch/fizz035/sweep_slip.json`): READ IT before anything goes
+      to main.
+      **Open on this item:** (1) the terrain under a moved slip road is still shaped and painted along the mapped
+      line (up to 5 m away at the street, fading out over 30 m): not looked at on sloping ground; (2) the game's
+      traffic was not watched driving the invisible roads; (3) the photos show no sidewalk at that street's edge
+      (a grass verge, a dirt path set back), the level builds one: a separate question (sidewalks assumed on a
+      street with none mapped); (4) only `*_link` one-way roads are treated; a slip road tagged as a plain one-way
+      road is not; (5) tell the tester it is on dev (the user talks to him; never post to Discord yourself).
 - [ ] **Fizz_Mechanic's remaining points** (not started): road-to-bridge and road-to-tunnel joins; the galleries
       round the lake that sit a little low (a bored tunnel's open stretches, not `solveGallery`); the oversized
       tunnel box by the dam; bridge width (needs the place from him). His material: `scratch/fizz035/`.
