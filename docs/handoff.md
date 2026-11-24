@@ -18,7 +18,9 @@ replace the tracking files (see CLAUDE.md, "Tracking"); it is the short "start h
   very large levels (ZIP64 writer, progress card, Cancel), road-mode warning, map view for levels in pieces. dev has
   only docs and the dev.3 version bump on top. Pushing main needs the user's word every time, as its own command:
   `git push origin <sha>:main`. Push dev freely.
-- **Test build:** `v0.3.7-dev.3` (tag at `cc7ed0d`, 2026-11-24). It has everything above. The permission check refuses a tag push unless the user has asked
+- **Test build:** `v0.3.7-dev.4` (tag at `25c91ef`, 2026-11-24): everything above plus line curves on railways,
+  paths and waterways (`8e5b7ca`, `b8fa986`) and no backdrop for road levels (`f0580b8`). Not on main yet (main is
+  at `0a53144`, dev.3's code). The permission check refuses a tag push unless the user has asked
   for that tag in so many words ("cut dev 2 now" worked; "proceed with your recommendations" did not): ask, then
   run bump, commit, and tag + push as separate commands (`node scripts/release/devRelease.mjs --write`, commit, tag, push dev and the tag).
 - **No work branches.** Everything is on dev. See "Branches and worktrees".
