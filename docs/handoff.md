@@ -19,14 +19,15 @@ when done, rewrite the "state" of the item you stop in. It does not replace the 
 - **dev:** ahead of main with the batch code removal and docs. Push dev freely.
 - **Test build:** `v0.3.7-dev.1` (tag at `677fcc6`). It does NOT contain the batch removal. Ask the user before
   cutting `v0.3.7-dev.2` (`node scripts/release/devRelease.mjs --write`, commit, tag, push dev and the tag).
-- **Work branch:** `seawall-037` (local only, not pushed): dev + the old `seawall` branch + fixes. Not merged.
+- **No work branches.** Everything is on dev. See "Branches and worktrees".
 
 ## Work list (the user's order)
 
 - [x] **Batch code removal.** On dev (`21ab735`, `604dbd0`, `e833c48`). Checked: build, unit tests, a browser run
       with an old saved job, two tiles through Generate and per-tile export, the desktop app in development mode.
       Left: when the 0.3.7 update page is written it must say that old batch jobs can no longer be opened.
-- [ ] **Sidewalks at banks and the water** (in progress, on `seawall-037`). See "Sea walls" below.
+- [ ] **Sidewalks at banks and the water** (the first approach was scrapped; nothing on dev yet). See the section
+      below before starting.
 - [ ] **Slip roads ending at the outer lane** (not started). Test case: area `toma_kaunas` (built from the tester's
       own OSM file, `refs/toma/kaunas.osm`, with `scratch/fizz035/toma_osm.mjs`); top view tool
       `scratch/fizz035/decalplot.py`. The small part is done (`services/mergingLinks.js`: a merging slip road no
@@ -44,75 +45,55 @@ when done, rewrite the "state" of the item you stop in. It does not replace the 
       re-framed); thecoachtoma's width-change report (needs a place from him); an optimization pass and a UI pass
       the user asked for before 0.3.6 and that did not happen.
 
-## Sea walls: the item in progress
+## Sidewalks at banks and the water: start again from the diagrams
 
-**Goal** (user, 2026-11-20): behind a retaining wall at the water, bring the pavement out to the wall and make it
-flat. **Done when:** a sweep shows no sidewalk cell worse than dev, then a look in the game at Kingston and Naldo.
+**The sea-wall approach was scrapped on 2026-11-24** (user: "this one sounds like a dead end"; all parked branches
+were deleted the same day, see below). It levelled the land behind every mapped retaining wall at the water and
+paved it flat out to the wall. It fixed Kingston's bayfront promenade (seen in the game) and Naldo's line of
+paving down a bank, and made six other sweep cells worse; two further rules were tried and reverted. Do not
+rebuild it as it was.
 
-**Branch `seawall-037` at `3dc1eb0`** (local only, not pushed). What it has on top of dev:
-- the old `seawall` branch merged (`services/quayFill.js`, changes in `pavedSidewalks.js`, `pavedWorker.js`,
-  `pavedArea.js`, `beamngSidewalks.js`, `exportBeamNGLevel.js`), and dev merged in after the batch removal;
-- every grid point within 4.5 m of a levelled wall knows its own stretch's level (`levelAt`, `LEVEL_BAND_M`);
-- a mapped walk inside that band takes that level across its whole width (`onLevel` in `pavedSidewalks.js`);
-- land whose top lies more than 6 m in from the wall is left alone (`TOP_FAR_M`): a ramp or a garden's bank;
-- the fill keeps off walks and steps that go down the bank (`walkAt`, `WALK_BELOW_M`);
-- the temporary probe lines are OUT of the export again (`scratch/fizz035/proberun.mjs` needs them: to probe, put a
-  `console.log` behind `globalThis.__MAPNG_PROBE` back in for the time of the probe and do not commit it).
-- Tests: 1,495 pass on the branch. Unit tests for each rule: `tests/quayFill.test.mjs`.
+**What is still true and worth keeping from that work:**
+- The three problems are real and unchanged on dev (they were in 0.3.5 too): the promenade's paving laid down the
+  shore's bank (Kingston, about 34 buried spots on Mapterhorn), paving down a bank with nothing mapped (Naldo,
+  47 buried), and slabs down the face of a raised motorway approach (Naldo, 13 floating, 3 to 4 m).
+- Kingston's buried spots arrived with commit `dc8cd53` (2026-11-19), which paved the walkway aprons out to a
+  seawall again.
+- **Every spot that was left, on the branch and on dev, sits 1 to 3 m inland of a mapped wall** (top views
+  `scratch/fizz035/kingst_left_top.png`, `ams_left_top.png`). Nobody has found why. That is the place to start.
+- The method that found real causes: print the ground at a few points after each step of the export, and what
+  the paving reports as its slab height at those points before the grading, and compare. Slab and ground
+  disagreed whenever two parts of the code used two different heights for the same place.
+- Tools: `scratch/fizz035/swtop.py` (top view round a spot: ground, sidewalk meshes, mapped walls and walks, the
+  check's spots), `scratch/devareas/sect.py` (sections), `scratch/fizz035/proberun.mjs` and `quayrun.mjs` (they
+  need a temporary `globalThis.__MAPNG_PROBE` / `__MAPNG_QUAY_FILL_DEBUG` hook in the export; `quayrun.mjs` only
+  made sense on the scrapped branch). Small test level of the bayfront: area `sw_bayfront` (512).
+- Sweep results kept for comparison: `scratch/fizz035/sweep_final.json` (dev) and `sweep_seawall.json` (the
+  scrapped branch).
 
-**Seen in the game (2026-11-24):** Kingston's bayfront on a small level built from the branch (new area
-`sw_bayfront`, 512): the paving runs flat out to the sea wall, from over the water and at walking height
-(`scratch/fizz035/bay_game.jpg`). Nothing else on the branch has been seen in the game.
-
-**The sweep on the branch** (`scratch/fizz035/sweep_seawall.json`, against dev's `sweep_final.json`): 8 cells
-differ, 3 better, 6 flagged. Sidewalk spots floating / buried, terrain "ready":
-
-| Cell | dev | branch |
-|---|---|---|
-| naldo@mh | 18 / 47 | 18 / 19 (better) |
-| kingst@mh | 0 / 34 | 5 / 23 (buried better, floating worse) |
-| kingst@gpxz | 0 / 38 | 4 / 24 (same pattern) |
-| kingst@t30 | 0 / 12 | 10 / 21 (worse; spikes 10 -> 18) |
-| naldo@gpxz | 17 / 16 | 22 / 24 (worse) |
-| ams_centraal@gpxz | 21 / 25 | 24 / 39 (worse) |
-| ams_centraal@mh | 30 / 27 | 32 / 31 (worse) |
-
-So the branch is NOT ready for dev by the "no cell worse" bar. The user was asked whether to merge it as a net
-improvement anyway and has not answered: do not merge without their word.
-
-**Open on the branch, with what is known:**
-1. **Every remaining new spot sits 1 to 3 m inland of a mapped wall** (top views: `scratch/fizz035/kingst_left_top.png`,
-   `ams_left_top.png`, drawn with `scratch/fizz035/swtop.py`). Kingston's are at wall corners and ends, floating
-   0.4 m; Amsterdam's are in a narrow strip of paving between the wall and a second walk, buried 0.2 to 0.8 m.
-2. **Tried and reverted, do not repeat as they were:**
-   - skipping banks that rise less than 0.6 m per metre: undid Naldo (buried 19 -> 42), Kingston 4 / 23 -> 12 / 34;
-   - not counting points past a wall's END as its water side (the idea: the "water side put back" step lowers
-     land behind the next wall at a corner): no change in any of six cells, so that is not the cause.
-3. **Not looked at yet:** why the coarse terrains are worse (kingst@t30, naldo@gpxz, ams_centraal@gpxz). Start
-   there with a top view and sections of the worst new clusters, before any code.
-4. `naldo`: the 13 floating spots at (392..420, 108..140), 3 to 4 m: sidewalk slabs down the face of a raised
-   motorway approach between two bridge decks. The branch does not touch this; it is a bridge-end problem.
-5. `quayFill.js` and `gridIndexAt` use grid rows as `H - 1 - r`; checked equal to `gradePaved`'s convention for whole
-   grid points, not checked against the corrected map frame in general.
-
-**How the two fixes that worked were found** (use the same method): print the ground at a few points after each
-step of the export, and print what the paving reports as its slab height at those points before the grading. The
-slab and the ground disagreed because two parts of the code used two different levels.
+**Suggested next step** (not agreed with the user yet): pick ONE of the three problems, the smallest first
+(Naldo's paving down a bank with nothing mapped near it), draw it (top view and two sections), find which part of
+the paved model lays paving there, and write a rule for that case alone with a synthetic test. Measure all three
+terrains (`mh`, `gpxz`, `t30`) of the areas it touches before calling it better: the scrapped branch was only
+measured on Mapterhorn until its sweep.
 
 **How to measure one area** (about 30 s each):
 ```
 NAPI_CANVAS=/home/nikluz/dev/mapng/desktop/node_modules/@napi-rs/canvas \
   node scripts/sweep/exportArea.mjs kingst mh <name> --out <a scratch folder>
 ```
-then read `<name>.checks.json` -> `sidewalks` (`floating`, `buried`, `spots`). Sections through a place:
-`scratch/devareas/sect.py <zip> <area> mh.f32 <out.png> "<title>"` with lines `x0 y0 x1 y1 label` on stdin and
-`KINDS=bridges,sidewalks,walls,retaining`. Ground after each step at chosen points: `scratch/fizz035/proberun.mjs`
-(env `PROBE='[[x,y],...]'`); the fill's plan along a line: `scratch/fizz035/quayrun.mjs` (env `QY`, `QX0`, `QX1`).
-Python with matplotlib: `~/miniconda3/envs/laneextraction/bin/python`.
+then read `<name>.checks.json` -> `sidewalks` (`floating`, `buried`, `spots`). Python with matplotlib:
+`~/miniconda3/envs/laneextraction/bin/python`.
 
-**Before merging the branch to dev:** the user's word; `npm test`; `npx vite build`; the smoke sweep matrix
-(`node scripts/sweep/runSweep.mjs --smoke --matrix --json <file>`, about 15 minutes, run it in the background)
-with no sidewalk value worse than the baselines; before/after sections sent to the user; then the game.
+## Branches and worktrees
+
+Only `dev` and `main` exist now (local `main` is stale; `origin/main` is what counts). Deleted on 2026-11-24 at the
+user's word ("scrap anything we don't need"), with their last commits in case one is wanted back within git's
+grace period (`git branch <name> <sha>`):
+`seawall-037` 3dc1eb0, `seawall` 5009640, `step-walls-2` 390b697, `step-walls` 05a91eb (also deleted on origin),
+`hairpin-blend` cf6405a, `shaped-levels` 7463d7e (was merged). The two old checkouts `../mapng-old` and
+`../mapng-sweep` are gone too. One old stash is left untouched (`git stash list`). The two `dependabot/*` branches
+on origin are GitHub's, not ours.
 
 ## Traps (things that went wrong, or nearly did, in the last sessions)
 

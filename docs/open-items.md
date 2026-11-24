@@ -31,7 +31,10 @@ Mesh Road joins. Riding along: the other 38 sweep areas re-framed, Zion's tunnel
   options the old combined-level path passed into the export read one by one: all of them are the ordinary export
   options the export panel passes too, nothing batch-only to take out. 1,489 unit tests, production build.
   Still to do, when the 0.3.7 page is written: a line that old batch jobs can no longer be opened.
-- **Sidewalks at the water: work branch `seawall-037`** (dev + the parked `seawall` branch, merged cleanly; 1,497
+- **Sidewalks at the water: the sea-wall approach scrapped 2026-11-24** (user: "this one sounds like a dead end";
+  the branch and every other parked branch deleted, SHAs in `docs/handoff.md`). The three problems stay open on
+  dev. What follows is the record of the scrapped branch, for what it found.
+- **(record) work branch `seawall-037`** (dev + the parked `seawall` branch, merged cleanly; 1,497
   tests pass). Sidewalk counts on Mapterhorn, dev -> the branch:
   (first numbers: `naldo` buried 47 -> 19, the 100 m line of paving down the bank gone; `kingst` floating 0 -> 58.)
   - **Kingston's promenade: fixed on the branch 2026-11-24 (late).** Two causes, both in how the level reaches
@@ -222,8 +225,7 @@ As of 2026-11-23:
   export. Live after the deploy: the app page's policy, `/crash-reports` and `/api/crash/list` gone (404), the
   wording on /security. Not checked: the dashboard's page signed in (behind the user's sign-in), the new release
   workflow (first tag), a signed Windows installer.
-  Branches: `seawall` (5009640, local: the promenade, for 0.3.6), `step-walls-2` (390b697), `hairpin-blend` (unswept),
-  `step-walls` (older, superseded by -2).
+  Branches: none parked any more (all deleted 2026-11-24, `docs/handoff.md`).
 - The sweep's known pre-existing flags: sidewalk drift at naldo, kingst, deckpark_g, stelvio; ams_centraal mh/ready;
   dev_szczyrk cross; ams t30/noshape swBuried; Michiel de Ruijtertunnel joint steps (check 4).
 
