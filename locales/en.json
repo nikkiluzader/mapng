@@ -2237,6 +2237,7 @@
     "error_tooFar": "Too far for one drag: drop the handle within 20 km of the road's end.",
     "error_noRoute": "No way along the roads to there: drop the handle on a road connected to this one.",
     "chunked": "Built in pieces (experimental): this shape is too long or diagonal for one grid, so it is made in chunks that are joined into one level. Generate downloads every chunk first; the previews show a coarser overview.",
-    "bigDesktop": "Big: this shape covers {km2} km², more than the website allows ({maxKm2} km²). The desktop app builds it, but it may take a long time and need a lot of disk space."
+    "bigDesktop": "Big: this shape covers {km2} km², more than the website allows ({maxKm2} km²). The desktop app builds it, but it may take a long time and need a lot of disk space.",
+    "manyPieces": "Built in {n} pieces. Generate and the export can each take an hour or more, and a level this big may be too much for the game to load. You can still try it: if something fails, a report helps make MapNG better."
   }
 }

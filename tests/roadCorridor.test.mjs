@@ -92,3 +92,15 @@ for (const [lat, km, mpp, half] of [[0, 4, 1, 100], [45, 16, 1, 250], [60, 30, 2
     for (const [y, x0, x1] of g.runs) assert.ok(y >= 0 && y < g.height && x0 >= 0 && x1 <= g.width && x1 > x0);
   });
 }
+
+import { corridorPieces } from '../services/roadCorridor.js';
+import { chunkLayout } from '../services/chunkLayout.js';
+
+// The road panel's warning counts the pieces from the corridor's rows; it must agree with the layout the export builds.
+test('the piece count from the rows matches the chunk layout', () => {
+  // a diagonal band 400 px wide across a 9000 x 6000 grid
+  const W = 9000; const H = 6000; const runs = [];
+  for (let y = 0; y < H; y++) { const x = Math.round((y / H) * (W - 400)); runs.push([y, x, x + 400]); }
+  assert.equal(corridorPieces(runs), chunkLayout({ runs }, W, H).length);
+  assert.equal(corridorPieces([]), 0);
+});

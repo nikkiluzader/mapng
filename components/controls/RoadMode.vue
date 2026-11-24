@@ -27,6 +27,11 @@
       <p v-if="grid.chunked" class="flex items-start gap-1.5 text-micro leading-snug text-gray-600 dark:text-gray-300" data-testid="road-chunked">
         <Layers :size="11" class="shrink-0 mt-px" /><span>{{ t('road.chunked') }}</span>
       </p>
+      <!-- (a very long road: many pieces, hours of work, maybe too big for the game. Warned, never refused on the desktop:
+           what people learn pushing the limits, and their reports, are worth having (user, 2026-11-24)) -->
+      <p v-if="grid.chunked && grid.pieces >= MANY_PIECES" class="flex items-start gap-1.5 text-micro leading-snug text-amber-700 dark:text-amber-300" data-testid="road-many-pieces">
+        <AlertTriangle :size="11" class="shrink-0 mt-px" /><span>{{ t('road.manyPieces', { n: grid.pieces }) }}</span>
+      </p>
       <!-- (the website's cap is the corridor's own area; the desktop app only warns) -->
       <p v-if="!grid.webOk" class="flex items-start gap-1.5 text-micro leading-snug" :class="isDesktop ? 'text-amber-700 dark:text-amber-300' : 'font-medium text-red-600 dark:text-red-400'" data-testid="road-web-cap">
         <AlertTriangle :size="11" class="shrink-0 mt-px" /><span>{{ t(isDesktop ? 'road.bigDesktop' : 'road.webCap', capArgs) }}</span>
@@ -67,6 +72,8 @@ const roadName = computed(() => {
   const label = [...(r.refs || []), ...(r.names || [])].filter(Boolean).slice(0, 3).join(' · ');
   return label || t('road.unnamed');
 });
+// (from this many pieces on, the road's own warning: a 220 km road was 442 pieces, an hour to Generate, more to export)
+const MANY_PIECES = 40;
 const capArgs = computed(() => {
   const m = Number(props.metersPerPixel) > 0 ? Number(props.metersPerPixel) : 1;
   return { km2: Math.round((grid.value?.areaPx || 0) * m * m / 1e6), maxKm2: Math.round(WEB_MAX_SIDE * WEB_MAX_SIDE * m * m / 1e6) };

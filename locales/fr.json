@@ -2237,6 +2237,7 @@
     "error_tooFar": "Trop loin pour un seul glisser : déposez la poignée à moins de 20 km du bout de la route.",
     "error_noRoute": "Aucun chemin par les routes jusque-là : déposez la poignée sur une route reliée à celle-ci.",
     "chunked": "Construit en morceaux (expérimental) : cette forme est trop longue ou trop en diagonale pour une seule grille, elle est donc faite en morceaux réunis en un seul niveau. Générer télécharge d'abord chaque morceau ; les aperçus montrent une vue d'ensemble plus grossière.",
-    "bigDesktop": "Grand : cette forme couvre {km2} km², plus que ce que permet le site ({maxKm2} km²). L'application de bureau la construit, mais cela peut prendre longtemps et demander beaucoup d'espace disque."
+    "bigDesktop": "Grand : cette forme couvre {km2} km², plus que ce que permet le site ({maxKm2} km²). L'application de bureau la construit, mais cela peut prendre longtemps et demander beaucoup d'espace disque.",
+    "manyPieces": "Construit en {n} morceaux. La génération et l'export peuvent prendre chacun une heure ou plus, et un niveau aussi grand peut être trop lourd à charger pour le jeu. Vous pouvez quand même essayer : si quelque chose échoue, un rapport aide à améliorer MapNG."
   }
 }

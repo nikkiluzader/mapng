@@ -106,3 +106,16 @@ export function corridorGrid(points, halfWidthM, mpp) {
   }
   return { center, width, height, runs, lengthM, areaPx, halfWidthM: h };
 }
+
+// The pieces a chunked corridor is built in: the chunk cores its rows touch (services/chunkLayout.js makes a chunk
+// wherever its core holds any of the footprint), counted from the row runs [[y, x0, x1]...] without building the
+// layout. For the warning on very long roads: a tester's 220 km road was 442 pieces.
+export function corridorPieces(runs, size = 2048, overlap = 256) {
+  const S = size - overlap; const cells = new Set();
+  for (const [y, p, q] of runs || []) {
+    if (!(q > p)) continue;
+    const b = Math.floor(y / S);
+    for (let a = Math.floor(p / S); a <= Math.floor((q - 1) / S); a++) cells.add(a * 1048576 + b);
+  }
+  return cells.size;
+}

@@ -8,7 +8,7 @@ import { heavyJobRunning } from '../services/heavyJob.js';
 import { metresPerDegree } from '../services/mapFrame.js';
 import { boxAround, PICK_RADIUS_M, PICK_CLASSES, drivableRoads, nearestRoad, followRoad, cumulative, stretchBetween, distanceAlong, distanceToLine, routeAlongRoads, metresBetween, ROUTE_MAX_M } from '../services/roadPick.js';
 import { WEB_MAX_SIDE } from '../services/tileLayout.js';
-import { corridorGrid } from '../services/roadCorridor.js';
+import { corridorGrid, corridorPieces } from '../services/roadCorridor.js';
 
 const val = (v) => (typeof v === 'function' ? v() : unref(v));
 const MIN_STRETCH_M = 20;          // the two handles are never closer than this along the road
@@ -45,7 +45,9 @@ export function useRoadMode(mpp) {
     let side = 1; while (side < Math.max(g.width, g.height)) side *= 2;
     // (past one grid's square the level is built in chunks, refs/output/chunked-pipeline-plan.md; the website's cap
     // is the corridor's own area; the desktop app has none, only a warning past it)
-    return { ...g, squareSide: side, chunked: side > WEB_MAX_SIDE, webOk: g.areaPx <= WEB_MAX_SIDE * WEB_MAX_SIDE };
+    const chunked = side > WEB_MAX_SIDE;
+    // (how many pieces, for the warning on very long roads: a tester's 220 km road was 442 of them)
+    return { ...g, squareSide: side, chunked, pieces: chunked ? corridorPieces(g.runs) : 1, webOk: g.areaPx <= WEB_MAX_SIDE * WEB_MAX_SIDE };
   });
   // (a way read in an earlier, smaller box comes back cut at that box's edge: the longer copy of each way is kept, or
   // the road broke where the first box ended and no route crossed it)

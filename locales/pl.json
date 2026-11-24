@@ -2237,6 +2237,7 @@
     "error_tooFar": "Za daleko na jedno przeciągnięcie: upuść uchwyt najwyżej 20 km od końca drogi.",
     "error_noRoute": "Brak trasy po drogach do tego miejsca: upuść uchwyt na drodze połączonej z tą.",
     "chunked": "Budowane w częściach (eksperymentalne): ten kształt jest za długi lub zbyt ukośny na jedną siatkę, więc powstaje w kawałkach łączonych w jeden poziom. Generowanie najpierw pobiera każdy kawałek; podglądy pokazują zgrubny widok całości.",
-    "bigDesktop": "Duże: powierzchnia kształtu: {km2} km², więcej niż pozwala strona ({maxKm2} km²). Aplikacja desktopowa go zbuduje, ale może to długo trwać i wymagać dużo miejsca na dysku."
+    "bigDesktop": "Duże: powierzchnia kształtu: {km2} km², więcej niż pozwala strona ({maxKm2} km²). Aplikacja desktopowa go zbuduje, ale może to długo trwać i wymagać dużo miejsca na dysku.",
+    "manyPieces": "Budowane w {n} częściach. Generowanie i eksport mogą trwać godzinę lub dłużej każde, a tak duży poziom może być za ciężki do wczytania przez grę. Nadal możesz spróbować: jeśli coś się nie uda, raport pomoże ulepszyć MapNG."
   }
 }

@@ -2237,6 +2237,7 @@
     "error_tooFar": "Zu weit für einmal Ziehen: Setz den Griff höchstens 20 km vom Straßenende ab.",
     "error_noRoute": "Kein Weg entlang der Straßen dorthin: Setz den Griff auf eine Straße, die mit dieser verbunden ist.",
     "chunked": "In Teilen gebaut (experimentell): Diese Form ist für ein einzelnes Raster zu lang oder zu schräg, daher wird sie in Stücken erstellt, die zu einem Level zusammengefügt werden. Generieren lädt zuerst jedes Stück herunter; die Vorschauen zeigen eine gröbere Übersicht.",
-    "bigDesktop": "Groß: Diese Form umfasst {km2} km², mehr als die Website erlaubt ({maxKm2} km²). Die Desktop-App baut sie, das kann aber lange dauern und viel Speicherplatz brauchen."
+    "bigDesktop": "Groß: Diese Form umfasst {km2} km², mehr als die Website erlaubt ({maxKm2} km²). Die Desktop-App baut sie, das kann aber lange dauern und viel Speicherplatz brauchen.",
+    "manyPieces": "Wird in {n} Teilen gebaut. Generieren und Export können jeweils eine Stunde oder länger dauern, und ein so großes Level kann zu viel sein, als dass das Spiel es lädt. Du kannst es trotzdem versuchen: Wenn etwas fehlschlägt, hilft ein Bericht, MapNG zu verbessern."
   }
 }
