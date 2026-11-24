@@ -32,6 +32,9 @@ reads (level files, materials, roads, prefabs, Lua, assets). Never guess a forma
   - `data/game-model-catalogue.json`: the native model catalogue.
   - The organiser and thumbnail tools are in `refs/output/tag-library/` (private).
   - Look at a model in game before using it.
+- **Known issues:** `docs/known-issues.md`: problems seen before (black boxes at a distance, link files that must not
+  be made, test traps), how to recognise them, the cause and the fix. Check it before chasing a strange sight in the
+  game; add an entry whenever one is solved.
 - **Reference sources:** `refs/output/reference-list.md` lists the OSM wiki tag pages, the photo and check
   sources, and the test and diagram tools. Use it on every task, and add to it.
 - **Technique sources:** `refs/BeamNG.Earth-main` (MIT) and `refs/earth2road-main`. Borrowed ideas get tailored to
