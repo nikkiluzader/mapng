@@ -67,7 +67,7 @@ import { leaveBridgeBuildings } from './bridgeBuildings.js';
 import { buildingsUnderDecks } from './buildingsUnderDecks.js';
 import { benchFacing, boxed } from './benchFacing.js';
 import { wingWallRuns, buildWingWallMesh } from './structures/wingWalls.js';
-import { mergingLinks, keptThroughMerge } from './mergingLinks.js';
+import { mergingLinks, keptThroughMerge, mergingLinkEnds, cutAtOuterLane } from './mergingLinks.js';
 import { buildMonumentMeshes, monumentKind, monumentHeight } from './monuments.js';
 import { solveProfilesSteps, gradeLimit } from './structures/profileSolve.js';
 import { appendAll, keepInPlace } from './keepInPlace.js';
@@ -7307,6 +7307,43 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   })();
   cutPaintAtOtherRoads(paintDecals, carriagewayIndex, drivableRoads, ownersAtNode, junctionMarkings.zones || [], solvedHeightOf, mergingLinks(carriageways));
   const mouths = cutSurfaceAtOtherSurfaces(surfaceDecals, carriageways, carriagewayIndex, { americas: markingStyle === 'americas' });
+  // Slip roads merging into a wider road (services/mergingLinks.js): OSM maps each to a node on that road's centre
+  // line, and drawn to it the slip road's surface lay across the road's lanes to its middle. The surface now ends
+  // where the slip road reaches the road's outer lane; from there to the node an invisible road of the same width
+  // carries the traffic, so the road graph stays joined as mapped.
+  {
+    const cwByOwner = new Map(carriageways.map((cw) => [cw.owner, cw]));
+    const ends = mergingLinkEnds(carriageways);
+    let cut = 0; let kept = 0; const why = { noDecal: 0, noRoom: 0, atRoadEnd: 0 };
+    for (const { link, road, end, atRoadEnd } of ends) {
+      // (where roads fan in to a wide street's end, the slip roads belong on its outer lanes: not done yet, left as drawn)
+      if (atRoadEnd) { why.atRoadEnd++; kept++; continue; }
+      const L = cwByOwner.get(link); const M = cwByOwner.get(road);
+      const at = end ? L.nodes[L.nodes.length - 1] : L.nodes[0];
+      // (the link's surface piece that ends at the merge: a way cut into pieces keeps only the last one's end there)
+      const piece = surfaceDecals.find((s) => s.owner === link && s.decal.__layer === 'asphalt' && s.decal.nodes?.length >= 2
+        && fastHypot((end ? s.decal.nodes[s.decal.nodes.length - 1] : s.decal.nodes[0])[0] - at[0], (end ? s.decal.nodes[s.decal.nodes.length - 1] : s.decal.nodes[0])[1] - at[1]) < 1);
+      if (!piece) { why.noDecal++; kept++; continue; }
+      // (every carriageway of that road near the merge: the street is often several ways end to end at the node)
+      const lines = carriageways.filter((cw) => cw === M || (cw.half >= M.half - 0.5 && !/_link$/.test(String(cw.highway || '')) && cw.nodes.some((nd) => fastHypot(nd[0] - at[0], nd[1] - at[1]) < 1))).map((cw) => cw.nodes);
+      const parts = cutAtOuterLane(piece.decal.nodes, end, lines, M.half - L.half);
+      if (!parts) { why.noRoom++; kept++; continue; }
+      const hidden = {
+        ...piece.decal,
+        name: `${piece.decal.name}_m`,
+        persistentId: generatePersistentId(),
+        material: GLOBAL_DECAL_MATERIALS.invisible,
+        nodes: parts.hidden,
+        startEndFade: [0, 0],
+      };
+      if (piece.decal.__owner !== undefined) Object.defineProperty(hidden, '__owner', { value: piece.decal.__owner, enumerable: false });
+      Object.defineProperty(hidden, '__layer', { value: 'merge', enumerable: false });
+      piece.decal.nodes = parts.visible;
+      piece.group.__items.push(hidden);
+      cut++;
+    }
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Slip roads merging into a wider road: ${ends.length} merge(s) looked at; ${cut} slip road surface(s) ended at the road's outer lane, an invisible road on to the mapped node; ${kept} left as drawn (${why.atRoadEnd} meeting the road at its own end, ${why.noDecal} no surface piece ending at the merge, ${why.noRoom} never clear of the road's lanes).`);
+  }
   if (mouths.length) appendAll(getOrCreateSplineGroup('road_mouths').__items, mouths);
   yield;
 

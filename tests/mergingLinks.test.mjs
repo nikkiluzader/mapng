@@ -29,3 +29,36 @@ test('only the lines between lanes are kept through a merge', () => {
   assert.equal(keptThroughMerge('line_right'), false, 'the edge line is cut at the slip road\'s mouth');
   assert.equal(keptThroughMerge('edge_left'), false);
 });
+
+import { mergingLinkEnds, cutAtOuterLane } from '../services/mergingLinks.js';
+
+test('a merging slip road\'s surface ends at the outer lane; the rest to the mapped node is the hidden part', () => {
+  const slip = link([[40, -60, 0, 6], [20, -30, 0, 6], [7, 0, 0, 6], [0, 20, 0, 6]]);
+  const ends = mergingLinkEnds([street, slip]);
+  assert.deepEqual(ends.map((e) => [e.link, e.road, e.end, e.atRoadEnd]), [[2, 1, 1, false]]);
+  const parts = cutAtOuterLane(slip.nodes, 1, [street.nodes], street.half - slip.half);
+  // the cut is where the slip road's centre is 7 m from the street's centre line: at the point (7, 0)
+  const P = parts.visible[parts.visible.length - 1];
+  assert.ok(Math.abs(P[0] - 7) < 0.3, `cut at x ${P[0].toFixed(2)}`);
+  assert.deepEqual(parts.hidden[parts.hidden.length - 1].slice(0, 2), [0, 20], 'the hidden part reaches the mapped node');
+  assert.deepEqual(parts.hidden[0].slice(0, 2), P.slice(0, 2), 'and starts where the surface ends');
+  assert.equal(parts.visible[0][0], 40, 'the surface keeps its own start');
+  // a slip road leaving the street (its first point on the centre line): the same, mirrored
+  const out = link([[0, 20, 0, 6], [7, 40, 0, 6], [20, 70, 0, 6]]);
+  const po = cutAtOuterLane(out.nodes, 0, [street.nodes], 7);
+  assert.deepEqual(po.hidden[0].slice(0, 2), [0, 20]); assert.ok(Math.abs(po.visible[0][0] - 7) < 0.3);
+});
+
+test('a link meeting the street at the street\'s own end is marked: nothing to cut there', () => {
+  const stub = { owner: 1, highway: 'tertiary', oneWay: false, half: 8, nodes: [[0, 0, 0], [0, 80, 0]] };
+  const slip = link([[30, -40, 0, 6], [8, -12, 0, 6], [0, 0, 0, 6]]);
+  const ends = mergingLinkEnds([stub, slip]);
+  assert.equal(ends.length, 1); assert.equal(ends[0].atRoadEnd, true);
+  // the same street mapped as two ways end to end at that point: no end of the street, a merge part-way along it
+  const before = { owner: 3, highway: 'tertiary', oneWay: false, half: 8, nodes: [[0, -80, 0], [0, 0, 0]] };
+  const mid = mergingLinkEnds([stub, before, slip]);
+  assert.equal(mid.length, 1); assert.equal(mid[0].atRoadEnd, false);
+  // a narrower road carrying on from there (the wide street starts at the point): still its end
+  const narrow = { owner: 4, highway: 'tertiary', oneWay: false, half: 4, nodes: [[0, -80, 0], [0, 0, 0]] };
+  assert.equal(mergingLinkEnds([stub, narrow, slip])[0].atRoadEnd, true);
+});
