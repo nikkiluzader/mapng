@@ -224,7 +224,7 @@ const roundLines = (osmFeatures) => {
   const { features, stats } = roundRoadCorners(osmFeatures);
   const b = stats.byFamily || {};
   const part = (k, name) => { const f = b[k] || { lines: 0, vertices: 0, kept: 0 }; return `${name}: ${f.vertices} corner(s) rounded on ${f.lines} line(s) (${f.kept} of them shared with another line, kept in place, the line bending through)`; };
-  console.log(`[Line curves] ${part('road', 'roads')}; ${part('rail', 'railways')}; ${part('path', 'paths')}; ${stats.roundedJoins} bend(s) rounded across two ways' meeting; ${stats.streetTracks} street track(s) given their road's curve. Steps, corridors and areas left as drawn.`);
+  console.log(`[Line curves] ${part('road', 'roads')}; ${part('rail', 'railways')}; ${part('path', 'paths')}; ${part('water', 'waterways')}; ${stats.roundedJoins} bend(s) rounded across two ways' meeting; ${stats.carriedNodes || 0} line end(s) carried with a node onto the curve of the line passing through; ${stats.streetTracks} street track(s) given their road's curve. Steps, corridors, areas, dams and power lines left as drawn.`);
   return features;
 };
 const shapeRoads = (osmFeatures) => fitTwinCarriageways(measureStreetWidths(roundLines(osmFeatures)).features).features;

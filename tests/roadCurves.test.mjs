@@ -57,7 +57,9 @@ test('short segments shrink the radius so neighbouring arcs never overlap', () =
   for (const p of g) assert.ok(dist(xy(p)) < 2, `point ${xy(p)} strays ${dist(xy(p))}`);
 });
 
-test('a vertex another way is attached to stays exactly, and the road still bends smoothly through it', () => {
+// (since 2026-11-24 a node one line passes through and others only end at is carried to the curve: pinned, the curve
+// through it swung out and back with all its turning near the node)
+test('a road vertex another road ends at stays exactly, and the road still bends smoothly through it', () => {
   const r = road('r', [[0, 0], [100, 0], [100, 100]]);
   const drive = { id: 'd', type: 'road', tags: { highway: 'service' }, geometry: [r.geometry[1], ll(140, -40)] };
   const { features } = roundRoadCorners([r, drive]);
@@ -65,6 +67,30 @@ test('a vertex another way is attached to stays exactly, and the road still bend
   assert.ok(g.some((p) => makeRoadNodeKey(p) === makeRoadNodeKey(r.geometry[1])), 'shared vertex kept');
   assert.ok(maxTurnDeg(g) < 30, `max turn ${maxTurnDeg(g)}`);
   assert.deepEqual(features[1].geometry[0], r.geometry[1], 'driveway still attached');
+});
+
+test('a path ending at another path\'s bend follows the node onto the rounded curve (at most 0.75 m)', () => {
+  const p = road('p', [[0, 0], [40, 0], [40, 40]], 'footway');
+  const q = { id: 'q', type: 'road', tags: { highway: 'footway' }, geometry: [p.geometry[1], ll(70, -30)] };
+  const { features, stats } = roundRoadCorners([p, q]);
+  const g = features[0].geometry;
+  assert.ok(maxTurnDeg(g) <= 6, `max turn ${maxTurnDeg(g)}`);
+  const start = features[1].geometry[0];
+  assert.ok(g.some((pt) => makeRoadNodeKey(pt) === makeRoadNodeKey(start)), 'the joining path still meets it');
+  const moved = Math.hypot(...xy(start).map((v, i) => v - [40, 0][i]));
+  assert.ok(moved > 0.3 && moved <= 0.7501, `node moved ${moved} m`);
+  assert.equal(stats.carriedNodes, 1);
+});
+
+test('a node two lines pass through stays exactly; so does a bridge\'s end', () => {
+  const a = road('a', [[0, 0], [100, 0], [100, 100]]);
+  const b = road('b', [[50, -50], [100, 0], [150, 30]], 'footway');
+  const { features } = roundRoadCorners([a, b]);
+  for (const f of features) assert.ok(f.geometry.some((p) => makeRoadNodeKey(p) === makeRoadNodeKey(a.geometry[1])), `${f.id} keeps the crossing node`);
+  const deck = { ...road('br', [[100, 0], [100, -60]]), tags: { highway: 'residential', bridge: 'yes' } };
+  const r2 = road('r2', [[0, 0], [100, 0], [100, 100]]);
+  const out = roundRoadCorners([r2, deck]).features;
+  assert.deepEqual(out[1].geometry[0], r2.geometry[1], 'the bridge end stays put');
 });
 
 test('two ways meeting mid-bend are rounded across the join and still meet; a signal there follows', () => {
@@ -120,14 +146,17 @@ test('a railway kink is rounded, never more than 1 m off the mapped track', () =
   assert.deepEqual(g[0], r.geometry[0]); assert.deepEqual(g[g.length - 1], r.geometry[3]);
 });
 
-test('a switch shared by two tracks stays exactly where it is mapped, and a level crossing too', () => {
-  const main = rail('m', [[0, 0], [100, 0], [200, 8]]);
+test('a switch: the siding follows the main line\'s curve (at most 1 m); a level crossing stays exactly', () => {
+  const main = rail('m', [[0, 0], [100, 0], [200, 8], [300, 30]]);
   const siding = rail('s', [[100, 0], [180, 20]], { service: 'siding' });
-  const street = road('x', [[150, -50], [150, 4], [150, 60]]);
+  const street = road('x', [[200, -50], [200, 8], [210, 60]]);
   const { features } = roundRoadCorners([main, siding, street]);
   const keys = (f) => new Set(f.geometry.map((p) => makeRoadNodeKey(p)));
-  assert.ok(keys(features[0]).has(makeRoadNodeKey(main.geometry[1])), 'the switch node kept on the main line');
-  assert.ok(keys(features[1]).has(makeRoadNodeKey(main.geometry[1])), 'and on the siding');
+  const sw = features[1].geometry[0];
+  assert.ok(keys(features[0]).has(makeRoadNodeKey(sw)), 'the siding still leaves from the main line');
+  assert.ok(Math.hypot(...xy(sw).map((v, i) => v - [100, 0][i])) <= 1.0001, 'the switch moved at most 1 m');
+  assert.ok(keys(features[0]).has(makeRoadNodeKey(main.geometry[2])), 'the level crossing kept on the track');
+  assert.ok(keys(features[2]).has(makeRoadNodeKey(main.geometry[2])), 'and on the street');
 });
 
 test('a footpath corner is rounded within 0.75 m; steps stay as drawn', () => {
@@ -153,4 +182,15 @@ test('a railway and a road ending at the same node are not rounded as one line',
   const s = road('s', [[50, 0], [100, 30]]);
   const { stats } = roundRoadCorners([r, s]);
   assert.equal(stats.roundedJoins, 0);
+});
+
+test('a river bend is rounded within 2 m; a dam and a power line stay as drawn', () => {
+  const river = { id: 'rv', type: 'water', tags: { waterway: 'river' }, geometry: [[0, 0], [80, 0], [140, 50]].map(([x, y]) => ll(x, y)) };
+  const dam = { id: 'dm', type: 'water', tags: { waterway: 'dam' }, geometry: [[0, 100], [50, 100], [60, 140]].map(([x, y]) => ll(x, y)) };
+  const power = { id: 'pw', type: 'power_line', tags: { power: 'line' }, geometry: [[0, 200], [80, 200], [140, 250]].map(([x, y]) => ll(x, y)) };
+  const { features, stats } = roundRoadCorners([river, dam, power]);
+  assert.equal(stats.byFamily.water.vertices, 1);
+  assert.ok(maxTurnDeg(features[0].geometry) <= 5.5);
+  assert.ok(strayM(features[0].geometry, river.geometry) <= 2.0001, `stray ${strayM(features[0].geometry, river.geometry)}`);
+  assert.equal(features[1], dam); assert.equal(features[2], power);
 });

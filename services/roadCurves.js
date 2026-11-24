@@ -34,6 +34,9 @@ import { activeRailKind } from './railways.js';
  * two tracks, a level crossing or a path meeting a road is a node two lines use, so it stays put and the line bends
  * smoothly through it. A track laid in a street (a tram on a road way) follows its road's curve. Steps, corridors
  * and areas stay as drawn. Map data > "Keep map lines as drawn" (OSM_LINES_AS_DRAWN_KEY) skips all of it.
+ * Waterway centrelines too (rivers, canals, streams, ditches); dams and weirs stay as drawn. Not power lines: each of
+ * their points is a tower and the wire is straight between them. Walls and fences are laid along a rounded line by
+ * the export itself (lineSmoothing.js).
  */
 
 // Map data > Keep map lines as drawn: no rounding at all, roads included (read where Generate shapes the roads).
@@ -79,6 +82,14 @@ const RAIL_MAX_CUT_M = 1;
 // Paths: a walker's or rider's line; at most PATH_MAX_CUT_M inside a vertex (a footway is about 2 m wide).
 const RADIUS_BY_PATH = { footway: 25, path: 30, cycleway: 50, bridleway: 30, pedestrian: 20 };
 const PATH_MAX_CUT_M = 0.75;
+// Waterway centrelines (rivers chained in beamngWater.js, banks lowered at Generate, waterBanks.js): largest radius and
+// the limit inside a corner, per kind. A canal is dug straighter than a river meanders; a ditch is narrow.
+const WATER_KINDS = {
+    river: { radius: 150, maxCut: 2 }, canal: { radius: 300, maxCut: 1 }, tidal_channel: { radius: 100, maxCut: 1.5 },
+    stream: { radius: 40, maxCut: 1 }, ditch: { radius: 20, maxCut: 0.5 }, drain: { radius: 20, maxCut: 0.5 },
+};
+const isWaterLine = (f) => f?.type === 'water' && !!f.tags?.waterway && f.tags.area !== 'yes' && Array.isArray(f.geometry) && f.geometry.length >= 2
+    && !(f.geometry.length > 3 && makeRoadNodeKey(f.geometry[0]) === makeRoadNodeKey(f.geometry[f.geometry.length - 1]));
 
 const lineOk = (f) => Array.isArray(f?.geometry) && f.geometry.length >= 2 && f.tags?.area !== 'yes';
 // a track laid in a street (its road way carries it too): it follows the road's curve, not its own
@@ -93,6 +104,10 @@ export function lineProfile(f) {
         const r = RADIUS_BY_PATH[hw];
         return r ? { family: 'path', radius: r, maxCut: PATH_MAX_CUT_M } : null;
     }
+    if (isWaterLine(f)) {
+        const w = WATER_KINDS[String(f.tags.waterway).toLowerCase()];
+        return w ? { family: 'water', radius: w.radius, maxCut: w.maxCut } : null;
+    }
     if (f.type === 'railway' && !isStreetTrack(f)) {
         const kind = activeRailKind(f.tags || {});
         if (!kind) return null;
@@ -102,7 +117,7 @@ export function lineProfile(f) {
     return null;
 }
 // the lines whose nodes count as shared (a junction, a switch, a crossing): roads, paths and railways alike
-const countsForNodes = (f) => (f?.type === 'road' || (f?.type === 'railway' && !isStreetTrack(f))) && Array.isArray(f.geometry);
+const countsForNodes = (f) => (f?.type === 'road' || (f?.type === 'railway' && !isStreetTrack(f)) || isWaterLine(f)) && Array.isArray(f.geometry);
 
 /**
  * Tangent arc replacing the corner a → b → c, as lat/lng points from the
@@ -192,7 +207,7 @@ function throughCurve(b, ux, uy, vx, vy, tangent, turn, mx, my) {
  */
 export function roundRoadCorners(osmFeatures) {
     const fam0 = () => ({ lines: 0, vertices: 0, kept: 0 });
-    const stats = { roads: 0, roundedVertices: 0, roundedJoins: 0, streetTracks: 0, byFamily: { road: fam0(), rail: fam0(), path: fam0() } };
+    const stats = { roads: 0, roundedVertices: 0, roundedJoins: 0, streetTracks: 0, byFamily: { road: fam0(), rail: fam0(), path: fam0(), water: fam0() } };
     if (!Array.isArray(osmFeatures) || osmFeatures.length === 0) return { features: osmFeatures, stats };
 
     const nodeUse = new Map();
@@ -220,11 +235,44 @@ export function roundRoadCorners(osmFeatures) {
         if (!p0 || !p1 || p0.family !== p1.family) continue;
         joinOf.set(k, ends);
     }
+    // Carried nodes: one line passes through, the others only end there (a siding leaving the main line at a switch, a
+    // path joining another path or a street). The line passing through is rounded as at any vertex and the node moves
+    // to its curve; the lines ending there follow it, where the move is within their own limits too (3 m road, 1 m rail, 0.75 m path).
+    // Pinned instead, a curve through the node had to swing out and back, all its turning within a metre or so of the
+    // node (17 deg steps over 0.3 m at Kaunas station). Two lines passing through (a level crossing, two paths crossing)
+    // and anything on a bridge or in a tunnel stay pinned: those ends are where structures meet.
+    const structural = (f) => !!(f?.tags?.bridge && f.tags.bridge !== 'no') || !!(f?.tags?.tunnel && f.tags.tunnel !== 'no');
+    const carried = new Set();
+    {
+        const through = new Map();   // key -> [fi] for interior occurrences
+        osmFeatures.forEach((f, fi) => {
+            if (!countsForNodes(f)) return;
+            const g = f.geometry;
+            for (let i = 1; i < g.length - 1; i++) { const k = makeRoadNodeKey(g[i]); if (!through.has(k)) through.set(k, []); through.get(k).push(fi); }
+        });
+        for (const [k, list] of through) {
+            if (list.length !== 1 || !profiles[list[0]] || structural(osmFeatures[list[0]])) continue;
+            const ends = endUse.get(k) || [];
+            if (!ends.length || nodeUse.get(k) !== 1 + ends.length) continue;
+            if (ends.some((e) => e.fi === list[0] || structural(osmFeatures[e.fi]))) continue;
+            // (the node moves as far as the through line's limit: only where every line ending there allows that much,
+            // so a footpath meeting a street's bend is not dragged 3 m; it stays pinned)
+            const lim = profiles[list[0]].maxCut;
+            if (ends.some((e) => !profiles[e.fi] || profiles[e.fi].maxCut < lim)) continue;
+            // (not roads: a side street meeting a main road's bend moved its junction up to 3 m, and the sidewalks,
+            // junction shapes and grading built round it changed in 87 of 135 sweep cells (28 more floating sidewalk
+            // spots, 112 more creases). Roads keep the pinned curve through such a node, as before 2026-11-24)
+            if (profiles[list[0]].family === 'road' || ends.some((e) => profiles[e.fi].family === 'road')) continue;
+            carried.add(k);
+        }
+    }
+    stats.carriedNodes = 0;
     // A vertex keeps its position when it is a junction, a dead end or
     // anything shared.
     const isFixed = (p, isEnd) => {
         const k = makeRoadNodeKey(p);
         if (joinOf.has(k)) return false;
+        if (!isEnd && carried.has(k)) return false;
         return isEnd || (nodeUse.get(k) || 0) > 1;
     };
     // A segment is split between its two ends when both get a curve; an end
@@ -299,6 +347,23 @@ export function roundRoadCorners(osmFeatures) {
         if (endHalf) { push(...endHalf); changed = true; } else push(g[g.length - 1]);
         return changed ? { ...f, geometry } : f;
     });
+
+    // the lines ending at a carried node follow it to the curve of the line passing through
+    if (carried.size) {
+        for (let i = 0; i < out.length; i++) {
+            const f = out[i];
+            if (!countsForNodes(f) || f.geometry.length < 2) continue;
+            const g = f.geometry; const last = g.length - 1;
+            const k0 = makeRoadNodeKey(osmFeatures[i].geometry[0]); const k1 = makeRoadNodeKey(osmFeatures[i].geometry[osmFeatures[i].geometry.length - 1]);
+            const m0 = carried.has(k0) ? movedNodes.get(k0) : null; const m1 = carried.has(k1) ? movedNodes.get(k1) : null;
+            if (!m0 && !m1) continue;
+            const geometry = g.slice();
+            if (m0) geometry[0] = { ...g[0], ...m0 };
+            if (m1) geometry[last] = { ...g[last], ...m1 };
+            out[i] = { ...f, geometry };
+            stats.carriedNodes += (m0 ? 1 : 0) + (m1 ? 1 : 0);
+        }
+    }
 
     // a track laid in a street: its road's rounded line (osm.js names it after the road way, `<id>_rail`)
     const roadGeometry = new Map();
