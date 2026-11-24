@@ -171,11 +171,26 @@ export function buildCoverage(regionKey) {
   way([[-200, 860, { power: 'pole' }], [-200, 800, { power: 'pole' }], [-150, 780, { power: 'pole' }]], { power: 'minor_line' });
   structure('tower line', 0, 930, [80, 0]); structure('pole line and shared node', -200, 860, [45, 0]); structure('minor line', -180, 800, [45, 0]);
 
+  // ── sports at their real sizes (the user, 2026-11-24: squeezed into a plot, a baseball field was 30 m) ──
+  {
+    const SPORT_FIELDS = [
+      ['baseball', 150, 60, 120, 120], ['soccer', 340, 0, 105, 68], ['american_football', 340, 150, 110, 49],
+      ['running', 560, 80, 176, 92, 'leisure=track'], ['tennis', 760, 240, 36, 18], ['basketball', 760, 190, 28, 15],
+      ['volleyball', 760, 145, 18, 9], ['skateboard', 760, 95, 30, 20], ['multi', 760, 35, 40, 22], ['golf', 900, 140, 60, 200],
+    ];
+    for (const [sport, x, y, w, h, tag] of SPORT_FIELDS) {
+      const tags = tag === 'leisure=track' ? { leisure: 'track', sport: 'running', lit: 'yes' } : { leisure: 'pitch', sport, lit: 'yes' };
+      area(x, y, w, h, { ...tags, name: `cov ${sport} ${w} x ${h} m` });
+      structure(`sport=${sport}, ${w} x ${h} m`, x, y, [Math.max(w, h) * 0.9 + 20, 0]);
+    }
+  }
+
   // ── the plots: one per tag MapNG builds ──
   const lib = JSON.parse(fs.readFileSync(path.join(REPO, 'data/osm-tag-library.json'), 'utf8'));
   const wanted = [];
   // (tags the layout's own structures already carry, not repeated in a plot: an inland coastline would cut the land)
-  const BUILT_ELSEWHERE = new Set(['natural=coastline']);
+  // (the platform plot too: a platform is raised beside its track, the station on the main line has one)
+  const BUILT_ELSEWHERE = new Set(['natural=coastline', 'railway=platform']);
   for (const [tag, e] of Object.entries(lib.tags)) {
     if (e.status !== 'built' && e.status !== 'partial') continue;
     if (BUILT_ELSEWHERE.has(tag)) continue;
@@ -189,8 +204,6 @@ export function buildCoverage(regionKey) {
     const extra = Object.fromEntries(Object.entries(o.when || {}).map(([k, vals]) => [k, vals[0]]));
     wanted.push({ tag: o.tag, on: ['node'], extra, rule: id });
   }
-  const SPORTS = ['soccer', 'tennis', 'basketball', 'baseball', 'american_football', 'volleyball', 'running', 'golf', 'skateboard', 'multi'];
-  for (const sport of SPORTS) wanted.push({ tag: 'leisure=pitch', on: ['area'], extra: { sport, lit: 'yes' } });
   const cols = Math.floor((PLOT_X1 - PLOT_X0) / PW); const rows = Math.floor((PLOT_Y1 - PLOT_Y0) / PLOT);
   if (wanted.length > cols * rows) throw new Error(`${wanted.length} plots wanted, the grid holds ${cols * rows}: widen it`);
   // (the streets: one along the south side of each plot row, with sidewalks)

@@ -33,6 +33,29 @@ python3 scripts/coverage/tour_targets.py coverage_na_east scratch/coverage/mapng
 conda run -n laneextraction python scripts/coverage/contact_sheets.py <shots folder> scratch/coverage/tour_targets.lua scratch/coverage/sheets
 ```
 
+## The themed test levels
+
+The same plumbing makes one level per kind of situation (`scripts/coverage/testLevels.mjs`, user 2026-11-24):
+
+```
+node scripts/coverage/testLevels.mjs all na_east     # or roads | structures | terrain
+# export each as above (area test_<suite>_na_east, level mapng_test_<suite>_na_east), then
+python3 scripts/coverage/addLabels.py <level.zip> test_<suite>_na_east
+```
+
+- **roads** (flat): lanes 4 -> 3 -> 2 -> 1 -> 4, a one-way pair, a dual carriageway with slip roads, T / cross /
+  staggered / Y / five-way / skewed junctions, roundabouts (mini, r 15, r 40, two-lane), turn lanes at signals,
+  zebra and signalled crossings, a level crossing, curve radii 30-200 m, every road class, sidewalk options, widths,
+  lit, every surface, a car park.
+- **structures**: a 45 m gorge bridged by each structure type (beam, truss, arch, suspension, cable-stayed, stone
+  arch, viaduct) with both ends labelled, a valley viaduct, rail bridge and footbridge, overpasses on the flat, a
+  ridge with short, long diagonal, curved, graded, rail and twin tunnels, both portals labelled.
+- **terrain**: a 350 m mountain with a switchback pass, a steep ridge road, a steep street grid, roads across
+  rolling hills, a valley road along a river.
+
+`addLabels.py` puts the labels in the level (an extension loaded with the mod): every situation's name floats over it
+in game, 250 m round the camera; `mapngTestLabels.toggle()` hides them.
+
 ## What the check reports
 
 - **models**: placed (official, generated) and, of the tag library's models in use for the region, which were not
