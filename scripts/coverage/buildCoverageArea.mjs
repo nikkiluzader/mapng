@@ -229,6 +229,16 @@ export function buildCoverage(regionKey) {
     }
   }
 
+  // ── a building over a passage: a street through under it (tunnel=building_passage), to look up at its floor from
+  // the street (the user, 2026-11-24: ceilings seen from under a building were see-through) ──
+  {
+    way([[300, -150], [390, -150]], { highway: 'residential', name: 'cov passage street' });
+    way([[390, -150], [410, -150]], { highway: 'residential', tunnel: 'building_passage', name: 'cov passage street' });
+    way([[410, -150], [500, -150]], { highway: 'residential', name: 'cov passage street' });
+    area(400, -150, 20, 30, { building: 'apartments', 'building:levels': '3', name: 'cov building over a passage' });
+    structure('building over a passage (tunnel=building_passage)', 400, -150, [45, 0]);
+  }
+
   // ── the plots: one per tag MapNG builds ──
   const lib = JSON.parse(fs.readFileSync(path.join(REPO, 'data/osm-tag-library.json'), 'utf8'));
   const wanted = [];
