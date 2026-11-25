@@ -22,6 +22,7 @@ import { planPitches, pitchFootprints } from './sportsFields.js';
 import { levelCrossingBarriers, buildLevelCrossingMeshes } from './levelCrossingBarriers.js';
 import { planStepFlights, buildStepFlightMeshes, stepWidth } from './stepFlights.js';
 import { findCarriagewaySplits, splitShiftAt, splitTaperAt } from './carriagewaySplits.js';
+import { placementShift, placementShiftAt } from './lanePlacement.js';
 import { findBridgeTowers, towerPierGeometry, towerHouseTags } from './bridgeTowers.js';
 import { buildTexturedBuildings, buildingContext, screenBuilding, getBuildingMaterialDefs, garageExtras, isGarageFeature, FACADE_EMISSIVE_FILE, BUILDING_TILE_M, letterName } from './beamngBuildings.js';
 import { isCarportFeature, planCarports } from './beamngCarports.js';
@@ -2959,6 +2960,8 @@ function getDecalMergeStyleKey(segment) {
     tags['lanes:both_ways'] || '',
     tags.width || '',
     tags['mapng:carriageway_width'] || '',
+    // (and where its line lies across the lanes: a way with placement tags moved apart from one without, lanePlacement.js)
+    Object.keys(tags).filter((k) => /^placement(:|$)/.test(k)).sort().map((k) => `${k}=${tags[k]}`).join(';'),
     // (a drawbridge span stays its own segment: the structure solver keeps
     // the whole bridge low by it)
     tags.bridge === 'movable' || (!!tags['bridge:movable'] && tags['bridge:movable'] !== 'no'),
@@ -7292,6 +7295,57 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     const oneway = isOneWayRoad(t) ? (['-1', 'reverse'].includes(String(t.oneway ?? '').trim().toLowerCase()) ? -1 : 1) : 0;
     return { oneway, cls: sf.highway || t.highway || '', half: widthsOf(sf).styleHalfWidth, xy: sf.geometry.map((pt) => geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0)) };
   }), { leftHand: leftHandTraffic });
+  // Placement (lanePlacement.js): where a way's mapped line lies across its lanes. The drawn carriageway is moved off
+  // the line by it, everything built from the drawn line with it (markings, curbs, sidewalks, the ground under it)
+  const placements = new Map();
+  drivableRoads.forEach((sf, k) => {
+    const t = sf.sourceFeature?.tags || {};
+    if (!Object.keys(t).some((key) => /^placement(:|$)/.test(key))) return;
+    const w = widthsOf(sf);
+    const sh = placementShift(t, { half: w.drivingHalfWidth, extraShift: (w.crossSection.leftExtra - w.crossSection.rightExtra) / 2, leftHand: leftHandTraffic });
+    if (!sh) return;
+    const xy = sf.geometry.map((pt) => geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0).slice(0, 2));
+    const cum = [0]; for (let i = 1; i < xy.length; i++) cum.push(cum[i - 1] + fastHypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]));
+    placements.set(k, { shift: sh, xy, cum, wayId: sf.sourceFeature?.id });
+  });
+  // (the shift at (x, y): by its share along the way, for a line moving across the lanes)
+  const placementAt = (pl, x, y) => {
+    if (Math.abs(pl.shift.start - pl.shift.end) < 1e-6) return pl.shift.start;
+    let best = Infinity; let at = 0;
+    for (let i = 0; i + 1 < pl.xy.length; i++) {
+      const [ax, ay] = pl.xy[i]; const [bx, by] = pl.xy[i + 1]; const ex = bx - ax; const ey = by - ay; const L2 = ex * ex + ey * ey || 1;
+      const t = Math.max(0, Math.min(1, ((x - ax) * ex + (y - ay) * ey) / L2)); const d = fastHypot(ax + ex * t - x, ay + ey * t - y);
+      if (d < best) { best = d; at = pl.cum[i] + t * Math.sqrt(L2); }
+    }
+    return placementShiftAt(pl.shift, at / (pl.cum[pl.cum.length - 1] || 1));
+  };
+  // (a placed way's own placement wins over a split's guess: the mapper said where its lanes are)
+  for (const k of placements.keys()) splits.plans.delete(k);
+  if (structureGraph && placements.size) {
+    let moved = 0;
+    for (const pl of placements.values()) {
+      for (const e of structureGraph.edges) {
+        if (pl.wayId == null || e.wayId !== pl.wayId || e.bridge || e.tunnel || !(e.x?.length > 1)) continue;
+        const ox = Array.from(e.x); const oy = Array.from(e.y);
+        for (let i = 0; i < ox.length; i++) {
+          const m = placementAt(pl, ox[i], oy[i]); if (!m) continue;
+          const a = Math.max(0, i - 1); const b = Math.min(ox.length - 1, i + 1);
+          const L = fastHypot(ox[b] - ox[a], oy[b] - oy[a]) || 1;
+          e.x[i] = ox[i] - ((oy[b] - oy[a]) / L) * m; e.y[i] = oy[i] + ((ox[b] - ox[a]) / L) * m;
+          const g0 = e.g ? e.g[i] : null;
+          if (e.g) e.g[i] = getTerrainHeightAtWorldXY(e.x[i], e.y[i], terrainData, squareSize);
+          const zs = structureGraph.profile?.z?.[e.id];
+          if (opts.shaping?.terrain === false && zs && Number.isFinite(g0) && Number.isFinite(e.g[i])) zs[i] += e.g[i] - g0;
+          moved++;
+        }
+      }
+    }
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Placement: ${moved} station(s) of the road graph moved with their drawn roads (the ground is shaped under them).`);
+  }
+  {
+    const list = [...placements.entries()].map(([k, pl]) => `${drivableRoads[k]?.sourceFeature?.tags?.name || drivableRoads[k]?.highway || '?'} ${pl.shift.start.toFixed(2)}${Math.abs(pl.shift.end - pl.shift.start) > 1e-6 ? `..${pl.shift.end.toFixed(2)}` : ''} m`);
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Placement: ${placements.size ? `${placements.size} way(s) with their mapped line off the carriageway's middle (placement tags), the drawn road moved off the line (left of the way's direction positive): ${list.slice(0, 12).join(', ')}${list.length > 12 ? ', ...' : ''}` : 'no way carries a placement tag that moves its road (absent, transition, or the middle): every road centred on its line'}.`);
+  }
   const splitEnds = new Set();
   for (const sp of splits.points) { splitEnds.add(`${sp.trunk}:${sp.trunkAtStart}`); for (const b of sp.branches) splitEnds.add(`${b.k}:${b.atStart}`); }
   // (the structure graph's branch edges moved with the drawn branches, so the ground shaped under them later
@@ -7421,8 +7475,18 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
       const halfAt = (taper || splitTaper) ? centerNodes.map((nd) => splitTaperAt(splitTaper, nd[0], nd[1], taper ? taper(nd[0], nd[1], styleHalfWidth) : styleHalfWidth)) : null;
       if (halfAt) halfAt.forEach((h, k) => { centerNodes[k][3] = h; });
       // (a split's branch: its drawn line moved to its half of the two-way road near the split, eased onto its own)
-      if (splitPlan) {
-        const moves = centerNodes.map((nd) => splitShiftAt(splitPlan, nd[0], nd[1]));
+      // (or a placed way: its drawn line moved off the mapped one by its placement tags)
+      const placed = placements.get(segIndex);
+      if (splitPlan || placed) {
+        // (a placed way narrowed at its end to the next piece's width, a lane gained or dropped there: narrowed on the
+        // side its lanes were added, the far edge running straight on; narrowed both ways, the through lanes' edge kinked
+        // in over the taper)
+        const moves = centerNodes.map((nd, k) => {
+          if (!placed) return splitShiftAt(splitPlan, nd[0], nd[1]);
+          const m = placementAt(placed, nd[0], nd[1]);
+          const d = halfAt ? Math.max(0, styleHalfWidth - halfAt[k]) : 0;
+          return m - Math.sign(m) * Math.min(Math.abs(m), d);
+        });
         if (moves.some((m) => m !== 0)) {
           const orig = centerNodes.map((nd) => [nd[0], nd[1]]);
           centerNodes.forEach((nd, k) => {

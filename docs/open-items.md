@@ -26,6 +26,13 @@ is where each item's full text, numbers and file names now live.
 A new session starts with `docs/handoff.md`. Its "Work list" holds the agreed order of the 0.3.7 work and each
 item's state. The open items there, one line each:
 
+- **Placement tags (thecoachtoma, Discord 2026-11-25): done on dev, sweep pending.** `services/lanePlacement.js`
+  reads placement, placement:forward/backward, :start/:end (transition left to the split rule); the drawn road, its
+  graph edges and the painted texture move by it; a lane gain tapers on its own side. Roads level scenes A-E (x 620-950,
+  y -60..200). Plots `scratch/toma_placement/{expected,after}.png`; in game 2026-11-25. Left: his Kaunas junctions once
+  his placement edits are on OSM (none in the three tj_ areas yet, refetched 2026-11-25); the painted asphalt is not
+  tapered at a lane gain (a small dark patch beside the decal's taper); the painter assumes right-hand traffic for
+  two-way placement:forward/backward.
 - **Sidewalks at banks and the water.** Start again from the diagrams; the sea-wall approach was scrapped
   2026-11-24. `docs/handoff.md`, "Sidewalks at banks and the water"; record in H > 0.3.7 and H > Priority list
   (item 10). Done when: no sidewalk sweep cell worse than dev, then in game at Kingston and Naldo.

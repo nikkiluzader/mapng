@@ -292,6 +292,30 @@ function roads(regionKey) {
     way([[500, -880], [500, -930]], { highway: 'service', name: 'Car park entrance' });
     label('car park with aisles', 500, -830, [90, 0]);
   }
+  // 11. placement: where the mapped line lies across the lanes (x 620-950, y -60..200; thecoachtoma's Kaunas
+  // junctions, 2026-11-25: a turn lane added beside the line, the line not moved; services/lanePlacement.js)
+  {
+    const P = { highway: 'primary', oneway: 'yes' };
+    // A: a left-turn lane added, the line staying between the two through lanes (right_of:2 of 3)
+    way(run(620, 200, 780, 200, 20), { ...P, lanes: '2', name: 'Placement A' });
+    way(run(780, 200, 940, 200, 20), { ...P, lanes: '3', 'turn:lanes': 'left|through|through', placement: 'right_of:2', name: 'Placement A' });
+    label('placement=right_of:2: a left-turn lane added, the line kept', 860, 200, [45, 0]);
+    // B: a right-turn lane added (right_of:1 of 3)
+    way(run(620, 140, 780, 140, 20), { ...P, lanes: '2', name: 'Placement B' });
+    way(run(780, 140, 940, 140, 20), { ...P, lanes: '3', 'turn:lanes': 'through|through|right', placement: 'right_of:1', name: 'Placement B' });
+    label('placement=right_of:1: a right-turn lane added', 860, 140, [45, 0]);
+    // C: a two-way road gaining a forward lane on its right, the line on the divider
+    way(run(620, 80, 780, 80, 20), { highway: 'primary', lanes: '2', name: 'Placement C' });
+    way(run(780, 80, 940, 80, 20), { highway: 'primary', lanes: '3', 'lanes:forward': '2', 'lanes:backward': '1', 'placement:forward': 'left_of:1', name: 'Placement C' });
+    label('placement:forward=left_of:1: a two-way road gains a forward lane', 860, 80, [45, 0]);
+    // D: the line moving from the left lane to the right lane along the way
+    way(run(620, 20, 940, 20, 20), { ...P, lanes: '2', 'placement:start': 'middle_of:1', 'placement:end': 'middle_of:2', name: 'Placement D' });
+    label('placement:start=middle_of:1, placement:end=middle_of:2', 780, 20, [45, 0]);
+    // E: a way mapped along its left lane all the way, beside an untagged one for comparison
+    way(run(620, -40, 940, -40, 20), { ...P, lanes: '2', placement: 'middle_of:1', name: 'Placement E' });
+    label('placement=middle_of:1: the road to the right of the line', 780, -40, [45, 0]);
+    drive('driver: placement A, the turn lane opening', 700, 198.4, 0);
+  }
   return { b, size: SIZE, heightAt };
 }
 

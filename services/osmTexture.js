@@ -5,6 +5,7 @@ import { racewayHalfWidth, estimateRoadCrossSection, buildUrbanRoadClassifier, i
 import { readGameTextureBlend, gameTextureBlendStrength } from './gameTextureBlend.js';
 import { WC, steepRockFrom } from "./worldCover.js";
 import { fastHypot } from './fastMath.js';
+import { placementShift, placementShiftAt } from './lanePlacement.js';
 
 // Colors aligned to OSM Carto style definitions
 // Source: https://github.com/gravitystorm/openstreetmap-carto (landcover.mss / water.mss)
@@ -1454,8 +1455,27 @@ const renderFeaturesToCanvas = (
       const cs = estimateRoadCrossSection(tags, tags.highway, isOneWayRoad(tags), { urban: isUrban(road), fallbackHalfWidth: layoutWidth / 2 || 3.5 });
       return 2 * cs.carriagewayHalfWidth;
     };
+    // (a road whose mapped line is off its carriageway's middle, placement tags: painted where the export builds it,
+    // lanePlacement.js; centred on the line, its asphalt left grass along one edge of the decal)
+    const placed = (features || []).map((f) => {
+      if (f?.type !== 'road' || !(f.geometry?.length > 1) || !Object.keys(f.tags || {}).some((k) => /^placement(:|$)/.test(k))) return f;
+      const tags = f.tags;
+      const cs = estimateRoadCrossSection(tags, tags.highway, isOneWayRoad(tags), { urban: isUrban(f), fallbackHalfWidth: 3.5 });
+      const sh = placementShift(tags, { half: cs.drivingHalfWidth, extraShift: (cs.leftExtra - cs.rightExtra) / 2, leftHand: !!options.leftHandTraffic });
+      if (!sh) return f;
+      const lat0 = f.geometry[0].lat; const ky = 111320; const kx = ky * Math.cos((lat0 * Math.PI) / 180);
+      const xy = f.geometry.map((q) => [q.lng * kx, q.lat * ky]);
+      const cum = [0]; for (let i = 1; i < xy.length; i++) cum.push(cum[i - 1] + fastHypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]));
+      const total = cum[cum.length - 1] || 1;
+      const geometry = f.geometry.map((q, i) => {
+        const a = xy[Math.max(0, i - 1)]; const b = xy[Math.min(xy.length - 1, i + 1)]; const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
+        const m = placementShiftAt(sh, cum[i] / total);
+        return { ...q, lat: q.lat + (((b[0] - a[0]) / L) * m) / ky, lng: q.lng - (((b[1] - a[1]) / L) * m) / kx };
+      });
+      return { ...f, geometry };
+    });
     try {
-      return renderFeaturesToCanvas(ctx, features, toPixel, SCALE_FACTOR, { ...options, builtWidths: true });
+      return renderFeaturesToCanvas(ctx, placed, toPixel, SCALE_FACTOR, { ...options, builtWidths: true });
     } finally {
       builtWidthOf = null;
     }
