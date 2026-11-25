@@ -1,6 +1,6 @@
 # MapNG open items
 
-Last reviewed: 2026-11-25 (tidied; main and dev 0c9381f; v0.3.7-dev.12; 0.3.6 Latest)
+Last reviewed: 2026-11-25 (main and dev at the tracking commit after e7fb142; v0.3.7-dev.12; 0.3.6 Latest; test levels 2026-11-25c)
 
 The short "now" board: current work, what waits on someone, and checks owed on shipped work. The other tracking
 files: `refs/output/backlog.md` holds everything wanted later, by area; `refs/output/releases.md` what shipped;
@@ -16,7 +16,7 @@ is where each item's full text, numbers and file names now live.
   v0.3.6 at 759ea31).
 - No work branches: all parked branches were deleted 2026-11-24 (SHAs in `docs/handoff.md`). Notes below that name
   `step-walls`, `step-walls-2`, `seawall` or `shaped-levels` refer to deleted branches.
-- Official test levels re-uploaded 2026-11-25 (manifest 2026-11-25b, built from 367b3f9).
+- Official test levels re-uploaded 2026-11-25 (manifest 2026-11-25c, built from e7fb142; all five checked through mapng.com).
 - Known sweep flags from before: sidewalk drift at naldo, kingst, deckpark_g, stelvio; ams_centraal mh/ready;
   dev_szczyrk cross; ams t30/noshape swBuried; Michiel de Ruijtertunnel joint steps (check if still the list after
   the 2026-11-24 baselines). H > State of the branches.
