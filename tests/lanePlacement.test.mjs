@@ -91,3 +91,10 @@ test('lane lines at the mapped lane widths', async () => {
   const want = -edge + 2 * edge * (4 / 6);
   assert.ok(Math.abs(sep.offset - want) < 1e-9, `separator at ${sep.offset}, want ${want}`);
 });
+
+test('lane line shares: the mapped widths from the right edge', async () => {
+  const { laneLineShares } = await import('../services/exportBeamNGLevel.js');
+  const sh = laneLineShares({ oneway: 'yes', lanes: '2', 'width:lanes': '2|4' }, { oneWay: true, lanes: 2, nF: 2, nB: 0 });
+  near(sh[1], 4 / 6, 'the 4 m right lane first'); near(sh[2], 1, 'all of it');
+  assert.equal(laneLineShares({ oneway: 'yes', lanes: '2' }, { oneWay: true, lanes: 2, nF: 2, nB: 0 }), null);
+});

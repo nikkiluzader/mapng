@@ -3320,13 +3320,32 @@ const WIDTH_TAPER_MEET_M = 0.75;
 const WIDTH_TAPER_ON_COS = Math.cos((30 * Math.PI) / 180);
 // A way's painted-line frame: its edge lines at base +- edge, its centre line at centre (the lanes split by direction).
 // (and its lanes: lanes, nF forward on the negative side, oneWay, reverse: for its lane dividers)
-const linesFrame = (w) => ({ base: w.lineBase ?? 0, edge: w.lineEdge ?? w.half, centre: w.lineCentre ?? (w.lineBase ?? 0), lanes: w.lanes || 0, nF: w.nF || 0, oneWay: !!w.oneWay, reverse: !!w.reverse });
+// (shares: each lane boundary's share of the way from the right edge line to the left one, k / lanes for equal lanes,
+// the mapped lane widths summed where width:lanes is: a taper carried the lines onto equal lanes and they stepped 0.5 to
+// 0.7 m at the joint, roads level scene H)
+const linesFrame = (w) => ({ base: w.lineBase ?? 0, edge: w.lineEdge ?? w.half, centre: w.lineCentre ?? (w.lineBase ?? 0), lanes: w.lanes || 0, nF: w.nF || 0, oneWay: !!w.oneWay, reverse: !!w.reverse, shares: w.lineShares || null });
+const shareOf = (f, k) => (f.shares && f.shares.length === f.lanes + 1 ? f.shares[k] : k / (f.lanes || 1));
+/**
+ * Each lane boundary's share of the way across the lanes from the right edge (forward lanes on the right, as the
+ * painted lines are laid out), k = 0..lanes; the mapped lane widths summed (width:lanes), else null (equal lanes).
+ */
+export function laneLineShares(tags, counts) {
+  const across = laneWidthsAcross(tags, { oneway: counts.oneWay, forward: counts.nF, backward: counts.nB, total: counts.lanes }, false);
+  if (!across || across.length !== counts.lanes) return null;
+  const fromRight = [...across].reverse().map((l) => l.w);
+  const total = fromRight.reduce((a, w) => a + w, 0);
+  const out = [0]; let sum = 0;
+  for (const w of fromRight) { sum += w; out.push(sum / total); }
+  return out;
+}
 // A lane divider's place in a frame: the k of a dashed line at offset o (its lanes' split, line_sep_k), or 0 when o is
 // no divider (an edge line, the centre line).
 function dividerIndex(f, o) {
   if (!(f.lanes >= 2)) return 0;
-  const w = (2 * f.edge) / f.lanes; const k = (o - (f.base - f.edge)) / w; const r = Math.round(k);
-  if (Math.abs(k - r) > 0.12 || r < 1 || r > f.lanes - 1 || (!f.oneWay && r === f.nF)) return 0;
+  const w = (2 * f.edge) / f.lanes;
+  let r = 0; let best = Infinity;
+  for (let k = 1; k < f.lanes; k++) { const d = Math.abs(f.base - f.edge + 2 * f.edge * shareOf(f, k) - o); if (d < best) { best = d; r = k; } }
+  if (best > 0.12 * w || (!f.oneWay && r === f.nF)) return 0;
   return r;
 }
 // Where divider k goes on the next piece (n): its index there, or 0 when its lane ends (the outer lane closes: a
@@ -3425,7 +3444,7 @@ export function findWidthTapers(ways) {
       if (k) {
         const k2 = dividerOnto(own, n, k);
         if (!k2) return o;
-        return o + ((n.base - n.edge + (k2 * 2 * n.edge) / n.lanes) - o) * e;
+        return o + ((n.base - n.edge + 2 * n.edge * shareOf(n, k2)) - o) * e;
       }
       // (piecewise: the right edge to the centre line, the centre line to the left edge, each onto the next piece's)
       const lo = own.base - own.edge; const hi = own.base + own.edge;
@@ -3705,14 +3724,8 @@ export function buildLineMarkingLayers(highway, tags = {}, styleHalfWidth = 3.5,
   const counts = markingLaneCounts(highway, tags);
   // (where the lanes' own widths are mapped, width:lanes: each line at the lanes' widths summed from the right edge,
   // the forward lanes on the right as everywhere here; equal lanes otherwise)
-  const across = laneWidthsAcross(tags, { oneway: counts.oneWay, forward: counts.nF, backward: counts.nB, total: counts.lanes }, false);
-  const fromRight = across ? [...across].reverse().map((l) => l.w) : null;
-  const totalW = fromRight ? fromRight.reduce((a, w) => a + w, 0) : 0;
-  const shareAt = (k, lanes) => {
-    if (!fromRight || fromRight.length !== lanes) return k / lanes;
-    let sum = 0; for (let i = 0; i < k; i++) sum += fromRight[i];
-    return sum / totalW;
-  };
+  const shares = laneLineShares(tags, counts);
+  const shareAt = (k, lanes) => (shares && shares.length === lanes + 1 ? shares[k] : k / lanes);
 
   const pushSeparator = (k, lanes) => {
     const offset = -edgeOffset + 2 * edgeOffset * shareAt(k, lanes);
@@ -7302,8 +7315,9 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     const lineBase = w.crossSection?.laneShift || 0;
     const lineEdge = Math.max(0.5, w.drivingHalfWidth - EDGE_LINE_INSET_M);
     const c = markingLaneCounts(sf.highway, tags);
-    const lineCentre = lineBase + (c.oneWay || !c.lanes ? 0 : -lineEdge + (2 * lineEdge * c.nF) / c.lanes);
-    return { lineBase, lineEdge, lineCentre, lanes: c.lanes, nF: c.nF, oneWay: c.oneWay, reverse: c.oneWay && isReverseOneWayRoad(tags) };
+    const lineShares = laneLineShares(tags, c);
+    const lineCentre = lineBase + (c.oneWay || !c.lanes ? 0 : -lineEdge + 2 * lineEdge * (lineShares ? lineShares[c.nF] : c.nF / c.lanes));
+    return { lineBase, lineEdge, lineCentre, lanes: c.lanes, nF: c.nF, oneWay: c.oneWay, reverse: c.oneWay && isReverseOneWayRoad(tags), lineShares };
   };
   const widthTapers = findWidthTapers(drivableRoads.map((sf) => (shouldGenerateDecalRoads(sf.highway, sf.sourceFeature.tags || {})
     ? { name: sf.sourceFeature.tags?.name || '', cls: sf.highway || '', ref: sf.sourceFeature.tags?.ref || '', half: widthsOf(sf).styleHalfWidth, ...lineFrameOf(sf), xy: sf.geometry.map((pt) => geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0).slice(0, 2)) }
