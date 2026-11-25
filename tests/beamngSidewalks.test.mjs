@@ -872,3 +872,37 @@ test('a walk crossing an at-grade track bed stops at its edges; the paved model 
   assert.ok(paved(item) > 0, 'without beds the walk is paved across');
   assert.equal(paved({ ...item, railBeds: [bed] }), 0, 'with the bed, nothing paved on it');
 });
+
+test('a sidewalk width read in both spellings, width:sidewalk:<side> as well (a cycleway\'s sidewalk, thecoachtoma)', () => {
+  assert.deepEqual(sidewalkSides({ tags: { sidewalk: 'left', 'width:sidewalk:left': '2.5' }, highway: 'cycleway' }), { left: 2.5, right: 0 });
+  assert.deepEqual(sidewalkSides({ tags: { sidewalk: 'both', 'width:sidewalk': '3' } }), { left: 3, right: 3 });
+  // (the sidewalk:<side>:width form wins where both are mapped)
+  assert.deepEqual(sidewalkSides({ tags: { sidewalk: 'right', 'sidewalk:right:width': '1.5', 'width:sidewalk:right': '4' } }), { left: 0, right: 1.5 });
+});
+
+test('a footbridge whose end is mapped on the shoreline lands on the bank, both ends level', async () => {
+  // (a boardwalk across a lake: its west end node fell on the water side of the bank's step on the terrain grid and
+  // the deck ran from the east bank down to the water; sidewalk test level, 2026-11-24)
+  const { buildDeckRuns } = await import('../services/beamngSidewalks.js');
+  const bank = 8; const water = 5.5;
+  const ground = (x) => (x <= -60.5 || x >= 60 ? bank : water);   // the west end (-60) just inside the step
+  const walk = { nodes: Array.from({ length: 13 }, (_, i) => [-60 + i * 10, 0, 0]), half: 1, bridge: true, wood: true };
+  const [r] = buildDeckRuns([walk], [], { groundAt: (x) => ground(x), seaZ: -100 });
+  const z = r.centre.map((q) => q[2]);
+  assert.ok(Math.abs(z[0] - z[z.length - 1]) < 0.05, `ends level: ${z[0].toFixed(2)} and ${z[z.length - 1].toFixed(2)}`);
+  assert.ok(z.every((v) => v > water + 1.5), `never down at the water: ${Math.min(...z).toFixed(2)}`);
+});
+
+test('a path\'s own sidewalk is laid only where the ground beside it is level with it, never on a bank', async () => {
+  // (a cycleway along a railway embankment, sidewalk=right on the embankment's side: Amsterdam Centraal, 2026-11-24)
+  const { sidewalkPieces } = await import('../services/exportBeamNGLevel.js');
+  const nodes = Array.from({ length: 31 }, (_, i) => [i * 2, 0, 0]);       // 60 m east
+  // the ground right of the way (y < 0) climbs a bank between x = 20 and x = 40; level elsewhere and on the left
+  const ground = (x, y) => (y < -2 && x > 20 && x < 40 ? 4 : 0);
+  const pieces = sidewalkPieces(nodes, 1.75, { highway: 'cycleway', sidewalk: 'both', 'width:sidewalk:right': '2' }, ground);
+  const left = pieces.filter((p) => p.tags.sidewalk === 'left'); const right = pieces.filter((p) => p.tags.sidewalk === 'right');
+  assert.equal(left.length, 1); assert.equal(left[0].nodes.length, 31);
+  assert.equal(right.length, 2, 'the right side split round the bank');
+  for (const p of right) assert.ok(p.nodes.every((q) => q[0] <= 20 || q[0] >= 40), 'none along the bank');
+  assert.equal(right[0].tags['width:sidewalk:right'], '2');
+});

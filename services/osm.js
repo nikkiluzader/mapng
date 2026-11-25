@@ -215,7 +215,9 @@ const isAreaLikeWay = (tags, nodes) => {
     tags.leisure || tags.golf || tags.recreation || tags.natural ||
     tags.amenity || tags.aeroway || tags.tourism || tags.man_made ||
     tags.public_transport || tags.power || tags.military ||
-    tags.place || tags.historic || tags.wetland || tags.surface || tags.material
+    tags.place || tags.historic || tags.wetland || tags.surface || tags.material ||
+    // (a pedestrian area's own outline: always an area, getFeatureType)
+    tags["area:highway"] === "pedestrian"
   );
 };
 
@@ -469,6 +471,10 @@ export const parseOverpassResponse = (data, bounds) => {
       tags.water === "dock" || tags.harbour === "yes"
     ) return "water";
     if (tags.barrier) return "barrier";
+    // (a pedestrian area drawn as its own outline, area:highway=pedestrian beside the street's line: an area like a
+    // square (plazas.js isPlaza). With no other tag it matched nothing here and was dropped: the sidewalk test level's
+    // outline came out unpaved, 2026-11-24)
+    if (tags["area:highway"] === "pedestrian") return "landuse";
     // (a railway platform mapped with nothing else on it: platforms.js raises it beside its track)
     if (tags.railway === "platform" && !tags.highway) return "platform";
     if (

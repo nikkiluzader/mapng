@@ -69,3 +69,16 @@ test('breakwaters and groynes mapped as lines are read (coverage level, 2026-11-
   assert.deepEqual(f.map((x) => x.tags.man_made).sort(), ['breakwater', 'groyne']);
   assert.ok(f.every((x) => x.geometry.length === 2), 'kept as lines');
 });
+
+test('a pedestrian area drawn as its own outline (area:highway=pedestrian, nothing else) is kept as an area', async () => {
+  const { parseOverpassResponse } = await import('../services/osm.js');
+  const b = { north: 0.001, south: -0.001, east: 0.001, west: -0.001 };
+  const n = (id, lat, lon) => ({ type: 'node', id, lat, lon });
+  const pts = [[-0.0005, -0.0005], [-0.0005, 0.0005], [0.0005, 0.0005], [0.0005, -0.0005]];
+  const nodes = pts.map(([la, lo], i) => n(i + 1, la, lo));
+  const way = { type: 'way', id: 9, nodes: [1, 2, 3, 4, 1], geometry: [...pts, pts[0]].map(([lat, lon]) => ({ lat, lon })), tags: { 'area:highway': 'pedestrian' } };
+  const out = parseOverpassResponse({ elements: [...nodes, way] }, b);
+  const f = out.find((x) => x.tags?.['area:highway'] === 'pedestrian');
+  assert.ok(f, 'kept');
+  assert.equal(f.type, 'landuse');
+});

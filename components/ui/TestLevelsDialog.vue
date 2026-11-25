@@ -37,7 +37,7 @@ const props = defineProps({ open: { type: Boolean, default: false } });
 defineEmits(['close']);
 const { t } = useI18n();
 const levels = ref([]); const loading = ref(false); const error = ref(false);
-const KINDS = new Set(['coverage', 'roads', 'structures', 'terrain']);
+const KINDS = new Set(['coverage', 'roads', 'structures', 'terrain', 'sidewalks']);
 
 watch(() => props.open, async (on) => {
   if (!on || levels.value.length || loading.value) return;

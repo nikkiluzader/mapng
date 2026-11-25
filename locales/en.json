@@ -10,7 +10,8 @@
       "coverage": "Coverage: every asset and map tag MapNG builds",
       "roads": "Roads: lanes, junctions, roundabouts, crossings, surfaces",
       "structures": "Structures: every bridge type and tunnel",
-      "terrain": "Terrain: a mountain pass, steep streets, a valley river"
+      "terrain": "Terrain: a mountain pass, steep streets, a valley river",
+      "sidewalks": "Sidewalks: every sidewalk tag, corner, crossing, footway, square, step and cycleway case"
     }
   },
   "backupData": {
@@ -1230,7 +1231,7 @@
   },
   "levels": {
     "testLevels": "Download official test levels",
-    "testLevelsHint": "The four levels MapNG is tested on (every asset it builds, road situations, bridges and tunnels, terrain), downloaded into your mods folder and listed here.",
+    "testLevelsHint": "The levels MapNG is tested on (every asset it builds, road situations, bridges and tunnels, terrain, sidewalks), downloaded into your mods folder and listed here.",
     "testLevelsProgress": "Downloading {file}: {done} of {total} MB",
     "testLevelsDone": "{n} test levels are in your mods folder.",
     "testLevelOfficial": "Official test level: refresh it with “Download official test levels”",

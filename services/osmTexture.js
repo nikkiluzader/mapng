@@ -1,7 +1,7 @@
 import { parallelMap, parallelThreads } from './parallel.js';
 import { blendStrip } from './satelliteDetailStrip.js';
 import { buildRoadNetwork, getEffectiveRoadLayer, mergeLinearRoadSegments } from "./roadNetwork.js";
-import { racewayHalfWidth } from "./roadWidth.js";
+import { racewayHalfWidth, estimateRoadCrossSection, buildUrbanRoadClassifier, isOneWayRoad } from "./roadWidth.js";
 import { readGameTextureBlend, gameTextureBlendStrength } from './gameTextureBlend.js';
 import { WC, steepRockFrom } from "./worldCover.js";
 import { fastHypot } from './fastMath.js';
@@ -953,6 +953,18 @@ const getTextureWidthCorridorKey = (road) => {
   ]);
 };
 
+// The width the level export builds a road at (roadWidth.js estimateRoadCrossSection: lanes plus the parking lanes or
+// edge strips a street carries, a street in town by the same building test as the export), set for one painting by
+// renderFeaturesToCanvas. The lane layout alone left a two-lane town street 6 m wide here and 9 m curb to curb in the
+// level: the asphalt decal's outer edge let the grass painted between show along every curb (sidewalk test level,
+// 2026-11-24). Lane markings still use the lane layout.
+let builtWidthOf = null;
+const builtRoadWidth = (road, layoutWidth) => {
+  if (!builtWidthOf || !road?.tags?.highway) return layoutWidth;
+  const built = builtWidthOf(road, layoutWidth);
+  return Number.isFinite(built) && built > layoutWidth ? built : layoutWidth;
+};
+
 const buildStableTextureWidthMap = (roads) => {
   const widthGroups = new Map();
 
@@ -964,7 +976,7 @@ const buildStableTextureWidthMap = (roads) => {
     const key = getTextureWidthCorridorKey(road);
     const widths = widthGroups.get(key) || [];
     for (const member of members) {
-      const width = getLaneLayout(member.tags || {}).totalWidth;
+      const width = builtRoadWidth(member, getLaneLayout(member.tags || {}).totalWidth);
       if (Number.isFinite(width) && width > 0) widths.push(width);
     }
     widthGroups.set(key, widths);
@@ -1016,7 +1028,7 @@ const getRoadPavementColor = (road) => {
 
 const getStableTextureRoadWidth = (road, stableWidthMap = null) => {
   const layout = getLaneLayout(road.tags || {});
-  const baseWidth = layout.totalWidth;
+  const baseWidth = builtRoadWidth(road, layout.totalWidth);
   const highway = road.tags?.highway;
   if (!STABLE_TEXTURE_WIDTH_HIGHWAYS.has(highway)) {
     return baseWidth;
@@ -1432,6 +1444,20 @@ const renderFeaturesToCanvas = (
       return renderFeaturesToCanvas(ctx, features, toPixel, SCALE_FACTOR, { ...options, palette: null });
     } finally {
       Object.assign(COLORS, saved);
+    }
+  }
+  // (the roads at the width the export builds them: one building test for the whole painting, cleared after)
+  if (!options.builtWidths) {
+    const isUrban = buildUrbanRoadClassifier(features || []);
+    builtWidthOf = (road, layoutWidth) => {
+      const tags = road.tags || {};
+      const cs = estimateRoadCrossSection(tags, tags.highway, isOneWayRoad(tags), { urban: isUrban(road), fallbackHalfWidth: layoutWidth / 2 || 3.5 });
+      return 2 * cs.carriagewayHalfWidth;
+    };
+    try {
+      return renderFeaturesToCanvas(ctx, features, toPixel, SCALE_FACTOR, { ...options, builtWidths: true });
+    } finally {
+      builtWidthOf = null;
     }
   }
   const drawPath = (points) => {

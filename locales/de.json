@@ -10,7 +10,8 @@
       "coverage": "Abdeckung: jedes Objekt und jeder Karten-Tag, den MapNG baut",
       "roads": "Straßen: Fahrstreifen, Kreuzungen, Kreisverkehre, Übergänge, Beläge",
       "structures": "Bauwerke: jeder Brückentyp und Tunnel",
-      "terrain": "Gelände: ein Pass, steile Straßen, ein Fluss im Tal"
+      "terrain": "Gelände: ein Pass, steile Straßen, ein Fluss im Tal",
+      "sidewalks": "Gehwege: jeder Gehweg-Tag, jede Ecke, jeder Übergang, Fußweg, Platz, jede Treppe und jeder Radweg"
     }
   },
   "common": {
@@ -1225,7 +1226,7 @@
   },
   "levels": {
     "testLevels": "Offizielle Testlevel herunterladen",
-    "testLevelsHint": "Die vier Level, mit denen MapNG getestet wird (alle Objekte, Straßensituationen, Brücken und Tunnel, Gelände), werden in deinen Mods-Ordner geladen und hier aufgeführt.",
+    "testLevelsHint": "Die Level, mit denen MapNG getestet wird (alle Objekte, Straßensituationen, Brücken und Tunnel, Gelände, Gehwege), werden in deinen Mods-Ordner geladen und hier aufgeführt.",
     "testLevelsProgress": "{file} wird geladen: {done} von {total} MB",
     "testLevelsDone": "{n} Testlevel liegen in deinem Mods-Ordner.",
     "testLevelOfficial": "Offizielles Testlevel: Aktualisiere es mit „Offizielle Testlevel herunterladen“",

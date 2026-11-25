@@ -9,7 +9,9 @@
 //   terrain     a 350 m mountain with a switchback pass to a saddle and a ridge road, a steep street grid on a hill
 //               side, a straight road across rolling hills (cuts and embankments), a valley road along a river
 //
-//   node scripts/coverage/testLevels.mjs <roads|structures|terrain|all> [region]
+//   sidewalks   every sidewalk rule and past fault, one 200 m plot each (scripts/coverage/sidewalkScene.mjs)
+//
+//   node scripts/coverage/testLevels.mjs <roads|structures|terrain|sidewalks|all> [region]
 //
 // Writes scratch/levelprobe/data/test_<suite>_<region>/ like the coverage area: export it with
 // scripts/sweep/exportArea.mjs, label it with scripts/coverage/addLabels.py, tour it with the coverage tour.
@@ -375,7 +377,8 @@ function terrain(regionKey) {
   return { b, size: SIZE, heightAt, landCover };
 }
 
-export const SUITES = { roads, structures, terrain };
+import { sidewalks } from './sidewalkScene.mjs';
+export const SUITES = { roads, structures, terrain, sidewalks: (region) => sidewalks(region, makeBuilder) };
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const which = process.argv[2] || 'all'; const region = process.argv[3] || 'na_east';

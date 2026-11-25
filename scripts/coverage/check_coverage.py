@@ -129,7 +129,9 @@ def main():
     official = {}; generated = set()
     for p in placed:
         o = official_of(p)
-        if o and o.startswith('levels/') and not o.startswith(base) or (o and o.startswith('art/')):
+        # (the game's own models: under levels/ (through the level's links), art/ and assets/ (the shared meshes, such as
+        # the flight of steps placed for highway=steps; read through refs/beamng/content/assets/meshes.zip)
+        if o and o.startswith('levels/') and not o.startswith(base) or (o and o.startswith(('art/', 'assets/'))):
             official[p] = o
         else:
             generated.add(p)

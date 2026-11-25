@@ -103,3 +103,15 @@ scripts/r2.sh copyto scratch/coverage/upload/<file> r2:mapng-osm/test-levels/<fi
 The desktop app checks each zip against the manifest's SHA-256, so upload the zips before the manifest when
 replacing a set.
 
+## The sidewalk level's tour
+
+Its streets are lined with houses, so a camera from a fixed side shows roofs. Aim each spot down its street first:
+
+```
+node scripts/coverage/testLevels.mjs sidewalks na_east
+python3 scripts/coverage/aim_tour.py scratch/levelprobe/data/test_sidewalks_na_east 30
+```
+
+then export, label and tour as above. In game, set the free camera before starting the tour
+(`commands.setFreeCamera()`): with the spawned car's camera active every shot is the same.
+

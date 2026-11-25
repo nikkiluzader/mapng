@@ -10,7 +10,8 @@
       "coverage": "Couverture : chaque objet et balise de carte que MapNG construit",
       "roads": "Routes : voies, carrefours, giratoires, passages, revêtements",
       "structures": "Ouvrages : chaque type de pont et de tunnel",
-      "terrain": "Relief : un col, des rues en pente, une rivière dans une vallée"
+      "terrain": "Relief : un col, des rues en pente, une rivière dans une vallée",
+      "sidewalks": "Trottoirs : chaque balise de trottoir, angle, passage, chemin piéton, place, escalier et piste cyclable"
     }
   },
   "common": {
@@ -1225,7 +1226,7 @@
   },
   "levels": {
     "testLevels": "Télécharger les niveaux de test officiels",
-    "testLevelsHint": "Les quatre niveaux sur lesquels MapNG est testé (tous les objets, situations routières, ponts et tunnels, relief), téléchargés dans ton dossier de mods et listés ici.",
+    "testLevelsHint": "Les niveaux sur lesquels MapNG est testé (tous les objets, situations routières, ponts et tunnels, relief, trottoirs), téléchargés dans ton dossier de mods et listés ici.",
     "testLevelsProgress": "Téléchargement de {file} : {done} sur {total} Mo",
     "testLevelsDone": "{n} niveaux de test sont dans ton dossier de mods.",
     "testLevelOfficial": "Niveau de test officiel : mets-le à jour avec « Télécharger les niveaux de test officiels »",

@@ -3816,6 +3816,21 @@
    },
    "code": "services/exportBeamNGLevel.js"
   },
+  "area:highway=pedestrian": {
+   "what": "A pedestrian area drawn as its own outline beside the street's line",
+   "on": [
+    "area"
+   ],
+   "group": "walk",
+   "item": "paths",
+   "status": "built",
+   "fetched": true,
+   "builds": "A paved surface in the mapped surface, cut round buildings, roads and water inside it, as a square",
+   "assets": [],
+   "generated": "Draped paved mesh in the mapped surface",
+   "code": "services/plazas.js",
+   "note": "Kept as an area by services/osm.js even with no other tag (dropped before 2026-11-24)"
+  },
   "highway=pedestrian": {
    "what": "A pedestrian street or square",
    "on": [

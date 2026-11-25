@@ -132,10 +132,18 @@ export function turningCircleDecalNodes(tc) {
   const r = tc.r;
   const ts = [];
   // (from the street's side, where the street covers it already, out past the centre to the far tip)
-  for (let t = -r * 0.6; t < r * 0.7; t += TC_DECAL_STEP_M) ts.push(t);
+  // (from near the ring's street-side edge: started at -0.6 r it left two wedges of grass between the street and the
+  // bulb inside the curb; sidewalk test level, 2026-11-24)
+  for (let t = -r * 0.95; t < r * 0.7; t += TC_DECAL_STEP_M) ts.push(t);
   for (let t = r * 0.7; t < r; t += TC_DECAL_TIP_STEP_M) ts.push(t);
+  // (the tip last, always ahead of the point before it: the loop's last step could land within 0.05 m of the tip, and
+  // the tip pushed after it ran the decal backwards over its last node; the game drew none of the bulb then, only the
+  // curb round grass: sidewalk test level, 2026-11-24)
   ts.push(r - 0.05);
-  return ts.map((t) => {
+  // (and no two points closer than 0.1 m: where the two step sizes meet, and before the tip)
+  const kept = [];
+  for (const t of ts) { if (kept.length && t - kept[kept.length - 1] < 0.1) kept.pop(); kept.push(t); }
+  return kept.map((t) => {
     const x = tc.c[0] + tc.dir[0] * t; const y = tc.c[1] + tc.dir[1] * t;
     return [x, y, bulbHeight(tc, x, y), Math.max(TC_DECAL_MIN_W, 2 * Math.sqrt(Math.max(0, r * r - t * t)))];
   });

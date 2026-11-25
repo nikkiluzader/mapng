@@ -20,6 +20,7 @@ import { CURB_ONLY_M, sidewalkSides } from './beamngSidewalks.js';
 import { osmRockAllowed, steepRockFrom } from './worldCover.js';
 import { railHalfWidth, railKindOf, undergroundRailIds } from './railways.js';
 import { fastHypot } from './fastMath.js';
+import { stepWidth } from './stepFlights.js';
 
 // ── Material names ─────────────────────────────────────────────────────────
 // Index 0 = DefaultMaterial (satellite base), 1–9 = BeamNG-referenced materials
@@ -451,6 +452,9 @@ const ROAD_STYLE = {
   pedestrian:     { mat: 7, halfWidthM: 4.0 },
   track:          { mat: 6, halfWidthM: 2.5 },
   footway:        { mat: 7, halfWidthM: 1.2 },
+  // (a flight of steps: concrete under it, as wide as the flight (stepFlights.js), no grass growing up through the
+  // treads; it fell to the ground's grass: sidewalk test level, 2026-11-24)
+  steps:          { mat: 7, halfWidthM: 1.0 },
   cycleway:       { mat: 7, halfWidthM: 1.2 },
   path:           { mat: 6, halfWidthM: 1.0 },
 };
@@ -965,6 +969,13 @@ function paintRoadFootprints(layerMap, terrainData, worldSize) {
     if (!style || !(run.pts?.length >= 2)) continue;
     roads.push({ style, halfWidthM: Math.max(style.halfWidthM, run.halfM || 0), sidewalkM: 0, pts: run.pts.map(([x, y]) => ({ px: toLayer(x), py: toLayer(y) })) });
   }
+  // (a pedestrian area drawn as its own outline, area:highway=pedestrian: paved as a square, plazas.js; it fell to the
+  // ground's grass and the grass grew up through the paving)
+  for (const feature of osmFeatures) {
+    if (feature.tags?.['area:highway'] !== 'pedestrian' || !(feature.geometry?.length >= 3)) continue;
+    if (getEffectiveRoadLayer(feature.tags) !== 0) continue;
+    squares.push({ mat: ROAD_STYLE.pedestrian.mat, ring: feature.geometry.map((pt) => toPx(pt.lat, pt.lng)) });
+  }
   for (const feature of osmFeatures) {
     if (feature.type !== 'road' || !feature.geometry?.length) continue;
     const tags = feature.tags || {};
@@ -987,6 +998,7 @@ function paintRoadFootprints(layerMap, terrainData, worldSize) {
     // wherever the decal shows it.
     let halfWidthM = style.halfWidthM;
     let sidewalkM = 0;
+    if (highway === 'steps') halfWidthM = Math.max(halfWidthM, stepWidth(tags) / 2 + 0.3);
     if (style.mat === 5) {
       const urban = isUrbanRoad(feature);
       const { carriagewayHalfWidth } = estimateRoadCrossSection(tags, highway, isOneWayRoad(tags), { urban });

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { planTurningCircles, turningCircleCarriageway, gradeTurningCircle, bulbHeight, turningCircleRadius, TC_MIN_R, TC_MAX_R } from '../services/turningCircles.js';
+import { planTurningCircles, turningCircleCarriageway, turningCircleDecalNodes, gradeTurningCircle, bulbHeight, turningCircleRadius, TC_MIN_R, TC_MAX_R } from '../services/turningCircles.js';
 
 // a street along +x ending at (100, 0), climbing 3 %, 4.5 m half width; another street crossing at x = 0
 const street = (over = {}) => ({ owner: 7, highway: 'residential', half: 4.5, tags: { highway: 'residential' }, nodes: Array.from({ length: 51 }, (_, i) => [i * 2, 0, i * 2 * 0.03, 4.5]), ...over });
@@ -75,4 +75,14 @@ test('a bulb with its sidewalk mapped round it (footway=sidewalk) gets none of i
   const loop = Array.from({ length: 24 }, (_, i) => [100 + 16 * Math.cos(i / 4), 16 * Math.sin(i / 4)]);
   assert.equal(turningCircleCarriageway(tc, { mappedWalks: [loop] }).tags.sidewalk, 'no');
   assert.equal(turningCircleCarriageway(tc, { mappedWalks: [[[400, 400], [410, 400]]] }).tags.sidewalk, 'right');
+});
+
+test('a bulb decal\'s points always move outward to its tip, whatever its radius', () => {
+  // (a last loop step landing within 0.05 m of the tip put the tip behind it: the decal ran backwards and the game drew
+  // none of the bulb; sidewalk test level, 2026-11-24, r = 10.5)
+  for (let r = 8; r <= 13; r += 0.01) {
+    const tc = { r, ri: 0, c: [0, 0], dir: [1, 0], z0: 0, grade: 0, street: {} };
+    const nodes = turningCircleDecalNodes(tc);
+    for (let i = 1; i < nodes.length; i++) assert.ok(nodes[i][0] - nodes[i - 1][0] >= 0.09, `r ${r.toFixed(2)}: node ${i} at ${nodes[i][0].toFixed(3)} after ${nodes[i - 1][0].toFixed(3)}`);
+  }
 });

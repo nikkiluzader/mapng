@@ -10,7 +10,8 @@
       "coverage": "Pokrycie: każdy obiekt i znacznik mapy, który buduje MapNG",
       "roads": "Drogi: pasy, skrzyżowania, ronda, przejścia, nawierzchnie",
       "structures": "Budowle: każdy typ mostu i tunelu",
-      "terrain": "Teren: przełęcz, strome ulice, rzeka w dolinie"
+      "terrain": "Teren: przełęcz, strome ulice, rzeka w dolinie",
+      "sidewalks": "Chodniki: każdy znacznik chodnika, narożnik, przejście, ścieżka, plac, schody i droga rowerowa"
     }
   },
   "common": {
@@ -1225,7 +1226,7 @@
   },
   "levels": {
     "testLevels": "Pobierz oficjalne poziomy testowe",
-    "testLevelsHint": "Cztery poziomy, na których testowany jest MapNG (wszystkie obiekty, sytuacje drogowe, mosty i tunele, teren), pobrane do folderu modów i pokazane tutaj.",
+    "testLevelsHint": "Poziomy, na których testowany jest MapNG (wszystkie obiekty, sytuacje drogowe, mosty i tunele, teren, chodniki), pobrane do folderu modów i pokazane tutaj.",
     "testLevelsProgress": "Pobieranie {file}: {done} z {total} MB",
     "testLevelsDone": "{n} poziomy testowe są w folderze modów.",
     "testLevelOfficial": "Oficjalny poziom testowy: odśwież go przyciskiem „Pobierz oficjalne poziomy testowe”",

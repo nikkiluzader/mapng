@@ -118,6 +118,7 @@ const SIDEWALK_DECK_M = 10;
 const SIDEWALK_DECK_COS = Math.cos((30 * Math.PI) / 180);
 const DECK_DUG_M = 0.5;          // a footbridge end this far under the survey stands on the surveyed ground // ... but not where its slab overlaps the road's lanes more than this
 const DECK_POST_M = 4;
+const DECK_END_REACH_M = 2;   // a footbridge's end stands on the highest ground this far out past it (a shoreline end)
 const WALL_WATER_M = 0.5;      // ground this little over the water is the water's side
 const WALL_INNER_LIFT_M = 0.5; // the deck's land edge over the highest ground along it
 const WALL_SLOPE_DROP_M = 1;  // down to the water's edge
@@ -213,7 +214,7 @@ const V_BAND_LOW = 1 - 63 / 512;
 
 // (bricks, pavers, sett, cobble: walks mapped in stone or brick, with the
 // squares' materials, plazas.js)
-const PAVED_SETS = ['bricks', 'pavers', 'sett', 'cobble'];
+const PAVED_SETS = ['bricks', 'pavers', 'sett', 'cobble', 'asphalt'];
 export const SIDEWALK_MATERIALS = {
   curb: 'mapng_curbs', slab: 'mapng_sidewalk', paved: 'mapng_corner_asphalt', wood: 'mapng_pier_wood', metal: 'mapng_gangway_aluminium',
   // (white road paint on a mesh: a mini roundabout's centre, services/miniRoundabouts.js)
@@ -320,8 +321,11 @@ export const CURB_ONLY_M = CURB_W;
  * ones mapped as footways); a town street has its curb either way.
  */
 export function sidewalkSides({ tags = {}, highway, urban, curbed }) {
-  const width = (side) => parseWidth(tags[`sidewalk:${side}:width`]) ?? parseWidth(tags['sidewalk:both:width'])
-    ?? parseWidth(tags['sidewalk:width']) ?? DEFAULT_WIDTH_M;
+  // (both spellings mapped: sidewalk:<side>:width and width:sidewalk:<side>, the second asked for by thecoachtoma for a
+  // cycleway's sidewalk, 2026-11-24)
+  const width = (side) => parseWidth(tags[`sidewalk:${side}:width`]) ?? parseWidth(tags[`width:sidewalk:${side}`])
+    ?? parseWidth(tags['sidewalk:both:width']) ?? parseWidth(tags['width:sidewalk:both'])
+    ?? parseWidth(tags['sidewalk:width']) ?? parseWidth(tags['width:sidewalk']) ?? DEFAULT_WIDTH_M;
   const general = norm(tags.sidewalk);
   const both = norm(tags['sidewalk:both']);
   const sideTag = (side) => norm(tags[`sidewalk:${side}`]);
@@ -2552,7 +2556,14 @@ export function buildDeckRuns(paths, bridges, opts = {}) {
       // water: an end inside a river's outline took the dug bed, 4 m under the bank, and the pier rule's sea level)
       for (const e of [0, nodes.length - 1]) {
         const w = opts.walkTop ? opts.walkTop(nodes[e][0], nodes[e][1]) : null;
-        raw[e] = w !== null && w !== undefined ? w - WALK_H : Math.max(raw[e], groundAt(nodes[e][0], nodes[e][1]));
+        // (the ground at the end, or up to DECK_END_REACH_M beyond it outward along the path, the highest: an end mapped
+        // on the shoreline fell on the water's side of the bank's step on the terrain's grid, and a boardwalk across a
+        // lake ran from the bank at one end down to the water at the other; the user, sidewalk test level 2026-11-24)
+        const o = e === 0 ? nodes[1] : nodes[nodes.length - 2]; const q = nodes[e];
+        const L = fastHypot(q[0] - o[0], q[1] - o[1]) || 1; const ox = (q[0] - o[0]) / L; const oy = (q[1] - o[1]) / L;
+        let endGround = groundAt(q[0], q[1]);
+        for (let d = 1; d <= DECK_END_REACH_M; d += 1) endGround = Math.max(endGround, groundAt(q[0] + ox * d, q[1] + oy * d));
+        raw[e] = w !== null && w !== undefined ? w - WALK_H : Math.max(raw[e], endGround);
         // (an end where the level's ground was dug under the survey (a river's bed carved along its line) stands
         // at the surveyed height: the Swamp Rabbit Trail's bridge below the falls ended 3 m under the trail it joins)
         if ((w === null || w === undefined) && opts.surveyAt) {

@@ -143,14 +143,15 @@ export function plazaSurface(surface) {
 /** Metres one repeat of a surface set's texture covers. */
 export const plazaTileM = (set) => SETS[set]?.tileM ?? 1;
 
-/** The stone or brick set a walk's surface=* is laid in, or null (concrete, asphalt, untagged: the plain slab). */
+/** The stone, brick or asphalt set a walk's surface=* is laid in, or null (concrete, untagged: the plain slab). An
+ * asphalt footway was the light concrete slab (sidewalk test level, 2026-11-24). */
 export function pavedWalkSurface(surface, { americas = false } = {}) {
   const s = String(surface ?? '').trim().toLowerCase();
   if (!s) return null;
   // (as the paved streets' decals: paving stones in the Americas are red brick)
   if (s === 'paving_stones' || s.startsWith('paving_stones:')) return americas ? 'bricks' : 'pavers';
   const set = plazaSurface(s);
-  return set === 'pavers' || set === 'concrete' || set === 'asphalt' ? null : set;
+  return set === 'pavers' || set === 'concrete' ? null : set;
 }
 
 /** Is this OSM feature a pedestrian square? */
@@ -244,10 +245,14 @@ export function courtyardPathHalf(tags = {}) {
  * ([{ nodes, half }]): laid out by courtyardLayout. Returns { meshes, count,
  * triangles }.
  */
-export function buildPlazaMeshes(plazas, { drape, buildings = [], roads = [] } = {}) {
+// water: rings of the water areas (lakes, basins, docks, rivers drawn as areas): cut out of a square drawn round them
+// (a square mapped round a dock basin was paved on the basin's floor under the water: sidewalk test level, 2026-11-24);
+// a water area round the whole square (a square on a deck over a harbour) cuts nothing, as a building round a courtyard
+export function buildPlazaMeshes(plazas, { drape, buildings = [], roads = [], water = [] } = {}) {
   const parts = {};
   let triangles = 0;
   let count = 0;
+  let waterCut = 0;
   const builder = {
     tri(mat, a, b, c) {
       const p = parts[mat] || (parts[mat] = { pos: [], uv: [] });
@@ -260,6 +265,7 @@ export function buildPlazaMeshes(plazas, { drape, buildings = [], roads = [] } =
     },
   };
   const buildingBoxes = buildings.map((r) => ({ r, box: boxOf(r) }));
+  const waterBoxes = water.filter((r) => r?.length >= 3).map((r) => ({ r, box: boxOf(r) }));
   const roadQuads = [];
   for (const { nodes, half } of roads) {
     for (let i = 0; i + 1 < nodes.length; i++) {
@@ -283,12 +289,14 @@ export function buildPlazaMeshes(plazas, { drape, buildings = [], roads = [] } =
     // (not the building round it: a courtyard is its outline's hole, and cut
     // round that outline nothing was left)
     const encloses = (c) => ring.every(([x, y]) => inRing(x, y, c.r));
-    const cuts = [...buildingBoxes.filter((c) => overlaps(c.box, box) && !encloses(c)), ...roadQuads.filter((c) => overlaps(c.box, box))].map((c) => [close(open(c.r))]);
+    const wet = waterBoxes.filter((c) => overlaps(c.box, box) && !encloses(c));
+    if (wet.length) waterCut++;
+    const cuts = [...buildingBoxes.filter((c) => overlaps(c.box, box) && !encloses(c)), ...waterBoxes.filter((c) => overlaps(c.box, box) && !encloses(c)), ...roadQuads.filter((c) => overlaps(c.box, box))].map((c) => [close(open(c.r))]);
     let shape = [[close(ring)]];
     try {
       if (cuts.length) shape = polygonClipping.difference(shape, ...cuts);
     } catch (err) {
-      console.warn('Plazas: could not cut a square round its buildings and roads:', err?.message);
+      console.warn('Plazas: could not cut a square round its buildings, water and roads:', err?.message);
       continue;
     }
     const set = SETS[plaza.surface] ? plaza.surface : 'pavers';
@@ -318,5 +326,5 @@ export function buildPlazaMeshes(plazas, { drape, buildings = [], roads = [] } =
     mesh.name = `plazas_${set}`;
     meshes.push(mesh);
   }
-  return { meshes, count, triangles };
+  return { meshes, count, triangles, waterCut };
 }

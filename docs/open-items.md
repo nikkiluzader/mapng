@@ -133,6 +133,36 @@ Mesh Road joins. Riding along: the other 38 sweep areas re-framed, Zion's tunnel
 - **To refresh the levels after a change:** re-export with `--fix-stubs` (real reflection files), addLabels, check,
   write the manifest and upload (refs/output/history.md "Test levels" has the steps; scripts/r2.sh).
 
+## Now: the sidewalk test level (user 2026-11-24: "make sure this synthetic test covers every scenario")
+
+- **All its findings fixed 2026-11-24 (in game and in the sweep, 135 cells clean); the level is the fifth official test level.** Fixed: the curb band (texture width), area:highway=pedestrian (parsed, fetched, paved, no grass), water inside a square, cul-de-sac bulbs (decal priority), steps (stepFlights.js), service roads and cycleways with their own sidewalk (flush edge for cycleways, width:sidewalk:<side>, never on a bank), asphalt footways, footbridge ends on a shoreline (the boardwalk). Earlier text kept below as the record.
+- **Built and toured once (record).** `scripts/coverage/sidewalkScene.mjs` (suite `sidewalks` of
+  testLevels.mjs): 81 plots of 200 m, 319 scenes and walker views covering every rule of the sidewalk builders and the
+  past faults (tags, widths, classes, in and out of town, corners, roundabouts, cul-de-sacs, crossings, driveways,
+  medians, fronts and lawns, footways, plazas, rail, bridges, the sea, canal, river, lake, hills). Area
+  `scratch/levelprobe/data/test_sidewalks_na_east`; export `scratch/sidewalks/out`; plan and overlay
+  `scratch/sidewalks/{expected,after}.py` (PLOTS="c,r;..." for close-ups); tour sheets `scratch/sidewalks/sheets`;
+  `scratch/sidewalks/aim.py` aims each tour shot down its street (the fixed side views showed only roofs).
+  Not yet uploaded or offered for download; not yet a sweep area. Code uncommitted.
+- **Found (confirmed in game or in the exported data):**
+  1. A grass band along the curb on every town street: the base texture paints a street with the lane layout
+     (osmTexture.js getStableTextureRoadWidth, about 6 m for a two-lane residential street) while the export builds it
+     with the road width library (9 m curb to curb here); the asphalt decal fades over its outer 2 m, so the green
+     shows. Cross-section and marks: 2026-11-24 session (road 8.00 m, curbs at +-4.5 m, texture grey only to +-3 m).
+  2. `highway=turning_circle`: the curb ring is built, the road surface is not: grass inside the ring.
+  3. `area:highway=pedestrian` is not paved (Plazas: 3 of 3; that outline is not among them).
+  4. `highway=steps` comes out as a dirt path, in town too (plots 5,7 and 8,8).
+  5. `highway=service` with `sidewalk=both` gets no sidewalks.
+  6. A pedestrian square drawn round a dock basin is paved on the basin's floor under the water (paving at
+     3.3-3.6 m, water at 5.05 m).
+  7. A footway with `surface=asphalt` looks like a light concrete slab (plot 7,4; check the material).
+  8. Known, backlog: `highway=cycleway` + `sidewalk=both` builds none.
+  To check: the trunk's narrow median (plot 6,3) shows no jersey barrier.
+- **Scene mistakes found and fixed on the way:** the dual carriageways were laid out for left-hand traffic and named
+  differently (findMedians pairs by name); the roundabout ran clockwise. The check tool did not know game models
+  under `assets/` (fixed in check_coverage.py; the front steps' three slate materials are undefined in the game
+  itself and draw fine).
+
 ## Priority list (2026-11-23, asked for by the user; details in the sections below)
 
 **Where 0.3.6 stands, 2026-11-24 (late):** scope closed by the user. In: Fizz_Mechanic's three targets (funicular

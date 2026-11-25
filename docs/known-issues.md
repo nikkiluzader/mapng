@@ -167,3 +167,25 @@ back on a fresh session, the saved log tail is `scratch/coverage/crash_log_tail.
   desktop app's canvas, with the app's fonts); exportArea.mjs takes `--title`.
 - **Also:** a level downloaded under a name the game's mod list already knows keeps that entry's on/off state
   (mods/db.json); names left switched off by a test run stay hidden from the level list.
+
+## A road decal that overlaps another at the same render priority is not drawn at all
+
+- **Seen:** 2026-11-24, the sidewalk test level: a cul-de-sac's bulb (a decal over the street's end) never drew, grass
+  inside its curb ring; regenerating it by hand did nothing until its priority changed.
+- **Cause:** the game drops a DecalRoad that overlaps another of the same `renderPriority`.
+- **Fix:** the bulb one step off the street's priority (exportBeamNGLevel.js, cul-de-sacs). Any decal laid over another
+  road's decal needs its own priority.
+
+## A grass band between the asphalt and the curb on town streets
+
+- **Seen:** 2026-11-24, every street of the sidewalk test level; brightest on the sunny side (ground cover).
+- **Cause:** the base texture painted streets with the lane layout (6 m for a two-lane street) while the export
+  built them 9 m curb to curb; the asphalt decal lets the ground show over its outer 2 m.
+- **Fix:** osmTexture.js paints roads at the export's width (roadWidth.js estimateRoadCrossSection, same urban test).
+
+## The game stuck in "Cannot setCamera, camera not found: gameCamera"
+
+- **Seen:** twice on 2026-11-24, after leaving a test level with `endActiveGameMode()`; the next level never loaded.
+- **Fix:** only a game restart cleared it. Switch levels with `startFreeroam` from inside the loaded level (mod
+  deactivated, zip replaced, mod activated) instead of ending the game mode.
+

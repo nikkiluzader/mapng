@@ -10,7 +10,8 @@
       "coverage": "Cobertura: cada objeto y etiqueta del mapa que construye MapNG",
       "roads": "Carreteras: carriles, cruces, rotondas, pasos, firmes",
       "structures": "Estructuras: cada tipo de puente y túnel",
-      "terrain": "Terreno: un puerto de montaña, calles empinadas, un río en un valle"
+      "terrain": "Terreno: un puerto de montaña, calles empinadas, un río en un valle",
+      "sidewalks": "Aceras: cada etiqueta de acera, esquina, paso, sendero, plaza, escalera y carril bici"
     }
   },
   "common": {
@@ -1225,7 +1226,7 @@
   },
   "levels": {
     "testLevels": "Descargar los niveles de prueba oficiales",
-    "testLevelsHint": "Los cuatro niveles con los que se prueba MapNG (todos los objetos, situaciones de carretera, puentes y túneles, terreno), descargados en tu carpeta de mods y listados aquí.",
+    "testLevelsHint": "Los niveles con los que se prueba MapNG (todos los objetos, situaciones de carretera, puentes y túneles, terreno, aceras), descargados en tu carpeta de mods y listados aquí.",
     "testLevelsProgress": "Descargando {file}: {done} de {total} MB",
     "testLevelsDone": "{n} niveles de prueba están en tu carpeta de mods.",
     "testLevelOfficial": "Nivel de prueba oficial: actualízalo con «Descargar los niveles de prueba oficiales»",

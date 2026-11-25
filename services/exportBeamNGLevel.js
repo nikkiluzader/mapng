@@ -20,6 +20,7 @@ import { planFountains, fountainFootprints, fountainWaterBlocks } from './founta
 import { streetIndex } from './buildingDetails.js';
 import { planPitches, pitchFootprints } from './sportsFields.js';
 import { levelCrossingBarriers, buildLevelCrossingMeshes } from './levelCrossingBarriers.js';
+import { planStepFlights, buildStepFlightMeshes, stepWidth } from './stepFlights.js';
 import { findBridgeTowers, towerPierGeometry, towerHouseTags } from './bridgeTowers.js';
 import { buildTexturedBuildings, buildingContext, screenBuilding, getBuildingMaterialDefs, garageExtras, isGarageFeature, FACADE_EMISSIVE_FILE, BUILDING_TILE_M, letterName } from './beamngBuildings.js';
 import { isCarportFeature, planCarports } from './beamngCarports.js';
@@ -112,6 +113,7 @@ import { buildIngameProbes } from './ingameProbes.js';
 import { smoothLine } from './lineSmoothing.js';
 import { planTurningCircles, turningCircleCarriageway, turningCircleDecalNodes, gradeTurningCircle } from './turningCircles.js';
 import { buildPlazaMeshes, courtyardPathHalf, courtyardPaved, getPlazaMaterialDefs, isCourtyard, isPlaza, plazaSurface, PLAZA_MATERIAL, plazaTileM } from './plazas.js';
+import { sidewalkSides } from './beamngSidewalks.js';
 import { buildSidewalkMeshesParallel, cornerPatches, inferCrossingSidewalks, buildWallDeckMesh, gutterLines, isCurbedClass, lowerUnderWallDecks, checkPavedGround, CURB_ONLY_M, ZEBRA_CROSSING_MATERIAL, getSidewalkMaterialDefs, SIDEWALK_MATERIALS, sidewalkFootways, streetSides, DEFAULT_SIDEWALK_LOOK, setCurbHeight, CURB_HEIGHTS_M,
 } from './beamngSidewalks.js';
 import { buildRoadNameZones } from './roadNameZones.js';
@@ -3596,6 +3598,42 @@ const CENTRE_LINE_MIN_WIDTH_M = 5.5;
 
 const hasSidewalkTag = (tags = {}) => ['sidewalk', 'sidewalk:both', 'sidewalk:left', 'sidewalk:right']
   .some((key) => ['both', 'left', 'right', 'yes', 'separate'].includes(String(tags[key] ?? '').trim().toLowerCase()));
+// A path's or service road's own sidewalk, per side, in pieces where the ground beside the way stays level with it
+// (within SIDE_BANK_M at SIDE_LOOK_M out past its edge): a sidewalk is never laid on a bank. Returns
+// [{ nodes, tags }]: each piece's points and its tags with that one side's sidewalk (the width tags kept).
+const SIDE_BANK_M = 1;
+const SIDE_LOOK_M = [1.5, 3];
+const SIDE_MIN_M = 8;
+export function sidewalkPieces(nodes, half, tags, groundAt) {
+  const sides = sidewalkSides({ tags, highway: tags.highway });
+  const out = [];
+  for (const side of ['left', 'right']) {
+    if (!(sides[side] > CURB_ONLY_M)) continue;
+    const sgn = side === 'left' ? 1 : -1;
+    const ok = nodes.map((p, i) => {
+      const a = nodes[Math.max(0, i - 1)]; const b = nodes[Math.min(nodes.length - 1, i + 1)];
+      const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1; const nx = (-(b[1] - a[1]) / L) * sgn; const ny = ((b[0] - a[0]) / L) * sgn;
+      const g0 = groundAt(p[0], p[1]);
+      return SIDE_LOOK_M.every((d) => Math.abs(groundAt(p[0] + nx * (half + d), p[1] + ny * (half + d)) - g0) <= SIDE_BANK_M);
+    });
+    let run = [];
+    const flush = () => {
+      let len = 0; for (let k = 1; k < run.length; k++) len += fastHypot(run[k][0] - run[k - 1][0], run[k][1] - run[k - 1][1]);
+      if (run.length >= 2 && len >= SIDE_MIN_M) {
+        const own = { ...tags, sidewalk: side }; delete own['sidewalk:both']; delete own['sidewalk:left']; delete own['sidewalk:right'];
+        out.push({ nodes: run, tags: own });
+      }
+      run = [];
+    };
+    nodes.forEach((p, i) => { if (ok[i]) run.push(p); else flush(); });
+    flush();
+  }
+  return out;
+}
+
+// a sidewalk built along the way itself (not one mapped separately): sidewalk=yes/both/left/right on any side key
+const buildsOwnSidewalk = (tags = {}) => ['sidewalk', 'sidewalk:both', 'sidewalk:left', 'sidewalk:right']
+  .some((key) => ['both', 'left', 'right', 'yes'].includes(String(tags[key] ?? '').trim().toLowerCase()));
 
 /**
  * Build line-marking decal layers (center line, edge lines, lane separators)
@@ -6143,6 +6181,7 @@ function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = [],
   const decals = [];
   const ways = [];
   const footpaths = [];
+  const sidewalkWays = [];
   const perStreet = new Map();
   const americas = getMarkingStyle(terrainData.roadRules) === 'americas';
   // the streets' raised sidewalks: [{ nodes, half, left, right }]
@@ -6322,6 +6361,19 @@ function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = [],
       // (paved footways are real slabs wherever they run; dirt and gravel paths stay on the ground)
       const raised = footpath && tags.highway === 'footway' && !UNPAVED_PATH.has(surface) && !tags.bridge && !tags.tunnel;
       if (footpath) footpaths.push({ nodes, half: fullWidth / 2, sidewalk: raised, crossing: tags.footway === 'crossing', surface: tags.surface });
+      // (a service road or a cycleway with a sidewalk of its own tagged: built along it as along a street, by the
+      // sidewalk builder; these roads are drawn here, not as streets, and it never saw them. Service streets and
+      // cycleways with sidewalk=* came out bare: sidewalk test level and thecoachtoma, 2026-11-24)
+      if ((service || tags.highway === 'cycleway') && buildsOwnSidewalk(tags)) {
+        // (a cycleway's sidewalk nearly level with it, a flush edge between (thecoachtoma's photo: pavers beside the
+        // cycle path, a small edge); a service road's at the level's curb)
+        // (per side, only where the ground beside the way is level with it: never on a bank. A cycleway along a
+        // railway's raised approach, sidewalk=right on the embankment's side, had a 2 m strip cut out of the bank and
+        // the ground round it graded down 6.8 m (Amsterdam Centraal, sweep 2026-11-24))
+        for (const piece of sidewalkPieces(nodes, fullWidth / 2, tags, (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize))) {
+          sidewalkWays.push({ owner: `sw_${feature.id}_${sidewalkWays.length}`, nodes: piece.nodes.map((p) => [p[0], p[1], p[2], fullWidth / 2]), half: fullWidth / 2, tags: piece.tags, highway: tags.highway, urban: isUrban(feature), curbed: false, wayId: feature.id, oneWay: isOneWayRoad(tags), leftExtra: 0, rightExtra: 0, ...(tags.highway === 'cycleway' ? { curbH: CURB_HEIGHTS_M.flush } : {}) });
+        }
+      }
       if (service) { serviceCount++; serviceLength += pathLength(nodes); }
       ways.push({ nodes, half: fullWidth / 2 });
       const n = (perStreet.get(street) || 0) + 1;
@@ -6373,7 +6425,7 @@ function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = [],
       }
     }
   }
-  return { decals, ways, footpaths, services: { count: serviceCount, length: serviceLength }, sidewalkStrips: { count: stripCount, length: stripLength } };
+  return { decals, ways, footpaths, sidewalkWays, services: { count: serviceCount, length: serviceLength }, sidewalkStrips: { count: stripCount, length: stripLength } };
 }
 
 const EASE_ROOF_TOL_M = 0.15;   // a street's ground this little under a tunnel's roof still counts as on it
@@ -7428,9 +7480,12 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
         persistentId: generatePersistentId(),
         position: [...turningCircleDecalNodes(tc)[0].slice(0, 3)],
         nodes: turningCircleDecalNodes(tc).map((nd) => nd.map((v) => Math.round(v * 1000) / 1000)),
-        // (no traffic round it: not in the AI's road graph, as a driveway)
-        drivability: 0,
-        autoLanes: false,
+        // (no traffic round it: visual only, out of the AI's road graph, drivability -1 (refs/output/beamng-master-
+        // reference.md))
+        drivability: -1,
+        // (one step off the street's own priority: overlapping the street at the same priority, the game drew none of
+        // it, the bulb grass inside its curb; one step off, it draws (sidewalk test level, in game 2026-11-24))
+        renderPriority: (Number(look.renderPriority) || 14) + 1,
       };
       Object.defineProperty(decal, '__owner', { value: ring.owner, enumerable: false });
       base.group.__items.push(decal);
@@ -7578,6 +7633,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   Object.defineProperty(groups, 'turningCircles', { value: turningCircles, enumerable: false });
   Object.defineProperty(groups, 'pedestrianStreets', { value: pedestrianStreets.ways, enumerable: false });
   Object.defineProperty(groups, 'footpaths', { value: pedestrianStreets.footpaths, enumerable: false });
+  Object.defineProperty(groups, 'sidewalkWays', { value: pedestrianStreets.sidewalkWays, enumerable: false });
   Object.defineProperty(groups, 'serviceRoads', { value: pedestrianStreets.services, enumerable: false });
   Object.defineProperty(groups, 'sidewalkStrips', { value: pedestrianStreets.sidewalkStrips, enumerable: false });
   Object.defineProperty(groups, 'bridges', { value: bridges, enumerable: false });
@@ -14660,6 +14716,17 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // built along a street: lamps, props, signs, the spawn)
   const turningRings = decalRoads.turningCircles || [];
   const groundWithRings = turningRings.length ? [...groundCarriageways, ...turningRings] : groundCarriageways;
+  // (service roads and cycleways with their own sidewalk tagged: the sidewalk builder's alone, not streets for lamps,
+  // signs or props)
+  // (each point at the finished ground's height, the ground the way's own decal lies on: at the surveyed height the
+  // slab beside a cycleway under a railway's raised approach graded a 6.8 m trench into it (Amsterdam Centraal, sweep
+  // 2026-11-24), the cycle path itself still on top)
+  // (and the bank test again on the shaped ground: on coarse elevation a railway's embankment is only raised by the
+  // shaping, after the first test on the surveyed ground; t30 Amsterdam Centraal)
+  const shapedAt = (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize);
+  const sidewalkWays = (decalRoads.sidewalkWays || []).flatMap((w) => sidewalkPieces(w.nodes, w.half, w.tags, shapedAt)
+    .map((piece, k) => ({ ...w, owner: `${w.owner}_${k}`, tags: piece.tags, nodes: piece.nodes.map((p) => [p[0], p[1], shapedAt(p[0], p[1]), p[3]]) })));
+  console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Sidewalks: ${sidewalkWays.length ? `${sidewalkWays.length} piece(s) of service road or cycleway with a sidewalk of their own tagged (${[...new Set(sidewalkWays.map((w) => w.highway))].join(', ')}) built along like streets` : 'no service road or cycleway tags a sidewalk of its own'}.`);
   // (a railway's track bed: no road sign stands on it. A road curving beside a line put its chevrons on the track,
   // and a sign at a junction by a level crossing stood between the rails)
   const nearRail = railways?.lines?.length ? buildClearanceIndex(railways.lines) : null;
@@ -14958,7 +15025,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   if (includeRoads && includeSidewalks) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Sidewalks: ${sidewalkRailBeds.length} at-grade track bed piece(s) kept clear of raised slabs (a path or sidewalk crossing the rails stops at the bed's edge).`);
   // (the walkway tops on worker threads in the desktop app; here otherwise)
   const sidewalks = includeRoads && includeSidewalks
-    ? await buildSidewalkMeshesParallel(groundWithRings, {
+    ? await buildSidewalkMeshesParallel(sidewalkWays.length ? [...groundWithRings, ...sidewalkWays] : groundWithRings, {
       zones: decalRoads.crosswalkZones || [],
       // building footprints at ground level: no slab into a wall
       buildings: (exportTerrainData.osmFeatures || [])
@@ -16120,9 +16187,13 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
           .filter((f) => f.type === 'building' && f.geometry?.length > 2 && !isRaisedBuildingPart(f.tags))
           .map((f) => f.geometry.map(toW)),
         roads: groundCarriageways.map((cw) => ({ nodes: cw.nodes, half: cw.half })),
+        // (the water drawn inside a square: not paved; beamngWater.js isLakeWater's kinds and the rest drawn as areas)
+        water: (exportTerrainData.osmFeatures || [])
+          .filter((f) => f.type === 'water' && f.geometry?.length > 3 && !f.tags?.waterway)
+          .map((f) => f.geometry.map(toW)),
       });
       appendAll(sidewalks.meshes, plazas.meshes);
-      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Plazas: ${plazas.count} of ${squares.length} pedestrian square(s) and courtyard(s) paved, ${plazas.triangles} triangles.`);
+      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Plazas: ${plazas.count} of ${squares.length} pedestrian square(s) and courtyard(s) paved, ${plazas.triangles} triangles; ${plazas.waterCut} cut round the water drawn inside them.`);
     }
     // railway platforms, raised beside their track (platforms.js)
     if (built('platforms') && built('railways')) {
@@ -16298,6 +16369,19 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     const res = buildLevelCrossingMeshes(railways.barriers);
     appendAll(sidewalks.meshes, res.meshes);
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Level crossings: ${res.count} barrier(s) in the sidewalk tiles, ${res.triangles} triangles.`);
+  }
+  // steps (highway=steps): a concrete flight on the finished ground (stepFlights.js); none on a bridge, in a tunnel or
+  // indoors (no deck or bore to stand them on here)
+  if (Array.isArray(sidewalks.meshes) && includeRoads) {
+    const stepFeatures = (exportTerrainData.osmFeatures || []).filter((f) => f.type === 'road' && f.tags?.highway === 'steps' && f.geometry?.length >= 2);
+    const usable = stepFeatures.filter((f) => !isBridgeRoad(f.tags) && !(f.tags.tunnel && f.tags.tunnel !== 'no') && f.tags.indoor !== 'yes' && !String(f.tags.level || '').startsWith('-') && f.tags.area !== 'yes');
+    if (usable.length) {
+      const ways = usable.map((f) => ({ nodes: f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0)), width: stepWidth(f.tags) }));
+      const flights = planStepFlights(ways, (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize));
+      const res = buildStepFlightMeshes(flights);
+      appendAll(sidewalks.meshes, res.meshes);
+      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Steps: ${res.count} of ${stepFeatures.length} flight(s) built (${res.treads} tread(s), ${flights.filter((f) => f.flat).length} on flat ground as a raised strip, ${(flights.reduce((a, f) => a + f.rise, 0)).toFixed(1)} m of rise in all); ${stepFeatures.length - usable.length} on a bridge, in a tunnel or indoors left out; ${usable.length - res.count} shorter than 1 m left out; ${res.triangles} triangles.`);
+    } else console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Steps: ${stepFeatures.length ? `${stepFeatures.length} mapped, all on bridges, in tunnels or indoors: none built` : 'none mapped'}.`);
   }
   const sidewalkTileDaes = [];
   for (const t of await generateSidewalkTileDAEs(sidewalks.meshes, buildingTileSize(worldSize))) {

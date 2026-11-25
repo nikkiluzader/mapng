@@ -94,7 +94,8 @@ export function makeRoadHeight(carriageways) {
     for (let i = 0; i + 1 < n.length; i++) {
       const a = n[i]; const b = n[i + 1];
       if (!Number.isFinite(a[2]) || !Number.isFinite(b[2])) continue;
-      const s = segs.length; segs.push(a[0], a[1], a[2], b[0], b[1], b[2], cw.half || 3);
+      // (with the road's own curb height where it has one, else NaN: the level's curb)
+      const s = segs.length; segs.push(a[0], a[1], a[2], b[0], b[1], b[2], cw.half || 3, Number.isFinite(cw.curbH) ? cw.curbH : NaN);
       const reach = (cw.half || 3) + MARGIN_M;
       for (let gx = Math.floor((Math.min(a[0], b[0]) - reach) / SEG_CELL_M); gx <= Math.floor((Math.max(a[0], b[0]) + reach) / SEG_CELL_M); gx++) {
         for (let gy = Math.floor((Math.min(a[1], b[1]) - reach) / SEG_CELL_M); gy <= Math.floor((Math.max(a[1], b[1]) + reach) / SEG_CELL_M); gy++) {
@@ -103,8 +104,9 @@ export function makeRoadHeight(carriageways) {
       }
     }
   }
-  // (returns { z, d, ex, ey }: the centreline z, the distance out past the carriageway's edge, and the point on its
-  // edge just inside the curb (EDGE_IN_M) toward (x, y); null far from any road)
+  // (returns { z, d, ex, ey, curb }: the centreline z, the distance out past the carriageway's edge, the point on its
+  // edge just inside the curb (EDGE_IN_M) toward (x, y), and the road's own curb height (NaN: the level's); null far
+  // from any road)
   return (x, y) => {
     const l = cells.get(key(Math.floor(x / SEG_CELL_M), Math.floor(y / SEG_CELL_M)));
     if (!l) return null;
@@ -122,7 +124,7 @@ export function makeRoadHeight(carriageways) {
     const d = Math.sqrt(best2); const half = segs[bs + 6];
     const inner = Math.max(0, Math.min(d, half - EDGE_IN_M));
     const ex = d > 1e-9 ? bpx + ((x - bpx) / d) * inner : bpx; const ey = d > 1e-9 ? bpy + ((y - bpy) / d) * inner : bpy;
-    return { z: segs[bs + 2] + (segs[bs + 5] - segs[bs + 2]) * bt, d: Math.max(0, d - half), ex, ey };
+    return { z: segs[bs + 2] + (segs[bs + 5] - segs[bs + 2]) * bt, d: Math.max(0, d - half), ex, ey, curb: segs[bs + 7] };
   };
 }
 
@@ -179,7 +181,9 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
     const h = road(x, y); if (!h) return groundAt ? groundAt(x, y) : 0;
     const surface = edgeSurface(h);
     const share = Math.min(smooth01((toDriveway(x, y) - DRIVEWAY_HALF_M) / DIP_RAMP_M), smooth01(toDip(x, y) / DIP_RAMP_M));
-    let top = surface + curbH * share + DIP_LIP_M * (1 - share) + crossSlope * Math.min(h.d, 6);
+    // (a road with a curb of its own: a cycleway's sidewalk, nearly level with it)
+    const ownCurb = Number.isFinite(h.curb) ? h.curb : curbH;
+    let top = surface + ownCurb * share + DIP_LIP_M * (1 - share) + crossSlope * Math.min(h.d, 6);
     const wk = walkHeight(x, y);
     // (tried: a mapped walk within 0.5 m of the street's level laid at the street's level. Its ground around it is not
     // graded to that level, and Barcelona's sidewalks came out buried and floating (30 m: 13 -> 157 buried samples)

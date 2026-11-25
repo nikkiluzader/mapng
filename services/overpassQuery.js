@@ -83,7 +83,7 @@ export const OSM_FILTER = {
     'power', 'military', 'historic', 'tourism', 'amenity', 'landuse', 'natural', 'leisure',
     'water', 'wetland', 'surface', 'landcover', 'golf',
   ],
-  wayTags: [['area', 'yes'], ['natural', 'tree_row'], ['railway', 'platform'], ...[...RAILWAY_WAYS, ...RAILWAY_LIFECYCLE_WAYS].map((v) => ['railway', v])],
+  wayTags: [['area', 'yes'], ['natural', 'tree_row'], ['railway', 'platform'], ['area:highway', 'pedestrian'], ...[...RAILWAY_WAYS, ...RAILWAY_LIFECYCLE_WAYS].map((v) => ['railway', v])],
   // (points kept for any value of their key: a mapped traffic sign's value is a country's code, DE:274[50], US:R1-1)
   nodeKeys: ['traffic_sign'],
   relationKeys: [
