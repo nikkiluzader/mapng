@@ -151,7 +151,7 @@ import {
 import { planRaceways } from './racetracks.js';
 import { backdropImageryFetch } from './backdropImagery.js';
 import { RAIL_DEPTH_M, RAIL_GRADE_CEILING, railHalfWidth, railKindOf, railSegmentsFrom, streetRunningTest, undergroundRailIds } from './railways.js';
-import { prepareRailEdges, unjoinedRailCrossings, markUnjoinedCrossing, buildTrackGeometry, crossingDecals, streetTramDecals, railMaterialDefs, RAIL_MATERIALS, TRAMLINE_MATERIAL, railwayStats } from './railTrack.js';
+import { prepareRailEdges, unjoinedRailCrossings, markUnjoinedCrossing, pathRailCrossings, buildTrackGeometry, crossingDecals, streetTramDecals, railMaterialDefs, RAIL_MATERIALS, TRAMLINE_MATERIAL, railwayStats } from './railTrack.js';
 // footways and other paths: a level crossing of one is a foot crossing
 const PATH_HIGHWAYS = new Set(['footway', 'cycleway', 'path', 'pedestrian', 'steps', 'bridleway']);
 import { POLE_SHAPE, POLE_SHAPE_HEIGHT_M, beamRotation } from './sportsLights.js';
@@ -6788,6 +6788,14 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
       structureGraph.railCrossings = prepareRailEdges(structureGraph, { pathClasses: PATH_HIGHWAYS });
       structureGraph.railUnjoined = unjoinedRailCrossings(structureGraph);
       for (const c of structureGraph.railUnjoined) markUnjoinedCrossing(structureGraph, c);
+      // (and the paths crossing the line at grade: no edges of the graph, found by their lines, railTrack.js)
+      const project = (p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0);
+      const atGrade = (t) => !(t.bridge && t.bridge !== 'no') && !(t.tunnel && t.tunnel !== 'no') && !(Number(t.layer) || 0) && t.indoor !== 'yes' && t.covered !== 'yes';
+      const crossingPaths = (terrainData.osmFeatures || [])
+        .filter((f) => f?.type === 'road' && PATH_HIGHWAYS.has(f.tags?.highway) && f.tags.highway !== 'steps' && f.geometry?.length >= 2 && atGrade(f.tags))
+        .map((f) => { const w = Number.parseFloat(f.tags.width); return { xy: f.geometry.map(project), half: Number.isFinite(w) && w > 0 ? Math.min(3, Math.max(0.75, w / 2)) : f.tags.highway === 'cycleway' ? 1.25 : 1 }; });
+      structureGraph.railPathCrossings = pathRailCrossings(structureGraph, crossingPaths);
+      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Railways: ${structureGraph.railPathCrossings.length} path crossing(s) at grade (of ${crossingPaths.length} at-grade path(s) looked at): the track laid level through each, no ballast or sleepers, the crossing's surface at the rails' top, the path meeting it.`);
     }
     // stage B: crossings and their order, bridges over water (shadow mode too)
     structureGraph.crossings = findCrossings(structureGraph, { waterAt: buildWaterLookup(terrainData, squareSize) });
@@ -14770,7 +14778,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         log: (msg) => console.log(`${BEAMNG_EXPORT_SERVICE_LOG} ${msg}`),
       });
       if (railways.decals.length) decalRoads.push({ class: 'SimGroup', name: 'railways', persistentId: generatePersistentId(), __parent: 'Decal_Roads', __items: railways.decals });
-      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Railways: ${railways.stats.trackKm} km of track, ${railways.daes.length} object(s), ${railways.stats.triangles} triangles, ${railways.stats.crossings} level crossing(s), ${railways.stats.streetTramKm} km of tram in streets.`);
+      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Railways: ${railways.stats.trackKm} km of track, ${railways.daes.length} object(s), ${railways.stats.triangles} triangles, ${railways.stats.crossings} road level crossing(s), ${railways.stats.pathCrossings ?? 0} path crossing(s) (paths over the line at grade, ones a road's node shares too), ${railways.stats.streetTramKm} km of tram in streets.`);
     } catch (err) {
       console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Railway track skipped: ${err?.message || err}`);
       railways = null;
@@ -15109,6 +15117,10 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       // 2026-11-24); the path stops at the bed's edge, the ground between runs flush. Not a track on a bridge or in a
       // tunnel, not a tram running in its street)
       railBeds: sidewalkRailBeds,
+      // traffic islands mapped as areas (area:highway=traffic_island): a median raised only beside them
+      islands: (exportTerrainData.osmFeatures || [])
+        .filter((f) => f.tags?.['area:highway'] === 'traffic_island' && f.geometry?.length > 2)
+        .map((f) => f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0))),
       // driveways and parking aisles: the curb lowered where they cross
       driveways: (exportTerrainData.osmFeatures || [])
         .filter((f) => f.type === 'road' && f.tags?.highway === 'service' && f.geometry?.length > 1)
@@ -15207,7 +15219,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       worldSize: exportTerrainData.width * squareSize, minHeight: Number(exportTerrainData.minHeight) || 0,
     }, (idx, v) => hmSide.set(idx, v));
     sidewalks.groundPixels = graded.pixels;
-    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Sidewalks: ${sidewalks.runs.length} curb runs, ${(sidewalks.medianRuns || []).length} median island runs, ${(sidewalks.pockets || []).length} paved pockets by seawalls, ${sidewalks.triangles} triangles in ${sidewalks.meshes.length} mesh(es).`);
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Sidewalks: ${sidewalks.runs.length} curb runs, ${(sidewalks.medianRuns || []).length} median island runs (${sidewalks.medianRuns?.islands?.mapped ? `${sidewalks.medianRuns.islands.mapped} traffic island(s) mapped as areas: medians beside them raised only along them, ${sidewalks.medianRuns.islands.cuts} stretch(es) between paved across` : 'no traffic islands mapped as areas: medians from the gap between the carriageways'}), ${(sidewalks.pockets || []).length} paved pockets by seawalls, ${sidewalks.triangles} triangles in ${sidewalks.meshes.length} mesh(es).`);
   }
 
   beginStep('props', 'Placing street props (hydrants, bins, benches, utility poles, power lines) and traffic signals…');

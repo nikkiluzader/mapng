@@ -26,6 +26,7 @@ import { isGroundLevelRoad, smoothRoadsInHeightmap } from '../../services/roadSm
 import { snapRoadsToTerrain } from '../../services/roadSnap.js';
 import { measureBenchWidths } from '../../services/benchWidths.js';
 import { measureStreetWidths } from '../../services/streetWidths.js';
+import { measureKerbWidths, kerbWidthsSummary } from '../../services/kerbWidths.js';
 import { roundRoadCorners } from '../../services/roadCurves.js';
 import { withRegionalWidths } from '../../services/regionalWidths.js';
 import { fitTwinCarriageways } from '../../services/twinCarriageways.js';
@@ -65,7 +66,7 @@ const raw = !!process.env.RAW;
 await withRegionalWidths(osmFeatures, meta.bounds);
 // (PREPROCESSED, or a level's bundled map data, mapng_source/meta.json preprocessed: the roads already as Generate left them)
 const rounded = process.env.PREPROCESSED || meta.preprocessed ? osmFeatures : roundRoadCorners(osmFeatures).features;
-let osmRoads = process.env.NOWIDTH || process.env.PREPROCESSED ? rounded : fitTwinCarriageways(measureStreetWidths(rounded).features).features;
+let osmRoads = process.env.NOWIDTH || process.env.PREPROCESSED ? rounded : (() => { const k = measureKerbWidths(rounded); console.log(kerbWidthsSummary(k)); return fitTwinCarriageways(measureStreetWidths(k.features).features).features; })();
 // (how far the lidar road snap moved the roads goes into the checks: a snap that wanders shows there)
 let snapStats = null;
 if (fine && !raw && !process.env.NOBENCH) { const b = measureBenchWidths(heightMap, meta.size, meta.size, meta.bounds, osmRoads, meta.mpp); osmRoads = b.features; if (b.stats.measured) console.log(`[Roads] ${b.stats.measured} hillside road(s) at their bench's width (median ${b.stats.medianM.toFixed(1)} m), of ${b.stats.roads}`); }

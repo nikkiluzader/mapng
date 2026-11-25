@@ -38,6 +38,7 @@ import { snapRoadsToTerrain } from "./roadSnap.js";
 import { measureBenchWidths } from "./benchWidths.js";
 import { roundRoadCorners, osmLinesAsDrawn } from "./roadCurves.js";
 import { measureStreetWidths } from "./streetWidths.js";
+import { measureKerbWidths, kerbWidthsSummary } from "./kerbWidths.js";
 import { fitTwinCarriageways } from "./twinCarriageways.js";
 import { decodeTerrariumPixels, blendTerrariumTileSeams, sampleTerrariumHeights, wrapMosaicX } from "./terrariumSampling.js";
 import { continuousLngRange } from "./lngRange.js";
@@ -227,7 +228,12 @@ const roundLines = (osmFeatures) => {
   console.log(`[Line curves] ${part('road', 'roads')}; ${part('rail', 'railways')}; ${part('path', 'paths')}; ${part('water', 'waterways')}; ${stats.roundedJoins} bend(s) rounded across two ways' meeting; ${stats.carriedNodes || 0} line end(s) carried with a node onto the curve of the line passing through; ${stats.streetTracks} street track(s) given their road's curve. Steps, corridors, areas, dams and power lines left as drawn.`);
   return features;
 };
-const shapeRoads = (osmFeatures) => fitTwinCarriageways(measureStreetWidths(roundLines(osmFeatures)).features).features;
+// (widths: between the mapped kerbs first, kerbWidths.js; then between the buildings, streetWidths.js)
+const shapeRoads = (osmFeatures) => {
+  const kerbs = measureKerbWidths(roundLines(osmFeatures));
+  console.log(kerbWidthsSummary(kerbs));
+  return fitTwinCarriageways(measureStreetWidths(kerbs.features).features).features;
+};
 
 const decodeTerrariumHeight = (r, g, b) => {
   const h = r * 256 + g + b / 256 - 32768;

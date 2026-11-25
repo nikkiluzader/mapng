@@ -906,3 +906,24 @@ test('a path\'s own sidewalk is laid only where the ground beside it is level wi
   for (const p of right) assert.ok(p.nodes.every((q) => q[0] <= 20 || q[0] >= 40), 'none along the bank');
   assert.equal(right[0].tags['width:sidewalk:right'], '2');
 });
+
+test('a median with traffic islands mapped as areas: raised only beside them, paved across between', () => {
+  const line = (y, x0, x1) => Array.from({ length: 41 }, (_, i) => [x0 + ((x1 - x0) * i) / 40, y, 5, 0]);
+  const cw = (owner, y, x0, x1) => ({ owner, half: 3, highway: 'tertiary', urban: true, continuations: [], tags: { name: 'Galliers Avenue', oneway: 'yes' }, nodes: line(y, x0, x1) });
+  const all = [cw(1, -4, -100, 100), cw(2, 4, 100, -100)];
+  const medians = findMedians(all);
+  // no islands mapped: one long island each side, as before
+  const plain = buildMedianRuns(all, medians);
+  assert.ok(plain.length >= 2 && plain.every((r) => Math.abs(r.points[r.points.length - 1][0] - r.points[0][0]) > 150));
+  // two islands mapped, 6 m and 10 m long, in the 2 m gap between the carriageways
+  const islands = [[[-40, -0.8], [-34, -0.8], [-34, 0.8], [-40, 0.8]], [[20, -0.8], [30, -0.8], [30, 0.8], [20, 0.8]]];
+  const runs = buildMedianRuns(all, medians, { islands });
+  assert.ok(runs.length >= 2, 'the islands stand, however short');
+  for (const r of runs) {
+    const xs = r.points.map((p) => p[0]);
+    const lo = Math.min(...xs); const hi = Math.max(...xs);
+    assert.ok((lo > -42 && hi < -32) || (lo > 18 && hi < 32), `raised only beside an island: ${lo}..${hi}`);
+  }
+  assert.ok(runs.gaps.some((g) => g.points.some((p) => Math.abs(p[0]) < 10)), 'between them: paved across');
+  assert.equal(runs.islands.mapped, 2);
+});

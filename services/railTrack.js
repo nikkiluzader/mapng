@@ -231,6 +231,64 @@ function segHit(ax, ay, bx, by, cx, cy, dx, dy) {
   return t >= 0 && t <= 1 && u >= 0 && u <= 1 ? { t, u } : null;
 }
 
+/**
+ * Paths (footways, cycleways) crossing a railway at grade. A path is no edge of the structure graph, so its crossing
+ * was never found: the track ran on in its ballast and sleepers, and the path's slab stopped at the bed's edge, a
+ * step down to the stones (Splatplays, Sherwood station, Perth, 2026-11-25). paths: [{ xy: [[x, y]...], half }]
+ * (at grade only: no bridge, tunnel or other layer). Returns [{ x, y, rail, s, half, path: true }], one per path
+ * and track, each marked on its rail edge as a road's crossing is (the formation up to the rails' top, no ballast or
+ * sleepers, the crossing's surface).
+ */
+export function pathRailCrossings(graph, paths = []) {
+  const out = [];
+  const edges = graph?.edges || [];
+  if (!paths.length || !edges.some((e) => e.rail && e.drop)) return out;
+  const CELL = 32;
+  const grid = new Map();
+  paths.forEach((p, k) => {
+    for (let i = 0; i + 1 < (p.xy?.length || 0); i++) {
+      const a = p.xy[i]; const b = p.xy[i + 1];
+      for (let gx = Math.floor(Math.min(a[0], b[0]) / CELL); gx <= Math.floor(Math.max(a[0], b[0]) / CELL); gx++) {
+        for (let gy = Math.floor(Math.min(a[1], b[1]) / CELL); gy <= Math.floor(Math.max(a[1], b[1]) / CELL); gy++) {
+          const key = `${gx},${gy}`;
+          if (!grid.has(key)) grid.set(key, []);
+          grid.get(key).push(k, i);
+        }
+      }
+    }
+  });
+  edges.forEach((e, k) => {
+    if (!e.rail || !e.drop || e.bridge || e.tunnel || e.rail === 'monorail') return;
+    const seen = new Set();
+    for (let i = 0; i + 1 < e.x.length; i++) {
+      const ax = e.x[i]; const ay = e.y[i]; const bx = e.x[i + 1]; const by = e.y[i + 1];
+      const cand = new Set();
+      for (let gx = Math.floor(Math.min(ax, bx) / CELL); gx <= Math.floor(Math.max(ax, bx) / CELL); gx++) {
+        for (let gy = Math.floor(Math.min(ay, by) / CELL); gy <= Math.floor(Math.max(ay, by) / CELL); gy++) {
+          const list = grid.get(`${gx},${gy}`) || [];
+          for (let q = 0; q < list.length; q += 2) cand.add(`${list[q]}:${list[q + 1]}`);
+        }
+      }
+      for (const c of cand) {
+        const [pk, pi] = c.split(':').map(Number);
+        if (seen.has(pk)) continue;
+        const p = paths[pk]; const u = p.xy[pi]; const v = p.xy[pi + 1];
+        // (the path's segment stretched a hair past its ends: a crossing node shared with the rail lies on both)
+        const ux = v[0] - u[0]; const uy = v[1] - u[1]; const L = fastHypot(ux, uy) || 1; const ex = (ux / L) * 0.05; const ey = (uy / L) * 0.05;
+        const hit = segHit(ax, ay, bx, by, u[0] - ex, u[1] - ey, v[0] + ex, v[1] + ey);
+        if (!hit) continue;
+        seen.add(pk);
+        const sv = e.s[i] + (e.s[i + 1] - e.s[i]) * hit.t;
+        // (a path cut at the crossing node, its two ways both on the line: one crossing)
+        if (out.some((c) => c.rail === k && Math.abs(c.s - sv) < 2)) continue;
+        out.push({ x: ax + (bx - ax) * hit.t, y: ay + (by - ay) * hit.t, rail: k, s: sv, half: p.half, path: true });
+        markCrossing(e, sv, p.half);
+      }
+    }
+  });
+  return out;
+}
+
 /** A crossing without a node: its zone on the rail edge marked as a node's would be. */
 export function markUnjoinedCrossing(graph, c) {
   const e = graph.edges[c.rail];
@@ -646,7 +704,7 @@ export function railwayStats(graph, segments = []) {
     bridgeRuns: deckRuns, tunnelRuns,
     bridgeNames: [...bridgeNames], tunnelNames: [...tunnelNames],
     roadCrossings: crossings.filter((c) => !c.path).length,
-    pathCrossings: crossings.filter((c) => c.path).length,
+    pathCrossings: crossings.filter((c) => c.path).length + (graph.railPathCrossings || []).length,
     unjoinedCrossings: (graph.railUnjoined || []).length,
   };
 }

@@ -82,6 +82,8 @@ export const OSM_FILTER = {
     'highway', 'building', 'waterway', 'barrier', 'aeroway', 'man_made', 'public_transport',
     'power', 'military', 'historic', 'tourism', 'amenity', 'landuse', 'natural', 'leisure',
     'water', 'wetland', 'surface', 'landcover', 'golf',
+    // (a road's surface or a traffic island mapped as an area: kerbWidths.js measures the street between its edges)
+    'area:highway',
   ],
   wayTags: [['area', 'yes'], ['natural', 'tree_row'], ['railway', 'platform'], ['area:highway', 'pedestrian'], ...[...RAILWAY_WAYS, ...RAILWAY_LIFECYCLE_WAYS].map((v) => ['railway', v])],
   // (points kept for any value of their key: a mapped traffic sign's value is a country's code, DE:274[50], US:R1-1)

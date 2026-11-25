@@ -133,6 +133,24 @@ Mesh Road joins. Riding along: the other 38 sweep areas re-framed, Zion's tunnel
 - **To refresh the levels after a change:** re-export with `--fix-stubs` (real reflection files), addLabels, check,
   write the manifest and upload (refs/output/history.md "Test levels" has the steps; scripts/r2.sh).
 
+## Now: Splatplays' reports of 2026-11-25 (Discord #general; area `sp_crawley`, Armadale WA)
+
+- **Fixed on dev, sweep pending (2026-11-25).**
+  1. Streets are measured kerb to kerb from mapped `barrier=kerb` lines and `area:highway` road areas
+     (services/kerbWidths.js, ahead of the building measurement). Traffic islands count as kerbs for one-way
+     carriageways only. Schruth St S was 5.5 m, now 7.4 m. That removes the trench between the curb and the mapped
+     sidewalk, and the zig-zag corners.
+  2. Medians are raised only beside traffic islands mapped as areas (`area:highway=traffic_island`, any value of
+     `area:highway` is fetched now), with the rest paved across. At Galliers Ave the median had run into the
+     Railway Ave junction.
+  3. Footpaths crossing a railway at grade are found by their lines (railTrack.js `pathRailCrossings`). The track is
+     embedded there and the path meets it flush. Before, the path stopped at the bed and the track kept its ballast.
+- **Where to look:** before/after plots in `scratch/splat/plot/*_before_after.png` (tool `scratch/splat/plot/top.py`,
+  `REL=1` colours by height over the road; `band.py`). In-game shots were taken 2026-11-25. Synthetic plots are on
+  the sidewalk level: 5,1 mapped kerbs, 6,1 traffic islands (and 1,5 rail crossings).
+- **Left, in the backlog:** the verge behind bare curbs, paving over the track bed to the rails, the median groove.
+- **Done means:** the sweep is clean, the commit is made, and the sidewalk level is re-uploaded with plots 5,1 and 6,1.
+
 ## Now: the sidewalk test level (user 2026-11-24: "make sure this synthetic test covers every scenario")
 
 - **All its findings fixed 2026-11-24 (in game and in the sweep, 135 cells clean); the level is the fifth official test level.** Fixed: the curb band (texture width), area:highway=pedestrian (parsed, fetched, paved, no grass), water inside a square, cul-de-sac bulbs (decal priority), steps (stepFlights.js), service roads and cycleways with their own sidewalk (flush edge for cycleways, width:sidewalk:<side>, never on a bank), asphalt footways, footbridge ends on a shoreline (the boardwalk). Earlier text kept below as the record.

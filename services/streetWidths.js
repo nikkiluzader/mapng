@@ -163,6 +163,8 @@ export function measurable(tags = {}) {
   if (!MEASURED.has(tags.highway) || tags.area === 'yes') return false;
   if (tags.highway === 'service' && !SERVICE_MEASURED.has(tags.service)) return false;
   if (has(tags.width) || has(tags['width:carriageway']) || has(tags.lanes)) return false;
+  // (measured between its kerbs already, kerbWidths.js: the kerbs are the carriageway's edge itself)
+  if (has(tags['mapng:carriageway_width'])) return false;
   if (tags.junction === 'roundabout' || tags.junction === 'circular') return false;
   if (has(tags.bridge) && tags.bridge !== 'no') return false;
   if (has(tags.tunnel) && tags.tunnel !== 'no') return false;

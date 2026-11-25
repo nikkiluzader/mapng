@@ -168,6 +168,53 @@ export function sidewalks(regionKey, makeBuilder) {
     o.lab('cycleway in town, sidewalk=right', 0, -60, [35]);
     o.walk('on the town cycleway\'s sidewalk', 60, -62.5, Math.PI);
   });
+  // kerbs mapped as lines and road surfaces as areas (Splatplays' Armadale, 2026-11-25: barrier=kerb along every
+  // street, area:highway=*): the street as wide as its kerbs (kerbWidths.js), its curb on the kerb, a mapped sidewalk
+  // flush against it
+  plot(5, 1, 'mapped kerbs', (o) => {
+    // an 8 m street between mapped kerbs, wider than its class's 5.5 m, its sidewalks mapped as footways at the kerb
+    o.ln(-85, 60, 85, 60, { highway: 'tertiary', sidewalk: 'separate', lane_markings: 'no', name: 'Kerbed street' }, 10, [[0, 60]]);
+    for (const s of [1, -1]) {
+      o.ln(-85, 60 + s * 4, -8, 60 + s * 4, { barrier: 'kerb' }, 10); if (s > 0) o.ln(8, 64, 85, 64, { barrier: 'kerb' }, 10); else o.ln(-8, 56, 85, 56, { barrier: 'kerb' }, 10);
+      o.ln(-85, 60 + s * 5.2, 85, 60 + s * 5.2, { highway: 'footway', footway: 'sidewalk' }, 10);
+    }
+    o.row(-80, -14, 60, { back: 11, side: 1 }); o.row(14, 80, 60, { back: 11, side: 1 }); o.row(-80, 80, 60, { back: 11, side: -1 });
+    // ... a side street joining from the north, kerbs round its corners
+    o.ln(0, 60, 0, 95, { highway: 'residential', sidewalk: 'separate', name: 'Kerbed side street' }, 10);
+    for (const s of [1, -1]) {
+      const arc = Array.from({ length: 7 }, (_, i) => { const a = (i / 6) * (Math.PI / 2); return [s * (3.5 + 4.5 - 4.5 * Math.cos(a)), 64 + 4.5 - 4.5 * Math.sin(a)]; }).reverse();
+      o.st([[s * 3.5, 95], [s * 3.5, 68.5], ...arc.slice(1), [s * 8, 64]], { barrier: 'kerb' });
+    }
+    o.lab('8 m between mapped kerbs (barrier=kerb), sidewalks mapped at the kerb: no trench', -40, 60, [35]);
+    o.lab('side street with kerbs round its corners', 0, 66, [35]);
+    o.walk('on the mapped sidewalk at the kerb', -60, 65.2, 0); o.drv('driving the kerbed street', -60, 58, 0);
+    // a road's surface mapped as an area (area:highway), sidewalk=both
+    o.ln(-85, 0, 85, 0, { highway: 'residential', sidewalk: 'both', name: 'Road area street' }, 10);
+    o.ar([[-85, -3.6], [85, -3.6], [85, 3.6], [-85, 3.6]], { 'area:highway': 'residential', surface: 'asphalt' });
+    o.row(-80, 80, 0, { back: 9 });
+    o.lab('road surface mapped as area:highway=residential, 7.2 m', 0, 0, [35]);
+    // kerbs on one side only: the street keeps its class width
+    o.ln(-85, -60, 85, -60, { highway: 'residential', name: 'One kerb street' }, 10);
+    o.ln(-85, -56, 85, -56, { barrier: 'kerb' }, 10); o.row(-80, 80, -60, { back: 9 });
+    o.lab('a kerb mapped on one side only (the class width kept)', 0, -60, [35]);
+  });
+  // traffic islands mapped as areas (Splatplays' Galliers Avenue, 2026-11-25): a street splitting into one-way
+  // carriageways before a junction, short islands between them; the median raised only along the islands
+  plot(6, 1, 'traffic islands', (o) => {
+    o.ln(-60, -90, -60, 90, { highway: 'residential', name: 'Cross street' }, 10, [[-60, 0], [-60, 3.5], [-60, -3.5]]);
+    o.ln(20, 0, 85, 0, { highway: 'tertiary', name: 'Island avenue' }, 10);
+    o.st([[20, 0], [10, 3.5], [0, 3.5], [-20, 3.5], [-40, 3.5], [-60, 3.5]], { highway: 'tertiary', oneway: 'yes', name: 'Island avenue' });
+    o.st([[-60, -3.5], [-40, -3.5], [-20, -3.5], [0, -3.5], [10, -3.5], [20, 0]], { highway: 'tertiary', oneway: 'yes', name: 'Island avenue' });
+    for (const s of [1, -1]) {
+      o.st([[-55, s * 7], [10, s * 7], [25, s * 4.5], [85, s * 4.5]], { barrier: 'kerb' });
+    }
+    o.ar([[-52, -1.4], [-46, -1.4], [-46, 1.4], [-52, 1.4]], { 'area:highway': 'traffic_island' });
+    o.ar([[-42, -1.4], [-38, -1.4], [-38, 1.4], [-42, 1.4]], { 'area:highway': 'traffic_island' });
+    o.ar([[-20, -1.6], [0, -1.6], [8, 0], [0, 1.6], [-20, 1.6]], { 'area:highway': 'traffic_island' });
+    o.row(-50, 80, 0, { back: 13 }); o.col(-80, 80, -60, { back: 9, side: -1 });
+    o.lab('a split before a junction, islands mapped as areas: raised only there, paved between', -30, 0, [40]);
+    o.drv('driving west to the junction', 40, 2, Math.PI);
+  });
   plot(3, 1, 'unmapped ground and other roads', (o) => {
     // a second road 3 m behind the curb: the strip between is no sidewalk (UNMAPPED_ROAD_CLEAR_M)
     tagStreet(o, 70, {}, 'untagged, a service road 9 m away in parallel', { houses: false });

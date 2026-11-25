@@ -688,9 +688,34 @@ function everyMetres(line, step) {
   return out;
 }
 
-export function buildMedianRuns(carriageways, medians, { zones = [] } = {}) {
+// A point within r of a ring (inside it, or this near its outline).
+function nearRing(ring, x, y, r) {
+  let inside = false; let d2 = r * r;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [ax, ay] = ring[j]; const [bx, by] = ring[i];
+    if ((by > y) !== (ay > y) && x < ((ax - bx) * (y - by)) / (ay - by) + bx) inside = !inside;
+    const ex = bx - ax; const ey = by - ay; const L2 = ex * ex + ey * ey;
+    const t = L2 > 0 ? Math.max(0, Math.min(1, ((x - ax) * ex + (y - ay) * ey) / L2)) : 0;
+    const dx = ax + ex * t - x; const dy = ay + ey * t - y;
+    if (dx * dx + dy * dy < d2) return true;
+  }
+  return inside;
+}
+export const ISLAND_REACH_M = 1;   // a median within this of a mapped traffic island has its islands mapped
+const ISLAND_EDGE_M = 0.3;         // the median's middle this near an island's outline is beside it
+
+export function buildMedianRuns(carriageways, medians, { zones = [], islands = [] } = {}) {
   const index = buildCarriagewayIndex(carriageways);
   const pieces = [];
+  // (the traffic islands mapped as areas, area:highway=traffic_island: where a median has any, it is raised only
+  // beside them, the road paved across the rest. Guessed from the gap between the carriageways it ran the whole
+  // way from the split into the junction: Galliers Avenue, Splatplays 2026-11-25)
+  const isl = islands.filter((r) => r?.length > 2).map((ring) => {
+    let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
+    for (const [x, y] of ring) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+    return { ring, x0, y0, x1, y1 };
+  });
+  let islandCuts = 0;
   const jersey = [];
   for (const cw of carriageways) {
     const median = medians.get(cw);
@@ -726,8 +751,37 @@ export function buildMedianRuns(carriageways, medians, { zones = [] } = {}) {
         // (a thin gap has its other carriageway right beside it)
         const margin = typical < MEDIAN_MIN_M ? -0.1 : CUT_MARGIN_M;
         const blocked = (x, y) => isOnOtherCarriageway(index, x, y, margin, (o) => ignore.has(o)) || isInZone(zones, x, y);
-        for (const piece of cutNodes(nodes, blocked, { minPieceM: 0.5 })) {
+        // (the mapped islands beside this stretch, if any)
+        const reach = typical + ISLAND_REACH_M;
+        let bx0 = Infinity; let by0 = Infinity; let bx1 = -Infinity; let by1 = -Infinity;
+        for (const [x, y] of nodes) { bx0 = Math.min(bx0, x); by0 = Math.min(by0, y); bx1 = Math.max(bx1, x); by1 = Math.max(by1, y); }
+        const near = isl.filter((o) => o.x1 >= bx0 - reach && o.x0 <= bx1 + reach && o.y1 >= by0 - reach && o.y0 <= by1 + reach);
+        // (the median's middle beside a curb point, found along the stretch's own line: a point tested at the curb
+        // reached a metre along the road past each island's end too, and closed the gap between two short ones)
+        let seg = 0;
+        const middleOf = (x, y) => {
+          if (nodes.length < 2) return [x, y];
+          const d2 = (k) => { const a = nodes[k]; const b = nodes[k + 1]; const ex = b[0] - a[0]; const ey = b[1] - a[1]; const L2 = ex * ex + ey * ey || 1; const t = Math.max(0, Math.min(1, ((x - a[0]) * ex + (y - a[1]) * ey) / L2)); const dx = a[0] + ex * t - x; const dy = a[1] + ey * t - y; return dx * dx + dy * dy; };
+          if (seg > nodes.length - 2 || d2(seg) > d2(0)) seg = 0;
+          while (seg + 1 < nodes.length - 1 && d2(seg + 1) <= d2(seg)) seg++;
+          const a = nodes[seg]; const b = nodes[seg + 1]; const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
+          const half = widths[Math.min(widths.length - 1, seg)] / 2;
+          return [x - ((b[1] - a[1]) / L) * side * half, y + ((b[0] - a[0]) / L) * side * half];
+        };
+        const besideIsland = (x, y) => {
+          const [mx, my] = middleOf(x, y);
+          return near.some((o) => mx >= o.x0 - 1 && mx <= o.x1 + 1 && my >= o.y0 - 1 && my <= o.y1 + 1 && nearRing(o.ring, mx, my, ISLAND_EDGE_M));
+        };
+        const mapped = near.length > 0 && nodes.some(([x, y]) => besideIsland(x, y));
+        for (const piece of cutNodes(nodes, mapped ? (x, y) => blocked(x, y) || !besideIsland(x, y) : blocked, { minPieceM: 0.5 })) {
           pieces.push({ points: piece, side, width: 0, owner: cw.owner, highway: cw.highway, median: true, thin: typical < MEDIAN_MIN_M });
+        }
+        // (and the stretches between them paved across, as a gap too thin for an island)
+        if (mapped) {
+          for (const piece of cutNodes(nodes, (x, y) => blocked(x, y) || besideIsland(x, y), { minPieceM: 0.5 })) {
+            islandCuts++;
+            pieces.push({ points: piece, side, width: 0, owner: cw.owner, highway: cw.highway, median: true, thin: true, unmapped: true });
+          }
         }
         i = j + 1;
       }
@@ -736,11 +790,15 @@ export function buildMedianRuns(carriageways, medians, { zones = [] } = {}) {
   // OSM splits a carriageway into many short ways: join their pieces end to
   // end first (each point keeps its own width), then drop the short ones
   const merged = mergeRuns(pieces.filter((p) => !p.thin), { matchWidth: false });
-  const raised = merged.filter((run) => runLength(run.points) >= MEDIAN_MIN_RUN_M)
+  // (a mapped island stands however short it is: a few metres at a crosswalk)
+  const islandRun = (run) => isl.length > 0 && run.points.some(([x, y]) => isl.some((o) => x >= o.x0 - 3 && x <= o.x1 + 3 && y >= o.y0 - 3 && y <= o.y1 + 3 && nearRing(o.ring, x, y, ISLAND_REACH_M)));
+  const keep = (run) => runLength(run.points) >= MEDIAN_MIN_RUN_M || (runLength(run.points) >= 1 && islandRun(run));
+  const raised = merged.filter(keep)
     .map((run) => ({ ...run, width: Math.max(...run.points.map((pt) => pt[3])) }));
   // what's too thin or short for an island: the road paved across it (grass showed in stripes)
-  raised.gaps = [...pieces.filter((p) => p.thin), ...merged.filter((run) => runLength(run.points) < MEDIAN_MIN_RUN_M)];
+  raised.gaps = [...pieces.filter((p) => p.thin), ...merged.filter((run) => !keep(run))];
   raised.jersey = jersey;
+  raised.islands = { mapped: isl.length, cuts: islandCuts };
   return raised;
 }
 

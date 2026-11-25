@@ -697,6 +697,21 @@
     "roundabout"
    ],
    "note": "thecoachtoma's V. Kreves pr., Kaunas: a roundabout whose four approaches split"
+  },
+  {
+   "name": "sp_crawley",
+   "lat": -32.135829,
+   "lng": 116.012776,
+   "size": 1024,
+   "mpp": 1,
+   "dem": "mh",
+   "categories": [
+    "sidewalk",
+    "curb",
+    "junction",
+    "railway"
+   ],
+   "note": "Splatplays Crawley Road, Armadale WA (2026-11-25): sidewalk slabs at bent junction corners, curbs vs sidewalk level, area:highway road areas, footpath rail crossings lost at a platform"
   }
  ]
 }
