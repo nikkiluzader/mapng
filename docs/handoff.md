@@ -14,15 +14,15 @@ replace the tracking files (see CLAUDE.md, "Tracking"); it is the short "start h
 ## Where things stand
 
 - **Released:** 0.3.6 is published as Latest (tag `v0.3.6` at `759ea31`). Do not move that tag.
-- **main = dev at `0a53144`** (pushed 2026-11-24 with the user's go-ahead): 0.3.6, the sidebar styling, slip roads,
-  very large levels (ZIP64 writer, progress card, Cancel), road-mode warning, map view for levels in pieces. dev has
-  only docs and the dev.3 version bump on top. Pushing main needs the user's word every time, as its own command:
-  `git push origin <sha>:main`. Push dev freely.
-- **Test build:** `v0.3.7-dev.4` (tag at `25c91ef`, 2026-11-24): everything above plus line curves on railways,
-  paths and waterways (`8e5b7ca`, `b8fa986`) and no backdrop for road levels (`f0580b8`). On main since 2026-11-24
-  (`8aebfb4`, with the user's go-ahead). The permission check refuses a tag push unless the user has asked
-  for that tag in so many words ("cut dev 2 now" worked; "proceed with your recommendations" did not): ask, then
-  run bump, commit, and tag + push as separate commands (`node scripts/release/devRelease.mjs --write`, commit, tag, push dev and the tag).
+- **main = dev at `0c9381f`** (pushed 2026-11-25 with the user's go-ahead). Since 0.3.6: the sidebar styling, slip
+  roads, very large levels, line curves, the Perth and Armadale reports (kerb widths, mapped traffic islands, path
+  level crossings, bare-curb verges), carriageway splits, the sidewalk test level. Pushing main needs the user's word
+  every time, as its own command: `git push origin <sha>:main`. Push dev freely.
+- **Test build:** `v0.3.7-dev.12` (tag at `0c9381f`, 2026-11-25). The permission check refuses a tag push unless the
+  user has asked for that tag in so many words: ask, then run bump, commit, and tag + push as separate commands
+  (`node scripts/release/devRelease.mjs --write`, commit, tag, push dev and the tag).
+- **Official test levels:** re-uploaded 2026-11-25 (manifest 2026-11-25b, from `367b3f9`). Every missed case goes
+  into them (CLAUDE.md, Testing).
 - **No work branches.** Everything is on dev. See "Branches and worktrees".
 
 ## Work list (the user's order)

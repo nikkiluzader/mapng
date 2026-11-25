@@ -143,6 +143,13 @@ Diagrams solve problems faster than game trips. Before the first code change on 
 - **Run long tests in the background** with a progress log. Check on them about every 10 s, keep per-step timeouts
   short, and stop anything that stalls.
 - **Commit only when every test passes.** Run /verify before code commits.
+- **Every missed case goes into the test levels.** Whenever a report or a find shows a case the synthetic test levels
+  (`scripts/coverage/`: coverage, roads, structures, terrain, sidewalks) did not cover, add a scene for it in the
+  same change, check it in game, and re-upload the official set when the batch is done (ask first).
+- **Every fix is checked four ways:** diagrams (top view and sections, before and after), the game, Mapillary street
+  views (and other photos) of the real place, and the OSM wiki or other references when the tags are in question.
+- **Update the release page as you go:** each fix that ships gets its line (and before/after pictures where they help)
+  on the draft page of the coming release (`public/updates/<version>/`) in the same session.
 
 ## Data and code
 
