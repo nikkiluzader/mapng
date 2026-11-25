@@ -532,7 +532,8 @@ const smooth01 = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 export const VERGE_RAISE_MAX_M = 0.25;
 export const VERGE_ROAD_M = 3;
 export const VERGE_FAR_M = 2.5;
-export function gradePaved(cells, g, terrain, { heightAt = () => 0, core = null, overhead = null, verge = null } = {}) {
+// keep(x, y): ground left as it is (a level crossing's pad: the track's own shaping, at the rails' top)
+export function gradePaved(cells, g, terrain, { heightAt = () => 0, core = null, overhead = null, verge = null, keep = null } = {}) {
   const { heightMap, width, height, worldSize, minHeight = 0 } = terrain;
   const N = width * height; const sq = worldSize / width;
   // (the terrain grid's convention: pixel (c, r) at ((c / W) - 0.5) * size, (0.5 - (r + 1) / H) * size)
@@ -562,6 +563,7 @@ export function gradePaved(cells, g, terrain, { heightAt = () => 0, core = null,
       const k = r * sw + c; const gi = (r + r0) * width + (c + c0);
       if (gi < 0 || gi >= N || road[k]) continue;
       if (core) { const x = wx(c + c0); const y = wy(r + r0); if (x < core[0] || x >= core[2] || y < core[1] || y >= core[3]) continue; }
+      if (keep && keep(wx(c + c0), wy(r + r0))) continue;
       if (paved[k]) {
         // (never raised up into a deck or a tunnel over it: the old grading's guard, missing at first: terrain stood
         // through a bridge deck over a paved strip)

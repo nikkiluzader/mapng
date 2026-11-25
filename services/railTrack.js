@@ -289,6 +289,40 @@ export function pathRailCrossings(graph, paths = []) {
   return out;
 }
 
+/**
+ * Where a path's paving may cross a track bed: per path crossing, the pad (a ring: the bed's width across the line,
+ * the crossing's zone along it) and the rail strips inside it (each track's rails and their heads, which stay clear:
+ * no slab over the rails, the crossing's surface shows them). A path's paving stopped at the bed's edge, 2 m of
+ * shaped ground short of the first rail, where the real crossing is paved up to the rails (Splatplays' Sherwood,
+ * 2026-11-25). Returns [{ pad: [[x, y]...], strips: [{ pts: [[x, y], [x, y]], half }] }].
+ */
+export const PAD_STRIP_PAST_M = 0.12;
+export const PAD_PAST_PATH_M = 0.05;      // a pad this much longer than the path is wide, each side     // a rail strip this much wider than the gauge each side (the rail heads)
+export function pathCrossingPads(graph, { tagsOf = () => ({}), bedHalf = () => 2 } = {}) {
+  const out = [];
+  for (const c of graph?.railPathCrossings || []) {
+    const e = graph.edges[c.rail];
+    if (!e) continue;
+    const n = e.s.length;
+    let i = 0; while (i + 2 < n && e.s[i + 1] < c.s) i++;
+    const dx = e.x[i + 1] - e.x[i]; const dy = e.y[i + 1] - e.y[i]; const L = fastHypot(dx, dy) || 1;
+    const ux = dx / L; const uy = dy / L; const nx = -uy; const ny = ux;
+    const tags = tagsOf(e) || {};
+    // (along the line: the path's own width; the embedded track's zone runs CROSSING_PAD_M wider each side)
+    const along = c.half + PAD_PAST_PATH_M; const across = bedHalf(tags);
+    const P = (a, o) => [c.x + ux * a + nx * o, c.y + uy * a + ny * o];
+    const pad = [P(-along, -across), P(along, -across), P(along, across), P(-along, across)];
+    const gauge = gaugeOf(tags); const tracks = tracksOf(tags); const scale = Math.max(0.7, gauge / STANDARD_GAUGE_M);
+    const strips = [];
+    for (let t = 0; t < tracks; t++) {
+      const o = (t - (tracks - 1) / 2) * TRACK_SPACING_M * scale;
+      strips.push({ pts: [P(-along - 1, o), P(along + 1, o)], half: gauge / 2 + PAD_STRIP_PAST_M });
+    }
+    out.push({ pad, strips, x: c.x, y: c.y });
+  }
+  return out;
+}
+
 /** A crossing without a node: its zone on the rail edge marked as a node's would be. */
 export function markUnjoinedCrossing(graph, c) {
   const e = graph.edges[c.rail];

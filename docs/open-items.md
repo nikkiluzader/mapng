@@ -26,10 +26,6 @@ is where each item's full text, numbers and file names now live.
 A new session starts with `docs/handoff.md`. Its "Work list" holds the agreed order of the 0.3.7 work and each
 item's state. The open items there, one line each:
 
-- **In progress (this session): a path's paving carried over the track bed to the rails.** Splatplays, 2026-11-25.
-  Backlog section 1. The rest of his 2026-11-25 reports is done (H > Now: Splatplays' reports of 2026-11-25).
-- **In progress (this session): a slab median's two halves leave a groove down its middle.** Splatplays,
-  2026-11-25. Backlog section 1.
 - **Sidewalks at banks and the water.** Start again from the diagrams; the sea-wall approach was scrapped
   2026-11-24. `docs/handoff.md`, "Sidewalks at banks and the water"; record in H > 0.3.7 and H > Priority list
   (item 10). Done when: no sidewalk sweep cell worse than dev, then in game at Kingston and Naldo.

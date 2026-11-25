@@ -659,6 +659,16 @@ export function sidewalks(regionKey, makeBuilder) {
     o.lab('8 % street (climbing north)', -50, 0, [50, 0]); o.lab('15 % street', 40, 0, [50, 0]);
     o.walk('up the 15 % sidewalk', 44.5, -50, Math.PI / 2); o.walk('down the 15 % sidewalk', 35.5, 50, -Math.PI / 2);
   }, eased((lx, ly) => (lx < -5 ? 0.08 : 0.15) * Math.max(-85, Math.min(85, ly)) + (lx < -5 ? 7 : 13)));
+  // a divided street across a slope, a narrow slab median between its carriageways: the two halves of the island meet
+  // at one height (Splatplays' Galliers Avenue: each half at its own road's height met in a step, a groove)
+  plot(4, 6, 'divided street across a slope', (o) => {
+    // (right-hand traffic: eastbound on the south side)
+    o.ln(-85, -2.7, 85, -2.7, { highway: 'tertiary', oneway: 'yes', name: 'Slope boulevard' }, 10);
+    o.ln(85, 2.7, -85, 2.7, { highway: 'tertiary', oneway: 'yes', name: 'Slope boulevard' }, 10);
+    o.row(-80, 80, 0, { back: 14 });
+    o.lab('divided street across a 1.5 % slope: the slab median\'s halves meet level in the middle', 0, 0, [35]);
+    o.walk('along the median', -60, 0, 0);
+  }, eased((lx, ly) => 0.015 * ly + 12));
   plot(6, 6, 'street across a slope', (o) => {
     o.ln(-85, 20, 85, 20, { highway: 'residential', sidewalk: 'both', name: 'Across 10 %' }); o.row(-80, 80, 20);
     o.ln(-85, -50, 85, -50, { highway: 'residential', sidewalk: 'both', name: 'Across 25 %' }); o.row(-80, 80, -50);

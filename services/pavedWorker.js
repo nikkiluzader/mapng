@@ -28,7 +28,16 @@ export function pavedTile(item) {
   if (item.railBeds?.length) {
     const inB = new Uint8Array(cells.length);
     for (const ring of item.railBeds) markPolygon(inB, g, ring, 1);
-    for (let i = 0; i < cells.length; i++) if (inB[i]) cells[i] &= ~(WALK | GAP);
+    // (except where a path crosses the line at grade: its paving goes on over the bed, flush, up to the rails; each
+    // rail strip stays clear (railTrack.js pathCrossingPads; Splatplays' Sherwood, 2026-11-25))
+    const keep = new Uint8Array(cells.length);
+    if (item.pads?.length) {
+      const strip = new Uint8Array(cells.length);
+      for (const pd of item.pads) markPolygon(keep, g, pd.pad, 1);
+      for (const pd of item.pads) for (const st of pd.strips) markLine(strip, g, st.pts, st.half, 1);
+      for (let i = 0; i < cells.length; i++) if (strip[i]) keep[i] = 0;
+    }
+    for (let i = 0; i < cells.length; i++) if (inB[i] && !keep[i]) cells[i] &= ~(WALK | GAP);
   }
   // (nor across a river's channel: its bed is dug after the sidewalks, and paving over it floated over the dug bed)
   if (item.rivers?.length) {

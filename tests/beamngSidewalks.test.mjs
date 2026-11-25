@@ -927,3 +927,18 @@ test('a median with traffic islands mapped as areas: raised only beside them, pa
   assert.ok(runs.gaps.some((g) => g.points.some((p) => Math.abs(p[0]) < 10)), 'between them: paved across');
   assert.equal(runs.islands.mapped, 2);
 });
+
+test('a slab median\'s two halves meet at one height in the middle; a split level keeps its step', () => {
+  const line = (y, x0, x1, z) => Array.from({ length: 21 }, (_, i) => [x0 + ((x1 - x0) * i) / 20, y, z, 0]);
+  const cw = (owner, y, x0, x1, z) => ({ owner, half: 2.2, highway: 'tertiary', urban: true, continuations: [], tags: { name: 'Slope boulevard', oneway: 'yes' }, nodes: line(y, x0, x1, z) });
+  const runs = (dz) => { const all = [cw(1, -2.7, -100, 100, 10), cw(2, 2.7, 100, -100, 10 + dz)]; return buildMedianRuns(all, findMedians(all)); };
+  const near = runs(0.06);
+  assert.ok(near.seams > 0, 'stations tilted');
+  for (const r of near) {
+    const p = r.points[Math.floor(r.points.length / 2)];
+    const own = r.owner === 1 ? 10 : 10.06;
+    assert.ok(Math.abs(own + p[4] - 10.03) < 1e-6, `owner ${r.owner}: meets at 10.03 (${own + p[4]})`);
+  }
+  const split = runs(0.4);
+  assert.equal(split.seams, 0, 'a 0.4 m split level: the step stays');
+});

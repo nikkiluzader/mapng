@@ -151,7 +151,7 @@ import {
 import { planRaceways } from './racetracks.js';
 import { backdropImageryFetch } from './backdropImagery.js';
 import { RAIL_DEPTH_M, RAIL_GRADE_CEILING, railHalfWidth, railKindOf, railSegmentsFrom, streetRunningTest, undergroundRailIds } from './railways.js';
-import { prepareRailEdges, unjoinedRailCrossings, markUnjoinedCrossing, pathRailCrossings, buildTrackGeometry, crossingDecals, streetTramDecals, railMaterialDefs, RAIL_MATERIALS, TRAMLINE_MATERIAL, railwayStats } from './railTrack.js';
+import { prepareRailEdges, unjoinedRailCrossings, markUnjoinedCrossing, pathRailCrossings, pathCrossingPads, buildTrackGeometry, crossingDecals, streetTramDecals, railMaterialDefs, RAIL_MATERIALS, TRAMLINE_MATERIAL, railwayStats } from './railTrack.js';
 // footways and other paths: a level crossing of one is a foot crossing
 const PATH_HIGHWAYS = new Set(['footway', 'cycleway', 'path', 'pedestrian', 'steps', 'bridleway']);
 import { POLE_SHAPE, POLE_SHAPE_HEIGHT_M, beamRotation } from './sportsLights.js';
@@ -15100,6 +15100,13 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
             heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
             minHeight: Number(exportTerrainData.minHeight) || 0, worldSize: exportTerrainData.width * squareSize,
           }, exportTerrainData.landCover, -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0), { coarse: !!terrainData?.coarseElevation, coast: coastLinesOf(exportTerrainData, squareSize) }); } catch { return null; } })() : null;
+  // (where a path crosses the line at grade, its paving goes on over the bed up to the rails, flush, railTrack.js)
+  const sidewalkCrossingPads = includeRoads && includeSidewalks && decalRoads.structureGraph?.railPathCrossings?.length
+    ? pathCrossingPads(decalRoads.structureGraph, { tagsOf: (e) => decalRoads.structureGraph.railSegments?.[e.seg]?.tags || {}, bedHalf: (t) => railHalfWidth(t) + RAIL_BED_PAD_M + 0.3 })
+    : [];
+  if (sidewalkCrossingPads.length) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Sidewalks: ${sidewalkCrossingPads.length} path crossing pad(s): the path's paving carried over the track bed up to the rails, flush with the crossing, each rail strip (${sidewalkCrossingPads.reduce((a, p) => a + p.strips.length, 0)} in all) left clear.`);
+  // (a probe's hook: the pads as planned, e.g. scratch/splat/padsdump.mjs; off unless set)
+  globalThis.__MAPNG_PADS_DUMP?.(sidewalkCrossingPads);
   const sidewalkRailBeds = includeRoads && includeSidewalks ? railBedRings(exportTerrainData.osmFeatures, (p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0)) : [];
   if (includeRoads && includeSidewalks) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Sidewalks: ${sidewalkRailBeds.length} at-grade track bed piece(s) kept clear of raised slabs (a path or sidewalk crossing the rails stops at the bed's edge).`);
   // (the walkway tops on worker threads in the desktop app; here otherwise)
@@ -15118,6 +15125,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       // 2026-11-24); the path stops at the bed's edge, the ground between runs flush. Not a track on a bridge or in a
       // tunnel, not a tram running in its street)
       railBeds: sidewalkRailBeds,
+      // (and where a path crosses the line, its paving over the bed up to the rails)
+      crossingPads: sidewalkCrossingPads,
       // traffic islands mapped as areas (area:highway=traffic_island): a median raised only beside them
       islands: (exportTerrainData.osmFeatures || [])
         .filter((f) => f.tags?.['area:highway'] === 'traffic_island' && f.geometry?.length > 2)
@@ -15204,7 +15213,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     const graded = (() => {
       const idx = []; const z = []; let verges = 0;
       for (const t of sidewalks.paved.tiles) {
-        const e = gradePaved(t.cells, t.g, terrainGrid, { heightAt: sidewalks.paved.heightAt, core: t.core, overhead: underDeck, verge: sidewalks.paved.vergeAt });
+        const e = gradePaved(t.cells, t.g, terrainGrid, { heightAt: sidewalks.paved.heightAt, core: t.core, overhead: underDeck, verge: sidewalks.paved.vergeAt, keep: sidewalks.paved.padAt });
         for (let k = 0; k < e.idx.length; k++) { idx.push(e.idx[k]); z.push(e.z[k]); }
         verges += e.verges || 0;
       }
@@ -15222,7 +15231,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       worldSize: exportTerrainData.width * squareSize, minHeight: Number(exportTerrainData.minHeight) || 0,
     }, (idx, v) => hmSide.set(idx, v));
     sidewalks.groundPixels = graded.pixels;
-    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Sidewalks: ${sidewalks.runs.length} curb runs, ${(sidewalks.medianRuns || []).length} median island runs (${sidewalks.medianRuns?.islands?.mapped ? `${sidewalks.medianRuns.islands.mapped} traffic island(s) mapped as areas: medians beside them raised only along them, ${sidewalks.medianRuns.islands.cuts} stretch(es) between paved across` : 'no traffic islands mapped as areas: medians from the gap between the carriageways'}), ${(sidewalks.pockets || []).length} paved pockets by seawalls, ${sidewalks.triangles} triangles in ${sidewalks.meshes.length} mesh(es).`);
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Sidewalks: ${sidewalks.runs.length} curb runs, ${(sidewalks.medianRuns || []).length} median island runs (${sidewalks.medianRuns?.islands?.mapped ? `${sidewalks.medianRuns.islands.mapped} traffic island(s) mapped as areas: medians beside them raised only along them, ${sidewalks.medianRuns.islands.cuts} stretch(es) between paved across` : 'no traffic islands mapped as areas: medians from the gap between the carriageways'}; ${sidewalks.medianRuns?.seams || 0} slab station(s) tilted to meet the other half at one height in the middle), ${(sidewalks.pockets || []).length} paved pockets by seawalls, ${sidewalks.triangles} triangles in ${sidewalks.meshes.length} mesh(es).`);
   }
 
   beginStep('props', 'Placing street props (hydrants, bins, benches, utility poles, power lines) and traffic signals…');

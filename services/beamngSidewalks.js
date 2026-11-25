@@ -688,6 +688,52 @@ function everyMetres(line, step) {
   return out;
 }
 
+// A slab median's two halves, one per carriageway, each reach the middle at their own road's height plus the curb:
+// where the two roads stand at different heights (camber, grade) the halves met in a step, a groove down the island
+// (Galliers Avenue's teardrop, 5 cm; Splatplays 2026-11-25). Each station's slab is given p[4], half the difference to
+// the other half's top at the middle, tilted in from its own curb (sweepRun), so both meet at one height. Returns the
+// number of stations given a share.
+const SEAM_MATCH_M = 0.6;      // the other half's middle this near this half's middle is its twin
+const SEAM_MAX_M = 0.1;        // a difference over this is no seam to close (a split level: the step stays, a curb)
+const SEAM_TILT_MAX = 0.1;     // ... nor one tilting a half more than this (rise over its width)
+function meetInTheMiddle(runs) {
+  const mids = []; const grid = new Map(); const CELL = 2;
+  const outwardAt = (pts, i, side) => {
+    const a = pts[Math.max(0, i - 1)]; const b = pts[Math.min(pts.length - 1, i + 1)];
+    const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
+    return [-((b[1] - a[1]) / L) * side, ((b[0] - a[0]) / L) * side];
+  };
+  // (every point a value, 0 at first: a ramp's stations are interpolated between points, component by component)
+  for (const run of runs) for (const pt of run.points) pt[4] = 0;
+  runs.forEach((run, r) => run.points.forEach((pt, i) => {
+    // (a wide median's two curbs with ground between carry exactly MEDIAN_CURB_W: no slab to meet; a slab half can be
+    // narrower than that, down to 0.3 m)
+    if (Math.abs(pt[3] - MEDIAN_CURB_W) < 1e-6) return;
+    const o = outwardAt(run.points, i, run.side);
+    const m = { r, i, owner: run.owner, x: pt[0] + o[0] * pt[3], y: pt[1] + o[1] * pt[3], z: pt[2] };
+    mids.push(m);
+    const key = `${Math.floor(m.x / CELL)},${Math.floor(m.y / CELL)}`;
+    if (!grid.has(key)) grid.set(key, []); grid.get(key).push(m);
+  }));
+  let n = 0;
+  for (const m of mids) {
+    let best = null; let bd = SEAM_MATCH_M;
+    const cx = Math.floor(m.x / CELL); const cy = Math.floor(m.y / CELL);
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+      for (const o of grid.get(`${cx + dx},${cy + dy}`) || []) {
+        if (o.owner === m.owner) continue;
+        const d = fastHypot(o.x - m.x, o.y - m.y);
+        if (d < bd) { bd = d; best = o; }
+      }
+    }
+    if (!best || Math.abs(best.z - m.z) > SEAM_MAX_M) continue;
+    if (Math.abs(best.z - m.z) / 2 > SEAM_TILT_MAX * runs[m.r].points[m.i][3]) continue;
+    runs[m.r].points[m.i][4] = (best.z - m.z) / 2;
+    n++;
+  }
+  return n;
+}
+
 // A point within r of a ring (inside it, or this near its outline).
 function nearRing(ring, x, y, r) {
   let inside = false; let d2 = r * r;
@@ -799,6 +845,7 @@ export function buildMedianRuns(carriageways, medians, { zones = [], islands = [
   raised.gaps = [...pieces.filter((p) => p.thin), ...merged.filter((run) => !keep(run))];
   raised.jersey = jersey;
   raised.islands = { mapped: isl.length, cuts: islandCuts };
+  raised.seams = meetInTheMiddle(raised);
   return raised;
 }
 
@@ -1480,7 +1527,9 @@ function sweepRun(builder, run) {
     const len = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
     return [-((b[1] - a[1]) / len) * side, ((b[0] - a[0]) / len) * side];
   });
-  const stations = points.map((p, i) => (profiles ? profiles[i] : profile).points.map(([o, h]) => [p[0] + outward[i][0] * o, p[1] + outward[i][1] * o, p[2] + (h > 0 ? h * share[i] : h)]));
+  // (a median half's tilt to its twin's height at the middle, p[4]: none at its curb, all of it at its far edge)
+  const tilt = (p, o) => (run.median && p[4] ? p[4] * Math.max(0, Math.min(1, o / (p[3] || width))) : 0);
+  const stations = points.map((p, i) => (profiles ? profiles[i] : profile).points.map(([o, h]) => [p[0] + outward[i][0] * o, p[1] + outward[i][1] * o, p[2] + (h > 0 ? h * share[i] : h) + tilt(p, o)]));
   let along = 0;
   for (let i = 0; i + 1 < points.length; i++) {
     const step = fastHypot(points[i + 1][0] - points[i][0], points[i + 1][1] - points[i][1]);
@@ -3721,6 +3770,7 @@ function* sidewalkMeshes(carriageways, options = {}) {
       riverChannels: options.riverChannels || [],
       // (at-grade track beds: the paved area, which reads the mapped walks whole, cleared over them too)
       railBeds: options.railBeds || [],
+      crossingPads: options.crossingPads || [],
       houses: options.houses || [],
       carriageways, corners, walks: options.walks || [], runs, openGround: options.openGround || [], buildings: options.buildings || [], driveways: options.driveways || [],
       curbH: CURB_H, crossSlope: CROSS_SLOPE, curbOnlyM: CURB_ONLY_M, THREE, groundAt: options.groundAt || null,

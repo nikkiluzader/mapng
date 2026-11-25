@@ -34,6 +34,20 @@ const BANK_BLOCK = 4;              // the bank test once a 4 x 4 block of cells 
 // over VERGE_BLEND_M; raised only, by VERGE_RAISE_MAX_M at most (more is a bank: left as it is). The curb stood 15 cm
 // proud of road-level ground with no sidewalk mapped behind it, where the real verge is at the kerb's top (Splatplays,
 // Armadale, 2026-11-25). The 0.5 m strip covers no terrain pixel of a 1 m grid, so the paving's grading raised nothing
+export const PAD_OVER_M = 0.02;     // a path's paving over a track bed at a crossing: this far over the shaped ground
+export const PAD_EASE_M = 1.5;      // ... eased back to the walk's own height within this of the pad
+// distance from (x, y) to a ring's outline, 0 inside it
+function ringDistance(ring, x, y) {
+  let inside = false; let d2 = Infinity;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [ax, ay] = ring[j]; const [bx, by] = ring[i];
+    if ((by > y) !== (ay > y) && x < ((ax - bx) * (y - by)) / (ay - by) + bx) inside = !inside;
+    const ex = bx - ax; const ey = by - ay; const L2 = ex * ex + ey * ey;
+    const t = L2 > 0 ? Math.max(0, Math.min(1, ((x - ax) * ex + (y - ay) * ey) / L2)) : 0;
+    const dx = ax + ex * t - x; const dy = ay + ey * t - y; d2 = Math.min(d2, dx * dx + dy * dy);
+  }
+  return inside ? 0 : Math.sqrt(d2);
+}
 export const VERGE_M = 1.5;
 export const VERGE_BLEND_M = 1.5;
 export const VERGE_UNDER_M = 0.02;
@@ -153,7 +167,7 @@ export function addPavedSidewalks(builder, opts = {}) {
 
 // (a generator: the tiles' grids asked of the driver as one batch, { kind: 'pavedTiles', items }, built on worker
 // threads where there are some; null back: built here)
-export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = [], walks = [], runs = [], openGround = [], buildings = [], driveways = [], pockets = [], uvBands = null, followGround = false, overhead = null, mapBox = null, water = [], seaMask = null, walkH = 0.1, riverChannels = [], railBeds = [], houses = [], curbH = 0.15, crossSlope = 0.015, curbOnlyM = 0.3, THREE, groundAt = null } = {}) {
+export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = [], walks = [], runs = [], openGround = [], buildings = [], driveways = [], pockets = [], uvBands = null, followGround = false, overhead = null, mapBox = null, water = [], seaMask = null, walkH = 0.1, riverChannels = [], railBeds = [], crossingPads = [], houses = [], curbH = 0.15, crossSlope = 0.015, curbOnlyM = 0.3, THREE, groundAt = null } = {}) {
   const road = makeRoadHeight(carriageways);
   // (a driveway counts only where it crosses the sidewalk to reach the road: the part of its line within
   // CROSS_REACH_M of where it comes to the road's edge. Whole, an alley along a street dropped the curb along it)
@@ -185,7 +199,7 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
   // slab is its height plus walkH, as today's walkways; between the curb and a walk it goes from the curb's top to the
   // walk's. Off the roads alone, the walk to a bridge's footway sat 2-3 m under the deck walk it met)
   const walkHeight = makeRoadHeight(walks.filter((w) => w.sidewalk && !w.crossing && (w.nodes || []).length > 1 && w.nodes.every((p) => Number.isFinite(p[2]))).map((w) => ({ nodes: w.nodes, half: w.half || 1 })));
-  const heightAt = (x, y) => {
+  let heightAt = (x, y) => {
     const h = road(x, y); if (!h) return groundAt ? groundAt(x, y) : 0;
     const surface = edgeSurface(h);
     const share = Math.min(smooth01((toDriveway(x, y) - DRIVEWAY_HALF_M) / DIP_RAMP_M), smooth01(toDip(x, y) / DIP_RAMP_M));
@@ -223,6 +237,33 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
     if (overhead && top - ground > OVERHEAD_FLOAT_M && overhead(x, y, ground, top + 6)) return ground + FOLLOW_OVER_M;
     return top;
   };
+  // (a path's paving over a track bed at a level crossing: flush with the crossing, the ground there shaped to the
+  // rails' top; eased back to the walk's own height within PAD_EASE_M of the pad (railTrack.js pathCrossingPads))
+  const pads = crossingPads.filter((pd) => pd?.pad?.length > 2).map((pd) => {
+    let a = Infinity; let b = Infinity; let c = -Infinity; let d = -Infinity;
+    for (const [x, y] of pd.pad) { a = Math.min(a, x); b = Math.min(b, y); c = Math.max(c, x); d = Math.max(d, y); }
+    return { ...pd, box: [a, b, c, d] };
+  });
+  const padDist = (x, y) => {
+    let best = Infinity;
+    for (const pd of pads) {
+      if (x < pd.box[0] - PAD_EASE_M || x > pd.box[2] + PAD_EASE_M || y < pd.box[1] - PAD_EASE_M || y > pd.box[3] + PAD_EASE_M) continue;
+      best = Math.min(best, ringDistance(pd.pad, x, y));
+      if (best <= 0) return 0;
+    }
+    return best;
+  };
+  const padAt = (x, y) => pads.length > 0 && padDist(x, y) <= 0;
+  if (pads.length && groundAt) {
+    const own = heightAt;
+    heightAt = (x, y) => {
+      const d = padDist(x, y);
+      if (d >= PAD_EASE_M) return own(x, y);
+      const flush = groundAt(x, y) + PAD_OVER_M;
+      if (d <= 0) return flush;
+      return flush + (own(x, y) - flush) * smooth01(d / PAD_EASE_M);
+    };
+  }
   let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
   // (over the roads, the mapped walks and the seawall pockets: a promenade more than the margin past the outermost road,
   // on a map's coastal edge, was left unpaved)
@@ -233,7 +274,7 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
   const stats = { tiles: 0, slab: 0, curb: 0, skirt: 0, ms: 0, bankCleared: 0, bankMs: 0, meshMs: 0, sampleMs: 0 };
   const tiles = [];
   let vergeAt = () => null;
-  if (!Number.isFinite(x0)) return { tiles, heightAt, vergeAt, stats, pavedAt: () => false };
+  if (!Number.isFinite(x0)) return { tiles, heightAt, vergeAt, padAt, stats, pavedAt: () => false };
   const t0 = Date.now();
   // (not a lift's or a stair's way mapped as a carriageway)
   // (a cul-de-sac whose sidewalk is mapped round it is left out of the road raster: its curb comes from its run, and
@@ -271,6 +312,7 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
   const WA = withBox(water.filter((r) => r.length > 2), (o) => o);
   const RC = withBox(riverChannels, (o) => o.pts);
   const RB = withBox(railBeds.filter((r) => r.length > 2), (o) => o);
+  const nearPads = (bx) => pads.filter((pd) => pd.box[0] <= bx[2] && pd.box[2] >= bx[0] && pd.box[1] <= bx[3] && pd.box[3] >= bx[1]).map(({ pad, strips }) => ({ pad, strips }));
   const HO = withBox(houses.filter((r) => r.length > 2), (o) => o);
   // (the sea mask's piece under a tile's box, in terrain pixels: (c, r) at ((c / W) - 0.5) * size, (0.5 - (r + 1) / H) * size)
   const seaPiece = (bx) => {
@@ -289,7 +331,7 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
   x0 -= MARGIN_M; y0 -= MARGIN_M; x1 += MARGIN_M; y1 += MARGIN_M;
   // (and never past the map: roads running on past its edge gave a test's 8 m map 3,093 empty tiles, a minute of work)
   if (mapBox) { x0 = Math.max(x0, mapBox[0]); y0 = Math.max(y0, mapBox[1]); x1 = Math.min(x1, mapBox[2]); y1 = Math.min(y1, mapBox[3]); }
-  if (x1 <= x0 || y1 <= y0) { stats.ms = Date.now() - t0; return { tiles, heightAt, vergeAt, stats, pavedAt: () => false }; }
+  if (x1 <= x0 || y1 <= y0) { stats.ms = Date.now() - t0; return { tiles, heightAt, vergeAt, padAt, stats, pavedAt: () => false }; }
   const items = []; const cores = [];
   for (let tx = Math.floor(x0 / TILE_M) * TILE_M; tx <= x1; tx += TILE_M) {
     for (let ty = Math.floor(y0 / TILE_M) * TILE_M; ty <= y1; ty += TILE_M) {
@@ -303,7 +345,7 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
       // whatever roads cross it)
       const tw = near(W, box); const ts = near(S, box); const tp = near(PK, box);
       if (!tw.length && !ts.length && !tp.length) continue;
-      items.push({ box, roads: tr, cornerArcs: near(A, box), walks: tw, streetWalks: ts, greenery: near(G, box), buildings: near(B, box), pockets: tp, water: near(WA, box), rivers: near(RC, box), railBeds: near(RB, box), houses: near(HO, [box[0] - 30, box[1] - 30, box[2] + 30, box[3] + 30]), sea: seaPiece(box) });
+      items.push({ box, roads: tr, cornerArcs: near(A, box), walks: tw, streetWalks: ts, greenery: near(G, box), buildings: near(B, box), pockets: tp, water: near(WA, box), rivers: near(RC, box), railBeds: near(RB, box), pads: nearPads(box), houses: near(HO, [box[0] - 30, box[1] - 30, box[2] + 30, box[3] + 30]), sea: seaPiece(box) });
       cores.push(core);
     }
   }
@@ -384,7 +426,7 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
   if (built) built.forEach((r, k) => { if (k >= next && !got[k]) onTile(k, r); });
   else items.forEach((it, k) => onTile(k, pavedTile(it)));
   stats.ms = Date.now() - t0;
-  return { tiles, heightAt, vergeAt, stats, pavedAt: makePavedAt(tiles) };
+  return { tiles, heightAt, vergeAt, padAt, stats, pavedAt: makePavedAt(tiles) };
 }
 
 /**
