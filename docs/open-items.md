@@ -1,6 +1,6 @@
 # MapNG open items
 
-Last reviewed: 2026-11-25 (0.3.6 Latest; dev aac37e9 swept clean; five official test levels uploaded)
+Last reviewed: 2026-11-25 (0.3.6 Latest; dev 367b3f9 swept clean; official test levels re-uploaded, manifest 2026-11-25b)
 
 The short "now" board: current work, what waits on someone, and checks owed on shipped work. The other tracking
 files: `refs/output/backlog.md` holds everything wanted later, by area; `refs/output/releases.md` what shipped;
@@ -157,7 +157,7 @@ Mesh Road joins. Riding along: the other 38 sweep areas re-framed, Zion's tunnel
   `REL=1` colours by height over the road; `band.py`). In-game shots were taken 2026-11-25. Synthetic plots are on
   the sidewalk level: 5,1 mapped kerbs, 6,1 traffic islands (and 1,5 rail crossings).
 - **Left, in the backlog:** paving over the track bed to the rails, the median groove.
-- **Done means:** the sweep is clean, the commit is made, and the sidewalk level is re-uploaded with plots 5,1 and 6,1.
+- **Done 2026-11-25:** smoke sweeps clean (135/135), commits c34a053 and 367b3f9. The five official test levels were re-uploaded (manifest 2026-11-25b, built from 367b3f9, all five checked through mapng.com by size and SHA-256); the roads level now has the junction split scenes too. Left: the backlog items above.
 
 ## Now: the sidewalk test level (user 2026-11-24: "make sure this synthetic test covers every scenario")
 
