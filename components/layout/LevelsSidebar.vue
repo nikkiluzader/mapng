@@ -102,6 +102,7 @@
           </div>
           <div v-else class="flex flex-wrap gap-1.5 pt-0.5">
             <button
+              v-if="!isOfficialTestLevel(level.levelName)"
               type="button"
               class="flex items-center gap-1 px-2 py-0.5 text-micro rounded border transition-colors"
               :class="isUpdatable(level)
@@ -123,8 +124,9 @@
             >
               <SlidersHorizontal :size="11" />{{ t('levels.modify') }}
             </button>
+            <!-- (not for the official test levels: made-up scenes, not real places) -->
             <button
-              v-if="level.center"
+              v-if="level.center && !isOfficialTestLevel(level.levelName)"
               type="button"
               class="flex items-center gap-1 px-2 py-0.5 text-micro rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-brand hover:text-brand transition-colors"
               @click="$emit('show-on-map', level)"
@@ -235,6 +237,7 @@
 import { PERSONAL_STORAGE_KEYS } from '../../services/personalKeys.js';
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { isOfficialTestLevel } from '../../services/officialTestLevels.js';
 import { ChevronDown, Download, FolderOpen, Hammer, HardDrive, History, Library, LifeBuoy, Loader2, MapPin, Mountain, PanelRightClose, RefreshCw, SlidersHorizontal, Trash2 } from 'lucide-vue-next';
 import { desktopApp } from '../../services/platform/desktop.js';
 import { openReportDialog } from '../../composables/useReportDialog.js';
@@ -303,7 +306,8 @@ const newer = (a, b) => {
   for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
   return false;
 };
-const isUpdatable = (level) => !level.appVersion || newer(appVersion.value, level.appVersion);
+// (not the official test levels: an update would rebuild a real place from their position; the download refreshes them)
+const isUpdatable = (level) => !isOfficialTestLevel(level.levelName) && (!level.appVersion || newer(appVersion.value, level.appVersion));
 const updatableCount = computed(() => levels.value.filter(isUpdatable).length);
 
 // The official test levels: downloaded into the mods folder by the desktop app, then the list read again
