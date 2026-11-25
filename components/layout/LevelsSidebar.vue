@@ -86,9 +86,9 @@
             <span>{{ formatBytes(level.zipBytes) }}</span>
           </div>
           <!-- (whether a rebuild can run offline from the level's saved data) -->
-          <div class="flex items-center gap-1 text-micro" :class="level.rebuildable ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-400'" :title="level.rebuildable ? t('levels.rebuildSavedHint') : t('levels.rebuildFetchHint')">
+          <div class="flex items-center gap-1 text-micro" :class="level.rebuildable ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-400'" :title="isOfficialTestLevel(level.levelName) ? t('levels.testLevelsHint') : level.rebuildable ? t('levels.rebuildSavedHint') : t('levels.rebuildFetchHint')">
             <HardDrive :size="10" class="shrink-0" />
-            <span>{{ level.rebuildable ? t('levels.savedData') : t('levels.noSavedData') }}</span>
+            <span>{{ isOfficialTestLevel(level.levelName) ? t('levels.testLevelOfficial') : level.rebuildable ? t('levels.savedData') : t('levels.noSavedData') }}</span>
           </div>
 
           <div v-if="busy[level.levelName]" class="space-y-1.5 pt-0.5">

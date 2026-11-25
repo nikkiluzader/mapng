@@ -1228,6 +1228,7 @@
     "testLevelsHint": "Die vier Level, mit denen MapNG getestet wird (alle Objekte, Straßensituationen, Brücken und Tunnel, Gelände), werden in deinen Mods-Ordner geladen und hier aufgeführt.",
     "testLevelsProgress": "{file} wird geladen: {done} von {total} MB",
     "testLevelsDone": "{n} Testlevel liegen in deinem Mods-Ordner.",
+    "testLevelOfficial": "Offizielles Testlevel: Aktualisiere es mit „Offizielle Testlevel herunterladen“",
     "testLevelsFailed": "Die Testlevel konnten nicht geladen werden: {error}",
     "title": "Meine Level",
     "open": "Meine MapNG-Level anzeigen",

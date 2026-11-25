@@ -1233,6 +1233,7 @@
     "testLevelsHint": "The four levels MapNG is tested on (every asset it builds, road situations, bridges and tunnels, terrain), downloaded into your mods folder and listed here.",
     "testLevelsProgress": "Downloading {file}: {done} of {total} MB",
     "testLevelsDone": "{n} test levels are in your mods folder.",
+    "testLevelOfficial": "Official test level: refresh it with “Download official test levels”",
     "testLevelsFailed": "The test levels could not be downloaded: {error}",
     "title": "My Levels",
     "open": "Show my MapNG levels",

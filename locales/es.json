@@ -1228,6 +1228,7 @@
     "testLevelsHint": "Los cuatro niveles con los que se prueba MapNG (todos los objetos, situaciones de carretera, puentes y túneles, terreno), descargados en tu carpeta de mods y listados aquí.",
     "testLevelsProgress": "Descargando {file}: {done} de {total} MB",
     "testLevelsDone": "{n} niveles de prueba están en tu carpeta de mods.",
+    "testLevelOfficial": "Nivel de prueba oficial: actualízalo con «Descargar los niveles de prueba oficiales»",
     "testLevelsFailed": "No se pudieron descargar los niveles de prueba: {error}",
     "title": "Mis niveles",
     "open": "Mostrar mis niveles de MapNG",

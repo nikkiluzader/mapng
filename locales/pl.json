@@ -1228,6 +1228,7 @@
     "testLevelsHint": "Cztery poziomy, na których testowany jest MapNG (wszystkie obiekty, sytuacje drogowe, mosty i tunele, teren), pobrane do folderu modów i pokazane tutaj.",
     "testLevelsProgress": "Pobieranie {file}: {done} z {total} MB",
     "testLevelsDone": "{n} poziomy testowe są w folderze modów.",
+    "testLevelOfficial": "Oficjalny poziom testowy: odśwież go przyciskiem „Pobierz oficjalne poziomy testowe”",
     "testLevelsFailed": "Nie udało się pobrać poziomów testowych: {error}",
     "title": "Moje poziomy",
     "open": "Pokaż moje poziomy MapNG",
