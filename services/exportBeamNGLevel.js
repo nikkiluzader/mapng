@@ -22,7 +22,7 @@ import { planPitches, pitchFootprints } from './sportsFields.js';
 import { levelCrossingBarriers, buildLevelCrossingMeshes } from './levelCrossingBarriers.js';
 import { planStepFlights, buildStepFlightMeshes, stepWidth } from './stepFlights.js';
 import { findCarriagewaySplits, splitShiftAt, splitTaperAt, splitHalfAt, splitLaneShiftAt, splitEdgeLineAt } from './carriagewaySplits.js';
-import { placementShift, placementShiftAt, laneCounts } from './lanePlacement.js';
+import { placementShift, placementShiftAt, laneCounts, laneWidthsAcross } from './lanePlacement.js';
 import { findBridgeTowers, towerPierGeometry, towerHouseTags } from './bridgeTowers.js';
 import { buildTexturedBuildings, buildingContext, screenBuilding, getBuildingMaterialDefs, garageExtras, isGarageFeature, FACADE_EMISSIVE_FILE, BUILDING_TILE_M, letterName } from './beamngBuildings.js';
 import { isCarportFeature, planCarports } from './beamngCarports.js';
@@ -2962,6 +2962,8 @@ function getDecalMergeStyleKey(segment) {
     tags['mapng:carriageway_width'] || '',
     // (and where its line lies across the lanes: a way with placement tags moved apart from one without, lanePlacement.js)
     Object.keys(tags).filter((k) => /^placement(:|$)/.test(k)).sort().map((k) => `${k}=${tags[k]}`).join(';'),
+    // (and its lanes' own widths: a turn lane narrowing on the next way is a different road layout)
+    Object.keys(tags).filter((k) => /^width:lanes(:|$)/.test(k)).sort().map((k) => `${k}=${tags[k]}`).join(';'),
     // (a drawbridge span stays its own segment: the structure solver keeps
     // the whole bridge low by it)
     tags.bridge === 'movable' || (!!tags['bridge:movable'] && tags['bridge:movable'] !== 'no'),
@@ -3381,7 +3383,7 @@ export function findWidthTapers(ways) {
     const perMetre = WIDTH_TAPER_RUN_BY_CLASS[ways[wide.k].cls] ?? WIDTH_TAPER_RUN;
     const run = Math.min(Math.max(WIDTH_TAPER_MIN_M, perMetre * step), WIDTH_TAPER_SHARE * lengthOf(ways[wide.k].xy));
     if (!plans.has(wide.k)) plans.set(wide.k, []);
-    plans.get(wide.k).push({ atStart: wide.atStart, to: ways[narrow.k].half, toLines: linesFrame(ways[narrow.k]), run });
+    plans.get(wide.k).push({ atStart: wide.atStart, to: ways[narrow.k].half, toLines: linesFrame(ways[narrow.k]), run, toK: narrow.k });
   }
   const out = new Map();
   for (const [k, list] of plans) {
@@ -3431,6 +3433,15 @@ export function findWidthTapers(ways) {
         ? (n.base - n.edge) + ((o - lo) * (n.centre - (n.base - n.edge))) / ((own.centre - lo) || 1)
         : n.centre + ((o - own.centre) * ((n.base + n.edge) - n.centre)) / ((hi - own.centre) || 1);
       return o + (to - o) * e;
+    };
+    // The next piece at the joint nearest (x, y), and how much of it to take there: { toK, e } (e 1 at the joint, 0
+    // where the taper starts), or null. A placed piece's offset is blended with its neighbour's by it (lanePlacement)
+    fn.neighbours = list.map((p) => p.toK);
+    fn.jointAt = (x, y) => {
+      const st = stationOf(x, y);
+      let best = null;
+      for (const p of list) { const d = p.atStart ? st : total - st; if (d < p.run && (!best || d / p.run < best.f)) best = { toK: p.toK, f: d / p.run }; }
+      return best ? { toK: best.toK, e: 1 - best.f * best.f * (3 - 2 * best.f) } : null;
     };
     // How far a divider at offset o is cut back at each end: the taper's length where its lane ends there (a
     // dropped lane's dashed line ran on through the taper beside the edge closing in: the user, 2026-11-24)
@@ -3692,9 +3703,19 @@ export function buildLineMarkingLayers(highway, tags = {}, styleHalfWidth = 3.5,
   const overtaking = String(tags.overtaking ?? '').trim().toLowerCase();
 
   const counts = markingLaneCounts(highway, tags);
+  // (where the lanes' own widths are mapped, width:lanes: each line at the lanes' widths summed from the right edge,
+  // the forward lanes on the right as everywhere here; equal lanes otherwise)
+  const across = laneWidthsAcross(tags, { oneway: counts.oneWay, forward: counts.nF, backward: counts.nB, total: counts.lanes }, false);
+  const fromRight = across ? [...across].reverse().map((l) => l.w) : null;
+  const totalW = fromRight ? fromRight.reduce((a, w) => a + w, 0) : 0;
+  const shareAt = (k, lanes) => {
+    if (!fromRight || fromRight.length !== lanes) return k / lanes;
+    let sum = 0; for (let i = 0; i < k; i++) sum += fromRight[i];
+    return sum / totalW;
+  };
 
   const pushSeparator = (k, lanes) => {
-    const offset = -edgeOffset + (2 * edgeOffset * k) / lanes;
+    const offset = -edgeOffset + 2 * edgeOffset * shareAt(k, lanes);
     layers.push({
       name: `line_sep_${k}`, material: GLOBAL_DECAL_MATERIALS.lineWhiteDashed,
       width: 0.15, offset, renderPriority: 2, ...LINE_LAYER_BASE,
@@ -3727,7 +3748,7 @@ export function buildLineMarkingLayers(highway, tags = {}, styleHalfWidth = 3.5,
   // Center divider sits at the forward/backward boundary. Forward travel
   // follows node order, so its lanes occupy the negative-offset (right) side.
   if (2 * styleHalfWidth >= CENTRE_LINE_MIN_WIDTH_M) {
-    const centerOffset = -edgeOffset + (2 * edgeOffset * nF) / lanes;
+    const centerOffset = -edgeOffset + 2 * edgeOffset * shareAt(nF, lanes);
     let centre;
     if (style === 'americas') {
       centre = overtaking === 'yes'
@@ -7353,6 +7374,17 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     const list = [...placements.entries()].map(([k, pl]) => `${drivableRoads[k]?.sourceFeature?.tags?.name || drivableRoads[k]?.highway || '?'} ${pl.shift.start.toFixed(2)}${Math.abs(pl.shift.end - pl.shift.start) > 1e-6 ? `..${pl.shift.end.toFixed(2)}` : ''} m`);
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Placement: ${placements.size ? `${placements.size} way(s) with their mapped line off the carriageway's middle (placement tags), the drawn road moved off the line (left of the way's direction positive): ${list.slice(0, 12).join(', ')}${list.length > 12 ? ', ...' : ''}` : 'no way carries a placement tag that moves its road (absent, transition, or the middle): every road centred on its line'}.`);
   }
+  // (each end key with the pieces ending there: a placed piece's end at a plain joint, two pieces of a road meeting, is
+  // carried past the joint to close the wedge a bend opens between two square ends set off the line)
+  const piecesAtKey = new Map();
+  drivableRoads.forEach((sf, k) => { for (const [key, atStart] of [[sf.startKey, true], [sf.endKey, false]]) { if (!key) continue; if (!piecesAtKey.has(key)) piecesAtKey.set(key, []); piecesAtKey.get(key).push({ k, atStart }); } });
+  const endDir = (k, atStart) => {
+    const g = drivableRoads[k]?.geometry; if (!(g?.length > 1)) return null;
+    const a = geoToWorldPoint((atStart ? g[0] : g[g.length - 1]).lat, (atStart ? g[0] : g[g.length - 1]).lng, terrainData, squareSize, 0);
+    const b = geoToWorldPoint((atStart ? g[1] : g[g.length - 2]).lat, (atStart ? g[1] : g[g.length - 2]).lng, terrainData, squareSize, 0);
+    const L = fastHypot(a[0] - b[0], a[1] - b[1]) || 1;
+    return [(a[0] - b[0]) / L, (a[1] - b[1]) / L];   // outward, away from the piece
+  };
   const splitEnds = new Set();
   for (const sp of splits.points) { splitEnds.add(`${sp.trunk}:${sp.trunkAtStart}`); for (const b of sp.branches) splitEnds.add(`${b.k}:${b.atStart}`); }
   // (the structure graph's branch edges moved with the drawn branches, so the ground shaped under them later
@@ -7489,15 +7521,22 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
       // (a split's branch: its drawn line moved to its half of the two-way road near the split, eased onto its own)
       // (or a placed way: its drawn line moved off the mapped one by its placement tags)
       const placed = placements.get(segIndex);
-      if (splitPlan || placed) {
+      // (a piece narrowed into a placed neighbour, placed or not itself: its offset blended into the neighbour's at the
+      // joint, so the two meet edge to edge)
+      const taperPlaced = !!taper?.neighbours?.some((k) => placements.has(k));
+      if (splitPlan || placed || taperPlaced) {
         // (a placed way narrowed at its end to the next piece's width, a lane gained or dropped there: narrowed on the
         // side its lanes were added, the far edge running straight on; narrowed both ways, the through lanes' edge kinked
         // in over the taper)
-        const moves = centerNodes.map((nd, k) => {
-          if (!placed) return splitShiftAt(splitPlan, nd[0], nd[1]);
-          const m = placementAt(placed, nd[0], nd[1]);
-          const d = halfAt ? Math.max(0, styleHalfWidth - halfAt[k]) : 0;
-          return m - Math.sign(m) * Math.min(Math.abs(m), d);
+        // (at a joint the piece starts where its neighbour's edges are: its offset eased from the neighbour's there to its
+        // own over the taper. Only the lanes' side: the first try narrowed toward the line, and where the neighbour was
+        // placed too (Savanoriu pr., left_of:1 into left_of:2) the edge jumped 5.3 m at the joint)
+        const moves = centerNodes.map((nd) => {
+          const own = placed ? placementAt(placed, nd[0], nd[1]) : (splitPlan ? splitShiftAt(splitPlan, nd[0], nd[1]) : 0);
+          const j = taper?.jointAt ? taper.jointAt(nd[0], nd[1]) : null;
+          if (!j || (!placed && !placements.has(j.toK))) return own;
+          const other = placements.has(j.toK) ? placementAt(placements.get(j.toK), nd[0], nd[1]) : 0;
+          return own + (other - own) * j.e;
         });
         if (moves.some((m) => m !== 0)) {
           const orig = centerNodes.map((nd) => [nd[0], nd[1]]);
@@ -7512,6 +7551,35 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
             if (!bridges.bySeg.get(segIndex) && !tunnels.bySeg.has(segIndex)) nd[2] = Math.round((getTerrainHeightAtWorldXY(nd[0], nd[1], terrainData, squareSize) + 0.1) * 1000) / 1000;
           });
         }
+      }
+      // (a placed piece, or one beside a placed piece, at a plain joint of two pieces: its end carried past the joint by
+      // what the bend opens on the outer side, (half + offset) x tan(half the bend); square ends set off the line left a
+      // wedge of grass at the bend, 2 m on a 12 m carriageway bending 10 degrees (Savanoriu pr., 2026-11-25))
+      for (const [atStart, isEdge] of [[true, i === 0], [false, i === clippedSegments.length - 1]]) {
+        if (!isEdge || centerNodes.length < 2) continue;
+        const key = atStart ? segmentFeature.startKey : segmentFeature.endKey;
+        const at = piecesAtKey.get(key);
+        if (!at || at.length !== 2) continue;
+        const other = at.find((e) => e.k !== segIndex); if (!other) continue;
+        if (!placed && !placements.has(other.k)) continue;
+        // (this piece's end as drawn, after its move off the line: an offset easing in over the end turns its last
+        // stretch and its square end face with it, 5 degrees at the Savanoriu pr. joint, a 1 m wedge across 12 m)
+        const e0 = atStart ? centerNodes[0] : centerNodes[centerNodes.length - 1];
+        const e1 = atStart ? centerNodes[1] : centerNodes[centerNodes.length - 2];
+        const eL = fastHypot(e0[0] - e1[0], e0[1] - e1[1]) || 1;
+        const mine = [(e0[0] - e1[0]) / eL, (e0[1] - e1[1]) / eL]; const theirs = endDir(other.k, other.atStart);
+        if (!theirs) continue;
+        // (straight on, the two outward directions oppose: the bend is how far they are from that)
+        const cosB = Math.max(-1, Math.min(1, -(mine[0] * theirs[0] + mine[1] * theirs[1])));
+        const bend = Math.acos(cosB);
+        if (bend < 0.02) continue;
+        const nd = atStart ? centerNodes[0] : centerNodes[centerNodes.length - 1];
+        const nx = atStart ? centerNodes[1] : centerNodes[centerNodes.length - 2];
+        const off = placed ? Math.abs(placementAt(placed, nd[0], nd[1])) : 0;
+        const reach = Math.min(4, (nd[3] + off) * Math.tan(bend / 2) + 0.3);
+        const L = fastHypot(nd[0] - nx[0], nd[1] - nx[1]) || 1;
+        const ext = [Math.round((nd[0] + ((nd[0] - nx[0]) / L) * reach) * 1000) / 1000, Math.round((nd[1] + ((nd[1] - nx[1]) / L) * reach) * 1000) / 1000, nd[2], nd[3]];
+        if (atStart) { centerNodes.unshift(ext); if (halfAt) halfAt.unshift(halfAt[0]); } else { centerNodes.push(ext); if (halfAt) halfAt.push(halfAt[halfAt.length - 1]); }
       }
       const bridgePart = bridges.bySeg.get(segIndex);
       if (bridgePart) bridgePart.half = styleHalfWidth;

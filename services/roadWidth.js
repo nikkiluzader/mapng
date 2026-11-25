@@ -1,3 +1,4 @@
+import { laneWidthsAcross } from './lanePlacement.js';
 /**
  * Road width estimation shared by the BeamNG export and the heightmap road
  * smoother.
@@ -410,6 +411,21 @@ export function estimateRoadCrossSection(tags = {}, highway, isOneWay = false, {
       }
       carriagewayHalfWidth = drivingHalfWidth + (leftExtra + rightExtra) / 2;
     }
+  }
+
+  // the lanes' own widths where they are mapped (width:lanes, :forward, :backward, lanePlacement.js): the driving width
+  // their sum, a tagged width's surplus over them the edge strips (else the defaults); every lane came out the same
+  // width, the road's width over its lanes (thecoachtoma's Kaunas lanes of 2 to 4 m, 2026-11-25)
+  const mapped = laneWidthsAcross(tags);
+  if (mapped) {
+    const sumHalf = mapped.reduce((a, l) => a + l.w, 0) / 2;
+    if (Number.isFinite(explicitWidth) && explicitWidth / 2 > sumHalf) {
+      leftExtra = rightExtra = explicitWidth / 2 - sumHalf;
+    } else if (Number.isFinite(explicitWidth)) {
+      leftExtra = rightExtra = 0;
+    }
+    drivingHalfWidth = sumHalf;
+    carriagewayHalfWidth = drivingHalfWidth + (leftExtra + rightExtra) / 2;
   }
 
   // a cap only (twinCarriageways.js: a divided road's carriageway fitted beside its twin): narrower,

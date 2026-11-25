@@ -334,6 +334,13 @@ function roads(regionKey) {
     way(run(860, -880, 860, -790, 20, [[860, -820]]), { highway: 'secondary', oneway: 'yes', lanes: '3', width: '12', placement: 'left_of:1', name: 'Placement G' });
     node(860, -820, { highway: 'traffic_signals' });
     label('placement=left_of:1 at signals: the lights off the drawn road', 860, -820, [55, 0]);
+    // H: per-lane widths (width:lanes:forward / :backward), copied from thecoachtoma's two Savanoriu pr. pieces: four
+    // lanes back, three on, the line in the middle of backward lane 2; on the second piece the left-turn lane (backward
+    // lane 1, by the centre line) narrows from 3.6 to 2 m. The left edge runs straight on, the right side comes in 1.6 m
+    const H = { highway: 'primary', name: 'Placement H', lanes: '7', 'lanes:backward': '4', 'lanes:forward': '3', 'placement:backward': 'middle_of:2', 'turn:lanes:backward': 'left|through|through|through', 'width:lanes:forward': '3.9|3.6|4' };
+    way(run(630, -955, 740, -955, 20), { ...H, 'width:lanes:backward': '3.6|3.6|4|3.6' });
+    way(run(740, -955, 840, -955, 20), { ...H, 'width:lanes:backward': '2|3.6|4|3.6' });
+    label('width:lanes: lanes of 2 to 4 m, the line in backward lane 2 (Savanoriu pr.)', 740, -955, [55, 0]);
   }
   return { b, size: SIZE, heightAt };
 }

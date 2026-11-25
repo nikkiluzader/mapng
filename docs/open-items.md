@@ -44,6 +44,13 @@ item's state. The open items there, one line each:
   his export), rails at the true gauge (inner faces 72 mm too close). Area `tj_savanoriu_pl` (from his export's map
   data), roads level scenes F and G, `scratch/splat/plot/gauge_before_after.png`. Waiting: test-level upload, dev build,
   main (user's go-ahead).
+- **Per-lane widths and Toma's big junction (thecoachtoma, Discord 2026-11-25): on dev, in game owed.** width:lanes,
+  :forward, :backward set the road's driving width (their sum), the placement offset and the lane lines
+  (`laneWidthsAcross` in lanePlacement.js). Placed pieces meeting at a joint: the offset eased into the neighbour's over
+  the width taper, and the end carried past a slight bend (Savanoriu pr. left_of:1 into left_of:2: a 5.3 m edge step and
+  a 1 m grass wedge, both gone). Roads level scene H (x 630-840, y -955). Plots
+  `scratch/toma_placement/{scene_h,junction_now,junction_zoom}.png`. Left: in game at his junction and scene H; the
+  16 m piece's left edge widens over a short run (the piece is short).
 - **Sidewalks at banks and the water.** Start again from the diagrams; the sea-wall approach was scrapped
   2026-11-24. `docs/handoff.md`, "Sidewalks at banks and the water"; record in H > 0.3.7 and H > Priority list
   (item 10). Done when: no sidewalk sweep cell worse than dev, then in game at Kingston and Naldo.

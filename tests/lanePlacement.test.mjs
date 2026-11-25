@@ -60,3 +60,34 @@ test('signal poles: the clear-spot check sees a placed road where it is drawn', 
   assert.equal(isClear(9, 0), false, 'inside the drawn road');
   assert.equal(isClear(-4, 0), true, 'west of its line is clear');
 });
+
+test('per-lane widths (width:lanes): the road their sum, the line placed in metres, the lines at their widths', async () => {
+  const { estimateRoadCrossSection } = await import('../services/roadWidth.js');
+  const { laneWidthsAcross } = await import('../services/lanePlacement.js');
+  // thecoachtoma's Savanoriu pr. pieces: 4 backward + 3 forward lanes, the line in the middle of backward lane 2
+  const base = { highway: 'primary', lanes: '7', 'lanes:backward': '4', 'lanes:forward': '3', 'placement:backward': 'middle_of:2', 'width:lanes:forward': '3.9|3.6|4' };
+  const a = { ...base, 'width:lanes:backward': '3.6|3.6|4|3.6' };
+  const b = { ...base, 'width:lanes:backward': '2|3.6|4|3.6' };
+  const across = laneWidthsAcross(a);
+  assert.deepEqual(across.map((l) => `${l.dir}${l.idx}:${l.w}`), ['b4:3.6', 'b3:4', 'b2:3.6', 'b1:3.6', 'f1:3.9', 'f2:3.6', 'f3:4'], 'left to right, backward lane 1 by the divider');
+  const ca = estimateRoadCrossSection(a, 'primary', false, { urban: true }); const cb = estimateRoadCrossSection(b, 'primary', false, { urban: true });
+  near(2 * ca.drivingHalfWidth, 26.3, 'width: the lanes summed'); near(2 * cb.drivingHalfWidth, 24.7, 'the narrow turn lane too');
+  const sa = placementShift(a, { half: ca.drivingHalfWidth }).start; const sb = placementShift(b, { half: cb.drivingHalfWidth }).start;
+  near(sa, -3.75, 'piece a'); near(sb, -2.95, 'piece b');
+  // the left (backward) edge 9.4 m from the line on both: the narrower turn lane takes in the right side
+  near(sa + ca.drivingHalfWidth, 9.4, 'left edge a'); near(sb + cb.drivingHalfWidth, 9.4, 'left edge b');
+  // a count that does not match the lanes: ignored
+  assert.equal(laneWidthsAcross({ ...a, 'width:lanes:forward': '3.9|3.6' }), null);
+});
+
+test('lane lines at the mapped lane widths', async () => {
+  const { buildLineMarkingLayers } = await import('../services/exportBeamNGLevel.js');
+  // a one-way road, lanes 2 m and 4 m from its left: the dashed line between them a third of the way from the left edge
+  // line, two thirds from the right one
+  const layers = buildLineMarkingLayers('primary', { oneway: 'yes', lanes: '2', 'width:lanes': '2|4' }, 3, { style: 'white' });
+  const sep = layers.find((l) => l.name === 'line_sep_1');
+  const edge = layers.reduce((m, l) => Math.max(m, Math.abs(l.offset)), 0) || 3;
+  // (offsets are left of the way positive: counted from the right edge, the 4 m lane comes first)
+  const want = -edge + 2 * edge * (4 / 6);
+  assert.ok(Math.abs(sep.offset - want) < 1e-9, `separator at ${sep.offset}, want ${want}`);
+});

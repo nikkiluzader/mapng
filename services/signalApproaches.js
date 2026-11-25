@@ -1,3 +1,4 @@
+import { laneWidthsAcross } from './lanePlacement.js';
 // Junction approaches for traffic signals and stop signs.
 //
 // BeamNG ties a signal instance to ONE approach edge: its `pos` is the stop
@@ -67,7 +68,11 @@ const defaultLaneCount = (highway, oneWay) => {
 // Half the paved carriageway, from width / lanes / class defaults.
 export function roadHalfWidth(tags = {}) {
   const width = Number.parseFloat(tags.width);
-  if (Number.isFinite(width) && width > 1) return width / 2;
+  // (the lanes' own mapped widths, width:lanes: their sum at the least)
+  const lanesAcross = laneWidthsAcross(tags);
+  const lanesHalf = lanesAcross ? lanesAcross.reduce((a, l) => a + l.w, 0) / 2 : 0;
+  if (Number.isFinite(width) && width > 1) return Math.max(width / 2, lanesHalf);
+  if (lanesHalf) return lanesHalf;
   const oneWay = onewayDirection(tags) !== 0;
   const lanes = parseLanes(tags.lanes)
     || (parseLanes(tags['lanes:forward']) + parseLanes(tags['lanes:backward']))
