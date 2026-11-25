@@ -1,6 +1,6 @@
 # MapNG open items
 
-Last reviewed: 2026-11-24, night (0.3.6 Latest; main = b39ed0e; dev 5026c75; test build v0.3.7-dev.7)
+Last reviewed: 2026-11-25 (0.3.6 Latest; dev aac37e9 swept clean; five official test levels uploaded)
 
 The short "now" board: current work, what waits on someone, and checks owed on shipped work. The other tracking
 files: `refs/output/backlog.md` holds everything wanted later, by area; `refs/output/releases.md` what shipped;
@@ -143,7 +143,8 @@ Mesh Road joins. Riding along: the other 38 sweep areas re-framed, Zion's tunnel
   `scratch/levelprobe/data/test_sidewalks_na_east`; export `scratch/sidewalks/out`; plan and overlay
   `scratch/sidewalks/{expected,after}.py` (PLOTS="c,r;..." for close-ups); tour sheets `scratch/sidewalks/sheets`;
   `scratch/sidewalks/aim.py` aims each tour shot down its street (the fixed side views showed only roofs).
-  Not yet uploaded or offered for download; not yet a sweep area. Code uncommitted.
+  Uploaded 2026-11-25 as the fifth official test level (manifest 2026-11-25, built from aac37e9, checked through the
+  desktop download from mapng.com). Not yet a sweep area.
 - **Found (confirmed in game or in the exported data):**
   1. A grass band along the curb on every town street: the base texture paints a street with the lane layout
      (osmTexture.js getStableTextureRoadWidth, about 6 m for a two-lane residential street) while the export builds it
