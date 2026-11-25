@@ -325,7 +325,7 @@ function roads(regionKey) {
     way(run(630, -900, 730, -900, 20), { ...F, lanes: '6', 'lanes:forward': '3', 'lanes:backward': '3', width: '24' });
     way(run(730, -900, 830, -900, 20), { ...F, lanes: '7', 'lanes:forward': '4', 'lanes:backward': '3', width: '28' });
     way(run(830, -900, 940, -900, 20), { ...F, lanes: '6', 'lanes:forward': '3', 'lanes:backward': '3', width: '24' });
-    node(780, -915, { highway: 'bus_stop', name: 'Placement F stop' });
+    node(780, -921, { highway: 'bus_stop', name: 'Placement F stop' });
     label('placement:backward=middle_of:1, width 24 -> 28 (a bus stop lane) -> 24', 780, -900, [55, 0]);
     drive('driver: placement F, past the bus stop lane', 680, -903, 0);
     // G: a signalled junction: a one-way three-lane road mapped along its left edge (placement=left_of:1) crossing a

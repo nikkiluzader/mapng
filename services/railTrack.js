@@ -543,7 +543,10 @@ export function buildTrackGeometry(graph, { tagsOf = () => ({}), owns = null } =
         const steel = partOf(t, RAIL_MATERIALS.steel);
         for (const o of offsets) {
           for (const side of [-1, 1]) {
-            const c = o + (side * gauge) / 2;
+            // (the gauge is between the rails' inner faces: each head's centre half a head further out. Centred on the
+            // gauge itself the inner faces stood 72 mm too close, a train built to the real gauge did not fit (Splatplays,
+            // Perth's 1,067 mm, 2026-11-25))
+            const c = o + side * (gauge / 2 + RAIL_HEAD_HALF_M);
             const L0 = at(i, s0, c + RAIL_HEAD_HALF_M, 0); const L1 = at(i, s1, c + RAIL_HEAD_HALF_M, 0);
             const R0 = at(i, s0, c - RAIL_HEAD_HALF_M, 0); const R1 = at(i, s1, c - RAIL_HEAD_HALF_M, 0);
             const LB0 = at(i, s0, c + RAIL_HEAD_HALF_M, RAIL_H_M); const LB1 = at(i, s1, c + RAIL_HEAD_HALF_M, RAIL_H_M);

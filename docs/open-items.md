@@ -39,6 +39,11 @@ item's state. The open items there, one line each:
   the trunk's edge strip on its side), widens outward with the seam held, and its lines start on the trunk's
   (carriagewaySplits.js `splitHalfAt`, `splitLaneShiftAt`, `splitEdgeLineAt`). Plots
   `scratch/toma_placement/split_before_after.png`, `forks_after.png`. A first sweep caught gt_chevril (fork skip restored).
+- **thecoachtoma's placement round 2 and Splatplays' gauge (Discord 2026-11-25): on dev a1ba6bb + the gauge commit.**
+  Tagged widths capped by counted lanes (his 24/28 m Savanoriu pr. bus stop), signal poles off placed roads (18 -> 0 in
+  his export), rails at the true gauge (inner faces 72 mm too close). Area `tj_savanoriu_pl` (from his export's map
+  data), roads level scenes F and G, `scratch/splat/plot/gauge_before_after.png`. Waiting: test-level upload, dev build,
+  main (user's go-ahead).
 - **Sidewalks at banks and the water.** Start again from the diagrams; the sea-wall approach was scrapped
   2026-11-24. `docs/handoff.md`, "Sidewalks at banks and the water"; record in H > 0.3.7 and H > Priority list
   (item 10). Done when: no sidewalk sweep cell worse than dev, then in game at Kingston and Naldo.
