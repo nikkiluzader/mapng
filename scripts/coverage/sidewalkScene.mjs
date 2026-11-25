@@ -194,6 +194,13 @@ export function sidewalks(regionKey, makeBuilder) {
     o.row(-80, 80, 0, { back: 9 });
     o.lab('road surface mapped as area:highway=residential, 7.2 m', 0, 0, [35]);
     // kerbs on one side only: the street keeps its class width
+    // bare curbs: sidewalk=separate, the sidewalk mapped on the north side only; the south side is a bare curb, the
+    // verge behind it graded up to its top (Splatplays: "the curb section should match the level of sidewalks")
+    o.ln(-85, -30, 85, -30, { highway: 'tertiary', sidewalk: 'separate', lane_markings: 'no', name: 'Bare curb street' }, 10);
+    for (const s2 of [1, -1]) o.ln(-85, -30 + s2 * 3.7, 85, -30 + s2 * 3.7, { barrier: 'kerb' }, 10);
+    o.ln(-85, -24.8, 85, -24.8, { highway: 'footway', footway: 'sidewalk' }, 10);
+    o.lab('sidewalk=separate, none mapped on the south side: a bare curb, the verge at its top', 0, -33.7, [30]);
+    o.walk('on the verge behind the bare curb', -40, -35, 0);
     o.ln(-85, -60, 85, -60, { highway: 'residential', name: 'One kerb street' }, 10);
     o.ln(-85, -56, 85, -56, { barrier: 'kerb' }, 10); o.row(-80, 80, -60, { back: 9 });
     o.lab('a kerb mapped on one side only (the class width kept)', 0, -60, [35]);
@@ -488,7 +495,14 @@ export function sidewalks(regionKey, makeBuilder) {
   // ═════ row 5: rail, overpasses, bridges, cycle tracks ═════
   plot(1, 5, 'rail crossings', (o) => {
     o.ln(-85, 30, 85, 30, { highway: 'residential', sidewalk: 'both', name: 'Level crossing street' }, 10, [[0, 30]]);
-    o.ln(0, -90, 0, 90, { railway: 'rail', name: 'Sidewalk test line' }, 10, [[0, 30], [0, -40]]); o.nd(0, 30, { railway: 'level_crossing' });
+    o.ln(0, -90, 0, 90, { railway: 'rail', name: 'Sidewalk test line' }, 10, [[0, 30], [0, -40], [0, -78]]); o.nd(0, 30, { railway: 'level_crossing' });
+    // a station (Splatplays' Sherwood, 2026-11-25): a second track and a platform, a path over both tracks at its end
+    o.ln(5, -90, 5, -10, { railway: 'rail', name: 'Sidewalk test line, second track' }, 10, [[5, -78]]);
+    o.ar([[8, -70], [12, -70], [12, -20], [8, -20]], { railway: 'platform', public_transport: 'platform' });
+    o.st([[-30, -78], [0, -78], [5, -78], [10, -78], [40, -78]], { highway: 'footway', surface: 'asphalt' });
+    o.nd(0, -78, { railway: 'crossing' }); o.nd(5, -78, { railway: 'crossing' });
+    o.lab('footway over two tracks at a platform\'s end (Sherwood station)', 3, -78, [35, 0]);
+    o.walk('crossing the two tracks', -15, -78, 0);
     o.row(-80, -15, 30); o.row(15, 80, 30); o.lab('sidewalks over a level crossing', 0, 30, [40, 0]); o.walk('across the tracks', -20, 34.5, 0);
     o.st([[-30, -40], [0, -40], [30, -40]], { highway: 'footway' }); o.nd(0, -40, { railway: 'crossing' }); o.lab('footway over the line (railway=crossing)', 0, -40, [35, 0]);
   });

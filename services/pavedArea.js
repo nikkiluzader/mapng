@@ -527,7 +527,12 @@ const smooth01 = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
  * BLEND_MAX_M); road pixels are left to the roads' own grading. Returns { idx: Int32Array, z: Float64Array } (raw).
  */
 // overhead(x, y, z0, z1): something built over that span (a deck, a tunnel's roof): the ground is never raised into it
-export function gradePaved(cells, g, terrain, { heightAt = () => 0, core = null, overhead = null } = {}) {
+// verge(x, y) -> { top, f } or null: the ground behind a bare curb raised toward its top (pavedSidewalks.js makeVergeAt),
+// never lowered, never by more than VERGE_RAISE_MAX_M (a bank stays as it is)
+export const VERGE_RAISE_MAX_M = 0.25;
+export const VERGE_ROAD_M = 3;
+export const VERGE_FAR_M = 2.5;
+export function gradePaved(cells, g, terrain, { heightAt = () => 0, core = null, overhead = null, verge = null } = {}) {
   const { heightMap, width, height, worldSize, minHeight = 0 } = terrain;
   const N = width * height; const sq = worldSize / width;
   // (the terrain grid's convention: pixel (c, r) at ((c / W) - 0.5) * size, (0.5 - (r + 1) / H) * size)
@@ -550,7 +555,7 @@ export function gradePaved(cells, g, terrain, { heightAt = () => 0, core = null,
     }
   }
   const { d2, near } = distanceWithNearest(paved, sw, sh);
-  const idx = []; const z = [];
+  const idx = []; const z = []; let verges = 0;
   const reach = BLEND_MAX_M / sq;
   for (let r = 0; r < sh; r++) {
     for (let c = 0; c < sw; c++) {
@@ -564,15 +569,38 @@ export function gradePaved(cells, g, terrain, { heightAt = () => 0, core = null,
         if (overhead && top[k] > ground && overhead(wx(c + c0), wy(r + r0), top[k], top[k] + 6)) continue;
         idx.push(gi); z.push(top[k] + minHeight); continue;
       }
-      if (near[k] < 0 || d2[k] > reach * reach) continue;
-      const ground = heightMap[gi] - minHeight; const t = top[near[k]];
-      const blend = Math.min(BLEND_MAX_M, Math.max(BLEND_MIN_M, Math.abs(ground - t) * BLEND_RUN));
-      const f = (Math.sqrt(d2[k]) * sq) / blend;
-      if (f >= 1) continue;
-      const zb = t + (ground - t) * smooth01(f);
-      if (overhead && zb > ground && overhead(wx(c + c0), wy(r + r0), zb, zb + 6)) continue;
-      idx.push(gi); z.push(zb + minHeight);
+      const ground = heightMap[gi] - minHeight;
+      // (behind a bare curb: the verge up to its top)
+      let zv = null;
+      if (verge) {
+        const x = wx(c + c0); const y = wy(r + r0);
+        const v = verge(x, y);
+        // (another road within VERGE_ROAD_M behind the curb: the strip between two roads, often a bank between levels,
+        // is no verge; raised, it grew a lip on Passeig de Gràcia's side carriageway, the sweep's creases 16 -> 32)
+        let roadBehind = false;
+        if (v?.dir) for (let d = 0.5; d <= VERGE_ROAD_M && !roadBehind; d += 0.5) if (at(x + v.dir[0] * d, y + v.dir[1] * d) & ROAD) roadBehind = true;
+        // (and the ground falling away behind it, more than the cap under the curb's top VERGE_FAR_M out: a slope, no level
+        // verge to give back; raised, its top grew a lip, the same sweep)
+        let falling = false;
+        if (v?.dir) {
+          const fc = Math.round(((x + v.dir[0] * VERGE_FAR_M) / worldSize + 0.5) * width); const fr = Math.round((0.5 - (y + v.dir[1] * VERGE_FAR_M) / worldSize) * height - 1);
+          if (fc >= 0 && fr >= 0 && fc < width && fr < height && v.top - (heightMap[fr * width + fc] - minHeight) > VERGE_RAISE_MAX_M) falling = true;
+        }
+        if (v && !roadBehind && !falling && v.top > ground && v.top - ground <= VERGE_RAISE_MAX_M) zv = ground + (v.top - ground) * v.f;
+      }
+      let zb = null;
+      if (near[k] >= 0 && d2[k] <= reach * reach) {
+        const t = top[near[k]];
+        const blend = Math.min(BLEND_MAX_M, Math.max(BLEND_MIN_M, Math.abs(ground - t) * BLEND_RUN));
+        const f = (Math.sqrt(d2[k]) * sq) / blend;
+        if (f < 1) zb = t + (ground - t) * smooth01(f);
+      }
+      const zf = zv !== null && (zb === null || zv > zb) ? zv : zb;
+      if (zf === null) continue;
+      if (overhead && zf > ground && overhead(wx(c + c0), wy(r + r0), zf, zf + 6)) continue;
+      if (zf === zv) verges++;
+      idx.push(gi); z.push(zf + minHeight);
     }
   }
-  return { idx: Int32Array.from(idx), z: Float64Array.from(z) };
+  return { idx: Int32Array.from(idx), z: Float64Array.from(z), verges };
 }

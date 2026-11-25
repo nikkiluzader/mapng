@@ -145,10 +145,18 @@ Mesh Road joins. Riding along: the other 38 sweep areas re-framed, Zion's tunnel
      Railway Ave junction.
   3. Footpaths crossing a railway at grade are found by their lines (railTrack.js `pathRailCrossings`). The track is
      embedded there and the path meets it flush. Before, the path stopped at the bed and the track kept its ballast.
+  4. The verge behind a bare curb (no sidewalk) is graded up to the curb's top within 1.5 m and eased out over 1.5 m
+     more. It is only ever raised, and never by more than 0.25 m. There is no verge with another road within 3 m
+     behind the curb, or where the ground 2.5 m behind lies more than 0.25 m under the curb's top (a slope); both
+     raised creases on Barcelona 30 m, 16 -> 32 (pavedSidewalks.js `makeVergeAt`, pavedArea.js `gradePaved`).
+     Sections: `scratch/splat/plot/verge_sections.png`.
+- **In the test levels:** on the sidewalk level, plot 5,1 has the 8 m kerbed street, a road area, a bare curb street
+  and a one-kerb street; 6,1 has the traffic islands; 1,5 has a footway over two tracks at a platform's end. The
+  sweep area is `sp_crawley`.
 - **Where to look:** before/after plots in `scratch/splat/plot/*_before_after.png` (tool `scratch/splat/plot/top.py`,
   `REL=1` colours by height over the road; `band.py`). In-game shots were taken 2026-11-25. Synthetic plots are on
   the sidewalk level: 5,1 mapped kerbs, 6,1 traffic islands (and 1,5 rail crossings).
-- **Left, in the backlog:** the verge behind bare curbs, paving over the track bed to the rails, the median groove.
+- **Left, in the backlog:** paving over the track bed to the rails, the median groove.
 - **Done means:** the sweep is clean, the commit is made, and the sidewalk level is re-uploaded with plots 5,1 and 6,1.
 
 ## Now: the sidewalk test level (user 2026-11-24: "make sure this synthetic test covers every scenario")

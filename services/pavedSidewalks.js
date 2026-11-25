@@ -30,6 +30,14 @@ export const GAP_STEEP_M = 1;      // curb and walk this far apart in height: th
 export const BEND_TOL_M = 0.05;     // a slab following unshaped ground: squares bending more than this are cut finely
 export const BANK_DROP_M = 1;      // the ground this far above or below the road's edge: a bank's slope, left unpaved
 const BANK_BLOCK = 4;              // the bank test once a 4 x 4 block of cells (1 m): the ground is no finer
+// the ground behind a bare curb (no sidewalk): up to its top within VERGE_M of the strip, easing back to the ground
+// over VERGE_BLEND_M; raised only, by VERGE_RAISE_MAX_M at most (more is a bank: left as it is). The curb stood 15 cm
+// proud of road-level ground with no sidewalk mapped behind it, where the real verge is at the kerb's top (Splatplays,
+// Armadale, 2026-11-25). The 0.5 m strip covers no terrain pixel of a 1 m grid, so the paving's grading raised nothing
+export const VERGE_M = 1.5;
+export const VERGE_BLEND_M = 1.5;
+export const VERGE_UNDER_M = 0.02;
+export const VERGE_RAISE_MAX_M = 0.25;
 export const CURB_STRIP_M = 0.6;   // ... beyond this much at the curb, which stays at the road   // the terrain at a road's edge is its surface while within this of its solved height  // a slab this far over ground with something overhead follows the ground   // a bare curb (no sidewalk): a strip this wide along the road edge, its curb and top band
 
 /** The part of a polyline from s0 to s1 metres along it. */
@@ -224,7 +232,8 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
   for (const pk of pockets) for (const p of pk?.[0] || []) grow(p);
   const stats = { tiles: 0, slab: 0, curb: 0, skirt: 0, ms: 0, bankCleared: 0, bankMs: 0, meshMs: 0, sampleMs: 0 };
   const tiles = [];
-  if (!Number.isFinite(x0)) return { tiles, heightAt, stats, pavedAt: () => false };
+  let vergeAt = () => null;
+  if (!Number.isFinite(x0)) return { tiles, heightAt, vergeAt, stats, pavedAt: () => false };
   const t0 = Date.now();
   // (not a lift's or a stair's way mapped as a carriageway)
   // (a cul-de-sac whose sidewalk is mapped round it is left out of the road raster: its curb comes from its run, and
@@ -241,13 +250,19 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
     const tx = b[0] - a[0]; const ty = b[1] - a[1]; const L = fastHypot(tx, ty) || 1;
     return [p[0] - (ty / L) * dist, p[1] + (tx / L) * dist];
   });
+  const bare = [];
   const street = runs.filter((r) => r.points?.length > 1 && r.width > curbOnlyM).map((r) => ({ pts: offset(r.points, (r.side ?? 1) * r.width / 2), half: r.width / 2 }));
   // a bare curb: a narrow strip along the road edge, left out across its dips (a car park right at the street, a
   // driveway: open there, as today)
   for (const r of runs) {
     if (!(r.points?.length > 1) || r.width > curbOnlyM) continue;
-    for (const piece of piecesOutside(r.points, r.dips || [])) street.push({ pts: offset(piece, (r.side ?? 1) * BARE_CURB_M / 2), half: BARE_CURB_M / 2 });
+    for (const piece of piecesOutside(r.points, r.dips || [])) {
+      const pts = offset(piece, (r.side ?? 1) * BARE_CURB_M / 2);
+      street.push({ pts, half: BARE_CURB_M / 2 });
+      bare.push(pts);
+    }
   }
+  vergeAt = makeVergeAt(bare, heightAt);
   const boxOf = (pts) => { let a = Infinity; let b = Infinity; let c = -Infinity; let d = -Infinity; for (const p of pts) { if (p[0] < a) a = p[0]; if (p[0] > c) c = p[0]; if (p[1] < b) b = p[1]; if (p[1] > d) d = p[1]; } return [a, b, c, d]; };
   const withBox = (list, get) => list.map((o) => ({ o, b: boxOf(get(o)) }));
   const R = withBox(roads, (o) => o.pts); const A = withBox(arcs, (o) => o); const W = withBox(ws, (o) => o.pts); const S = withBox(street, (o) => o.pts);
@@ -274,7 +289,7 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
   x0 -= MARGIN_M; y0 -= MARGIN_M; x1 += MARGIN_M; y1 += MARGIN_M;
   // (and never past the map: roads running on past its edge gave a test's 8 m map 3,093 empty tiles, a minute of work)
   if (mapBox) { x0 = Math.max(x0, mapBox[0]); y0 = Math.max(y0, mapBox[1]); x1 = Math.min(x1, mapBox[2]); y1 = Math.min(y1, mapBox[3]); }
-  if (x1 <= x0 || y1 <= y0) { stats.ms = Date.now() - t0; return { tiles, heightAt, stats, pavedAt: () => false }; }
+  if (x1 <= x0 || y1 <= y0) { stats.ms = Date.now() - t0; return { tiles, heightAt, vergeAt, stats, pavedAt: () => false }; }
   const items = []; const cores = [];
   for (let tx = Math.floor(x0 / TILE_M) * TILE_M; tx <= x1; tx += TILE_M) {
     for (let ty = Math.floor(y0 / TILE_M) * TILE_M; ty <= y1; ty += TILE_M) {
@@ -369,7 +384,50 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
   if (built) built.forEach((r, k) => { if (k >= next && !got[k]) onTile(k, r); });
   else items.forEach((it, k) => onTile(k, pavedTile(it)));
   stats.ms = Date.now() - t0;
-  return { tiles, heightAt, stats, pavedAt: makePavedAt(tiles) };
+  return { tiles, heightAt, vergeAt, stats, pavedAt: makePavedAt(tiles) };
+}
+
+/**
+ * The verge behind the bare curbs: vergeAt(x, y) -> { top, f } (the ground's target, the curb's top less
+ * VERGE_UNDER_M, and its weight: 1 within VERGE_M behind the strip, easing to 0 over VERGE_BLEND_M) or null. bare: the
+ * strips' centre lines; heightAt: the slab top (on a strip, the curb's).
+ */
+export function makeVergeAt(bare, heightAt) {
+  if (!bare.length) return () => null;
+  const CELL = 8; const grid = new Map(); const segs = [];
+  for (const pts of bare) {
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const a = pts[i]; const b = pts[i + 1];
+      const k = segs.length; segs.push([a[0], a[1], b[0], b[1]]);
+      for (let gx = Math.floor(Math.min(a[0], b[0]) / CELL); gx <= Math.floor(Math.max(a[0], b[0]) / CELL); gx++) {
+        for (let gy = Math.floor(Math.min(a[1], b[1]) / CELL); gy <= Math.floor(Math.max(a[1], b[1]) / CELL); gy++) {
+          const key = `${gx},${gy}`; if (!grid.has(key)) grid.set(key, []); grid.get(key).push(k);
+        }
+      }
+    }
+  }
+  const reach = BARE_CURB_M / 2 + VERGE_M + VERGE_BLEND_M;
+  return (x, y) => {
+    let best = null; let bd = reach;
+    for (let gx = Math.floor((x - reach) / CELL); gx <= Math.floor((x + reach) / CELL); gx++) {
+      for (let gy = Math.floor((y - reach) / CELL); gy <= Math.floor((y + reach) / CELL); gy++) {
+        for (const k of grid.get(`${gx},${gy}`) || []) {
+          const [ax, ay, bx, by] = segs[k]; const ex = bx - ax; const ey = by - ay; const L2 = ex * ex + ey * ey || 1;
+          const t = Math.max(0, Math.min(1, ((x - ax) * ex + (y - ay) * ey) / L2));
+          const px = ax + ex * t; const py = ay + ey * t; const d = fastHypot(x - px, y - py);
+          if (d < bd) { bd = d; best = [px, py]; }
+        }
+      }
+    }
+    if (!best) return null;
+    // (behind the strip: its far half and beyond; the road side is the road's)
+    const behind = bd - BARE_CURB_M / 2;
+    const f = behind <= VERGE_M ? 1 : 1 - smooth01((behind - VERGE_M) / VERGE_BLEND_M);
+    if (f <= 0) return null;
+    const top = heightAt(best[0], best[1]);
+    // (dir: away from the curb, for the grading's look behind it: another road there, the strip between is no verge)
+    return Number.isFinite(top) ? { top: top - VERGE_UNDER_M, f, dir: bd > 1e-6 ? [(x - best[0]) / bd, (y - best[1]) / bd] : null } : null;
+  };
 }
 
 /**

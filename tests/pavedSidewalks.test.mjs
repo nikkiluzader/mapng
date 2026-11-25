@@ -149,3 +149,32 @@ test('only raised walks are paved: an unpaved path far from the street is left o
   assert.ok(slabArea({ ...path, sidewalk: true }) > 80, 'a paved footway is paved');
   assert.equal(slabArea({ ...path, sidewalk: false }), 0, 'a dirt path is not');
 });
+
+test('the verge behind a bare curb: raised to its top within VERGE_M, eased out after, never on the road side ahead of it', async () => {
+  const { makeVergeAt, VERGE_M, VERGE_BLEND_M, VERGE_UNDER_M, BARE_CURB_M } = await import('../services/pavedSidewalks.js');
+  // a bare curb strip's centre line along y = 0.25 (the road edge at y = 0, the road below), its top at 10.15
+  const v = makeVergeAt([[[-50, 0.25], [50, 0.25]]], () => 10.15);
+  const at = (d) => v(0, BARE_CURB_M / 2 + 0.25 + d);   // d metres behind the strip
+  assert.ok(Math.abs(at(0.5).top - (10.15 - VERGE_UNDER_M)) < 1e-9 && at(0.5).f === 1);
+  assert.equal(at(VERGE_M - 0.01).f, 1);
+  const mid = at(VERGE_M + VERGE_BLEND_M / 2).f;
+  assert.ok(mid > 0.2 && mid < 0.8, `eased: ${mid}`);
+  assert.equal(at(VERGE_M + VERGE_BLEND_M + 0.1), null);
+  assert.equal(makeVergeAt([], () => 0)(0, 0), null);
+});
+
+test('gradePaved: a verge pixel raised toward the curb top, never lowered, a bank (over 0.25 m) left alone', async () => {
+  const { gradePaved, ROAD } = await import('../services/pavedArea.js');
+  // a 16 x 16 terrain of 1 m pixels at height 10; the paved grid holds only road (west half) at 0.25 m
+  const W = 16; const hm = new Float32Array(W * W).fill(10);
+  const g = { x0: -8, y1: 8, res: 0.25, w: 64, h: 64 };
+  const cells = new Uint8Array(64 * 64);
+  for (let r = 0; r < 64; r++) for (let c = 0; c < 28; c++) cells[r * 64 + c] = ROAD;   // x < -1: road
+  const terrain = { heightMap: hm, width: W, height: W, worldSize: W, minHeight: 0 };
+  const up = gradePaved(cells, g, terrain, { verge: (x) => (x > -1 && x < 1 ? { top: 10.13, f: 1 } : null) });
+  assert.ok(up.verges > 0 && Array.from(up.z).every((z) => Math.abs(z - 10.13) < 1e-9), 'raised to the top');
+  const down = gradePaved(cells, g, terrain, { verge: () => ({ top: 9.9, f: 1 }) });
+  assert.equal(down.verges, 0, 'never lowered');
+  const bank = gradePaved(cells, g, terrain, { verge: () => ({ top: 10.6, f: 1 }) });
+  assert.equal(bank.verges, 0, 'a bank left alone');
+});

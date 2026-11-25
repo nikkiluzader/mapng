@@ -172,7 +172,8 @@ import { resolveRegionalBiome } from './beamngRegion.js';
 import { contentExportOptions, contentOn, filterOsmByTags, filterWaterKinds, filterFootBridges } from './buildContent.js';
 import { withProcessHandlersKept } from './keepProcessHandlers.js';
 import { composeTerrainParallel } from './composeWorker.js';
-import { gradePaved } from './pavedArea.js';
+import { gradePaved, VERGE_RAISE_MAX_M } from './pavedArea.js';
+import { VERGE_M, VERGE_BLEND_M } from './pavedSidewalks.js';
 import { relaxSeams } from './terrainSeams.js';
 import { fastHypot } from './fastMath.js';
 
@@ -15201,11 +15202,13 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     };
     // (the paved model: graded from its own tiles, each its core)
     const graded = (() => {
-      const idx = []; const z = [];
+      const idx = []; const z = []; let verges = 0;
       for (const t of sidewalks.paved.tiles) {
-        const e = gradePaved(t.cells, t.g, terrainGrid, { heightAt: sidewalks.paved.heightAt, core: t.core, overhead: underDeck });
+        const e = gradePaved(t.cells, t.g, terrainGrid, { heightAt: sidewalks.paved.heightAt, core: t.core, overhead: underDeck, verge: sidewalks.paved.vergeAt });
         for (let k = 0; k < e.idx.length; k++) { idx.push(e.idx[k]); z.push(e.z[k]); }
+        verges += e.verges || 0;
       }
+      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Sidewalks: ground graded under the paving at ${idx.length} terrain pixel(s); ${verges} of them behind a bare curb raised toward its top (within ${VERGE_M} m, eased over ${VERGE_BLEND_M} m more; never lowered, never by more than ${VERGE_RAISE_MAX_M} m).`);
       return { pixels: idx.length, apply(set) { for (let k = 0; k < idx.length; k++) set(idx[k], z[k]); } };
     })();
     const hmSide = heightMapEditor(exportTerrainData);
