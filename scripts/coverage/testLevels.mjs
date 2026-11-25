@@ -316,6 +316,25 @@ function roads(regionKey) {
     label('placement=middle_of:1: the road to the right of the line', 780, -40, [45, 0]);
     drive('driver: placement A, the turn lane opening', 700, 198.4, 0);
   }
+  // 12. placement with tagged widths and signals (x 620-950, y -960..-780; thecoachtoma's Savanoriu pr., 2026-11-25)
+  {
+    // F: a two-way six-lane road (width 24) with its line in the middle of the innermost backward lane, a seventh lane
+    // beside a bus stop (width 28): one lane added on the right, the left edge straight on. (Its tagged width was held
+    // to the class cap, the lanes squeezed and the road moved sideways at the stop instead)
+    const F = { highway: 'primary', name: 'Placement F', 'placement:backward': 'middle_of:1' };
+    way(run(630, -900, 730, -900, 20), { ...F, lanes: '6', 'lanes:forward': '3', 'lanes:backward': '3', width: '24' });
+    way(run(730, -900, 830, -900, 20), { ...F, lanes: '7', 'lanes:forward': '4', 'lanes:backward': '3', width: '28' });
+    way(run(830, -900, 940, -900, 20), { ...F, lanes: '6', 'lanes:forward': '3', 'lanes:backward': '3', width: '24' });
+    node(780, -915, { highway: 'bus_stop', name: 'Placement F stop' });
+    label('placement:backward=middle_of:1, width 24 -> 28 (a bus stop lane) -> 24', 780, -900, [55, 0]);
+    drive('driver: placement F, past the bus stop lane', 680, -903, 0);
+    // G: a signalled junction: a one-way three-lane road mapped along its left edge (placement=left_of:1) crossing a
+    // two-way road; the lights stand off both roads where they are drawn (they stood in the moved road)
+    way(run(640, -820, 940, -820, 20, [[860, -820]]), { highway: 'secondary', lanes: '2', name: 'Placement G cross' });
+    way(run(860, -880, 860, -790, 20, [[860, -820]]), { highway: 'secondary', oneway: 'yes', lanes: '3', width: '12', placement: 'left_of:1', name: 'Placement G' });
+    node(860, -820, { highway: 'traffic_signals' });
+    label('placement=left_of:1 at signals: the lights off the drawn road', 860, -820, [55, 0]);
+  }
   return { b, size: SIZE, heightAt };
 }
 

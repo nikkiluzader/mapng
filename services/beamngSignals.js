@@ -1,3 +1,4 @@
+import { placementShift, placementShiftAt } from './lanePlacement.js';
 import {
   findSignalApproaches,
   makeProjector,
@@ -961,6 +962,8 @@ const POLE_KERB_GAP_M = 1.2;
 const POLE_CLEARANCE_M = 0.6;
 const POLE_SHIFT_STEP_M = 0.5;
 const POLE_SHIFT_MAX_M = 4;
+const POLE_BACK_STEP_M = 2;     // no clear spot beside the stop line: looked for this much further back each time
+const POLE_BACK_MAX_M = 10;     // ... up to this far back along the approach
 const FAR_SIDE_REACH_M = 2.5;
 const MAST_MAX_HEADS = 3;
 // North America hangs signals on the far side of the junction; elsewhere
@@ -973,7 +976,19 @@ export function makeRoadClearance(roadFeatures, projector) {
   const segments = [];
   for (const road of roadFeatures) {
     const half = roadHalfWidth(road.tags);
-    const pts = road.geometry.map((pt) => projector.project(pt));
+    let pts = road.geometry.map((pt) => projector.project(pt));
+    // (a road with a placement tag where its lanes are, off its mapped line: a pole was checked clear of the line's
+    // road and stood in the moved one (thecoachtoma, Savanoriu pr., 2026-11-25))
+    const pl = placementShift(road.tags || {}, { half });
+    if (pl && pts.length > 1) {
+      const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + fastHypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+      const total = cum[cum.length - 1] || 1;
+      pts = pts.map((p, i) => {
+        const a = pts[Math.max(0, i - 1)]; const b = pts[Math.min(pts.length - 1, i + 1)]; const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
+        const m = placementShiftAt(pl, cum[i] / total);
+        return [p[0] - ((b[1] - a[1]) / L) * m, p[1] + ((b[0] - a[0]) / L) * m];
+      });
+    }
     for (let i = 0; i + 1 < pts.length; i++) {
       const seg = { a: pts[i], b: pts[i + 1], half };
       const idx = segments.push(seg) - 1;
@@ -1025,11 +1040,16 @@ function buildSignalProps({ placements = [], projector, roadFeatures = [] }, ter
     const ll = projector.unproject(x, y);
     return geoToWorld(ll.lat, ll.lng, terrainData, squareSize, zOffset).map((v) => Math.round(v * 1000) / 1000);
   };
-  const findClearSpot = (x, y, sideX, sideY) => {
-    for (let shift = 0; shift <= POLE_SHIFT_MAX_M; shift += POLE_SHIFT_STEP_M) {
-      const px = x + sideX * shift;
-      const py = y + sideY * shift;
-      if (isClear(px, py)) return [px, py];
+  // (sideways off the kerb first; then, still none, a few metres back along the approach and sideways again: at a
+  // junction's corner the sideways search ends in the crossing road, where a real pole stands back from the corner)
+  const findClearSpot = (x, y, sideX, sideY, backX = 0, backY = 0) => {
+    for (let back = 0; back <= POLE_BACK_MAX_M; back += POLE_BACK_STEP_M) {
+      for (let shift = 0; shift <= POLE_SHIFT_MAX_M; shift += POLE_SHIFT_STEP_M) {
+        const px = x + sideX * shift + backX * back;
+        const py = y + sideY * shift + backY * back;
+        if (isClear(px, py)) return [px, py];
+      }
+      if (!backX && !backY) break;
     }
     return null;
   };
@@ -1046,15 +1066,21 @@ function buildSignalProps({ placements = [], projector, roadFeatures = [] }, ter
 
     if (placement.kind !== 'traffic_light') continue; // signs: roadSigns.js
 
-    let baseX = a.x + d[0] * 0.5;
-    let baseY = a.y + d[1] * 0.5;
+    // (the road where its lanes are: off its mapped line by its placement tag, lanePlacement.js; from the line, the
+    // poles stood in the moved road, traffic lights in the middle of it (thecoachtoma, Savanoriu pr., 2026-11-25))
+    const pl = placementShift(a.road?.tags || {}, { half: a.halfWidth, leftHand: leftHandTraffic });
+    const pm = pl ? placementShiftAt(pl, a.alongOrder ? 1 : 0) : 0;
+    const order = a.alongOrder ? d : [-d[0], -d[1]];
+    const px = -order[1] * pm; const py = order[0] * pm;
+    let baseX = a.x + d[0] * 0.5 + px;
+    let baseY = a.y + d[1] * 0.5 + py;
     if (farSide && !placement.midblock && placement.center) {
       const toCenter = (placement.center[0] - a.x) * d[0] + (placement.center[1] - a.y) * d[1];
       const reach = Math.max(0, ...placement.otherApproaches
         .filter((other) => other.armId !== a.armId)
         .map((other) => other.halfWidth)) + FAR_SIDE_REACH_M;
-      baseX = a.x + d[0] * (Math.max(0, toCenter) + reach);
-      baseY = a.y + d[1] * (Math.max(0, toCenter) + reach);
+      baseX = a.x + d[0] * (Math.max(0, toCenter) + reach) + px;
+      baseY = a.y + d[1] * (Math.max(0, toCenter) + reach) + py;
     }
     const sides = [kerb];
     // Wide approaches get a second head on the other side (far-left corner,
@@ -1064,7 +1090,7 @@ function buildSignalProps({ placements = [], projector, roadFeatures = [] }, ter
     }
     for (const side of sides) {
       const off = a.halfWidth + POLE_KERB_GAP_M;
-      const spot = findClearSpot(baseX + side[0] * off, baseY + side[1] * off, side[0], side[1]);
+      const spot = findClearSpot(baseX + side[0] * off, baseY + side[1] * off, side[0], side[1], -d[0], -d[1]);
       if (!spot) {
         dropped++;
         continue;

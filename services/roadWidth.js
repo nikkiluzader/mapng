@@ -149,11 +149,21 @@ const SINGLE_TRACK_MIN_M = 3.5;
  * Priority: explicit `width` tag -> lane-based estimate -> style fallback,
  * always clamped to class-specific practical limits.
  */
+// A tagged width's cap where the lanes are counted: as many wide lanes (WIDE_LANE_M each) as the mapper counted, when
+// that is more than the class's cap. A tagged 24 m six-lane and 28 m seven-lane primary both came out 12 m (+2.3 m
+// parking), the bus stop's extra lane drawn as narrower lanes, the road moved sideways by its placement tag instead of
+// widening on one side (thecoachtoma, Savanoriu pr., Kaunas, 2026-11-25)
+const WIDE_LANE_M = 4;
+export function taggedWidthCapHalf(tags = {}, highway, classMax) {
+  const n = Math.min(parsePositiveInt(tags.lanes) || (parsePositiveInt(tags['lanes:forward']) + parsePositiveInt(tags['lanes:backward'])) || 0, TAGGED_LANES_MAX);
+  return Math.max(classMax, (n * WIDE_LANE_M) / 2);
+}
+
 export function estimateRoadHalfWidth(tags = {}, highway, isOneWay = false, fallbackHalfWidth = 3.5) {
   const explicitWidth = parseRoadWidthMeters(tags.width);
   const limits = getRoadHalfWidthClamp(highway);
   if (Number.isFinite(explicitWidth) && explicitWidth > 0) {
-    return clamp(explicitWidth / 2, limits.min, limits.max);
+    return clamp(explicitWidth / 2, limits.min, taggedWidthCapHalf(tags, highway, limits.max));
   }
   // a raceway by its kind (a circuit 12 m, a dirt oval 16, a kart track 8), not by lanes
   if (highway === 'raceway') return clamp(racewayHalfWidth(tags), limits.min, limits.max);
@@ -367,7 +377,7 @@ export function estimateRoadCrossSection(tags = {}, highway, isOneWay = false, {
     // width= is the whole carriageway. Keep only TAGGED extras inside it;
     // defaults would invent parking the mapper already measured.
     const limits = getRoadHalfWidthClamp(highway);
-    carriagewayHalfWidth = clamp(explicitWidth / 2, limits.min, limits.max + PARKING_LANE_M);
+    carriagewayHalfWidth = clamp(explicitWidth / 2, limits.min, Math.max(limits.max + PARKING_LANE_M, taggedWidthCapHalf(tags, highway, limits.max)));
     const taggedExtra = (side) => {
       const parking = parseParkingSideMeters(tags, side);
       if (parking !== null) return parking;

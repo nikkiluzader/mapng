@@ -266,6 +266,8 @@ export function approachFromArm(arm, stopDistM, hint = null) {
     highway: road.tags?.highway,
     halfWidth: arm.edge.halfWidth,
     oneWay: onewayDirection(road.tags) !== 0,
+    // (arriving along the way's node order: the junction at its end; for its placement tag's side, beamngSignals.js)
+    alongOrder: travelAlongOrder,
     lanesIn: lanesInDirection(road.tags || {}, travelAlongOrder ? 1 : -1),
     hintTags: hint?.tags || null,
   };
