@@ -743,7 +743,7 @@ async function getTerrainTextureBlob(terrainData, textureType = 'hybrid') {
  */
 export const PREVIEW_W = 1024;
 export const PREVIEW_H = 576;
-async function generatePreviewBlob(title = '') {
+export async function generatePreviewBlob(title = '') {
   const W = PREVIEW_W; const H = PREVIEW_H;
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;

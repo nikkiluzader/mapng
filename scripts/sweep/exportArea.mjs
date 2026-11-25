@@ -2,7 +2,7 @@
 // Export one test area headless, the way the app does (roads conditioned into
 // the terrain as terrain.js does, then exportBeamNGLevel).
 //
-//   node scripts/sweep/exportArea.mjs <area> [gpxz|t30|mh] [levelName] [--out dir] [--fix-stubs]
+//   node scripts/sweep/exportArea.mjs <area> [gpxz|t30|mh] [levelName] [--out dir] [--title text] [--fix-stubs]
 //
 // Writes <out>/<levelName>.zip (default scratch/sweep) and, beside it,
 // <levelName>.checks.json (the export's structure checks). EXPORT_OPTS (JSON)
@@ -33,10 +33,12 @@ import { installCanvasPolyfill } from './polyfill.mjs';
 import { AREAS_DIR, OUT_DIR, REPO } from './env.mjs';
 
 const args = process.argv.slice(2);
-const pos = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--out');
+const pos = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--out' && args[i - 1] !== '--title');
 const [area, dem = 'gpxz', levelName = `sw_${area}`] = pos;
 const outDir = args.includes('--out') ? args[args.indexOf('--out') + 1] : OUT_DIR;
-if (!area) { console.error('usage: exportArea.mjs <area> [gpxz|t30|mh] [levelName] [--out dir] [--fix-stubs]'); process.exit(2); }
+// (the level's title in the game's list and on its thumbnail card; the level name when not given)
+const title = args.includes('--title') ? args[args.indexOf('--title') + 1] : null;
+if (!area) { console.error('usage: exportArea.mjs <area> [gpxz|t30|mh] [levelName] [--out dir] [--title text] [--fix-stubs]'); process.exit(2); }
 const dir = path.join(AREAS_DIR, area);
 if (!fs.existsSync(path.join(dir, `${dem}.f32`))) { console.error(`no ${dem}.f32 in ${dir} (fetch it: scripts/sweep/fetchArea.mjs)`); process.exit(2); }
 
@@ -158,7 +160,7 @@ const { blob, structureChecks, steps: stepTimes } = await exportBeamNGLevel(terr
   // extra export options as JSON, e.g. EXPORT_OPTS='{"shapeTerrain":false}'
   // (or EXPORT_OPTS=@file.json: the options in a file)
   ...(process.env.EXPORT_OPTS ? JSON.parse(process.env.EXPORT_OPTS.startsWith('@') ? fs.readFileSync(process.env.EXPORT_OPTS.slice(1), 'utf8') : process.env.EXPORT_OPTS) : {}),
-  levelName, elevationSource: 'upload', requestedResolution: meta.size, requestedProcessingMetersPerPixel: meta.mpp,
+  levelName, previewTitle: title, elevationSource: 'upload', requestedResolution: meta.size, requestedProcessingMetersPerPixel: meta.mpp,
   onProgress: ({ step, pct }) => { if (process.stderr.isTTY) process.stderr.write(`\r[${pct}%] ${String(step).slice(0, 70).padEnd(70)}`); },
 });
 if (process.stderr.isTTY) process.stderr.write('\n');

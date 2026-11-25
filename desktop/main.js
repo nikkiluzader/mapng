@@ -977,7 +977,7 @@ ipcMain.handle('levels:downloadTestLevels', async (event) => {
   testLevelsBusy = true;
   const send = (p) => { try { event.sender.send('levels:testProgress', p); } catch { /* window closed */ } };
   try {
-    const res = await net.fetch(`${API_ORIGIN}/api/test-levels`);
+    const res = await net.fetch(`${API_ORIGIN}/api/test-levels`, { cache: 'no-store' });
     if (!res.ok) return { ok: false, error: `manifest ${res.status}` };
     const manifest = await res.json();
     const levels = (manifest?.levels || []).filter((l) => TEST_LEVEL_FILE.test(String(l.file)) && /^[0-9a-f]{64}$/.test(String(l.sha256)));
@@ -990,7 +990,7 @@ ipcMain.handle('levels:downloadTestLevels', async (event) => {
         const h = crypto.createHash('sha256').update(fs.readFileSync(dest)).digest('hex');
         if (h === lv.sha256) { done += lv.size; installed.push(lv.file); send({ file: lv.file, done, total, skipped: true }); continue; }
       }
-      const r = await net.fetch(`${API_ORIGIN}/api/test-levels/${lv.file}`);
+      const r = await net.fetch(`${API_ORIGIN}/api/test-levels/${lv.file}`, { cache: 'no-store' });
       if (!r.ok || !r.body) return { ok: false, error: `${lv.file} ${r.status}`, installed };
       const hash = crypto.createHash('sha256');
       const out = fs.createWriteStream(part);

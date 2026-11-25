@@ -157,3 +157,13 @@ back on a fresh session, the saved log tail is `scratch/coverage/crash_log_tail.
 - Test roads crossing without a shared node made no junction: `run(..., through)` in `testLevels.mjs`.
 - Two coast plots in one row laid their lines on top of each other: each gets its own offset.
 - A 30 m square plot is no size for a canal, a track or a house: real sizes (`REAL_SIZE`, the water block).
+
+## Headless test levels show a grey thumbnail and their file name in the game's list
+
+- **Seen:** 2026-11-24, the first upload of the official test levels: grey cards titled "mapng_test_roads_na_east".
+- **Cause:** the sweep's canvas stand-in (scripts/sweep/polyfill.mjs) draws nothing, and fixStubs.mjs filled the
+  stub with grey; exportArea.mjs passed no title, so the level name became the title.
+- **Fix:** fixStubs.mjs draws the real card (scripts/sweep/levelCard.mjs: the app's generatePreviewBlob on the
+  desktop app's canvas, with the app's fonts); exportArea.mjs takes `--title`.
+- **Also:** a level downloaded under a name the game's mod list already knows keeps that entry's on/off state
+  (mods/db.json); names left switched off by a test run stay hidden from the level list.

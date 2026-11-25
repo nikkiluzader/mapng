@@ -92,7 +92,7 @@ test levels", straight into the mods folder). To publish a new set:
 
 ```
 # 1. fresh exports of all four, with the real reflection files, labels, and the offline check
-NAPI_CANVAS=$PWD/desktop/node_modules/@napi-rs/canvas node scripts/sweep/exportArea.mjs <area> mh mapng_<area> --out scratch/coverage/levels --fix-stubs
+NAPI_CANVAS=$PWD/desktop/node_modules/@napi-rs/canvas node scripts/sweep/exportArea.mjs <area> mh mapng_<area> --out scratch/coverage/levels --title "MapNG Test: Roads" --fix-stubs
 python3 scripts/coverage/addLabels.py scratch/coverage/levels/mapng_<area>.zip <area>
 python3 scripts/coverage/check_coverage.py scratch/coverage/levels/mapng_<area>.zip na_east
 # 2. a manifest { version, commit, levels: [{ id, kind (coverage|roads|structures|terrain), file, size, sha256 }] }

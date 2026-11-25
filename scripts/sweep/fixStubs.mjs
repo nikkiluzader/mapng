@@ -1,10 +1,11 @@
 // Replace the canvas-polyfill stub images (4-byte "PNG"s) in a headless export with real files,
 // so the level loads clean in game: node scripts/sweep/fixStubs.mjs <zip>
 // terrain.png -> grey at baseTexSize (what the app writes for baseTexture 'none'),
-// cubemap faces -> public/cubemap, preview.png -> grey 512.
+// cubemap faces -> public/cubemap, preview.png -> the level's card (logo and name, levelCard.mjs).
 import fs from 'node:fs';
 import JSZip from 'jszip';
 import sharp from 'sharp';
+import { renderLevelCard } from './levelCard.mjs';
 
 const file = process.argv[2];
 const zip = await JSZip.loadAsync(fs.readFileSync(file));
@@ -21,7 +22,13 @@ for (const name of Object.keys(zip.files)) {
     const mats = Object.keys(zip.files).find((n) => n.endsWith('/art/terrains/main.materials.json'));
     const set = Object.values(JSON.parse(await zip.file(mats).async('string'))).find((m) => m.class === 'TerrainMaterialTextureSet');
     zip.file(name, await grey(set?.baseTexSize?.[0] || 2048));
-  } else if (name.endsWith('/preview.png')) zip.file(name, await grey(512));
+  } else if (name.endsWith('/preview.png')) {
+    // (the card the app draws: the logo, "MapNG" and the level's title from its info.json)
+    const info = zip.file(name.replace(/preview\.png$/, 'info.json'));
+    let title = '';
+    try { title = JSON.parse(await info.async('string')).title || ''; } catch { /* no title */ }
+    zip.file(name, await renderLevelCard(title));
+  }
   else { console.log('left stub:', name); continue; }
   fixed++;
 }

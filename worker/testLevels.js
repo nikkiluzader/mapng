@@ -25,8 +25,8 @@ export async function handleTestLevels(request, url, env) {
     headers: {
       'Content-Type': manifest ? 'application/json; charset=utf-8' : 'application/zip',
       ...(manifest ? {} : { 'Content-Disposition': `attachment; filename="${name}"`, 'Content-Length': String(obj.size) }),
-      // (the manifest names the current build: a few minutes; a level's zip is replaced only with a new manifest)
-      'Cache-Control': manifest ? 'public, max-age=300' : 'public, max-age=3600',
+      // (no caching: a set is replaced in place, and a cached old zip would fail the new manifest's SHA-256)
+      'Cache-Control': 'no-cache',
       ETag: obj.httpEtag,
     },
   });
