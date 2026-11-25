@@ -21,6 +21,7 @@ import { streetIndex } from './buildingDetails.js';
 import { planPitches, pitchFootprints } from './sportsFields.js';
 import { levelCrossingBarriers, buildLevelCrossingMeshes } from './levelCrossingBarriers.js';
 import { planStepFlights, buildStepFlightMeshes, stepWidth } from './stepFlights.js';
+import { findCarriagewaySplits, splitShiftAt, splitTaperAt } from './carriagewaySplits.js';
 import { findBridgeTowers, towerPierGeometry, towerHouseTags } from './bridgeTowers.js';
 import { buildTexturedBuildings, buildingContext, screenBuilding, getBuildingMaterialDefs, garageExtras, isGarageFeature, FACADE_EMISSIVE_FILE, BUILDING_TILE_M, letterName } from './beamngBuildings.js';
 import { isCarportFeature, planCarports } from './beamngCarports.js';
@@ -3977,7 +3978,7 @@ const isCutPaintLayer = (layerName) => typeof layerName === 'string'
 // another road's carriageway this far above or below (the solved road
 // heights) is a different level: a stacked deck, a road under a bridge
 const PAINT_CUT_LEVEL_M = 3;
-function cutPaintAtOtherRoads(paintDecals, index, drivableRoads, ownersAtNode, zones = [], heightOf = null, merging = new Map()) {
+function cutPaintAtOtherRoads(paintDecals, index, drivableRoads, ownersAtNode, zones = [], heightOf = null, merging = new Map(), splitPartners = new Map()) {
   if (paintDecals.length === 0 || index.segments.length === 0) return;
   let keptAtMerges = 0;
   const ignoredBy = new Map();
@@ -3996,6 +3997,9 @@ function cutPaintAtOtherRoads(paintDecals, index, drivableRoads, ownersAtNode, z
   let pieces = 0;
   for (const { decal, group, owner } of paintDecals) {
     let ignore = ignoreSetFor(owner);
+    // (the lines of a carriageway split's roads carry on into each other, carriagewaySplits.js; the grass edge blends
+    // are still cut where they lie on a partner, or one branch's verge strip lay across the other's lanes)
+    if (decal.__layer.startsWith('line_') && splitPartners.has(owner)) ignore = new Set([...ignore, ...splitPartners.get(owner)]);
     // (a slip road merging into this road leaves its lane lines alone: services/mergingLinks.js)
     const merges = keptThroughMerge(decal.__layer) ? merging.get(owner) : null;
     if (merges?.size) { ignore = new Set([...ignore, ...merges]); keptAtMerges++; }
@@ -7271,6 +7275,45 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     const names = [...widthTapers.keys()].map((k) => drivableRoads[k]?.sourceFeature?.tags?.name || drivableRoads[k]?.highway || '?');
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Width tapers: ${widthTapers.size} road piece(s) narrowed to the next piece of the same road${names.length ? ` (${[...new Set(names)].slice(0, 12).join(', ')}${names.length > 12 ? ', ...' : ''})` : ''}.`);
   }
+  // Carriageway splits (carriagewaySplits.js): a two-way road dividing into two one-way carriageways is no junction;
+  // each branch is drawn starting on its own half of the road and eased onto its line, the ends there untrimmed
+  const splits = findCarriagewaySplits(drivableRoads.map((sf) => {
+    if (!shouldGenerateDecalRoads(sf.highway, sf.sourceFeature.tags || {})) return null;
+    const t = sf.sourceFeature.tags || {};
+    const oneway = isOneWayRoad(t) ? (['-1', 'reverse'].includes(String(t.oneway ?? '').trim().toLowerCase()) ? -1 : 1) : 0;
+    return { oneway, cls: sf.highway || t.highway || '', half: widthsOf(sf).styleHalfWidth, xy: sf.geometry.map((pt) => geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0)) };
+  }), { leftHand: leftHandTraffic });
+  const splitEnds = new Set();
+  for (const sp of splits.points) { splitEnds.add(`${sp.trunk}:${sp.trunkAtStart}`); for (const b of sp.branches) splitEnds.add(`${b.k}:${b.atStart}`); }
+  // (the structure graph's branch edges moved with the drawn branches, so the ground shaped under them later
+  // (terrainCompose) follows them: drawn alone, a branch's shifted edge lay over unshaped ground (creases in the sweep))
+  if (structureGraph && splits.plans.size) {
+    let moved = 0;
+    for (const [k, plan] of splits.plans) {
+      const wayId = drivableRoads[k]?.sourceFeature?.id;
+      for (const e of structureGraph.edges) {
+        if (wayId == null || e.wayId !== wayId || e.bridge || e.tunnel || !(e.x?.length > 1)) continue;
+        const ox = Array.from(e.x); const oy = Array.from(e.y);
+        for (let i = 0; i < ox.length; i++) {
+          const m = splitShiftAt(plan, ox[i], oy[i]); if (!m) continue;
+          const a = Math.max(0, i - 1); const b = Math.min(ox.length - 1, i + 1);
+          const L = fastHypot(ox[b] - ox[a], oy[b] - oy[a]) || 1;
+          e.x[i] = ox[i] - ((oy[b] - oy[a]) / L) * m; e.y[i] = oy[i] + ((ox[b] - ox[a]) / L) * m;
+          const g0 = e.g ? e.g[i] : null;
+          if (e.g) e.g[i] = getTerrainHeightAtWorldXY(e.x[i], e.y[i], terrainData, squareSize);
+          // (the solved height carried with the ground: with the terrain left untouched the road follows the ground,
+          // and a moved station kept its old height, off the ground (gt_chevril, 30 m, untouched))
+          const zs = structureGraph.profile?.z?.[e.id];
+          // (only there: shaped, the solved heights are smooth by design, and the ground's ups and downs added to them
+          // made bumps (gt_chevril, 30 m, ready))
+          if (opts.shaping?.terrain === false && zs && Number.isFinite(g0) && Number.isFinite(e.g[i])) zs[i] += e.g[i] - g0;
+          moved++;
+        }
+      }
+    }
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Carriageway splits: ${moved} station(s) of the road graph moved with the drawn branches (the ground is shaped under them).`);
+  }
+  console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Carriageway splits: ${splits.points.length ? `${splits.points.length} two-way road(s) dividing into (or joining from) two one-way carriageways, drawn as one road carrying on (no junction trim; each branch starts on its half, eased onto its line over ${[...splits.plans.values()].map((pl) => Math.round(pl.L)).join('/')} m)${splits.points.slice(0, 8).map((sp) => ` ${drivableRoads[sp.trunk]?.sourceFeature?.tags?.name || drivableRoads[sp.trunk]?.highway || '?'}`).join(',')}` : 'none'}.`);
   for (let segIndex = 0; segIndex < drivableRoads.length; segIndex++) {
     if (segIndex % 200 === 199) yield;
     const segmentFeature = drivableRoads[segIndex];
@@ -7297,18 +7340,21 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     const renderTags = getMergedRoadRenderTags(segmentFeature);
     const { style, isOneWay, urbanRoad, crossSection, drivingHalfWidth, styleHalfWidth } = widthsOf(segmentFeature);
     const taper = widthTapers.get(segIndex);
-    const startTrimProfile = getEndpointTrimProfile(
+    // (at a carriageway split the road carries on: no junction trim there)
+    const noTrim = { center: 0, pos: 0, neg: 0 };
+    const startTrimProfile = splitEnds.has(`${segIndex}:true`) ? noTrim : getEndpointTrimProfile(
       segmentFeature,
       segmentFeature.startKey,
       true,
       roadNetwork.intersections,
     );
-    const endTrimProfile = getEndpointTrimProfile(
+    const endTrimProfile = splitEnds.has(`${segIndex}:false`) ? noTrim : getEndpointTrimProfile(
       segmentFeature,
       segmentFeature.endKey,
       false,
       roadNetwork.intersections,
     );
+    const splitPlan = splits.plans.get(segIndex);
 
     // Clip to the terrain's safe inner boundary, splitting at crossings.
     // Then further chunk each segment so no single DecalRoad is too long.
@@ -7361,8 +7407,27 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
       const centerNodes = rawNodes;
       if (centerNodes.length < 2) continue;
       // (each node's own half width where the way narrows to the next one)
-      const halfAt = taper ? centerNodes.map((nd) => taper(nd[0], nd[1], styleHalfWidth)) : null;
+      // (and a split's trunk narrowed to its branches together at its end: carriagewaySplits.js)
+      const splitTaper = splits.tapers.get(segIndex);
+      const halfAt = (taper || splitTaper) ? centerNodes.map((nd) => splitTaperAt(splitTaper, nd[0], nd[1], taper ? taper(nd[0], nd[1], styleHalfWidth) : styleHalfWidth)) : null;
       if (halfAt) halfAt.forEach((h, k) => { centerNodes[k][3] = h; });
+      // (a split's branch: its drawn line moved to its half of the two-way road near the split, eased onto its own)
+      if (splitPlan) {
+        const moves = centerNodes.map((nd) => splitShiftAt(splitPlan, nd[0], nd[1]));
+        if (moves.some((m) => m !== 0)) {
+          const orig = centerNodes.map((nd) => [nd[0], nd[1]]);
+          centerNodes.forEach((nd, k) => {
+            if (!moves[k]) return;
+            const a = orig[Math.max(0, k - 1)]; const b = orig[Math.min(orig.length - 1, k + 1)];
+            const L = fastHypot(b[0] - a[0], b[1] - a[1]) || 1;
+            nd[0] = Math.round((orig[k][0] - ((b[1] - a[1]) / L) * moves[k]) * 1000) / 1000;
+            nd[1] = Math.round((orig[k][1] + ((b[0] - a[0]) / L) * moves[k]) * 1000) / 1000;
+            // (a node on the ground at the ground's height where it now stands: on a slope with the terrain left
+            // untouched it kept its old height and stood off the ground)
+            if (!bridges.bySeg.get(segIndex) && !tunnels.bySeg.has(segIndex)) nd[2] = Math.round((getTerrainHeightAtWorldXY(nd[0], nd[1], terrainData, squareSize) + 0.1) * 1000) / 1000;
+          });
+        }
+      }
       const bridgePart = bridges.bySeg.get(segIndex);
       if (bridgePart) bridgePart.half = styleHalfWidth;
       // a deck carried on along this approach is as wide as the road on it
@@ -7527,7 +7592,12 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
       return best < 400 ? zz : null;
     };
   })();
-  cutPaintAtOtherRoads(paintDecals, carriagewayIndex, drivableRoads, ownersAtNode, junctionMarkings.zones || [], solvedHeightOf, mergingLinks(carriageways));
+  const splitPartners = new Map();
+  for (const sp of splits.points) {
+    const all = [sp.trunk, ...sp.branches.map((b) => b.k)];
+    for (const k of all) { if (!splitPartners.has(k)) splitPartners.set(k, new Set()); for (const o of all) splitPartners.get(k).add(o); }
+  }
+  cutPaintAtOtherRoads(paintDecals, carriagewayIndex, drivableRoads, ownersAtNode, junctionMarkings.zones || [], solvedHeightOf, mergingLinks(carriageways), splitPartners);
   const mouths = cutSurfaceAtOtherSurfaces(surfaceDecals, carriageways, carriagewayIndex, { americas: markingStyle === 'americas' });
   // Slip roads merging into a wider road (services/mergingLinks.js): OSM maps each to a node on that road's centre
   // line, and drawn to it the slip road's surface lay across the road's lanes to its middle. The surface now ends

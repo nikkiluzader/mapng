@@ -656,6 +656,47 @@
    ],
    "smoke": true,
    "note": "a dam and its reservoir in wooded hills in Poland on 1 m lidar (Mapterhorn): the middle of an area a BeamNG developer exported (2026-11, water and console errors reported); every such area is kept in the sweep"
+  },
+  {
+   "name": "tj_pramones",
+   "lat": 54.904550126066525,
+   "lng": 23.978857420346415,
+   "size": 512,
+   "mpp": 0.6,
+   "dem": "gpxz",
+   "categories": [
+    "junction",
+    "split",
+    "roundabout"
+   ],
+   "note": "thecoachtoma's Pramones pr., Kaunas (2026-11-24): roads splitting into carriageways at a roundabout, 6 lanes into 2x2"
+  },
+  {
+   "name": "tj_savanoriu",
+   "lat": 54.928245380511534,
+   "lng": 23.97214142079421,
+   "size": 512,
+   "mpp": 0.6,
+   "dem": "gpxz",
+   "categories": [
+    "junction",
+    "split"
+   ],
+   "note": "thecoachtoma's Savanoriu pr., Kaunas: a large diamond, its ends splitting"
+  },
+  {
+   "name": "tj_kreves",
+   "lat": 54.92286622495119,
+   "lng": 23.97952264643339,
+   "size": 512,
+   "mpp": 0.6,
+   "dem": "gpxz",
+   "categories": [
+    "junction",
+    "split",
+    "roundabout"
+   ],
+   "note": "thecoachtoma's V. Kreves pr., Kaunas: a roundabout whose four approaches split"
   }
  ]
 }

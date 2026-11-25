@@ -1,7 +1,7 @@
 // The themed synthetic test levels (asked for by the user, 2026-11-24): one level per kind of situation, made by the
 // same plumbing as the coverage level (scripts/coverage/buildCoverageArea.mjs, the asset and tag coverage):
 //
-//   roads       flat ground: lane counts changing 4 -> 3 -> 2 -> 1 -> 4, a one-way pair, a dual carriageway with
+//   roads       flat ground: lane counts changing 4 -> 3 -> 2 -> 1 -> 4, carriageway splits (eight kinds), a one-way pair, a dual carriageway with
 //               slip roads, every junction shape, roundabouts from mini to two-lane, turn lanes at signals, curve
 //               radii, every road class with each sidewalk option, tagged widths, every surface, a car park
 //   structures  a gorge and a wide river valley bridged by every structure type, a viaduct, a rail bridge, road
@@ -115,6 +115,79 @@ function roads(regionKey) {
     label('unnamed lane change road', -200, 790, [60, 0]);
     // driver's views through each lane change, both roads, 40 m before it
     for (const x of [-550, -300, -50, 200]) { drive(`driver: lane change at x=${x}`, x - 40, 850, 0); drive(`driver: unnamed lane change at x=${x}`, x - 40, 790, 0); }
+  }
+  // 1b. carriageway splits (thecoachtoma's Kaunas junctions, 2026-11-24): a two-way road dividing into two one-way
+  // carriageways, the northbound one to the east (right-hand traffic), drawn as OSM does: three ways sharing one node
+  // on the road's centre line. East end of the level: x 600-950, y 640-950 and x 420-950, y -760 -> -440.
+  {
+    const split = (x, y0, what, trunk, north, south, { sep = 14, run: R = 40, ring = false, merge = false, spread = 0 } = {}) => {
+      const ys = y0 + 120; const h = sep / 2;
+      const off = (k) => (spread ? h + (k - R) * Math.tan((spread * Math.PI) / 180) : h);
+      // the branches: off the centre line over R metres, then parallel (or on at the spread angle) for 100 m
+      const eastPts = [[x, ys], [x + h * 0.15, ys + R * 0.3], [x + h * 0.6, ys + R * 0.65], [x + h, ys + R], [x + off(R + 100), ys + R + 100]];
+      const westPts = eastPts.map(([px, py]) => [2 * x - px, py]);
+      if (merge) {
+        // (two carriageways joining into one road going north: the split turned upside down)
+        // (mirrored about the middle of the branches: they start apart in the south and meet at ym, the road on north)
+        const mid = ys + R / 2 + 50; const flip = (pts) => pts.map(([px, py]) => [px, 2 * mid - py]); const ym = 2 * mid - ys;
+        way(run(x, ym, x, ym + 120, 20), { highway: 'primary', lanes: '4', name: what });
+        way(flip(eastPts).reverse(), { highway: 'primary', oneway: 'yes', lanes: '2', name: what });
+        way(flip(westPts), { highway: 'primary', oneway: 'yes', lanes: '2', name: what });
+        label(`split: ${what}`, x, ym, [55, 0]);
+        drive(`driver: ${what}, northbound joining`, x + h, ym - 50, Math.PI / 2);
+        drive(`driver: ${what}, southbound out of the joined road`, x, ym + 60, -Math.PI / 2);
+        return;
+      }
+      way(run(x, y0, x, ys, 20), { name: what, ...trunk });
+      way(eastPts, { name: what, oneway: 'yes', ...north });
+      if (!ring) way([...westPts].reverse(), { name: what, oneway: 'yes', ...south });
+      else {
+        // (into a roundabout: the branches end on its ring, entering at its south-east, leaving at its south-west)
+        const yc = ys + R + 100 + 17.3; const pts = []; for (let i = 0; i <= 24; i++) { const a = (i / 24) * 2 * Math.PI; pts.push([x + 20 * Math.cos(a), yc + 20 * Math.sin(a)]); } pts[24] = pts[0];
+        way(pts, { highway: north.highway || 'primary', junction: 'roundabout', lanes: '2', name: `${what} roundabout` });
+        eastPts[eastPts.length - 1] = [x + 10, yc - 17.32]; westPts[westPts.length - 1] = [x - 10, yc - 17.32];
+        for (const ang of [0, 90, 180]) { const a2 = (ang * Math.PI) / 180; way([[x + 20 * Math.cos(a2), yc + 20 * Math.sin(a2)], [x + 60 * Math.cos(a2), yc + 60 * Math.sin(a2)]], { highway: 'secondary', name: `${what} arm ${ang}` }); }
+        way([...westPts].reverse(), { name: what, oneway: 'yes', ...south });
+      }
+      label(`split: ${what}`, x, ys, [55, 0]);
+      drive(`driver: ${what}, approaching the split`, x + 2, ys - 50, Math.PI / 2);
+      drive(`driver: ${what}, on the northbound branch`, x + h, ys + R + 20, Math.PI / 2);
+      drive(`driver: ${what}, southbound through the split`, x - h, ys + R + 40, -Math.PI / 2);
+    };
+    const P4 = { highway: 'primary', lanes: '4' }; const O2 = { highway: 'primary', lanes: '2' };
+    split(620, 640, 'Split 4 to 2+2', P4, O2, O2);
+    split(710, 640, 'Split 2 to 1+1', { highway: 'residential' }, { highway: 'residential', lanes: '1' }, { highway: 'residential', lanes: '1' }, { sep: 8, run: 30 });
+    split(810, 640, 'Split 6 to 3+3', { highway: 'trunk', lanes: '6' }, { highway: 'trunk', lanes: '3' }, { highway: 'trunk', lanes: '3' }, { sep: 22, run: 60 });
+    split(910, 640, 'Split 3 to 2+1', { highway: 'secondary', lanes: '3', 'lanes:forward': '2', 'lanes:backward': '1' }, { highway: 'secondary', lanes: '2' }, { highway: 'secondary', lanes: '1' }, { sep: 12 });
+    split(480, -760, 'Split before a roundabout', P4, O2, O2, { sep: 14, run: 40, ring: true });
+    split(620, -760, 'Carriageways joining', P4, O2, O2, { merge: true });
+    split(760, -760, 'Fork at 40 degrees (a junction)', P4, O2, O2, { sep: 4, run: 6, spread: 40 });
+    split(900, -760, 'Split 4 to 2+3 (lanes not adding up)', P4, O2, { highway: 'primary', lanes: '3' });
+    // one-way roads forking and merging, their lanes shared out (thecoachtoma: "it's 4 lanes to 4 lanes total"): the
+    // left branch takes the left lanes, the right one the right lanes. x 180-400, y -545 -> -305.
+    const fork = (x, y0, what, trunkLanes, leftLanes, rightLanes, { merge = false, turn = null } = {}) => {
+      const ys = y0 + 90; const sep = 18; const R = 40;
+      const right = [[x, ys], [x + 1.5, ys + R * 0.35], [x + sep / 2 * 0.7, ys + R * 0.75], [x + sep / 2, ys + R], [x + sep / 2, ys + R + 60]];
+      const left = right.map(([px, py]) => [2 * x - px, py]);
+      const T = { highway: 'primary', oneway: 'yes', name: what };
+      if (!merge) {
+        way(run(x, y0, x, ys, 20), { ...T, lanes: String(trunkLanes), ...(turn ? { 'turn:lanes': turn } : {}) });
+        way(left, { ...T, lanes: String(leftLanes) }); way(right, { ...T, lanes: String(rightLanes) });
+        label(`fork: ${what}`, x, ys, [55, 0]);
+        drive(`driver: ${what}, before the fork`, x, ys - 45, Math.PI / 2);
+        drive(`driver: ${what}, on the left branch`, x - sep / 2, ys + R + 20, Math.PI / 2);
+      } else {
+        // (two one-way roads coming together into one, going north)
+        const top = ys + R + 60; const flip = (pts) => pts.map(([px, py]) => [px, ys + top - py]).reverse();
+        way(flip(left), { ...T, lanes: String(leftLanes) }); way(flip(right), { ...T, lanes: String(rightLanes) });
+        way(run(x, top, x, top + 50, 10), { ...T, lanes: String(trunkLanes) });
+        label(`merge: ${what}`, x, top, [55, 0]);
+        drive(`driver: ${what}, joining from the left`, x - sep / 2, top - 50, Math.PI / 2);
+      }
+    };
+    fork(190, -545, 'Fork 4 to 2+2 (one-way)', 4, 2, 2, { turn: 'left|left|through|through' });
+    fork(290, -545, 'Fork 3 to 2+1 (an exit lane)', 3, 2, 1);
+    fork(390, -545, 'Merge 2+2 to 4 (one-way)', 4, 2, 2, { merge: true });
   }
   // 2. a one-way pair, 3 lanes each (y = 700, 680)
   way(run(-900, 700, 550, 700, 25), { highway: 'secondary', oneway: 'yes', lanes: '3', name: 'One-way east' });
