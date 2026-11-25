@@ -21,8 +21,8 @@ import { streetIndex } from './buildingDetails.js';
 import { planPitches, pitchFootprints } from './sportsFields.js';
 import { levelCrossingBarriers, buildLevelCrossingMeshes } from './levelCrossingBarriers.js';
 import { planStepFlights, buildStepFlightMeshes, stepWidth } from './stepFlights.js';
-import { findCarriagewaySplits, splitShiftAt, splitTaperAt } from './carriagewaySplits.js';
-import { placementShift, placementShiftAt } from './lanePlacement.js';
+import { findCarriagewaySplits, splitShiftAt, splitTaperAt, splitHalfAt, splitLaneShiftAt, splitEdgeLineAt } from './carriagewaySplits.js';
+import { placementShift, placementShiftAt, laneCounts } from './lanePlacement.js';
 import { findBridgeTowers, towerPierGeometry, towerHouseTags } from './bridgeTowers.js';
 import { buildTexturedBuildings, buildingContext, screenBuilding, getBuildingMaterialDefs, garageExtras, isGarageFeature, FACADE_EMISSIVE_FILE, BUILDING_TILE_M, letterName } from './beamngBuildings.js';
 import { isCarportFeature, planCarports } from './beamngCarports.js';
@@ -3868,9 +3868,14 @@ function getLayeredRoadDecals(centerNodes, highway, tags, styleHalfWidth, parent
       ? offsetNodes(centerNodes, (k) => (edgeOffset ? edgeAt(k) : offset), (k) => (scaled ? width * (options.halfAt[k] / styleHalfWidth) : width))
       : options.halfAt && options.aiAt && layer.name === 'ai_path'
         ? offsetNodes(centerNodes, (k) => options.aiAt(k).offset, (k) => options.aiAt(k).width)
-        : options.halfAt && options.offsetAt
-          ? offsetNodes(centerNodes, (k) => options.offsetAt(k, offset), width)
-          : offsetNodes(centerNodes, offset, width);
+        : options.edgeLineAt && (layer.name === 'line_left' || layer.name === 'line_right')
+          // (a split branch's edge lines from its slice of the trunk's lanes at the split, carriagewaySplits.js
+          // splitEdgeLineAt: from its full width they hung up to a metre outside its narrower start (roads test level,
+          // 2026-11-25))
+          ? offsetNodes(centerNodes, (k) => options.edgeLineAt(k, offset), width)
+          : options.halfAt && options.offsetAt
+            ? offsetNodes(centerNodes, (k) => options.offsetAt(k, offset), width)
+            : offsetNodes(centerNodes, offset, width);
     const shouldTrimAtJunction = layer.name.startsWith('line_') || layer.name.startsWith('edge_');
     let trimStartM = 0;
     let trimEndM = 0;
@@ -7293,7 +7298,9 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     if (!shouldGenerateDecalRoads(sf.highway, sf.sourceFeature.tags || {})) return null;
     const t = sf.sourceFeature.tags || {};
     const oneway = isOneWayRoad(t) ? (['-1', 'reverse'].includes(String(t.oneway ?? '').trim().toLowerCase()) ? -1 : 1) : 0;
-    return { oneway, cls: sf.highway || t.highway || '', half: widthsOf(sf).styleHalfWidth, xy: sf.geometry.map((pt) => geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0)) };
+    const w = widthsOf(sf);
+    // (lanes and the driving width: a split's branches start as their share of the trunk's lanes)
+    return { oneway, cls: sf.highway || t.highway || '', half: w.styleHalfWidth, drive: w.drivingHalfWidth, lanes: laneCounts(t, w.drivingHalfWidth).total, xy: sf.geometry.map((pt) => geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0)) };
   }), { leftHand: leftHandTraffic });
   // Placement (lanePlacement.js): where a way's mapped line lies across its lanes. The drawn carriageway is moved off
   // the line by it, everything built from the drawn line with it (markings, curbs, sidewalks, the ground under it)
@@ -7376,7 +7383,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     }
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Carriageway splits: ${moved} station(s) of the road graph moved with the drawn branches (the ground is shaped under them).`);
   }
-  console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Carriageway splits: ${splits.points.length ? `${splits.points.length} two-way road(s) dividing into (or joining from) two one-way carriageways, drawn as one road carrying on (no junction trim; each branch starts on its half, eased onto its line over ${[...splits.plans.values()].map((pl) => Math.round(pl.L)).join('/')} m)${splits.points.slice(0, 8).map((sp) => ` ${drivableRoads[sp.trunk]?.sourceFeature?.tags?.name || drivableRoads[sp.trunk]?.highway || '?'}`).join(',')}` : 'none'}.`);
+  console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Carriageway splits: ${splits.points.length ? `${splits.points.length} two-way road(s) dividing into (or joining from) two one-way carriageways, drawn as one road carrying on (no junction trim; each branch starts as its share of the road, eased onto its own line and width over its run; per branch: run m / width at the split m / lanes moved toward the seam m: ${[...splits.plans.entries()].map(([k, pl]) => `${drivableRoads[k]?.sourceFeature?.tags?.name || '?'} ${Math.round(pl.L)}/${(2 * (pl.s0 ?? pl.h)).toFixed(1)}/${(pl.laneIn || 0).toFixed(2)}`).slice(0, 24).join(', ')})` : 'none'}.`);
   for (let segIndex = 0; segIndex < drivableRoads.length; segIndex++) {
     if (segIndex % 200 === 199) yield;
     const segmentFeature = drivableRoads[segIndex];
@@ -7472,7 +7479,12 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
       // (each node's own half width where the way narrows to the next one)
       // (and a split's trunk narrowed to its branches together at its end: carriagewaySplits.js)
       const splitTaper = splits.tapers.get(segIndex);
-      const halfAt = (taper || splitTaper) ? centerNodes.map((nd) => splitTaperAt(splitTaper, nd[0], nd[1], taper ? taper(nd[0], nd[1], styleHalfWidth) : styleHalfWidth)) : null;
+      // (and a split's branch started as its share of the trunk, widened to its own over its run)
+      const branchShare = splitPlan && Number.isFinite(splitPlan.s0) && splitPlan.s0 < styleHalfWidth - 1e-6;
+      const halfAt = (taper || splitTaper || branchShare) ? centerNodes.map((nd) => {
+        const own = splitTaperAt(splitTaper, nd[0], nd[1], taper ? taper(nd[0], nd[1], styleHalfWidth) : styleHalfWidth);
+        return branchShare ? Math.min(own, splitHalfAt(splitPlan, nd[0], nd[1], styleHalfWidth)) : own;
+      }) : null;
       if (halfAt) halfAt.forEach((h, k) => { centerNodes[k][3] = h; });
       // (a split's branch: its drawn line moved to its half of the two-way road near the split, eased onto its own)
       // (or a placed way: its drawn line moved off the mapped one by its placement tags)
@@ -7537,8 +7549,13 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
           }),
           drivingHalfWidth,
           halfAt,
+          ...(splitPlan && Number.isFinite(splitPlan.laneHalf) ? { edgeLineAt: (k, o) => splitEdgeLineAt(splitPlan, centerNodes[k][0], centerNodes[k][1], o) } : {}),
+          // (a split branch's lane lines on the trunk's lanes at the split, carriagewaySplits.js splitLaneShiftAt)
+          ...(!taper?.mapOffset && splitPlan?.laneIn > 0 ? {
+            offsetAt: (k, o) => o + splitLaneShiftAt(splitPlan, centerNodes[k][0], centerNodes[k][1]),
+          } : {}),
           ...(taper?.mapOffset ? {
-            offsetAt: (k, o) => taper.mapOffset(centerNodes[k][0], centerNodes[k][1], o),
+            offsetAt: (k, o) => taper.mapOffset(centerNodes[k][0], centerNodes[k][1], o) + (splitPlan?.laneIn > 0 ? splitLaneShiftAt(splitPlan, centerNodes[k][0], centerNodes[k][1]) : 0),
             dropTrim: taper.dropTrim,
             // (the AI's path between the mapped edge lines, out to the driving edges: on the road's middle, not the centre line)
             aiAt: (k) => {

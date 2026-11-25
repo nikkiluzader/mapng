@@ -33,6 +33,12 @@ item's state. The open items there, one line each:
   his placement edits are on OSM (none in the three tj_ areas yet, refetched 2026-11-25); the painted asphalt is not
   tapered at a lane gain (a small dark patch beside the decal's taper); the painter assumes right-hand traffic for
   two-way placement:forward/backward.
+- **Carriageway splits: branches start as their share of the trunk (2026-11-25, the user in game on the roads level:
+  "the two changes dont blend together at all").** Splits 3 to 2+1 and 6 to 3+3 stepped out, their lane lines jumped,
+  pinched and their inner edges crossed. Now each branch starts as its share (its lanes at the trunk's lane width plus
+  the trunk's edge strip on its side), widens outward with the seam held, and its lines start on the trunk's
+  (carriagewaySplits.js `splitHalfAt`, `splitLaneShiftAt`, `splitEdgeLineAt`). Plots
+  `scratch/toma_placement/split_before_after.png`, `forks_after.png`. A first sweep caught gt_chevril (fork skip restored).
 - **Sidewalks at banks and the water.** Start again from the diagrams; the sea-wall approach was scrapped
   2026-11-24. `docs/handoff.md`, "Sidewalks at banks and the water"; record in H > 0.3.7 and H > Priority list
   (item 10). Done when: no sidewalk sweep cell worse than dev, then in game at Kingston and Naldo.

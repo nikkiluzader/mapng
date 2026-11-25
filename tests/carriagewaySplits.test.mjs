@@ -23,7 +23,10 @@ test('a two-way road dividing into two one-way carriageways is a split, each bra
 });
 
 test('left-hand traffic shifts the other way; one-way branches both leaving, or a fork of two-way roads, are no split', () => {
-  assert.equal(findCarriagewaySplits([trunk, north, south], { leftHand: true }).plans.get(1).sign, 1);
+  // (left-hand traffic: the northbound carriageway lies to the west, as mapped; each branch moves to the side its own
+  // line goes to)
+  const mirror = (w) => ({ ...w, xy: w.xy.map(([x, y]) => [-x, y]) });
+  assert.equal(findCarriagewaySplits([trunk, mirror(north), mirror(south)], { leftHand: true }).plans.get(1).sign, 1);
   const bothLeave = { ...south, xy: [...south.xy].reverse() };
   assert.equal(findCarriagewaySplits([trunk, north, bothLeave]).points.length, 0);
   assert.equal(findCarriagewaySplits([trunk, { ...north, oneway: 0 }, { ...south, oneway: 0 }]).points.length, 0);
@@ -79,3 +82,26 @@ test('a motorway exit (a slip road leaving) is no lane share: left to the slip r
   assert.equal(findCarriagewaySplits([m, on, exit]).points.length, 0);
 });
 
+
+test('branches wider together than the trunk: each starts as its share, the seam held, the lane lines carried on', async () => {
+  const { splitHalfAt } = await import('../services/carriagewaySplits.js');
+  // a 6-lane two-way trunk (3.5 m lanes, 0.5 m edge strips: half 11) into two 3-lane carriageways each with edge strips
+  // both sides (half 5.75): together 23 m against the trunk's 22
+  const t6 = { xy: line([[0, -100], [0, 0]]), oneway: 0, half: 11, drive: 10.5, lanes: 6 };
+  const n3 = { xy: line([[0, 0], [2, 20], [8, 40], [10, 100]]), oneway: 1, half: 5.75, drive: 5.25, lanes: 3 };
+  const s3 = { xy: line([[-10, 100], [-8, 40], [-2, 20], [0, 0]]), oneway: 1, half: 5.75, drive: 5.25, lanes: 3 };
+  const { plans } = findCarriagewaySplits([t6, n3, s3]);
+  const pn = plans.get(1); const ps = plans.get(2);
+  // each starts 11/2 wide: three trunk lanes and the trunk's outer strip; middles 5.5 m off the axis, the seam on it
+  assert.ok(Math.abs(pn.s0 - 5.5) < 1e-9 && Math.abs(ps.s0 - 5.5) < 1e-9, `shares ${pn.s0} ${ps.s0}`);
+  assert.ok(Math.abs(splitShiftAt(pn, 0, 0) + 5.5) < 1e-9, 'northbound middle 5.5 m east at the split');
+  assert.ok(Math.abs(splitHalfAt(pn, 0, 0, 5.75) - 5.5) < 1e-9, 'its half there: its share');
+  assert.equal(splitHalfAt(pn, 10, 100, 5.75), 5.75, 'its own width once apart');
+  // the seam held: inner edge (middle minus half) never past the axis along the run
+  for (let y = 0; y <= pn.L; y += 2) {
+    const x = Math.min(10, y < 20 ? y * 0.1 : y < 40 ? 2 + (y - 20) * 0.3 : 8 + (y - 40) / 30);
+    const mid = x - splitShiftAt(pn, x, y);
+    const half = splitHalfAt(pn, x, y, 5.75);
+    assert.ok(mid - half > -0.05, `seam crossed at y=${y}: ${mid - half}`);
+  }
+});
