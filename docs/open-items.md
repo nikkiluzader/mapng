@@ -33,9 +33,13 @@ A new session starts with `docs/handoff.md` ("Work list").
     town roads' edge blends are asphalt into grass only (no random dirt), concrete roads have no blend. Ponce de Leon
     Blvd before/after `verge_game_before_after.jpg`. Left: a grey strip there from the terrain paint under the verge
     (the base texture's road width, not a decal); the sidewalk 8 cm under the uncurbed trunk road.
-  - (1) **corners where a street's line bends into the junction** (Cordova x King): the corner lands on its own
-    street's surface; a lean of 1.5 m into its own streets builds it but the paving still does not appear (the gap fill
-    there). Work parked in `scratch/stagsw/corner_work.patch` with its debug lines.
+  - (1) **corners joined: on dev 00608b7.** A corner may lean 1.5 m into its own two streets (by name or way; other
+    roads still refuse it from 0.2 m), and every corner's piece of sidewalk is paved explicitly (arc out to the
+    sidewalks' outer corner). Cordova x King SW corner joined in game (`public/updates/0.3.8/images/sidewalk-corner.jpg`).
+    Its NE corner stays open by the slip lane (right).
+  - **Owed:** test-level scenes for the three cases (a sidewalk beside a lawn at its level; a mapped sidewalk beside a
+    concrete trunk road; a street whose line bends into the junction), checked in game; the 0.3.8 draft page has the
+    lines and pictures. The user's own review on a fresh build.
   Joins "sidewalks at banks and the water", the sidewalk order of 2026-11-24 and the stairs model (backlog 10).
 - **Tile rotation on the 2D map (0.3.8 target).** Rotating the tiles in step 1 (backlog 0 and area 1, thecoachtoma's
   rotated box). Big.
