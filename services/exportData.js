@@ -50,7 +50,7 @@ export function exportDataNeeds(terrainData, options = {}) {
  * dropped: the export reads them back). onProgress(text, fraction 0..1).
  * Resolves { backdrop: bool, lidar: summary | null }.
  */
-export async function downloadExportData(terrainData, options = {}, { onProgress, lidarProvider } = {}) {
+export async function downloadExportData(terrainData, options = {}, { onProgress, lidarProvider, onBackdropTiles } = {}) {
   const needs = exportDataNeeds(terrainData, options);
   if (!needs) return { backdrop: false, lidar: null };
   const { terrainData: td, squareSize } = exportDataInputs(terrainData, options);
@@ -65,7 +65,7 @@ export async function downloadExportData(terrainData, options = {}, { onProgress
   const say = (who, text, f) => { if (who === lineOf) step(text, f); };
   const backdropRun = needs.backdrop ? (async () => {
     say('backdrop', 'Downloading the surroundings (elevation and satellite, 8 tiles)…', 0);
-    await fetchSurroundings(td, (text) => say('backdrop', `Surroundings: ${String(text).replace(/\.\.\.$/, '…')}`, 0), {
+    const tiles = await fetchSurroundings(td, (text) => say('backdrop', `Surroundings: ${String(text).replace(/\.\.\.$/, '…')}`, 0), {
       ...BACKDROP_FETCH,
       ...needs.backdrop.imagery,
       elevationSource: needs.backdrop.source,
@@ -73,6 +73,8 @@ export async function downloadExportData(terrainData, options = {}, { onProgress
       onDownloadProgress: ({ completedTotal, total }) => { if (total > 0) say('backdrop', 'Downloading the surroundings…', completedTotal / total); },
     });
     out.backdrop = true;
+    // (the desktop runner keeps small copies for the 2D preview: desktop/runner/prefetchJob.mjs)
+    if (onBackdropTiles) out.previewTiles = await onBackdropTiles(tiles, needs.key);
     done++;
   })() : null;
   const lidarRun = needs.lidar ? (async () => {
@@ -128,11 +130,32 @@ export async function loadBackdropTiles(terrainData, options = {}) {
   // (kept for this data step: reopening the preview shows them at once)
   const have = backdropTilesOf.get(needs.key);
   if (have) return have;
+  // (the desktop app: the small copies its data step's runner kept, read from disk. Rebuilding the eight tiles here
+  // stitched the backdrop's satellite and heights in the window, up to 16384 px a side each, about 1 GB apiece: the
+  // window ran out of memory on a big level, report MR-VYQGBY, Chromium's out-of-memory code in its crash dump)
+  const kept = runs.get(needs.key)?.state?.result;
+  if (kept?.previewTiles && kept.previewBase) {
+    const tiles = readPreviewTiles(kept.previewTiles, kept.previewBase);
+    backdropTilesOf.clear();
+    backdropTilesOf.set(needs.key, tiles);
+    tiles.catch(() => backdropTilesOf.delete(needs.key));
+    return tiles;
+  }
   const tiles = fetchSurroundings(td, undefined, { ...BACKDROP_FETCH, ...needs.backdrop.imagery, elevationSource: needs.backdrop.source, gpxzApiKey: needs.backdrop.gpxz });
   backdropTilesOf.clear();           // (one terrain's backdrop at a time: eight pictures and heightmaps)
   backdropTilesOf.set(needs.key, tiles);
   tiles.catch(() => backdropTilesOf.delete(needs.key));
   return tiles;
+}
+
+// (the runner's preview copies: { POS: { bounds, width, height, minHeight, maxHeight, sat, hm } } as files under base)
+async function readPreviewTiles(list, base) {
+  const out = {};
+  for (const [pos, t] of Object.entries(list || {})) {
+    const heightMap = t.hm ? new Float32Array(await (await fetch(`${base}/${t.hm}`)).arrayBuffer()) : null;
+    out[pos] = { bounds: t.bounds, width: t.width, height: t.height, minHeight: t.minHeight, maxHeight: t.maxHeight, heightMap, satelliteDataUrl: t.sat ? `${base}/${t.sat}` : null };
+  }
+  return out;
 }
 
 /** Watch the data step's state (the export panel's line under Surroundings). Returns unsubscribe. */

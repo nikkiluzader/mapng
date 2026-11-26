@@ -80,3 +80,22 @@ test('the data step runs once per area and options: the panel and the export sha
   await ensureExportData(td, bad, { run });
   assert.equal(exportDataState(td, bad).status, 'done');
 });
+
+test('desktop: the 2D preview reads the runner\'s small backdrop copies, never stitching the tiles in the window', async () => {
+  const { ensureExportData, loadBackdropTiles, resetExportData } = await import('../services/exportData.js');
+  resetExportData();
+  const td = terrain(32, 32);
+  const opts = { includeBackdrop: true, backdropElevationSource: 'global30m', lidarDecks: false };
+  const b = { north: 1, south: 0, east: 1, west: 0 };
+  const previewTiles = { N: { bounds: b, width: 2, height: 2, minHeight: 0, maxHeight: 3, sat: 'bdprev_x_N.jpg', hm: 'bdprev_x_N.f32' } };
+  await ensureExportData(td, opts, { run: async () => ({ backdrop: true, previewTiles, previewBase: 'app://mapng/__terrain/abc' }) });
+  const asked = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => { asked.push(String(url)); return { arrayBuffer: async () => new Float32Array([0, 1, 2, 3]).buffer }; };
+  try {
+    const tiles = await loadBackdropTiles(td, opts);
+    assert.deepEqual(asked, ['app://mapng/__terrain/abc/bdprev_x_N.f32'], 'only the kept heights read, nothing downloaded');
+    assert.equal(tiles.N.satelliteDataUrl, 'app://mapng/__terrain/abc/bdprev_x_N.jpg');
+    assert.deepEqual([...tiles.N.heightMap], [0, 1, 2, 3]);
+  } finally { globalThis.fetch = realFetch; }
+});

@@ -189,7 +189,9 @@ export async function prefetchExportDataOnDesktop(terrainData, options, onProgre
   if (!desktopApp?.prefetchExportData || typeof terrainId !== 'string') return { skipped: 'not a desktop terrain' };
   const plain = JSON.parse(JSON.stringify(toRaw(options) || {}));
   const r = await desktopApp.prefetchExportData(terrainId, plain, (p) => onProgress?.(p?.text || '', p?.fraction || 0));
-  return r?.result ?? r;
+  const result = r?.result ?? r;
+  // (the backdrop's preview copies the runner kept, in the terrain's own folder: services/exportData.js reads them)
+  return result?.previewTiles ? { ...result, previewBase: `app://mapng/__terrain/${terrainId}` } : result;
 }
 
 // ---- Generate Data in Node --------------------------------------------------

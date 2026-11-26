@@ -68,12 +68,6 @@ item's state. The open items there, one line each:
 - **Toma's three notes** (backlog section 1), not started. `docs/handoff.md`. (Check if still open: the carriageway
   splits work of 2026-11-25 may have covered some.)
 
-**Waiting on the user (0.3.7):**
-
-- Move the export's data step (`ensureExportData`, the backdrop download) out of the window into the desktop
-  runner, for lominsa's window out-of-memory crash (MR-VYQGBY). `docs/handoff.md`; H > 0.3.7.
-- Tile rotation: feasible but big; suggested as the first 0.3.8 item. `docs/handoff.md`.
-
 **Before the 0.3.7 release:**
 
 - The 0.3.7 page lines: old batch jobs can no longer be opened; the Perth fixes; whatever else lands

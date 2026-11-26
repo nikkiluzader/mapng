@@ -265,6 +265,9 @@
     <h2>Fixes</h2>
     <ul>
       <li><b>Slip roads meet the outer lane.</b> A slip road joining a wider street now runs into its outer lane, with the street's lines carried through, instead of stopping at its centre line.</li>
+      <li><b>Power lines on their poles.</b> A power line mapped on pole nodes (<code>power=pole</code>) now stands on poles, not towers, with one support where lines share a node (from a tester's map of Perth).</li>
+      <li><b>No raised paving over the tracks.</b> Where a street or a paved area crosses a railway at ground level, its raised paving now stops at the track bed instead of covering the rails (Perth).</li>
+      <li><b>The desktop app no longer runs out of memory showing the surroundings</b> on a big level. The 2D preview showed the backdrop's eight tiles rebuilt at full size in the window, up to 1 GB each; it now shows small copies kept when they are downloaded.</li>
       <li><b>Sidebar sections</b> are cards with a tinted header, easier to tell apart.</li>
       <li><b>The old batch mode is gone.</b> Tiles in step 1 replaced it in 0.3.6; an unfinished batch job saved by an older version can no longer be opened.</li>
     </ul>

@@ -64,8 +64,14 @@ replace the tracking files (see CLAUDE.md, "Tracking"); it is the short "start h
       on purpose, walls were already rounded by the export. Sweep 135/135, 116 identical. Game check done 2026-11-24 on area `curve_kaunas`
       (GPXZ; no Mapterhorn in Lithuania): station tracks and switches curve smoothly, the footpath join is a smooth
       curve (`scratch/curves/game/1_tracks.jpg`, `1b_switches.jpg`, `2_path.jpg`, cameras in `cams.png`).
-- [ ] **Next suggested (not agreed yet):** move the export's data step (backdrop download, `ensureExportData` in
-      ExportPanel) out of the window into the desktop runner, for lominsa's window out-of-memory crash.
+- [x] **lominsa's window out-of-memory crash (MR-VYQGBY), 2026-11-25.** The crash dump's code is Chromium's
+      out-of-memory (0xE0000008) in the window. The data step's downloads already ran in the runner on desktop
+      (since 70aacb9); the window then rebuilt the eight backdrop tiles for the 2D preview (`loadBackdropTiles`),
+      stitching satellite and heights at full size (up to 16384 px a side, about 1 GB each). Now the runner keeps
+      small copies (`keepPreviewTiles` in `desktop/runner/prefetchJob.mjs`: pictures at most 2048 px, heights as
+      Float32, in the terrain's folder) and the window reads those. Checked: unit test, the runner by hand (8 tiles,
+      8.4 MB), `scratch/verify-pw/e2e_desktop_backdrop.mjs` (8 layers from the kept files, no tile request from the
+      window after Generate), `e2e_desktop.mjs`. Road levels had no backdrop already (f0580b8).
 - [x] **Rounded curves on railways and paths** (thecoachtoma, SPLATPLAYS; user's decision 2026-11-24: on by default,
       a switch to keep lines as drawn). On dev `8e5b7ca`: `services/roadCurves.js` `lineProfile` (rail 500/150/40 m,
       1 m inside a corner; paths 25-50 m, 0.75 m), shared nodes kept, street trams follow their road; Map data >
