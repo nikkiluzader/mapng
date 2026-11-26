@@ -45,6 +45,19 @@ A new session starts with `docs/handoff.md` ("Work list").
   - Found on the way, not sidewalk work: a hole in the road surface where a street's width steps at a junction (the
     two-width T, 7 to 13 m); St. Augustine's grey strip under Ponce de Leon's verge is the terrain paint.
   Joins "sidewalks at banks and the water", the sidewalk order of 2026-11-24 and the stairs model (backlog 10).
+- **Discord feedback after 0.3.7 (2026-11-26), in the order agreed** (the user: "proceed with your recommendations"):
+  1. **Stop lines and zebra crossings ignore placement** (thecoachtoma): drawn across the mapped line, not the drawn
+     road. Probably the same missing placement shift as the signal poles (a1ba6bb). In progress.
+  2. **A sideways shift at a joint does not blend** (thecoachtoma, screenshot + satellite in
+     `scratch/discord/2026-11-26/`): the left lane ends as a right lane begins, same width, the road steps sideways with
+     grass at the step; the taper only starts on a width change. Ease each edge on its own over a taper run.
+  3. **`width:lanes:start` / `:end`** (and `:forward/:backward:start/:end`; thecoachtoma's stats: 6,198 / 3,121 / ~500-1,100
+     uses): lane widths blended along the way, as placement:start/end already are. With 2: the joint and lane-width code.
+  4. **A guide to manual improvements** (Splatplays): how to tag OSM or fix a level after export. Scope and place the user's.
+  5. **Road mode: more points along the road** (glitter_shitter): keep via points instead of dragging one end handle
+     again and again; touching the end handle by accident cleared the road. The user said they would add it.
+  6. **"Surrounding tiles" and "include backdrop" together crashed a computer** (recklessandfeckless): to reproduce
+     (which build, web or desktop, map size).
 - **Tile rotation on the 2D map (0.3.8 target).** Rotating the tiles in step 1 (backlog 0 and area 1, thecoachtoma's
   rotated box). Big.
 - **Carried from 0.3.7** (`docs/handoff.md`): Fizz_Mechanic's remaining points (road-to-bridge/tunnel joins, lake
