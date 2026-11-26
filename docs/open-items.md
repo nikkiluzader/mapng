@@ -20,37 +20,25 @@ is where each item's full text, numbers and file names now live.
   (checksums match). The sidewalks level's check flags a stairs model with undefined materials (older, backlog 10).
 - Sweep: 135/135, identical to the previous run, on 0077197 (the release code).
 
-## Now (0.3.7 shipped; 0.3.8 next)
+## Now (0.3.8)
 
 A new session starts with `docs/handoff.md` ("Work list").
 
-- **Shipped to main 2026-11-25, on the release page; tracked here until 0.3.7 is out:** thecoachtoma's placement
-  tags (scenes A-E), carriageway splits (branches start as their share of the trunk), tagged widths capped by counted
-  lanes, signal poles off placed roads (F, G), per-lane widths `width:lanes` and placed pieces meeting at joints (H),
-  Splatplays' kerb widths, traffic islands, path level crossings, bare-curb verge, median seam, rail gauge. Plots in
-  `scratch/toma_placement/` and `scratch/splat/plot/`. Left after 0.3.7 (backlog): Toma's Kaunas junctions once his
-  placement edits are on OSM; painted asphalt not tapered at a lane gain; the painter assumes right-hand traffic for
-  two-way placement:forward/backward; the 16 m Savanoriu piece widens over a short run.
-- **lominsa's window out-of-memory crash (MR-VYQGBY): fixed on dev 9ecc39a.** The dump says out of memory in the
-  window; the 2D preview rebuilt the backdrop's tiles at full size there. Now it shows the runner's small copies.
-  `docs/handoff.md` work list.
-- **Very large levels: proved 2026-11-25 (on dev, sweep running).** A 5 km road level in 12 pieces built with
-  `scratch/reports/MR-VYQGBY/roadsmall.mjs`, loaded in game; the same level padded to 66,711 files
-  (`pad64.mjs`, ZIP64) loads and draws the same (the game lists all 66,000 padding files). The game's map screen
-  framed the hidden anchor TerrainBlock 30 km away with the roads: the anchor now 25.6 m a side, 100 m under the
-  spawn (`groundAnchorPosition`); the map screen frames the whole road, decals draw. Each chunk's report is its own
-  file (`reports/chunk_<key>.md`) and the level's report one line per chunk (3.4 KB for 12 pieces; it was every
-  report in one file, 70 MB at 442) and no longer the first chunk's own report (the streamed zip kept the first
-  copy). The 20 km per drag stays by design. Not built: a real level over 65,535 files (about 1,300 pieces).
-- **0.3.8 targets** (the user, 2026-11-25): sidewalk fixes (missing curbs, odd shapes on their St. Augustine level)
-  and tile rotation on the 2D map. `refs/output/backlog.md` "0. Next up"; decision recorded.
-- **Carried to after 0.3.7** (`docs/handoff.md`): sidewalks at banks and the water; Fizz_Mechanic's remaining points
-  (road-to-bridge/tunnel joins, lake galleries, the dam's tunnel box, bridge width); long bridges in levels built in
-  pieces; slip roads at the outer lane (five points); Mesh Road joins and hairpins; the ride-alongs. Toma's notes of
-  2026-11-24: (a) road smoothing beside another ground road and (b) smoothing under paths are open, (c) done
-  (backlog area 1).
+- **Sidewalk fixes (0.3.8 target, the user 2026-11-25).** Missing curbs and odd sidewalk shapes on their
+  St. Augustine level. Start from top views and sections of that level, then the sidewalk test level. Joins
+  "sidewalks at banks and the water" (`docs/handoff.md`), the sidewalk order of 2026-11-24 (decisions) and the stairs
+  model with undefined materials (backlog 10). Big.
+- **Tile rotation on the 2D map (0.3.8 target).** Rotating the tiles in step 1 (backlog 0 and area 1, thecoachtoma's
+  rotated box). Big.
+- **Carried from 0.3.7** (`docs/handoff.md`): Fizz_Mechanic's remaining points (road-to-bridge/tunnel joins, lake
+  galleries, the dam's tunnel box, bridge width: needs the place); long bridges in levels built in pieces; slip roads
+  at the outer lane (five points); Mesh Road joins and hairpins; the ride-alongs. Toma's notes of 2026-11-24 (a)
+  road smoothing beside another ground road, (b) smoothing under paths (backlog area 1).
+- **Left from the 0.3.7 street work** (backlog): Toma's Kaunas junctions once his placement edits are on OSM; painted
+  asphalt not tapered at a lane gain; the painter assumes right-hand traffic for two-way placement:forward/backward;
+  the 16 m Savanoriu piece widens over a short run.
 
-## After the 0.3.7 release
+## Housekeeping after 0.3.7
 
 - Dependabot: open alerts on vite (1 high, 7 medium, 1 low) and esbuild (dev tools, not in the app) and minimatch in
   /desktop (medium). Left for after 0.3.7.
