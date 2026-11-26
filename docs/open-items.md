@@ -1,6 +1,6 @@
 # MapNG open items
 
-Last reviewed: 2026-11-26 (main = dev at e9de811; tag v0.3.7 building its draft; 0.3.6 Latest; test levels 2026-11-26)
+Last reviewed: 2026-11-26 (main = dev; **0.3.7 published as Latest**, tag v0.3.7 at e9de811; test levels 2026-11-26)
 
 The short "now" board: current work, what waits on someone, and checks owed on shipped work. The other tracking
 files: `refs/output/backlog.md` holds everything wanted later, by area; `refs/output/releases.md` what shipped;
@@ -13,14 +13,14 @@ is where each item's full text, numbers and file names now live.
 ## Branch state
 
 - **main = dev at e9de811** (2026-11-26): release 0.3.7 (version, page public, sitemap, LATEST_UPDATE). Workers
-  Builds for both passed; mapng.com/updates/latest serves 0.3.7. **Tag v0.3.7** pushed: the draft with the installers
-  builds; publishing waits on the user. **0.3.6** is Latest until then.
+  Builds for both passed; mapng.com/updates/latest serves 0.3.7. **0.3.7 published** 2026-11-26 01:58 UTC as Latest
+  (refs/output/releases.md). Next: 0.3.8 (sidewalk fixes, tile rotation).
 - No work branches.
 - Official test levels: manifest **2026-11-26** (from e9de811, scenes F-H in), all five checked through mapng.com
   (checksums match). The sidewalks level's check flags a stairs model with undefined materials (older, backlog 10).
 - Sweep: 135/135, identical to the previous run, on 0077197 (the release code).
 
-## Now (0.3.7)
+## Now (0.3.7 shipped; 0.3.8 next)
 
 A new session starts with `docs/handoff.md` ("Work list").
 
@@ -50,9 +50,8 @@ A new session starts with `docs/handoff.md` ("Work list").
   2026-11-24: (a) road smoothing beside another ground road and (b) smoothing under paths are open, (c) done
   (backlog area 1).
 
-## Before the 0.3.7 release
+## After the 0.3.7 release
 
-- Publish the v0.3.7 draft (ask the user), then add the notes to `refs/output/releases.md`.
 - Dependabot: open alerts on vite (1 high, 7 medium, 1 low) and esbuild (dev tools, not in the app) and minimatch in
   /desktop (medium). Left for after 0.3.7.
 - The user: run the signed Windows installer (not run here since 0.3.6).
