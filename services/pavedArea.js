@@ -16,6 +16,7 @@
 // - a strip inside mapped greenery at ground level stays a verge.
 
 import { fastHypot } from './fastMath.js';
+import polyClip from './polyClip.js';
 
 export const PAVED_RES_M = 0.25;
 export const SIDEWALK_GAP_M = 12;
@@ -418,6 +419,7 @@ export function buildPavedMesh(rings0, cells, g, { heightAt = () => 0, bottomAt 
     return out;
   });
   const slab = []; const curb = []; const skirt = []; const curbTop = [];
+  const stats = { holeSquares: 0, holeClipFailed: 0 };
   // polygons: each outer ring with the holes inside it
   const outers = rings.filter((r) => ringSignedArea(r) > 0); const holes = rings.filter((r) => ringSignedArea(r) < 0);
   const inside = (p, ring) => { let s = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const a = ring[i]; const b = ring[j]; if ((a[1] > p[1]) !== (b[1] > p[1]) && p[0] < a[0] + ((p[1] - a[1]) * (b[0] - a[0])) / (b[1] - a[1])) s = !s; } return s; };
@@ -451,10 +453,24 @@ export function buildPavedMesh(rings0, cells, g, { heightAt = () => 0, bottomAt 
   // (each ring clipped to a row strip once, then the strip's ring to each square in the row: clipping the whole ring
   // per square was quadratic, 13 s of a dense 4 km city's 34)
   const valid = (r) => r.length >= 3 && Math.abs(ringSignedArea(r)) > 1e-4;
-  const tri = (o, hs) => {
+  const triOne = (o, hs) => {
     const contour = o.map(([x, y]) => new THREE.Vector2(x, y)); const hv = hs.map((h) => h.map(([x, y]) => new THREE.Vector2(x, y)));
     const all = [...o, ...hs.flat()];
     for (const [a, b, c] of THREE.ShapeUtils.triangulateShape(contour, hv)) { push3(slab, all[a]); push3(slab, all[b]); push3(slab, all[c]); }
+  };
+  // (a square holding a hole: the outline clipped to it is often the whole square with seams along its edges, the
+  // ring's other passes through the square joined along the cut, and the clipped hole lies on those same edges; handed
+  // to the triangulation as they are, 11 squares of a courtyard whose lawns were holes came out wrong, up to three
+  // times their paving, spikes over the lawn and gaps in the paths (St. Augustine's Flagler College, 2026-11-26). There
+  // the square's paving is worked out first, the outline less its holes, and each clean piece triangulated)
+  const tri = (o, hs) => {
+    if (!hs.length) { triOne(o, hs); return; }
+    let pieces = null;
+    try { pieces = polyClip.difference([o], ...hs.map((h) => [h])); } catch { pieces = null; stats.holeClipFailed++; }
+    if (!pieces) { triOne(o, hs); return; }
+    stats.holeSquares++;
+    const open = (r) => (r.length > 1 && r[0][0] === r[r.length - 1][0] && r[0][1] === r[r.length - 1][1] ? r.slice(0, -1) : r);
+    for (const poly of pieces) { const [outer, ...inner] = poly.map(open); if (valid(outer)) triOne(outer, inner.filter(valid)); }
   };
   for (const p of polys) {
     const [x0, y0, x1, y1] = box(p.outer);
@@ -520,7 +536,7 @@ export function buildPavedMesh(rings0, cells, g, { heightAt = () => 0, bottomAt 
       }
     }
   }
-  return { slab: Float32Array.from(slab), curb: Float32Array.from(curb), skirt: Float32Array.from(skirt), curbTop: Float32Array.from(curbTop), polygons: polys.length };
+  return { slab: Float32Array.from(slab), curb: Float32Array.from(curb), skirt: Float32Array.from(skirt), curbTop: Float32Array.from(curbTop), polygons: polys.length, holeSquares: stats.holeSquares, holeClipFailed: stats.holeClipFailed };
 }
 
 // grading (step 3d): today's values (beamngSidewalks.js gradeSidewalkGround)

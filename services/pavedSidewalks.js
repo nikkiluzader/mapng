@@ -271,7 +271,7 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
   for (const cw of carriageways) for (const p of cw.nodes || []) grow(p);
   for (const w of walks) if (!w.crossing) for (const p of w.nodes || []) grow(p);
   for (const pk of pockets) for (const p of pk?.[0] || []) grow(p);
-  const stats = { tiles: 0, slab: 0, curb: 0, skirt: 0, ms: 0, bankCleared: 0, bankMs: 0, meshMs: 0, sampleMs: 0 };
+  const stats = { tiles: 0, slab: 0, curb: 0, skirt: 0, ms: 0, bankCleared: 0, bankMs: 0, meshMs: 0, sampleMs: 0, holeSquares: 0, holeClipFailed: 0 };
   const tiles = [];
   let vergeAt = () => null;
   if (!Number.isFinite(x0)) return { tiles, heightAt, vergeAt, padAt, stats, pavedAt: () => false };
@@ -428,7 +428,7 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
     let tq = performance.now();
     const m = buildPavedMesh(rings, cells, g, { heightAt, bottomAt: surfaceAt, groundAt, curbH, THREE, core, fineAt, bendTol: groundAt && (followGround || overhead) ? BEND_TOL_M : null, bendWhere: followGround ? null : underOverhead });
     addToBuilder(builder, m, uvBands);
-    stats.tiles++; stats.slab += m.slab.length / 9; stats.curb += m.curb.length / 9; stats.skirt += m.skirt.length / 9;
+    stats.tiles++; stats.slab += m.slab.length / 9; stats.curb += m.curb.length / 9; stats.skirt += m.skirt.length / 9; stats.holeSquares += m.holeSquares || 0; stats.holeClipFailed += m.holeClipFailed || 0;
     stats.meshMs += performance.now() - tq; tq = performance.now();
     tiles.push({ cells, g, core, slabZ: sampleSlab(m.slab, g) });
     stats.sampleMs += performance.now() - tq;

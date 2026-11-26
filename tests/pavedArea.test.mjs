@@ -196,3 +196,27 @@ test('paved tiles: worker threads and this thread agree', async () => {
     assert.ok(inline[i].rings.length > 0);
   }
 });
+
+test('buildPavedMesh: a lawn enclosed by paths (a hole crossing the 4 m squares) meshes to the outline, no spikes or gaps', async () => {
+  // (St. Augustine's Flagler College courtyard, 2026-11-26: the corner paved square at King x Cordova joined the two
+  // sidewalks into one outline with the courtyard's paths and their lawns as holes. Clipped square by square, the
+  // outline came out as the whole square with seams along its edges and the hole on those same edges; the
+  // triangulation of 11 squares was wrong, up to three times their paving, spikes over the lawn and gaps in the paths)
+  const THREE = await import('three');
+  const fs = await import('node:fs');
+  const { buildPavedMesh, ringSignedArea } = await import('../services/pavedArea.js');
+  const { rings } = JSON.parse(fs.readFileSync(new URL('./fixtures/pavedLoopCourtyard.json', import.meta.url)));
+  const want = rings.reduce((a, r) => a + ringSignedArea(r), 0);
+  const g = { x0: -560, y1: 40, w: 1, h: 1, res: 1 };
+  const m = buildPavedMesh(rings, new Uint8Array(1), g, { THREE, heightAt: () => 0 });
+  let tri = 0;
+  for (let i = 0; i < m.slab.length; i += 9) tri += Math.abs((m.slab[i + 3] - m.slab[i]) * (m.slab[i + 7] - m.slab[i + 1]) - (m.slab[i + 6] - m.slab[i]) * (m.slab[i + 4] - m.slab[i + 1])) / 2;
+  assert.ok(Math.abs(tri - want) < 0.5, `slab ${tri.toFixed(1)} m2 vs outline ${want.toFixed(1)} m2`);
+  // (and no triangle over a hole: each one's middle inside the outer ring and outside every hole)
+  const inside = (p, ring) => { let s2 = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const a = ring[i]; const b = ring[j]; if ((a[1] > p[1]) !== (b[1] > p[1]) && p[0] < a[0] + ((p[1] - a[1]) * (b[0] - a[0])) / (b[1] - a[1])) s2 = !s2; } return s2; };
+  // (the clipper works on a 1 cm grid: slivers along the edges, their middles millimetres outside, are no fault)
+  const dEdge = (p) => { let best = Infinity; for (const r of rings) for (let i = 0; i < r.length; i++) { const a = r[i]; const b = r[(i + 1) % r.length]; const ex = b[0] - a[0]; const ey = b[1] - a[1]; const L2 = ex * ex + ey * ey || 1; const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * ex + (p[1] - a[1]) * ey) / L2)); best = Math.min(best, Math.hypot(a[0] + ex * t - p[0], a[1] + ey * t - p[1])); } return best; };
+  let off = 0;
+  for (let i = 0; i < m.slab.length; i += 9) { const p = [(m.slab[i] + m.slab[i + 3] + m.slab[i + 6]) / 3, (m.slab[i + 1] + m.slab[i + 4] + m.slab[i + 7]) / 3]; if ((!inside(p, rings[0]) || rings.slice(1).some((h) => inside(p, h))) && dEdge(p) > 0.01) off++; }
+  assert.equal(off, 0, `${off} slab triangle(s) over a lawn`);
+});

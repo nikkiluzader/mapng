@@ -3837,7 +3837,7 @@ function* sidewalkMeshes(carriageways, options = {}) {
       curbH: CURB_H, crossSlope: CROSS_SLOPE, curbOnlyM: CURB_ONLY_M, THREE, groundAt: options.groundAt || null,
     });
     paved.pockets = pavedPockets;
-    console.log(`Sidewalks (paved model): ${paved.stats.tiles} tiles, ${Math.round(paved.stats.slab)} slab / ${Math.round(paved.stats.curb)} curb / ${Math.round(paved.stats.skirt)} edge triangles in ${paved.stats.ms} ms (banks found in ${Math.round(paved.stats.bankMs)} ms on ${paved.stats.bankCleared} tiles, mesh ${Math.round(paved.stats.meshMs)} ms, check samples ${Math.round(paved.stats.sampleMs)} ms)`);
+    console.log(`Sidewalks (paved model): ${paved.stats.tiles} tiles, ${Math.round(paved.stats.slab)} slab / ${Math.round(paved.stats.curb)} curb / ${Math.round(paved.stats.skirt)} edge triangles in ${paved.stats.ms} ms (banks found in ${Math.round(paved.stats.bankMs)} ms on ${paved.stats.bankCleared} tiles, mesh ${Math.round(paved.stats.meshMs)} ms, check samples ${Math.round(paved.stats.sampleMs)} ms); ${paved.stats.holeSquares || 0} mesh square(s) holding a hole (a lawn or bed enclosed by paving) triangulated from the outline less its holes${paved.stats.holeClipFailed ? `, ${paved.stats.holeClipFailed} where that failed and the plain clip was used` : ''}`);
     flush();
   }
   for (const run of medianRuns) {
