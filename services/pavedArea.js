@@ -151,7 +151,7 @@ function closeMask(mask, w, h, rCells) {
  * Returns { cells: Uint8Array (ROAD | WALK | GAP | VERGE bits), grid }.
  */
 // houses: rings of houses (a residential street: the strip from curb to sidewalk is a lawn, not paving)
-export function buildPavedGrid(g, { roads = [], cornerArcs = [], walks = [], streetWalks = [], greenery = [], houses = [] } = {}) {
+export function buildPavedGrid(g, { roads = [], cornerArcs = [], cornerSlabs = [], walks = [], streetWalks = [], greenery = [], houses = [] } = {}) {
   const N = g.w * g.h;
   const cells = new Uint8Array(N);
   for (const r of roads) if (r.pts.length > 1) markLine(cells, g, r.pts, r.half, ROAD);
@@ -168,6 +168,8 @@ export function buildPavedGrid(g, { roads = [], cornerArcs = [], walks = [], str
     if (!wk.sidewalk) markLine(plainNear, g, wk.pts, wk.half + PLAIN_GAP_M + 0.3, 1);
   }
   for (const s of streetWalks) if (s.pts.length > 1) { markLine(plain, g, s.pts, s.half, 1); markLine(plainNear, g, s.pts, s.half + PLAIN_GAP_M + 0.3, 1); }
+  // (a corner's piece of sidewalk, from its rounded curb out to the two sidewalks' outer corner: paved as theirs)
+  for (const poly of cornerSlabs) if (poly.length > 2) markPolygon(plain, g, poly, 1);
   for (const r of roads) if (r.pts.length > 1) markLine(roadBand, g, r.pts, r.half + PLAIN_GAP_M, 1);
   const road = new Uint8Array(N); const walk = new Uint8Array(N);
   for (let i = 0; i < N; i++) {

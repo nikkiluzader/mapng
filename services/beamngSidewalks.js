@@ -182,6 +182,7 @@ const CORNER_RADIUS = 5;
 const CORNER_TRIES = [1, 0.5, 0.25];
 const CORNER_REACH_M = 15;    // how far past a run's end its corner may lie
 const CORNER_ANGLES = [30, 150];  // degrees between the two curb lines for a corner
+const CORNER_OWN_SLACK_M = 1.5;  // how far a corner may lean into the two streets it joins (joinCorners)
 const RUNS_PER_MESH = 300;
 
 // Divided roads' medians (BeamNG.Earth server/roads.py dual_carriageways,
@@ -1619,7 +1620,7 @@ function moveEnd(end, t) {
  * [{ arc: [[x, y, z]...], centre, outer: [x, y], a: end, b: end }]. Ends
  * left over get curb ramps.
  */
-function joinCorners(runs, index, walkRuns = []) {
+function joinCorners(runs, index, walkRuns = [], streetOfOwner = new Map()) {
   const ends = runs.flatMap((run) => [runEnd(run, true), runEnd(run, false)]);
   // (ends by grid cell of the reach: each against its neighbours, not all
   // against all: 4 s of a dense 8 km map)
@@ -1683,7 +1684,15 @@ function joinCorners(runs, index, walkRuns = []) {
         [T2[0] + B.n[0] * B.run.width, T2[1] + B.n[1] * B.run.width], B.d);
       if (!outer) break;
       const probes = [...arc, outer, [(outer[0] + Z[0]) / 2, (outer[1] + Z[1]) / 2]];
-      if (probes.some(([x, y]) => isOnOtherCarriageway(index, x, y, -0.2, () => false))) continue;
+      // (the two streets the corner joins may reach CORNER_OWN_SLACK_M past its curb: a street drawn in pieces of
+      // different widths overlaps at the junction, the wider piece 0.2 to 0.4 m past the narrower one's curb, and three
+      // of four corners at Cordova x King St. were refused, the sidewalks ending square (St. Augustine, 2026-11-26).
+      // Any other road still refuses it from 0.2 m in)
+      const own = new Set([A.run.owner, ...(A.run.owners || []), B.run.owner, ...(B.run.owners || [])]);
+      const ownStreets = new Set([...own].map((o) => streetOfOwner.get(o)).filter((v) => v !== undefined));
+      const isOwn = (o) => own.has(o) || ownStreets.has(streetOfOwner.get(o));
+      const onRoad = ([x, y]) => isOnOtherCarriageway(index, x, y, -0.2, isOwn) || isOnOtherCarriageway(index, x, y, -CORNER_OWN_SLACK_M, () => false);
+      if (probes.some(onRoad)) continue;
       moveEnd(A, t1);
       moveEnd(B, t2);
       corners.push({ arc, centre: Z, outer, a: A, b: B });
@@ -3732,7 +3741,9 @@ function* sidewalkMeshes(carriageways, options = {}) {
   const walkRuns = buildWalkRuns(options.walks, carriageways, options);
   const runs = buildSidewalkRuns(carriageways, { ...options, medians, walkEnds: walkRuns.flatMap((r) => r.roadEnds) });
   const medianRuns = buildMedianRuns(carriageways, medians, options);
-  const corners = joinCorners(runs, buildCarriagewayIndex(carriageways), walkRuns);
+  // (each carriageway's street, by name or way: a corner may lean into its own two streets' pieces, joinCorners)
+  const streetOfOwner = new Map(carriageways.map((cw) => [cw.owner, cw.tags?.name || cw.wayId || cw.owner]));
+  const corners = joinCorners(runs, buildCarriagewayIndex(carriageways), walkRuns, streetOfOwner);
   levelWalkEndsOnSidewalks(walkRuns, runs, corners);
   const paveAt = pavedWalkZones(carriageways, options.walks, { americas: options.americas });
   const meshes = [];

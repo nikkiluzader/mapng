@@ -282,6 +282,20 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
   // sidewalk of its own is in, or the strip from the street to that sidewalk was paved across the bulb)
   const roads = carriageways.filter((c) => c.nodes?.length > 1 && !(c.turningCircle && c.mappedWalk) && !['elevator', 'steps', 'footway', 'path'].includes(c.highway)).map((c) => ({ pts: c.nodes, half: c.half || 3 }));
   const arcs = corners.filter((c) => c.arc?.length > 1).map((c) => c.arc);
+  // (each corner's piece of sidewalk: from its rounded curb out to where the two sidewalks' outer edges meet, where both
+  // are sidewalks, not bare curbs. Left to the gap closing, a residential corner (houses near: the verge a lawn, no
+  // closing there) had its two sidewalks end square with grass between, the curb round the corner alone (St.
+  // Augustine's Cordova x King St., the user 2026-11-26))
+  // (the piece: the curb's arc, then out across each sidewalk's width from the arc's ends to the sidewalks' outer corner;
+  // that corner only on the sidewalks' side of both curbs. With the arc and the corner alone the piece was a sliver)
+  const cornerSlabs = corners.filter((c) => c.arc?.length > 1 && c.a?.run?.width > curbOnlyM && c.b?.run?.width > curbOnlyM).map((c) => {
+    const arc = c.arc.map((q) => [q[0], q[1]]); const T1 = arc[0]; const T2 = arc[arc.length - 1];
+    const wa = c.a.run.width; const wb = c.b.run.width;
+    const p1 = [T1[0] + c.a.n[0] * wa, T1[1] + c.a.n[1] * wa]; const p2 = [T2[0] + c.b.n[0] * wb, T2[1] + c.b.n[1] * wb];
+    const O = Array.isArray(c.outer) ? c.outer : null;
+    const inside = O && (O[0] - T1[0]) * c.a.n[0] + (O[1] - T1[1]) * c.a.n[1] > 0 && (O[0] - T2[0]) * c.b.n[0] + (O[1] - T2[1]) * c.b.n[1] > 0;
+    return inside ? [...arc, p2, [O[0], O[1]], p1] : [...arc, p2, p1];
+  });
   // (only paved walks are paving: a dirt or gravel path, a highway=path, a footway on a bridge or in a tunnel is no slab.
   // Marked as walks, every mapped path came out a concrete strip on the ground, leaning with a hillside's slope)
   const ws = walks.filter((w) => w.nodes?.length > 1 && (w.sidewalk || w.crossing)).map((w) => ({ pts: w.nodes, half: w.half || 1, sidewalk: !!w.sidewalk, crossing: !!w.crossing }));
@@ -306,7 +320,7 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
   vergeAt = makeVergeAt(bare, heightAt);
   const boxOf = (pts) => { let a = Infinity; let b = Infinity; let c = -Infinity; let d = -Infinity; for (const p of pts) { if (p[0] < a) a = p[0]; if (p[0] > c) c = p[0]; if (p[1] < b) b = p[1]; if (p[1] > d) d = p[1]; } return [a, b, c, d]; };
   const withBox = (list, get) => list.map((o) => ({ o, b: boxOf(get(o)) }));
-  const R = withBox(roads, (o) => o.pts); const A = withBox(arcs, (o) => o); const W = withBox(ws, (o) => o.pts); const S = withBox(street, (o) => o.pts);
+  const R = withBox(roads, (o) => o.pts); const A = withBox(arcs, (o) => o); const CS = withBox(cornerSlabs, (o) => o); const W = withBox(ws, (o) => o.pts); const S = withBox(street, (o) => o.pts);
   const G = withBox(openGround.filter((r) => r.length > 2), (o) => o); const B = withBox(buildings.filter((r) => r.length > 2), (o) => o);
   const PK = withBox(pockets.filter((p) => p?.[0]?.length > 2), (o) => o[0]);
   const WA = withBox(water.filter((r) => r.length > 2), (o) => o);
@@ -345,7 +359,7 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
       // whatever roads cross it)
       const tw = near(W, box); const ts = near(S, box); const tp = near(PK, box);
       if (!tw.length && !ts.length && !tp.length) continue;
-      items.push({ box, roads: tr, cornerArcs: near(A, box), walks: tw, streetWalks: ts, greenery: near(G, box), buildings: near(B, box), pockets: tp, water: near(WA, box), rivers: near(RC, box), railBeds: near(RB, box), pads: nearPads(box), houses: near(HO, [box[0] - 30, box[1] - 30, box[2] + 30, box[3] + 30]), sea: seaPiece(box) });
+      items.push({ box, roads: tr, cornerArcs: near(A, box), cornerSlabs: near(CS, box), walks: tw, streetWalks: ts, greenery: near(G, box), buildings: near(B, box), pockets: tp, water: near(WA, box), rivers: near(RC, box), railBeds: near(RB, box), pads: nearPads(box), houses: near(HO, [box[0] - 30, box[1] - 30, box[2] + 30, box[3] + 30]), sea: seaPiece(box) });
       cores.push(core);
     }
   }
