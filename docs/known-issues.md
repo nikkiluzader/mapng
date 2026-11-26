@@ -189,3 +189,15 @@ back on a fresh session, the saved log tail is `scratch/coverage/crash_log_tail.
 - **Fix:** only a game restart cleared it. Switch levels with `startFreeroam` from inside the loaded level (mod
   deactivated, zip replaced, mod activated) instead of ending the game mode.
 
+
+## Paving in spikes, wedges and gaps round paths that enclose a lawn
+
+- **Seen:** 2026-11-26, St. Augustine's Flagler College courtyard (the user's review level): the paths round two
+  circles came out as jagged light wedges over the lawn with holes in the paths; curbs fine.
+- **Recognise it:** the paving cells (zoom/curbcheck rasters) look right, the mesh triangles (plot them) do not; the
+  slab's area exceeds the paved cells' area. Happens where sidewalks and paths close a loop, the lawn a hole in one
+  outline; a change far away (a corner joining two sidewalks) can bring it on.
+- **Cause:** buildPavedMesh clipped the outline and each hole to every 4 m square on its own; the clipped outline
+  was the whole square with seams along its edges, the hole on those same edges, and the triangulation broke.
+- **Fix:** 4eadc23, squares holding a hole use polyClip.difference first. Probe: dump the tile
+  (scratch/swaudit/paveddump/hook.mjs) and mesh it with scratch/stagsw/probe/meshtile.mjs / persq.mjs.
