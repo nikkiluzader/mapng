@@ -344,6 +344,14 @@ function roads(regionKey) {
     way(run(630, -955, 740, -955, 20), { ...H, 'width:lanes:backward': '3.6|3.6|4|3.6' });
     way(run(740, -955, 840, -955, 20), { ...H, 'width:lanes:backward': '2|3.6|4|3.6' });
     label('width:lanes: lanes of 2 to 4 m, the line in backward lane 2 (Savanoriu pr.)', 740, -955, [55, 0]);
+    // I: as wide on both sides of a joint but shifted one lane sideways (the left lane ends as a right lane begins), the
+    // mapped line straight on: placement=left_of:2 into left_of:1. Eased over a lane-change run, not a step with grass in
+    // it (thecoachtoma, Discord 2026-11-26)
+    const I = { highway: 'secondary', oneway: 'yes', lanes: '3', name: 'Placement I' };
+    way(run(-650, -930, -450, -930, 20), { ...I, placement: 'left_of:2' });
+    way(run(-450, -930, -250, -930, 20), { ...I, placement: 'left_of:1' });
+    label('the road shifting one lane sideways at a joint: eased over the run', -450, -930, [55, 0]);
+    drive('driver: placement I, through the sideways shift', -560, -930, 0);
   }
   return { b, size: SIZE, heightAt };
 }

@@ -3326,6 +3326,7 @@ const WIDTH_TAPER_RUN_BY_CLASS = { motorway: 50, motorway_link: 30, trunk: 50, t
 const WIDTH_TAPER_MIN_M = 3;
 const WIDTH_TAPER_SHARE = 0.45;
 const WIDTH_TAPER_STEP_M = 0.2;
+const SHIFT_TAPER_MIN_M = 0.2;   // a joint shifting sideways more than this, as wide on both sides, is eased
 const WIDTH_TAPER_MEET_M = 0.75;
 const WIDTH_TAPER_ON_COS = Math.cos((30 * Math.PI) / 180);
 // A way's painted-line frame: its edge lines at base +- edge, its centre line at centre (the lanes split by direction).
@@ -3408,11 +3409,28 @@ export function findWidthTapers(ways) {
     if (a.out[0] * b.out[0] + a.out[1] * b.out[1] > -WIDTH_TAPER_ON_COS) continue;
     const [wide, narrow] = wa.half > wb.half ? [a, b] : [b, a];
     const step = ways[wide.k].half - ways[narrow.k].half;
-    if (step < WIDTH_TAPER_STEP_M) continue;
+    // (the two ends' drawn middles across the joint: each way's offset off the line (placement) along its left normal in
+    // its node order; their gap across the road, and whether the two left normals agree (+1) or the ways run opposite)
+    const sideOf = (e) => { const w = ways[e.k]; const fwd = e.atStart ? e.out : [-e.out[0], -e.out[1]]; return { n: [-fwd[1], fwd[0]], s: (e.atStart ? w.shiftStart : w.shiftEnd) || 0 }; };
+    const sa = sideOf(a); const sb = sideOf(b);
+    const sign = sa.n[0] * sb.n[0] + sa.n[1] * sb.n[1] >= 0 ? 1 : -1;
+    const sideways = Math.abs(sa.s - sign * sb.s);
+    if (step < WIDTH_TAPER_STEP_M) {
+      // (as wide on both sides but shifted sideways, a lane ending on one side as one begins on the other: the longer
+      // piece eased onto the other's line over a lane-change run. It stepped sideways at the joint, grass in the step
+      // (thecoachtoma, Discord 2026-11-26))
+      if (sideways < SHIFT_TAPER_MIN_M) continue;
+      const [mover, still] = lengthOf(ways[a.k].xy) >= lengthOf(ways[b.k].xy) ? [a, b] : [b, a];
+      const perMetre = WIDTH_TAPER_RUN_BY_CLASS[ways[mover.k].cls] ?? WIDTH_TAPER_RUN;
+      const run = Math.min(Math.max(WIDTH_TAPER_MIN_M, perMetre * sideways), WIDTH_TAPER_SHARE * lengthOf(ways[mover.k].xy));
+      if (!plans.has(mover.k)) plans.set(mover.k, []);
+      plans.get(mover.k).push({ atStart: mover.atStart, to: ways[mover.k].half, toLines: linesFrame(ways[mover.k]), run, toK: still.k, sign, shiftOnly: true });
+      continue;
+    }
     const perMetre = WIDTH_TAPER_RUN_BY_CLASS[ways[wide.k].cls] ?? WIDTH_TAPER_RUN;
     const run = Math.min(Math.max(WIDTH_TAPER_MIN_M, perMetre * step), WIDTH_TAPER_SHARE * lengthOf(ways[wide.k].xy));
     if (!plans.has(wide.k)) plans.set(wide.k, []);
-    plans.get(wide.k).push({ atStart: wide.atStart, to: ways[narrow.k].half, toLines: linesFrame(ways[narrow.k]), run, toK: narrow.k });
+    plans.get(wide.k).push({ atStart: wide.atStart, to: ways[narrow.k].half, toLines: linesFrame(ways[narrow.k]), run, toK: narrow.k, sign });
   }
   const out = new Map();
   for (const [k, list] of plans) {
@@ -3469,8 +3487,8 @@ export function findWidthTapers(ways) {
     fn.jointAt = (x, y) => {
       const st = stationOf(x, y);
       let best = null;
-      for (const p of list) { const d = p.atStart ? st : total - st; if (d < p.run && (!best || d / p.run < best.f)) best = { toK: p.toK, f: d / p.run }; }
-      return best ? { toK: best.toK, e: 1 - best.f * best.f * (3 - 2 * best.f) } : null;
+      for (const p of list) { const d = p.atStart ? st : total - st; if (d < p.run && (!best || d / p.run < best.f)) best = { toK: p.toK, f: d / p.run, sign: p.sign ?? 1 }; }
+      return best ? { toK: best.toK, e: 1 - best.f * best.f * (3 - 2 * best.f), sign: best.sign } : null;
     };
     // How far a divider at offset o is cut back at each end: the taper's length where its lane ends there (a
     // dropped lane's dashed line ran on through the taper beside the edge closing in: the user, 2026-11-24)
@@ -7335,8 +7353,23 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     const lineCentre = lineBase + (c.oneWay || !c.lanes ? 0 : -lineEdge + 2 * lineEdge * (lineShares ? lineShares[c.nF] : c.nF / c.lanes));
     return { lineBase, lineEdge, lineCentre, lanes: c.lanes, nF: c.nF, oneWay: c.oneWay, reverse: c.oneWay && isReverseOneWayRoad(tags), lineShares };
   };
-  const widthTapers = findWidthTapers(drivableRoads.map((sf) => (shouldGenerateDecalRoads(sf.highway, sf.sourceFeature.tags || {})
-    ? { name: sf.sourceFeature.tags?.name || '', cls: sf.highway || '', ref: sf.sourceFeature.tags?.ref || '', half: widthsOf(sf).styleHalfWidth, ...lineFrameOf(sf), xy: sf.geometry.map((pt) => geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0).slice(0, 2)) }
+  // Placement (lanePlacement.js): where a way's mapped line lies across its lanes. The drawn carriageway is moved off
+  // the line by it, everything built from the drawn line with it (markings, curbs, sidewalks, the ground under it)
+  const placements = new Map();
+  drivableRoads.forEach((sf, k) => {
+    const t = sf.sourceFeature?.tags || {};
+    if (!Object.keys(t).some((key) => /^placement(:|$)/.test(key))) return;
+    const w = widthsOf(sf);
+    const sh = placementShift(t, { half: w.drivingHalfWidth, extraShift: (w.crossSection.leftExtra - w.crossSection.rightExtra) / 2, leftHand: leftHandTraffic });
+    if (!sh) return;
+    const xy = sf.geometry.map((pt) => geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0).slice(0, 2));
+    const cum = [0]; for (let i = 1; i < xy.length; i++) cum.push(cum[i - 1] + fastHypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]));
+    placements.set(k, { shift: sh, xy, cum, wayId: sf.sourceFeature?.id });
+  });
+  const widthTapers = findWidthTapers(drivableRoads.map((sf, k) => (shouldGenerateDecalRoads(sf.highway, sf.sourceFeature.tags || {})
+    ? { name: sf.sourceFeature.tags?.name || '', cls: sf.highway || '', ref: sf.sourceFeature.tags?.ref || '', half: widthsOf(sf).styleHalfWidth, ...lineFrameOf(sf), xy: sf.geometry.map((pt) => geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0).slice(0, 2)),
+      // (the drawn road's offset off its mapped line at each end, placement tags: a joint shifting sideways is eased)
+      shiftStart: placements.get(k)?.shift.start ?? 0, shiftEnd: placements.get(k)?.shift.end ?? 0 }
     : null)));
   {
     // (what the width step did: the roads narrowed to the next piece of themselves, by name or class and ref)
@@ -7353,19 +7386,6 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     // (lanes and the driving width: a split's branches start as their share of the trunk's lanes)
     return { oneway, cls: sf.highway || t.highway || '', half: w.styleHalfWidth, drive: w.drivingHalfWidth, lanes: laneCounts(t, w.drivingHalfWidth).total, xy: sf.geometry.map((pt) => geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0)) };
   }), { leftHand: leftHandTraffic });
-  // Placement (lanePlacement.js): where a way's mapped line lies across its lanes. The drawn carriageway is moved off
-  // the line by it, everything built from the drawn line with it (markings, curbs, sidewalks, the ground under it)
-  const placements = new Map();
-  drivableRoads.forEach((sf, k) => {
-    const t = sf.sourceFeature?.tags || {};
-    if (!Object.keys(t).some((key) => /^placement(:|$)/.test(key))) return;
-    const w = widthsOf(sf);
-    const sh = placementShift(t, { half: w.drivingHalfWidth, extraShift: (w.crossSection.leftExtra - w.crossSection.rightExtra) / 2, leftHand: leftHandTraffic });
-    if (!sh) return;
-    const xy = sf.geometry.map((pt) => geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0).slice(0, 2));
-    const cum = [0]; for (let i = 1; i < xy.length; i++) cum.push(cum[i - 1] + fastHypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]));
-    placements.set(k, { shift: sh, xy, cum, wayId: sf.sourceFeature?.id });
-  });
   // (the shift at (x, y): by its share along the way, for a line moving across the lanes)
   const placementAt = (pl, x, y) => {
     if (Math.abs(pl.shift.start - pl.shift.end) < 1e-6) return pl.shift.start;
@@ -7565,7 +7585,8 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
           const own = placed ? placementAt(placed, nd[0], nd[1]) : (splitPlan ? splitShiftAt(splitPlan, nd[0], nd[1]) : 0);
           const j = taper?.jointAt ? taper.jointAt(nd[0], nd[1]) : null;
           if (!j || (!placed && !placements.has(j.toK))) return own;
-          const other = placements.has(j.toK) ? placementAt(placements.get(j.toK), nd[0], nd[1]) : 0;
+          // (the neighbour's offset in this piece's left-right: the two ways may run opposite)
+          const other = placements.has(j.toK) ? (j.sign ?? 1) * placementAt(placements.get(j.toK), nd[0], nd[1]) : 0;
           return own + (other - own) * j.e;
         });
         if (moves.some((m) => m !== 0)) {
