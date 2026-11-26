@@ -16,7 +16,7 @@ is where each item's full text, numbers and file names now live.
   Builds for both passed; mapng.com/updates/latest serves 0.3.7. **0.3.7 published** 2026-11-26 01:58 UTC as Latest
   (refs/output/releases.md). Next: 0.3.8 (sidewalk fixes, tile rotation).
 - No work branches.
-- Official test levels: manifest **2026-11-26** (from e9de811, scenes F-H in), all five checked through mapng.com
+- Official test levels: manifest **2026-11-26b** (from 7565a3d, sidewalk plot 7,1 in), all five checked through mapng.com
   (checksums match). The sidewalks level's check flags a stairs model with undefined materials (older, backlog 10).
 - Sweep: 135/135, identical to the previous run, on 0077197 (the release code).
 
@@ -40,7 +40,8 @@ A new session starts with `docs/handoff.md` ("Work list").
     508: 498 rounded, 8 square, 2 open). Checked against the user's photo of the Lightner Museum corner: the real one is a
     wider apron to the planting beds; ours is a sidewalk-wide L (a wider apron would be a further step, not started).
   - **Scenes: sidewalk test level plot 7,1** (side street jogging into a crossroads, two-width T with a square corner,
-    concrete trunk with a mapped sidewalk), checked in game. Official test levels not re-uploaded yet (ask first).
+    concrete trunk with a mapped sidewalk), checked in game. Official test levels re-uploaded 2026-11-26 (manifest
+    2026-11-26b, from 7565a3d), all five checked through mapng.com.
   - Found on the way, not sidewalk work: a hole in the road surface where a street's width steps at a junction (the
     two-width T, 7 to 13 m); St. Augustine's grey strip under Ponce de Leon's verge is the terrain paint.
   Joins "sidewalks at banks and the water", the sidewalk order of 2026-11-24 and the stairs model (backlog 10).
