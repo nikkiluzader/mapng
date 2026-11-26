@@ -182,6 +182,8 @@ const CORNER_RADIUS = 5;
 const CORNER_TRIES = [1, 0.5, 0.25];
 const CORNER_REACH_M = 15;    // how far past a run's end its corner may lie
 const CORNER_ANGLES = [30, 150];  // degrees between the two curb lines for a corner
+const SQUARE_BACK_M = 2;         // a corner paved square reaches this far back over its sidewalks' ends
+const SQUARE_LINE_IN_M = 0.5;    // ... and is refused with a road's centre line this far inside it
 const RUNS_PER_MESH = 300;
 
 // Divided roads' medians (BeamNG.Earth server/roads.py dual_carriageways,
@@ -1619,7 +1621,7 @@ function moveEnd(end, t) {
  * [{ arc: [[x, y, z]...], centre, outer: [x, y], a: end, b: end }]. Ends
  * left over get curb ramps.
  */
-function joinCorners(runs, index, walkRuns = [], streetOfOwner = new Map()) {
+function joinCorners(runs, index, walkRuns = [], streetOfOwner = new Map(), roundaboutOwners = new Set()) {
   const ends = runs.flatMap((run) => [runEnd(run, true), runEnd(run, false)]);
   // (ends by grid cell of the reach: each against its neighbours, not all
   // against all: 4 s of a dense 8 km map)
@@ -1713,9 +1715,31 @@ function joinCorners(runs, index, walkRuns = [], streetOfOwner = new Map()) {
     if (!made && !byOther) {
       const C = lineX(A.p, A.d, B.p, B.d);
       const O = lineX([A.p[0] + A.n[0] * A.run.width, A.p[1] + A.n[1] * A.run.width], A.d, [B.p[0] + B.n[0] * B.run.width, B.p[1] + B.n[1] * B.run.width], B.d);
-      if (C && O && fastHypot(C[0] - A.p[0], C[1] - A.p[1]) <= CORNER_REACH_M && fastHypot(C[0] - B.p[0], C[1] - B.p[1]) <= CORNER_REACH_M) {
+      // (not round a roundabout: its ring is one street, the corner's own, and corners paved square over the ring and its
+      // island buried the road 3.8 m under the graded ground (val_disere's Rond-Point des Pistes, the sweep))
+      let roadInside = [...own].some((o) => roundaboutOwners.has(o));
+      // (nor with any road's centre line through it, more than SQUARE_LINE_IN_M in from its edges: a ring not tagged as
+      // a roundabout, a street bending back. At the corners it is for, a street's line bending into the junction only
+      // touches its tip, where the curb lines meet)
+      if (!roadInside && C && O) {
+        const Ab = [A.p[0] - A.d[0] * SQUARE_BACK_M, A.p[1] - A.d[1] * SQUARE_BACK_M]; const Bb = [B.p[0] - B.d[0] * SQUARE_BACK_M, B.p[1] - B.d[1] * SQUARE_BACK_M];
+        const poly = [Ab, [Ab[0] + A.n[0] * A.run.width, Ab[1] + A.n[1] * A.run.width], O, [Bb[0] + B.n[0] * B.run.width, Bb[1] + B.n[1] * B.run.width], Bb, C];
+        const inPoly = (x, y) => { let k = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i]; const [xj, yj] = poly[j]; if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) k = !k; } return k; };
+        const edgeDist = (x, y) => { let best = Infinity; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [ax, ay] = poly[j]; const [bx, by] = poly[i]; const ex = bx - ax; const ey = by - ay; const L2 = ex * ex + ey * ey || 1; const t = Math.max(0, Math.min(1, ((x - ax) * ex + (y - ay) * ey) / L2)); best = Math.min(best, fastHypot(ax + ex * t - x, ay + ey * t - y)); } return best; };
+        const cx = (O[0] + C[0]) / 2; const cy = (O[1] + C[1]) / 2;
+        for (const idx of segmentsNear(index, cx, cy, CORNER_REACH_M)) {
+          const sg = index.segments[idx]; const L = fastHypot(sg.bx - sg.ax, sg.by - sg.ay); const n = Math.max(1, Math.ceil(L / 0.5));
+          for (let k = 0; k <= n && !roadInside; k++) { const x = sg.ax + ((sg.bx - sg.ax) * k) / n; const y = sg.ay + ((sg.by - sg.ay) * k) / n; if (inPoly(x, y) && edgeDist(x, y) > SQUARE_LINE_IN_M) roadInside = true; }
+          if (roadInside) break;
+        }
+      }
+      if (C && O && !roadInside && fastHypot(C[0] - A.p[0], C[1] - A.p[1]) <= CORNER_REACH_M && fastHypot(C[0] - B.p[0], C[1] - B.p[1]) <= CORNER_REACH_M) {
         stats.square++;
-        squares.push({ poly: [[A.p[0], A.p[1]], [A.p[0] + A.n[0] * A.run.width, A.p[1] + A.n[1] * A.run.width], O, [B.p[0] + B.n[0] * B.run.width, B.p[1] + B.n[1] * B.run.width], [B.p[0], B.p[1]], C], a: A, b: B });
+        // (SQUARE_BACK_M back over each sidewalk's end: the road raster's round end of a wider piece of the same street cut
+        // the sidewalks' ends back on a slant, and a corner from the cut ends left that slant as a triangle of bare ground
+        // (the sidewalk test level's two-width T). All of it lies behind both curb lines: no road surface is in it)
+        const Ab = [A.p[0] - A.d[0] * SQUARE_BACK_M, A.p[1] - A.d[1] * SQUARE_BACK_M]; const Bb = [B.p[0] - B.d[0] * SQUARE_BACK_M, B.p[1] - B.d[1] * SQUARE_BACK_M];
+        squares.push({ poly: [Ab, [Ab[0] + A.n[0] * A.run.width, Ab[1] + A.n[1] * A.run.width], O, [Bb[0] + B.n[0] * B.run.width, Bb[1] + B.n[1] * B.run.width], Bb, C], a: A, b: B });
         used.add(A); used.add(B);
       }
     }
@@ -3765,7 +3789,8 @@ function* sidewalkMeshes(carriageways, options = {}) {
   const medianRuns = buildMedianRuns(carriageways, medians, options);
   // (each carriageway's street, by name or way: a corner may lean into its own two streets' pieces, joinCorners)
   const streetOfOwner = new Map(carriageways.map((cw) => [cw.owner, cw.tags?.name || cw.wayId || cw.owner]));
-  const corners = joinCorners(runs, buildCarriagewayIndex(carriageways), walkRuns, streetOfOwner);
+  const roundaboutOwners = new Set(carriageways.filter((cw) => ['roundabout', 'circular'].includes(String(cw.tags?.junction ?? '').toLowerCase())).map((cw) => cw.owner));
+  const corners = joinCorners(runs, buildCarriagewayIndex(carriageways), walkRuns, streetOfOwner, roundaboutOwners);
   levelWalkEndsOnSidewalks(walkRuns, runs, corners);
   // (what the corner step did: rounded corners, corners paved square where no arc fit clear of the roads and only their
   // own two streets were in the way, and corners left open by another road or by their geometry)

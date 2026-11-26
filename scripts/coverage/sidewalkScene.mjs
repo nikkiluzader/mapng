@@ -207,6 +207,30 @@ export function sidewalks(regionKey, makeBuilder) {
   });
   // traffic islands mapped as areas (Splatplays' Galliers Avenue, 2026-11-25): a street splitting into one-way
   // carriageways before a junction, short islands between them; the median raised only along the islands
+  // corners where no rounded corner fits for the corner's own streets, and a sidewalk mapped beside a concrete trunk road
+  // (the user's St. Augustine level, 2026-11-26: Cordova x King St.'s corners ended square with grass between, Ponce de
+  // Leon Blvd had a dirt strip and a sidewalk raised with curbs on both sides)
+  plot(7, 1, 'corners and verges', (o) => {
+    // A: a crossroads whose side street's line jogs 7 m sideways in its last 5 m into the junction (as Cordova St. into
+    // King St.): its carriageway sweeps across one corner
+    o.ln(-85, 45, 85, 45, { highway: 'residential', sidewalk: 'both', name: 'Bend main' }, 10, [[0, 45]]);
+    o.st([[0, 45], [-7, 40], [-7, 0]], { highway: 'residential', sidewalk: 'both', name: 'Bend side' });
+    o.ln(0, 45, 0, 90, { highway: 'residential', sidewalk: 'both', name: 'Bend north' });
+    o.row(-80, -20, 45); o.row(20, 80, 45);
+    o.lab('side street bending into the junction: corners paved square, curb along the road', 0, 45, [50, 0]);
+    o.walk('round the bent corner', -20, 39, 0);
+    // B: a main street drawn as two ways of different widths meeting at a T
+    o.ln(-85, -5, 0, -5, { highway: 'residential', sidewalk: 'both', width: '7', name: 'Two widths' });
+    o.ln(0, -5, 85, -5, { highway: 'residential', sidewalk: 'both', width: '13', name: 'Two widths' });
+    o.ln(0, -5, 0, -40, { highway: 'residential', sidewalk: 'both', name: 'Two widths side' });
+    o.lab('main street of two widths at a T: both corners joined', 0, -5, [45, 0]);
+    // C: a concrete trunk road with its sidewalk mapped 2.5 m off its edge (a lawn verge between), houses behind
+    o.ln(-85, -70, 85, -70, { highway: 'trunk', lanes: '2', oneway: 'yes', surface: 'concrete', name: 'Concrete boulevard' }, 10);
+    o.ln(-85, -62.5, 85, -62.5, { highway: 'footway', footway: 'sidewalk' }, 10);
+    o.row(-80, 80, -70, { side: 1, back: 16 });
+    o.lab('concrete trunk with a mapped sidewalk 2.5 m off: grass verge, sidewalk flush, no dirt edge', 0, -66, [40, 0]);
+    o.walk('along the boulevard sidewalk', -40, -62.5, 0);
+  });
   plot(6, 1, 'traffic islands', (o) => {
     o.ln(-60, -90, -60, 90, { highway: 'residential', name: 'Cross street' }, 10, [[-60, 0], [-60, 3.5], [-60, -3.5]]);
     o.ln(20, 0, 85, 0, { highway: 'tertiary', name: 'Island avenue' }, 10);

@@ -151,10 +151,18 @@ function closeMask(mask, w, h, rCells) {
  * Returns { cells: Uint8Array (ROAD | WALK | GAP | VERGE bits), grid }.
  */
 // houses: rings of houses (a residential street: the strip from curb to sidewalk is a lawn, not paving)
-export function buildPavedGrid(g, { roads = [], cornerArcs = [], cornerSlabs = [], walks = [], streetWalks = [], greenery = [], houses = [] } = {}) {
+export function buildPavedGrid(g, { roads = [], cornerArcs = [], cornerSlabs = [], cornerSquares = [], walks = [], streetWalks = [], greenery = [], houses = [] } = {}) {
   const N = g.w * g.h;
   const cells = new Uint8Array(N);
   for (const r of roads) if (r.pts.length > 1) markLine(cells, g, r.pts, r.half, ROAD);
+  // (a corner paved square lies wholly behind both curb lines, out to where they meet: the road raster's round ends and
+  // junction overlap reaching into it are no road surface, and left as road they cut a triangle of bare ground out of the
+  // corner's tip (the sidewalk test level's two-width T))
+  if (cornerSquares.length) {
+    const sq = new Uint8Array(N);
+    for (const poly of cornerSquares) if (poly.length > 2) markPolygon(sq, g, poly, 1);
+    for (let i = 0; i < N; i++) if (sq[i]) cells[i] &= ~ROAD;
+  }
   for (const arc of cornerArcs) { const q = cornerApex(arc); if (q) markPolygon(cells, g, [...arc, q], ROAD); }
   // (marked straight into their layers, the road taken out once after: a scratch layer cleared per walk was a
   // pass over the whole grid for every walk)
@@ -170,6 +178,7 @@ export function buildPavedGrid(g, { roads = [], cornerArcs = [], cornerSlabs = [
   for (const s of streetWalks) if (s.pts.length > 1) { markLine(plain, g, s.pts, s.half, 1); markLine(plainNear, g, s.pts, s.half + PLAIN_GAP_M + 0.3, 1); }
   // (a corner's piece of sidewalk, from its rounded curb out to the two sidewalks' outer corner: paved as theirs)
   for (const poly of cornerSlabs) if (poly.length > 2) markPolygon(plain, g, poly, 1);
+  for (const poly of cornerSquares) if (poly.length > 2) markPolygon(plain, g, poly, 1);
   for (const r of roads) if (r.pts.length > 1) markLine(roadBand, g, r.pts, r.half + PLAIN_GAP_M, 1);
   const road = new Uint8Array(N); const walk = new Uint8Array(N);
   for (let i = 0; i < N; i++) {
