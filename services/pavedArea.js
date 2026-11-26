@@ -514,6 +514,10 @@ export function buildPavedMesh(rings0, cells, g, { heightAt = () => 0, bottomAt 
 
 // grading (step 3d): today's values (beamngSidewalks.js gradeSidewalkGround)
 export const GRADE_UNDER_M = 0.14;      // the ground this far under the slab's top (a 1 m grid can't follow it closer)
+export const BACK_EDGE_UNDER_M = 0.05;  // ... except along its back edge, beside open ground: flush with the lawn there
+export const RING_UNDER_M = 0.03;       // the first ring of ground out from that edge this far under the slab's top
+export const FLUSH_DROP_MAX_M = 0.3;    // ... unless the ground beside lies more than this under or over the slab (a bank)
+export const RING_LEVEL_FAR_M = 3;      // ... there and this far further out (a hillside)
 export const BLEND_MIN_M = 1;
 export const BLEND_MAX_M = 10;
 export const BLEND_RUN = 2;
@@ -555,6 +559,23 @@ export function gradePaved(cells, g, terrain, { heightAt = () => 0, core = null,
       else if (v & (WALK | GAP)) { paved[k] = 1; top[k] = heightAt(x, y) - GRADE_UNDER_M; }
     }
   }
+  // (the paving's back edge: a paved pixel beside open ground (not road) carries the ground BACK_EDGE_UNDER_M under the
+  // slab's top, and the ring of ground pixels just outside it the slab's top, so the terrain meets the edge flush. With
+  // the ground GRADE_UNDER_M under all of it and the blend starting at the first pixel out (1 m on a 1 m grid, where the
+  // shortest blend ends), every sidewalk stood 14 cm proud of its lawn; 72 % of them on a St. Augustine level (the
+  // user, 2026-11-26: "odd shapes"))
+  const backEdge = new Uint8Array(sw * sh);
+  for (let r = 0; r < sh; r++) {
+    for (let c = 0; c < sw; c++) {
+      const k = r * sw + c; if (!paved[k]) continue;
+      // (open ground beside it within FLUSH_DROP_MAX_M of the slab's top: a lawn at its level, not a bank or a hillside,
+      // where raised the edge only made creases, w_sf_russian 315 -> 356 on the sweep)
+      const slabTop = top[k] + GRADE_UNDER_M;
+      const open = (rr, cc) => rr >= 0 && cc >= 0 && rr < sh && cc < sw && !paved[rr * sw + cc] && !road[rr * sw + cc]
+        && Math.abs(heightMap[(rr + r0) * width + (cc + c0)] - minHeight - slabTop) <= FLUSH_DROP_MAX_M;
+      if (open(r - 1, c) || open(r + 1, c) || open(r, c - 1) || open(r, c + 1)) { backEdge[k] = 1; top[k] += GRADE_UNDER_M - BACK_EDGE_UNDER_M; }
+    }
+  }
   const { d2, near } = distanceWithNearest(paved, sw, sh);
   const idx = []; const z = []; let verges = 0;
   const reach = BLEND_MAX_M / sq;
@@ -592,10 +613,29 @@ export function gradePaved(cells, g, terrain, { heightAt = () => 0, core = null,
       }
       let zb = null;
       if (near[k] >= 0 && d2[k] <= reach * reach) {
-        const t = top[near[k]];
+        const nk = near[k];
+        // (the blend from under the slab, the edge pixels' ground set back to GRADE_UNDER_M for it)
+        const t = top[nk] - (backEdge[nk] ? GRADE_UNDER_M - BACK_EDGE_UNDER_M : 0);
         const blend = Math.min(BLEND_MAX_M, Math.max(BLEND_MIN_M, Math.abs(ground - t) * BLEND_RUN));
         const f = (Math.sqrt(d2[k]) * sq) / blend;
         if (f < 1) zb = t + (ground - t) * smooth01(f);
+        // (the ring of ground pixels next to a back edge at the slab's top, RING_UNDER_M under it, where the lawn there is
+        // within FLUSH_DROP_MAX_M of it: the ground meets the edge flush, as a sidewalk sits in its lawn. From under the
+        // slab, every sidewalk stood 10 to 20 cm proud of the grass along its back edge, 71 % of them on a St. Augustine
+        // level (the user, 2026-11-26: "odd shapes"). The ring only: switching the blend beyond it between the two
+        // grew creases on a hill city (w_sf_russian 315 -> 356, the sweep). Not by a deck: a deck's low end counts,
+        // checked from well under the ground, as the deck test sees only what reaches a deck's underside; raised there
+        // the ground came 0.2 m through a little bridge a driveway runs onto (val_disere b008))
+        if (backEdge[nk] && d2[k] <= 2.25) {
+          const ring = top[nk] + BACK_EDGE_UNDER_M - RING_UNDER_M;
+          // (and the ground RING_LEVEL_FAR_M further out too: on a smooth hillside the lawn next to the edge came within
+          // reach while the slope carried on past it, and the held ring made a crease (w_sf_russian, 30 m))
+          const nr = (nk / sw) | 0; const nc = nk - nr * sw;
+          const dr = r - nr; const dc = c - nc; const dl = Math.hypot(dr, dc) || 1;
+          const fr = Math.round(r + r0 + (dr / dl) * (RING_LEVEL_FAR_M / sq)); const fc = Math.round(c + c0 + (dc / dl) * (RING_LEVEL_FAR_M / sq));
+          const farOk = fr < 0 || fc < 0 || fr >= height || fc >= width || Math.abs(heightMap[fr * width + fc] - minHeight - ring) <= FLUSH_DROP_MAX_M;
+          if (farOk && Math.abs(ground - ring) <= FLUSH_DROP_MAX_M && !(overhead && overhead(wx(c + c0), wy(r + r0), ground - 3, ring + 6))) zb = Math.max(zb ?? -Infinity, ring);
+        }
       }
       const zf = zv !== null && (zb === null || zv > zb) ? zv : zb;
       if (zf === null) continue;

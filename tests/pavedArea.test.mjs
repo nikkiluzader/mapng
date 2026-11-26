@@ -108,10 +108,19 @@ test('gradePaved: ground under the pavement just below the slab, blending back t
   const pix = (x, y) => Math.round((0.5 - y / W) * W - 1) * W + Math.round((x / W + 0.5) * W);
   assert.ok(Math.abs(edit.get(pix(0, 7)) - (0.2 - GRADE_UNDER_M)) < 1e-9, 'under the strip');
   assert.ok(!edit.has(pix(0, 0)), 'the road is left to the road grading');
-  // (0.94 m of difference blends over 1.88 m: 1 m out is partway back up, 2 m out is the natural ground)
+  // (a hillside, the ground 0.8 m over the slab: graded as before, from under the slab, back up to the ground within 2 m)
+  const { BACK_EDGE_UNDER_M, RING_UNDER_M, FLUSH_DROP_MAX_M } = await import('../services/pavedArea.js');
   const near = edit.get(pix(0, 11)); const far = edit.get(pix(0, 12));
-  assert.ok(near > 0.06 && near < 1, `blending back up 1 m out: ${near}`);
-  assert.ok(far === undefined, `natural ground 2 m out: ${far}`);
+  assert.ok(near > 0.06 && near < 1, `a hillside: blending back up 1 m out: ${near}`);
+  assert.ok(far === undefined, `a hillside: natural ground 2 m out: ${far}`);
+  // (a lawn at the slab's level, 0.25 m: the back edge flush, the last pixel under the slab BACK_EDGE_UNDER_M under its
+  // top, the first out RING_UNDER_M under it)
+  assert.ok(0.25 - 0.2 <= FLUSH_DROP_MAX_M);
+  const lawn = new Float32Array(W * W).fill(0.25);
+  const flat = gradePaved(cells, g, { heightMap: lawn, width: W, height: W, worldSize: W, minHeight: 0 }, { heightAt: () => 0.2 });
+  const e2 = new Map(); flat.idx.forEach((i, k) => e2.set(i, flat.z[k]));
+  assert.ok(Math.abs(e2.get(pix(0, 10)) - (0.2 - BACK_EDGE_UNDER_M)) < 1e-9, `the back edge's last pixel: ${e2.get(pix(0, 10))}`);
+  assert.ok(Math.abs(e2.get(pix(0, 11)) - (0.2 - RING_UNDER_M)) < 1e-9, `the first pixel out at the slab top: ${e2.get(pix(0, 11))}`);
   assert.ok(!edit.has(pix(0, 25)), 'far ground untouched');
   // (never raised up into a deck over the paving: a 3 m ground under a 3.5 m slab, a deck over x > 0)
   const low = new Float32Array(W * W).fill(-3);
