@@ -1,6 +1,6 @@
 # MapNG open items
 
-Last reviewed: 2026-11-25 evening (main 775add0, dev ahead with the crash fix; v0.3.7-dev.14; 0.3.6 Latest; test levels 2026-11-25d)
+Last reviewed: 2026-11-26 (main = dev at e9de811; tag v0.3.7 building its draft; 0.3.6 Latest; test levels 2026-11-26)
 
 The short "now" board: current work, what waits on someone, and checks owed on shipped work. The other tracking
 files: `refs/output/backlog.md` holds everything wanted later, by area; `refs/output/releases.md` what shipped;
@@ -12,13 +12,13 @@ is where each item's full text, numbers and file names now live.
 
 ## Branch state
 
-- **main at 775add0** (2026-11-25, width:lanes); **dev ahead** with the window-memory fix (9ecc39a) and the chunked
-  report change. Desktop test build **v0.3.7-dev.14** (9e1a362, 10 assets). **0.3.6** is Latest (tag v0.3.6 at
-  759ea31). **0.3.7 being prepared for release** (the user, 2026-11-25).
-- No work branches (all deleted 2026-11-24, SHAs in `docs/handoff.md`).
-- Official test levels: manifest 2026-11-25d (from 04430fa). Roads level scenes F, G and H (signals, bus-stop
-  width, per-lane widths) are newer: rebuild and upload before the release (ask first).
-- Sweep: 135/135, identical to the previous run, on 775add0.
+- **main = dev at e9de811** (2026-11-26): release 0.3.7 (version, page public, sitemap, LATEST_UPDATE). Workers
+  Builds for both passed; mapng.com/updates/latest serves 0.3.7. **Tag v0.3.7** pushed: the draft with the installers
+  builds; publishing waits on the user. **0.3.6** is Latest until then.
+- No work branches.
+- Official test levels: manifest **2026-11-26** (from e9de811, scenes F-H in), all five checked through mapng.com
+  (checksums match). The sidewalks level's check flags a stairs model with undefined materials (older, backlog 10).
+- Sweep: 135/135, identical to the previous run, on 0077197 (the release code).
 
 ## Now (0.3.7)
 
@@ -52,13 +52,10 @@ A new session starts with `docs/handoff.md` ("Work list").
 
 ## Before the 0.3.7 release
 
-- Release page `public/updates/0.3.7/`: batch-jobs line and the Perth fixes in (2026-11-25); add the large-level
-  proofs' outcome and the desktop memory fix (in).
-- Official test levels rebuilt with scenes F-H and uploaded (ask first).
-- Dependabot: open alerts on vite (1 high, 7 medium, 1 low) and esbuild (dev tools, not shipped in the app), and
-  minimatch in /desktop (medium, the 0.3.6 note). Not updated before the release: a vite major step is no
-  release-day change. After 0.3.7.
-- The user: run the signed Windows installer for the release (not run here since 0.3.6).
+- Publish the v0.3.7 draft (ask the user), then add the notes to `refs/output/releases.md`.
+- Dependabot: open alerts on vite (1 high, 7 medium, 1 low) and esbuild (dev tools, not in the app) and minimatch in
+  /desktop (medium). Left for after 0.3.7.
+- The user: run the signed Windows installer (not run here since 0.3.6).
 
 ## Smaller open points from the moved sections
 
