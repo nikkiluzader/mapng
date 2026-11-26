@@ -231,6 +231,19 @@ export function sidewalks(regionKey, makeBuilder) {
     o.lab('concrete trunk with a mapped sidewalk 2.5 m off: grass verge, sidewalk flush, no dirt edge', 0, -66, [40, 0]);
     o.walk('along the boulevard sidewalk', -40, -62.5, 0);
   });
+  plot(8, 1, 'sidewalks set back', (o) => {
+    // a diagonal downtown street (no houses near) with its sidewalks mapped as their own ways: on the north-east side
+    // 8.5 m back from the road's edge (a bayfront sidewalk along a seawall), a grass verge between, clean edges; on the
+    // south-west side 1 m off, paved to the curb (St. Augustine's Avenida Menendez came out a paved strip with a
+    // sawtooth edge on its set-back side, the user 2026-11-26)
+    const d = (t, off) => [-60 + t * 120 * 0.8 + off * 0.6, -60 + t * 120 * 0.6 - off * 0.8];
+    o.st([d(0, 0), d(0.5, 0), d(1, 0)], { highway: 'tertiary', lanes: '2', name: 'Bayfront avenue', 'sidewalk:both': 'separate' });
+    o.st([d(0, -13.5), d(0.5, -13.5), d(1, -13.5)], { highway: 'footway', footway: 'sidewalk', surface: 'concrete' });
+    o.st([d(0, 6.5), d(0.5, 6.5), d(1, 6.5)], { highway: 'footway', footway: 'sidewalk', surface: 'concrete' });
+    o.ar([[30, -60], [70, -60], [70, -20], [30, -20]], { landuse: 'commercial' });
+    o.lab('sidewalk 8.5 m back: grass verge to it, straight edges; the other side 1 m off, paved to the curb', 0, 0, [40, 0]);
+    o.walk('along the set-back sidewalk', -22, -34, Math.atan2(0.6, 0.8));
+  });
   plot(6, 1, 'traffic islands', (o) => {
     o.ln(-60, -90, -60, 90, { highway: 'residential', name: 'Cross street' }, 10, [[-60, 0], [-60, 3.5], [-60, -3.5]]);
     o.ln(20, 0, 85, 0, { highway: 'tertiary', name: 'Island avenue' }, 10);

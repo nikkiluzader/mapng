@@ -220,3 +220,20 @@ test('buildPavedMesh: a lawn enclosed by paths (a hole crossing the 4 m squares)
   for (let i = 0; i < m.slab.length; i += 9) { const p = [(m.slab[i] + m.slab[i + 3] + m.slab[i + 6]) / 3, (m.slab[i + 1] + m.slab[i + 4] + m.slab[i + 7]) / 3]; if ((!inside(p, rings[0]) || rings.slice(1).some((h) => inside(p, h))) && dEdge(p) > 0.01) off++; }
   assert.equal(off, 0, `${off} slab triangle(s) over a lawn`);
 });
+
+test('buildPavedGrid: a sidewalk mapped well back from the road (no houses near) has a verge before it, one against the curb is paved to it', () => {
+  // (St. Augustine's bayfront sidewalk, 8.5 m off the drawn road along the seawall: paved up to the gap limit, with a
+  // sawtooth edge; a sidewalk 4.5 m off downtown stays paved to the curb, the other tests)
+  const g = makeGrid(-30, -30, 30, 30);
+  const road = { pts: [[-40, -30], [40, 30]], half: 4 };
+  const along = (off) => [[-40 - off * 0.6, -30 + off * 0.8], [40 - off * 0.6, 30 + off * 0.8]];   // off: left of the road
+  const { cells } = buildPavedGrid(g, { roads: [road], walks: [{ pts: along(4 + 8.5 + 1), half: 1, sidewalk: true }, { pts: along(-(4 + 1 + 1)), half: 1, sidewalk: true }] });
+  const at = (off, t = 0) => { const x = t * 0.8 - off * 0.6; const y = t * 0.6 + off * 0.8; const c = Math.floor((x - g.x0) / g.res); const r = Math.floor((g.y1 - y) / g.res); return cells[r * g.w + c]; };
+  let paved = 0; let verge = 0; let n = 0;
+  for (let t = -20; t <= 20; t += 0.5) for (const off of [5, 6, 7, 8, 9, 10, 11, 12]) { n++; const v = at(off, t); if (v & (WALK | GAP)) paved++; if (v & VERGE) verge++; }
+  assert.equal(paved, 0, 'nothing paved between the curb and the set-back sidewalk');
+  assert.ok(verge > 0.9 * n, `a verge there (${verge} of ${n} samples)`);
+  let gap = 0; let m = 0;
+  for (let t = -20; t <= 20; t += 0.5) { m++; if (at(-4.5, t) & GAP) gap++; }
+  assert.ok(gap > 0.9 * m, `the near sidewalk paved to the curb (${gap} of ${m})`);
+});

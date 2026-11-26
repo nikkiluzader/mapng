@@ -24,6 +24,7 @@ export const PLAIN_GAP_M = 1;
 export const CLOSE_M = 5;
 export const LAWN_REACH_M = 35;     // houses this near: the street's verge between curb and sidewalk is a lawn
 export const LAWN_MIN_GAP_M = 1.5;  // ... unless the walk is this near the curb (mapped against it)
+export const WIDE_VERGE_M = 6;      // a mapped sidewalk standing further than this off the road edge: the strip between is a verge (nearer, the strip is mostly a parking lane the road is drawn without: paved)
 export const POCKET_M2 = 20;      // an unpaved pocket this small between road and pavement is paved (crossing landings)
 export const SPECK_M2 = 0.5;      // a traced ring this small is dropped
 export const CURB_TOP_LIFT_M = 0.003;
@@ -202,7 +203,7 @@ export function buildPavedGrid(g, { roads = [], cornerArcs = [], cornerSlabs = [
     lawn = new Uint8Array(N);
     for (let i = 0; i < N; i++) if (dh[i] <= reach2) lawn[i] = 1;
   }
-  const lawnGap = LAWN_MIN_GAP_M / res;
+  const lawnGap = LAWN_MIN_GAP_M / res; const wideGap = WIDE_VERGE_M / res;
   // (lawn by the street, not cell by cell: a cell is lawn where it, its nearest road or the sidewalk it lies toward is within reach of houses. Judged
   // by the cell alone, the strip switched between lawn and paving where the houses' reach ran through it, in ragged
   // edges, and a residential street's far side, its houses a little further back, was paved solid (Naperville))
@@ -216,6 +217,12 @@ export function buildPavedGrid(g, { roads = [], cornerArcs = [], cornerSlabs = [
       const D = Math.sqrt(dRoad2[swNear[i]]);
       if (D <= swMax && dr + Math.sqrt(dSw2[i]) <= D + 0.5 / res) {
         if (lawnAt(i) && D > lawnGap) { cells[i] |= VERGE; continue; }
+        // (nor anywhere, houses or not, where the sidewalk stands well back from the road: the strip between is a verge
+        // of grass, trees and lamps, as a sidewalk mapped on its own downtown lies against the curb. Paved up to the
+        // gap limit, St. Augustine's bayfront sidewalk, 8.5 m off the drawn road along the seawall, came out a paved strip with a
+        // ragged sawtooth edge where the fill's test broke up along the diagonal (the user's camera, 2026-11-26;
+        // Mapillary: grass with palms between the curb and the seawall))
+        if (D > wideGap) { cells[i] |= VERGE; continue; }
         take = true;
       }
     }
