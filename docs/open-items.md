@@ -29,9 +29,10 @@ A new session starts with `docs/handoff.md` ("Work list").
   heights, sections, corner plots, Mapillary fetch; photos in mapillary/). Three faults:
   - (3) **back edges flush: on dev 796e139.** Edges over 10 cm proud 72 % -> 19 %; sections `sect_king.png`, game
     `backedge_game_before_after.jpg`; sweep no failing cell. On the 0.3.8 draft page.
-  - (2) **verge between road and a mapped sidewalk** (Ponce de Leon Blvd): a dirt strip at road level and a slab with
-    curbs both sides; really curb at the road, grass at curb top, sidewalk flush. The mapped walk takes the ground's
-    height (an earlier lift to street level was dropped for Barcelona's buried slabs, before flush grading). Next.
+  - (2) **verge between road and a mapped sidewalk: on dev ce9a180.** With (3) the sidewalk sits flush with its verge;
+    town roads' edge blends are asphalt into grass only (no random dirt), concrete roads have no blend. Ponce de Leon
+    Blvd before/after `verge_game_before_after.jpg`. Left: a grey strip there from the terrain paint under the verge
+    (the base texture's road width, not a decal); the sidewalk 8 cm under the uncurbed trunk road.
   - (1) **corners where a street's line bends into the junction** (Cordova x King): the corner lands on its own
     street's surface; a lean of 1.5 m into its own streets builds it but the paving still does not appear (the gap fill
     there). Work parked in `scratch/stagsw/corner_work.patch` with its debug lines.
