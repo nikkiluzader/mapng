@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MapNG 0.3.7: More File Formats, Smoother Curves, Very Large Levels</title>
 <meta name="description" content="MapNG 0.3.7: your own OSM data in more file formats (.osm.bz2, .xz, .gz, .o5m, history files, Shapefiles), smoother curves on railways, paths and rivers, very large levels that save and load, and fixes from testers' reports.">
-<meta name="robots" content="noindex">
 <link rel="canonical" href="https://mapng.com/updates/0.3.7/">
 <meta property="og:type" content="article">
 <meta property="og:title" content="MapNG 0.3.7: more file formats, smoother curves, very large levels">
@@ -149,8 +148,7 @@
   <div class="wrap">
     <a class="brand" href="/"><img src="/favicon.svg" alt="">MapNG</a>
     <h1>MapNG 0.3.7: more file formats, smoother curves, very large levels, truer streets</h1>
-    <p class="lede">Load your own OpenStreetMap data in the formats the extract services actually serve. Railways, footpaths and rivers now curve the way roads already did. And levels hundreds of kilometres long now save, load and show up in the game's map. Streets now follow their mapped kerbs and islands, and footpaths cross railway lines on a level crossing.</p>
-    <span class="draft-tag">Draft: not released yet</span>
+    <p class="lede">Load your own OpenStreetMap data in the formats the extract services actually serve. Railways, footpaths and rivers now curve the way roads already did. And levels hundreds of kilometres long now save, load and show up in the game's map. Streets now follow their mapped kerbs, islands, turn lanes and lane widths, and footpaths cross railway lines on a level crossing.</p>
   </div>
 </header>
 
@@ -162,6 +160,7 @@
     <div class="card"><b><span class="tick">✓</span>Slip roads</b><span>They now meet the outer lane.</span></div>
     <div class="card"><b><span class="tick">✓</span>Kerbs and islands</b><span>Streets as wide as their mapped kerbs.</span></div>
     <div class="card"><b><span class="tick">✓</span>Path level crossings</b><span>Footpaths cross the tracks flush.</span></div>
+    <div class="card"><b><span class="tick">✓</span>Turn lanes and lane widths</b><span>Roads widen on the side their lanes are added.</span></div>
   </div>
   <div class="cta">
     <a class="btn primary" href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>
@@ -230,6 +229,9 @@
       <li><b>The game's map view</b> gets one picture per piece, each at its place.</li>
       <li><b>The progress card moves</b> for levels built in pieces, Cancel works while downloads are still running, and step 1's notes measure the whole shape.</li>
       <li><b>Road mode</b> warns with the number of pieces on a very long road; on the desktop app it never refuses.</li>
+      <li><b>Tested past the plain zip format's limit.</b> A level padded to 66,711 files (ZIP64) loads in the game like any other.</li>
+      <li><b>The game's map screen shows the whole level.</b> It framed the level together with a small hidden ground piece the game needs, which stood 30 km away, so the roads sat at the edge of an empty view. That piece now sits out of sight under the start.</li>
+      <li><b>A short report for the whole level,</b> one line per piece, with each piece's full report in the level's reports folder. Before, every piece's report went into one file: 70 MB for 442 pieces.</li>
       <li><b>No backdrop for a level along a road.</b> The land round a long road is mostly far from it (about 150 by 100 km for a 200 km road), too much to download; the level ends at the road's corridor.</li>
     </ul>
   </section>
