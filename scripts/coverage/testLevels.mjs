@@ -331,9 +331,12 @@ function roads(regionKey) {
     // G: a signalled junction: a one-way three-lane road mapped along its left edge (placement=left_of:1) crossing a
     // two-way road; the lights stand off both roads where they are drawn (they stood in the moved road)
     way(run(640, -820, 940, -820, 20, [[860, -820]]), { highway: 'secondary', lanes: '2', name: 'Placement G cross' });
-    way(run(860, -880, 860, -790, 20, [[860, -820]]), { highway: 'secondary', oneway: 'yes', lanes: '3', width: '12', placement: 'left_of:1', name: 'Placement G' });
+    // (and a zebra crossing on it 30 m before the junction: the stop bar and the zebra centred on the drawn road, not
+    // across its mapped line (thecoachtoma, Discord 2026-11-26))
+    way(run(860, -880, 860, -790, 20, [[860, -850], [860, -820]]), { highway: 'secondary', oneway: 'yes', lanes: '3', width: '12', placement: 'left_of:1', name: 'Placement G' });
     node(860, -820, { highway: 'traffic_signals' });
-    label('placement=left_of:1 at signals: the lights off the drawn road', 860, -820, [55, 0]);
+    node(860, -850, { highway: 'crossing', crossing: 'uncontrolled', 'crossing:markings': 'zebra' });
+    label('placement=left_of:1 at signals: the lights off the drawn road, stop bar and zebra on it', 860, -820, [55, 0]);
     // H: per-lane widths (width:lanes:forward / :backward), copied from thecoachtoma's two Savanoriu pr. pieces: four
     // lanes back, three on, the line in the middle of backward lane 2; on the second piece the left-turn lane (backward
     // lane 1, by the centre line) narrows from 3.6 to 2 m. The left edge runs straight on, the right side comes in 1.6 m

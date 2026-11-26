@@ -200,7 +200,11 @@ export function parallelRoadAt(index, x, y, dir) {
   }
   if (!best) return null;
   const sign = best.s.ux * dir[0] + best.s.uy * dir[1] >= 0 ? 1 : -1;
-  return { half: best.s.half, dir: [best.s.ux * sign, best.s.uy * sign] };
+  // (and the nearest point of its drawn centre line: a road drawn off its mapped line (placement tags) has its markings
+  // centred there, not on the mapped line)
+  const s = best.s; const dx = s.bx - s.ax; const dy = s.by - s.ay; const len = dx * dx + dy * dy;
+  const t = len > 0 ? Math.max(0, Math.min(1, ((x - s.ax) * dx + (y - s.ay) * dy) / len)) : 0;
+  return { half: s.half, dir: [s.ux * sign, s.uy * sign], centre: [s.ax + t * dx, s.ay + t * dy] };
 }
 
 /** Half width of the road running along `dir` at (x, y), or null. */

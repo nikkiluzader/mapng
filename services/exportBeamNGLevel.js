@@ -8100,10 +8100,13 @@ export function generateJunctionMarkingDecals(terrainData, squareSize, { carriag
     paintedCrossingKeys.add(key);
     const spot = clearOfCrossingRoads(m);
     if (!spot) return;
-    const [cx, cy] = spot;
+    let [cx, cy] = spot;
     // Square to the drawn road where the crosswalk ends up: the tangent at a
     // junction vertex is bent by the other road.
     const drawn = carriageways ? parallelRoadAt(carriageways, cx, cy, m.tangent) : null;
+    // (centred on the drawn road: on a road drawn off its mapped line by placement tags the crossing sat across the
+    // mapped line, off the road's middle (thecoachtoma, Discord 2026-11-26))
+    if (drawn?.centre) [cx, cy] = drawn.centre;
     const tangent = drawn?.dir ?? m.tangent;
     const halfW = drawn ? Math.max(1, drawn.half - JUNCTION_MARK_EDGE_INSET_M) : m.halfW;
     const perp = [-tangent[1], tangent[0]];
@@ -8239,12 +8242,16 @@ export function generateJunctionMarkingDecals(terrainData, squareSize, { carriag
   for (const approach of approaches) {
     const ll = junctions.projector.unproject(approach.x, approach.y);
     if (!insideMargin(ll)) continue;
-    const [px, py] = geoToWorldPoint(ll.lat, ll.lng, terrainData, squareSize, 0);
+    let [px, py] = geoToWorldPoint(ll.lat, ll.lng, terrainData, squareSize, 0);
     const len = fastHypot(approach.dir[0], approach.dir[1]) || 1;
     const dir = [approach.dir[0] / len, approach.dir[1] / len];
     const right = [dir[1], -dir[0]];
     const kerb = leftHandTraffic ? [-right[0], -right[1]] : right;
-    const drawnHalf = carriageways ? parallelHalfWidthAt(carriageways, px, py, dir) : null;
+    // (on the drawn road, from its centre line: a road drawn off its mapped line by placement tags had its stop bar
+    // across the mapped line, part of it off the road (thecoachtoma, Discord 2026-11-26))
+    const drawn = carriageways ? parallelRoadAt(carriageways, px, py, dir) : null;
+    if (drawn?.centre) [px, py] = drawn.centre;
+    const drawnHalf = drawn?.half ?? null;
     const halfW = Math.max(1, (drawnHalf ?? approach.halfWidth) - JUNCTION_MARK_EDGE_INSET_M);
     const fromM = approach.oneWay ? -halfW : STOP_BAR_CENTRE_GAP_M;
     pushLine('jm_stopline', px, py, kerb[0], kerb[1], fromM, halfW, STOP_BAR_THICKNESS_M);
