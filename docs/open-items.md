@@ -24,10 +24,18 @@ is where each item's full text, numbers and file names now live.
 
 A new session starts with `docs/handoff.md` ("Work list").
 
-- **Sidewalk fixes (0.3.8 target, the user 2026-11-25).** Missing curbs and odd sidewalk shapes on their
-  St. Augustine level. Start from top views and sections of that level, then the sidewalk test level. Joins
-  "sidewalks at banks and the water" (`docs/handoff.md`), the sidewalk order of 2026-11-24 (decisions) and the stairs
-  model with undefined materials (backlog 10). Big.
+- **Sidewalk fixes (0.3.8 target; the user chose all three, 2026-11-26).** Their St. Augustine level
+  (`scratch/stagsw/`: user_level.zip, area `st_aug_sw` from its own map data, tools/ for extract, curb check, back
+  heights, sections, corner plots, Mapillary fetch; photos in mapillary/). Three faults:
+  - (3) **back edges flush: on dev 796e139.** Edges over 10 cm proud 72 % -> 19 %; sections `sect_king.png`, game
+    `backedge_game_before_after.jpg`; sweep no failing cell. On the 0.3.8 draft page.
+  - (2) **verge between road and a mapped sidewalk** (Ponce de Leon Blvd): a dirt strip at road level and a slab with
+    curbs both sides; really curb at the road, grass at curb top, sidewalk flush. The mapped walk takes the ground's
+    height (an earlier lift to street level was dropped for Barcelona's buried slabs, before flush grading). Next.
+  - (1) **corners where a street's line bends into the junction** (Cordova x King): the corner lands on its own
+    street's surface; a lean of 1.5 m into its own streets builds it but the paving still does not appear (the gap fill
+    there). Work parked in `scratch/stagsw/corner_work.patch` with its debug lines.
+  Joins "sidewalks at banks and the water", the sidewalk order of 2026-11-24 and the stairs model (backlog 10).
 - **Tile rotation on the 2D map (0.3.8 target).** Rotating the tiles in step 1 (backlog 0 and area 1, thecoachtoma's
   rotated box). Big.
 - **Carried from 0.3.7** (`docs/handoff.md`): Fizz_Mechanic's remaining points (road-to-bridge/tunnel joins, lake
