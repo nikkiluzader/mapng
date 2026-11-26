@@ -182,7 +182,6 @@ const CORNER_RADIUS = 5;
 const CORNER_TRIES = [1, 0.5, 0.25];
 const CORNER_REACH_M = 15;    // how far past a run's end its corner may lie
 const CORNER_ANGLES = [30, 150];  // degrees between the two curb lines for a corner
-const CORNER_OWN_SLACK_M = 1.5;  // how far a corner may lean into the two streets it joins (joinCorners)
 const RUNS_PER_MESH = 300;
 
 // Divided roads' medians (BeamNG.Earth server/roads.py dual_carriageways,
@@ -1657,8 +1656,17 @@ function joinCorners(runs, index, walkRuns = [], streetOfOwner = new Map()) {
   pairs.sort((x, y) => x.cost - y.cost || x.i - y.i || x.j - y.j);
   const used = new Set();
   const corners = [];
+  const squares = []; const stats = { pairs: 0, round: 0, square: 0, byOther: 0, noFit: 0 };
   for (const { A, B } of pairs) {
     if (used.has(A) || used.has(B)) continue;
+    // (the corner's own two streets: a street drawn in pieces of different widths, its line bending into the junction,
+    // reaches past the corner's curb; at Cordova x King St. three of four corners were refused for it and the two
+    // sidewalks ended square with grass between, where the real corner is paved from the curb to its planting beds
+    // (St. Augustine, the user's photo 2026-11-26))
+    const own = new Set([A.run.owner, ...(A.run.owners || []), B.run.owner, ...(B.run.owners || [])]);
+    const ownStreets = new Set([...own].map((o) => streetOfOwner.get(o)).filter((v) => v !== undefined));
+    const isOwn = (o) => own.has(o) || ownStreets.has(streetOfOwner.get(o));
+    let byOther = false; let made = false; stats.pairs++;
     const r0 = Math.max(CORNER_RADII[A.run.highway] ?? CORNER_RADIUS, CORNER_RADII[B.run.highway] ?? CORNER_RADIUS);
     for (const share of CORNER_TRIES) {
       const r = r0 * share;
@@ -1684,23 +1692,37 @@ function joinCorners(runs, index, walkRuns = [], streetOfOwner = new Map()) {
         [T2[0] + B.n[0] * B.run.width, T2[1] + B.n[1] * B.run.width], B.d);
       if (!outer) break;
       const probes = [...arc, outer, [(outer[0] + Z[0]) / 2, (outer[1] + Z[1]) / 2]];
-      // (the two streets the corner joins may reach CORNER_OWN_SLACK_M past its curb: a street drawn in pieces of
-      // different widths overlaps at the junction, the wider piece 0.2 to 0.4 m past the narrower one's curb, and three
-      // of four corners at Cordova x King St. were refused, the sidewalks ending square (St. Augustine, 2026-11-26).
-      // Any other road still refuses it from 0.2 m in)
-      const own = new Set([A.run.owner, ...(A.run.owners || []), B.run.owner, ...(B.run.owners || [])]);
-      const ownStreets = new Set([...own].map((o) => streetOfOwner.get(o)).filter((v) => v !== undefined));
-      const isOwn = (o) => own.has(o) || ownStreets.has(streetOfOwner.get(o));
-      const onRoad = ([x, y]) => isOnOtherCarriageway(index, x, y, -0.2, isOwn) || isOnOtherCarriageway(index, x, y, -CORNER_OWN_SLACK_M, () => false);
-      if (probes.some(onRoad)) continue;
+      // (clear of every road, its own two streets too: let lean into its own street, a corner's curb stood a metre into
+      // King St.'s lane at Cordova x King (St. Augustine, 2026-11-26). Refused by its own streets alone, the corner is
+      // paved square below instead)
+      if (probes.some(([x, y]) => isOnOtherCarriageway(index, x, y, -0.2, () => false))) {
+        if (probes.some(([x, y]) => isOnOtherCarriageway(index, x, y, -0.2, isOwn))) byOther = true;
+        continue;
+      }
       moveEnd(A, t1);
       moveEnd(B, t2);
       corners.push({ arc, centre: Z, outer, a: A, b: B });
       used.add(A);
       used.add(B);
+      made = true; stats.round++;
       break;
     }
+    // (no arc fits clear of the roads, and only the corner's own two streets were in the way: the corner paved square,
+    // from both sidewalks' ends out to their outer corner and in to where the curb lines meet; the road keeps its
+    // surface there and the curb follows its edge round the corner (pavedSidewalks.js cornerSlabs))
+    if (!made && !byOther) {
+      const C = lineX(A.p, A.d, B.p, B.d);
+      const O = lineX([A.p[0] + A.n[0] * A.run.width, A.p[1] + A.n[1] * A.run.width], A.d, [B.p[0] + B.n[0] * B.run.width, B.p[1] + B.n[1] * B.run.width], B.d);
+      if (C && O && fastHypot(C[0] - A.p[0], C[1] - A.p[1]) <= CORNER_REACH_M && fastHypot(C[0] - B.p[0], C[1] - B.p[1]) <= CORNER_REACH_M) {
+        stats.square++;
+        squares.push({ poly: [[A.p[0], A.p[1]], [A.p[0] + A.n[0] * A.run.width, A.p[1] + A.n[1] * A.run.width], O, [B.p[0] + B.n[0] * B.run.width, B.p[1] + B.n[1] * B.run.width], [B.p[0], B.p[1]], C], a: A, b: B });
+        used.add(A); used.add(B);
+      }
+    }
   }
+  stats.byOther = stats.pairs - stats.round - stats.square;
+  Object.defineProperty(corners, 'square', { value: squares, enumerable: false });
+  Object.defineProperty(corners, 'stats', { value: stats, enumerable: false });
   // a mapped walk carrying on from a sidewalk's end (one leaving the street
   // round a fountain or into a park): the slab stays up and meets it, not a
   // ramp down to the road beside the walk
@@ -3745,6 +3767,9 @@ function* sidewalkMeshes(carriageways, options = {}) {
   const streetOfOwner = new Map(carriageways.map((cw) => [cw.owner, cw.tags?.name || cw.wayId || cw.owner]));
   const corners = joinCorners(runs, buildCarriagewayIndex(carriageways), walkRuns, streetOfOwner);
   levelWalkEndsOnSidewalks(walkRuns, runs, corners);
+  // (what the corner step did: rounded corners, corners paved square where no arc fit clear of the roads and only their
+  // own two streets were in the way, and corners left open by another road or by their geometry)
+  { const st = corners.stats || {}; console.log(`Sidewalks: corners: ${st.pairs ?? 0} pair(s) of sidewalk ends at a corner; ${st.round ?? 0} rounded, ${st.square ?? 0} paved square (no arc clear of the roads, only their own two streets in the way), ${st.byOther ?? 0} left open (another road across the corner, a slip lane, or no corner shape)${(corners.square || []).length ? `; square at ${(corners.square || []).slice(0, 8).map((q) => `(${Math.round(q.poly[5][0])}, ${Math.round(q.poly[5][1])})`).join(' ')}${corners.square.length > 8 ? ' ...' : ''}` : ''}.`); }
   const paveAt = pavedWalkZones(carriageways, options.walks, { americas: options.americas });
   const meshes = [];
   let builder = new PartBuilder(paveAt, options.sidewalkLook);

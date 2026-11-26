@@ -296,6 +296,9 @@ export function* addPavedSidewalksSteps(builder, { carriageways = [], corners = 
     const inside = O && (O[0] - T1[0]) * c.a.n[0] + (O[1] - T1[1]) * c.a.n[1] > 0 && (O[0] - T2[0]) * c.b.n[0] + (O[1] - T2[1]) * c.b.n[1] > 0;
     return inside ? [...arc, p2, [O[0], O[1]], p1] : [...arc, p2, p1];
   });
+  // (and the corners paved square, where no arc fit clear of the roads (beamngSidewalks.js joinCorners): the road keeps
+  // its surface in them, the curb following its edge)
+  for (const sq of corners.square || []) if (sq.a?.run?.width > curbOnlyM && sq.b?.run?.width > curbOnlyM) cornerSlabs.push(sq.poly.map((q) => [q[0], q[1]]));
   // (only paved walks are paving: a dirt or gravel path, a highway=path, a footway on a bridge or in a tunnel is no slab.
   // Marked as walks, every mapped path came out a concrete strip on the ground, leaning with a hillside's slope)
   const ws = walks.filter((w) => w.nodes?.length > 1 && (w.sidewalk || w.crossing)).map((w) => ({ pts: w.nodes, half: w.half || 1, sidewalk: !!w.sidewalk, crossing: !!w.crossing }));
