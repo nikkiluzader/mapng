@@ -33,13 +33,16 @@ A new session starts with `docs/handoff.md` ("Work list").
     town roads' edge blends are asphalt into grass only (no random dirt), concrete roads have no blend. Ponce de Leon
     Blvd before/after `verge_game_before_after.jpg`. Left: a grey strip there from the terrain paint under the verge
     (the base texture's road width, not a decal); the sidewalk 8 cm under the uncurbed trunk road.
-  - (1) **corners joined: on dev 00608b7.** A corner may lean 1.5 m into its own two streets (by name or way; other
-    roads still refuse it from 0.2 m), and every corner's piece of sidewalk is paved explicitly (arc out to the
-    sidewalks' outer corner). Cordova x King SW corner joined in game (`public/updates/0.3.8/images/sidewalk-corner.jpg`).
-    Its NE corner stays open by the slip lane (right).
-  - **Owed:** test-level scenes for the three cases (a sidewalk beside a lawn at its level; a mapped sidewalk beside a
-    concrete trunk road; a street whose line bends into the junction), checked in game; the 0.3.8 draft page has the
-    lines and pictures. The user's own review on a fresh build.
+  - (1) **corners: on dev 6430ad6.** Rounded corners keep clear of every road (the 1.5 m lean of 00608b7 put a curb
+    in King St.'s lane, the user's screenshot); where none fits and only the corner's own two streets are in the way, the
+    corner is paved square to the curb (clearing the raster's overreach in it, 2 m back over the sidewalks' ends), never
+    round a roundabout or with a road's centre line inside it (val_disere). The export log counts them (St. Augustine
+    508: 498 rounded, 8 square, 2 open). Checked against the user's photo of the Lightner Museum corner: the real one is a
+    wider apron to the planting beds; ours is a sidewalk-wide L (a wider apron would be a further step, not started).
+  - **Scenes: sidewalk test level plot 7,1** (side street jogging into a crossroads, two-width T with a square corner,
+    concrete trunk with a mapped sidewalk), checked in game. Official test levels not re-uploaded yet (ask first).
+  - Found on the way, not sidewalk work: a hole in the road surface where a street's width steps at a junction (the
+    two-width T, 7 to 13 m); St. Augustine's grey strip under Ponce de Leon's verge is the terrain paint.
   Joins "sidewalks at banks and the water", the sidewalk order of 2026-11-24 and the stairs model (backlog 10).
 - **Tile rotation on the 2D map (0.3.8 target).** Rotating the tiles in step 1 (backlog 0 and area 1, thecoachtoma's
   rotated box). Big.
