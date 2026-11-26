@@ -1,6 +1,6 @@
 # MapNG open items
 
-Last reviewed: 2026-11-25 (main and dev at the tracking commit after e7fb142; v0.3.7-dev.12; 0.3.6 Latest; test levels 2026-11-25c)
+Last reviewed: 2026-11-25 evening (main 775add0, dev ahead with the crash fix; v0.3.7-dev.14; 0.3.6 Latest; test levels 2026-11-25d)
 
 The short "now" board: current work, what waits on someone, and checks owed on shipped work. The other tracking
 files: `refs/output/backlog.md` holds everything wanted later, by area; `refs/output/releases.md` what shipped;
@@ -12,69 +12,53 @@ is where each item's full text, numbers and file names now live.
 
 ## Branch state
 
-- **main = dev at 0c9381f** (2026-11-25). Desktop test build **v0.3.7-dev.12** tagged. **0.3.6** is Latest (tag
-  v0.3.6 at 759ea31).
-- No work branches: all parked branches were deleted 2026-11-24 (SHAs in `docs/handoff.md`). Notes below that name
-  `step-walls`, `step-walls-2`, `seawall` or `shaped-levels` refer to deleted branches.
-- Official test levels re-uploaded 2026-11-25 (manifest 2026-11-25d, built from 04430fa; all five checked through mapng.com; toured in game: placement scenes, splits, forks, sidewalk plots).
-- Known sweep flags from before: sidewalk drift at naldo, kingst, deckpark_g, stelvio; ams_centraal mh/ready;
-  dev_szczyrk cross; ams t30/noshape swBuried; Michiel de Ruijtertunnel joint steps (check if still the list after
-  the 2026-11-24 baselines). H > State of the branches.
+- **main at 775add0** (2026-11-25, width:lanes); **dev ahead** with the window-memory fix (9ecc39a) and the chunked
+  report change. Desktop test build **v0.3.7-dev.14** (9e1a362, 10 assets). **0.3.6** is Latest (tag v0.3.6 at
+  759ea31). **0.3.7 being prepared for release** (the user, 2026-11-25).
+- No work branches (all deleted 2026-11-24, SHAs in `docs/handoff.md`).
+- Official test levels: manifest 2026-11-25d (from 04430fa). Roads level scenes F, G and H (signals, bus-stop
+  width, per-lane widths) are newer: rebuild and upload before the release (ask first).
+- Sweep: 135/135, identical to the previous run, on 775add0.
 
-## Now
+## Now (0.3.7)
 
-A new session starts with `docs/handoff.md`. Its "Work list" holds the agreed order of the 0.3.7 work and each
-item's state. The open items there, one line each:
+A new session starts with `docs/handoff.md` ("Work list").
 
-- **Placement tags (thecoachtoma, Discord 2026-11-25): done on dev, sweep pending.** `services/lanePlacement.js`
-  reads placement, placement:forward/backward, :start/:end (transition left to the split rule); the drawn road, its
-  graph edges and the painted texture move by it; a lane gain tapers on its own side. Roads level scenes A-E (x 620-950,
-  y -60..200). Plots `scratch/toma_placement/{expected,after}.png`; in game 2026-11-25. Left: his Kaunas junctions once
-  his placement edits are on OSM (none in the three tj_ areas yet, refetched 2026-11-25); the painted asphalt is not
-  tapered at a lane gain (a small dark patch beside the decal's taper); the painter assumes right-hand traffic for
-  two-way placement:forward/backward.
-- **Carriageway splits: branches start as their share of the trunk (2026-11-25, the user in game on the roads level:
-  "the two changes dont blend together at all").** Splits 3 to 2+1 and 6 to 3+3 stepped out, their lane lines jumped,
-  pinched and their inner edges crossed. Now each branch starts as its share (its lanes at the trunk's lane width plus
-  the trunk's edge strip on its side), widens outward with the seam held, and its lines start on the trunk's
-  (carriagewaySplits.js `splitHalfAt`, `splitLaneShiftAt`, `splitEdgeLineAt`). Plots
-  `scratch/toma_placement/split_before_after.png`, `forks_after.png`. A first sweep caught gt_chevril (fork skip restored).
-- **thecoachtoma's placement round 2 and Splatplays' gauge (Discord 2026-11-25): on dev a1ba6bb + the gauge commit.**
-  Tagged widths capped by counted lanes (his 24/28 m Savanoriu pr. bus stop), signal poles off placed roads (18 -> 0 in
-  his export), rails at the true gauge (inner faces 72 mm too close). Area `tj_savanoriu_pl` (from his export's map
-  data), roads level scenes F and G, `scratch/splat/plot/gauge_before_after.png`. Waiting: test-level upload, dev build,
-  main (user's go-ahead).
-- **Per-lane widths and Toma's big junction (thecoachtoma, Discord 2026-11-25): on dev + main 775add0, dev.14.** width:lanes,
-  :forward, :backward set the road's driving width (their sum), the placement offset and the lane lines
-  (`laneWidthsAcross` in lanePlacement.js). Placed pieces meeting at a joint: the offset eased into the neighbour's over
-  the width taper, and the end carried past a slight bend (Savanoriu pr. left_of:1 into left_of:2: a 5.3 m edge step and
-  a 1 m grass wedge, both gone). Roads level scene H (x 630-840, y -955). Plots
-  `scratch/toma_placement/{scene_h,junction_now,junction_zoom}.png`; checked in game 2026-11-25 (the lines stepped
-  0.7 m at the joint, fixed in 775add0). Left: the 16 m piece's left edge widens over a short run (the piece is
-  short); test-level upload with scene H (ask first).
-- **Sidewalks at banks and the water.** Start again from the diagrams; the sea-wall approach was scrapped
-  2026-11-24. `docs/handoff.md`, "Sidewalks at banks and the water"; record in H > 0.3.7 and H > Priority list
-  (item 10). Done when: no sidewalk sweep cell worse than dev, then in game at Kingston and Naldo.
-- **Fizz_Mechanic's remaining points.** Road-to-bridge and road-to-tunnel joins, the galleries round the lake, the
-  tunnel box by the dam, bridge width (needs the place from him). `docs/handoff.md`; full lists in
-  H > Fizz_Mechanic's feedback on 0.3.5 and H > Fizz_Mechanic's 0.3.3 list.
-- **Long bridges in levels built in pieces.** Bridges are still planned per piece. `docs/handoff.md`.
-- **Mesh Road joins and hairpins.** Experimental feature, last. `docs/handoff.md`.
-- **Ride-alongs:** re-frame the other 38 sweep areas, Zion's tunnel with shaping off, Amsterdam's 221 m deck,
-  thecoachtoma's width-change report, the optimization and UI passes. `docs/handoff.md`.
-- **Slip roads at the outer lane: five open points** (freeway interchanges, terrain under a moved slip road,
-  traffic on the invisible roads, sidewalks on streets with none mapped, plain one-way slip roads).
-  `docs/handoff.md`.
-- **Toma's three notes** (backlog section 1), not started. `docs/handoff.md`. (Check if still open: the carriageway
-  splits work of 2026-11-25 may have covered some.)
+- **Shipped to main 2026-11-25, on the release page; tracked here until 0.3.7 is out:** thecoachtoma's placement
+  tags (scenes A-E), carriageway splits (branches start as their share of the trunk), tagged widths capped by counted
+  lanes, signal poles off placed roads (F, G), per-lane widths `width:lanes` and placed pieces meeting at joints (H),
+  Splatplays' kerb widths, traffic islands, path level crossings, bare-curb verge, median seam, rail gauge. Plots in
+  `scratch/toma_placement/` and `scratch/splat/plot/`. Left after 0.3.7 (backlog): Toma's Kaunas junctions once his
+  placement edits are on OSM; painted asphalt not tapered at a lane gain; the painter assumes right-hand traffic for
+  two-way placement:forward/backward; the 16 m Savanoriu piece widens over a short run.
+- **lominsa's window out-of-memory crash (MR-VYQGBY): fixed on dev 9ecc39a.** The dump says out of memory in the
+  window; the 2D preview rebuilt the backdrop's tiles at full size there. Now it shows the runner's small copies.
+  `docs/handoff.md` work list.
+- **Very large levels: proved 2026-11-25 (on dev, sweep running).** A 5 km road level in 12 pieces built with
+  `scratch/reports/MR-VYQGBY/roadsmall.mjs`, loaded in game; the same level padded to 66,711 files
+  (`pad64.mjs`, ZIP64) loads and draws the same (the game lists all 66,000 padding files). The game's map screen
+  framed the hidden anchor TerrainBlock 30 km away with the roads: the anchor now 25.6 m a side, 100 m under the
+  spawn (`groundAnchorPosition`); the map screen frames the whole road, decals draw. Each chunk's report is its own
+  file (`reports/chunk_<key>.md`) and the level's report one line per chunk (3.4 KB for 12 pieces; it was every
+  report in one file, 70 MB at 442) and no longer the first chunk's own report (the streamed zip kept the first
+  copy). The 20 km per drag stays by design. Not built: a real level over 65,535 files (about 1,300 pieces).
+- **0.3.8 targets** (the user, 2026-11-25): sidewalk fixes (missing curbs, odd shapes on their St. Augustine level)
+  and tile rotation on the 2D map. `refs/output/backlog.md` "0. Next up"; decision recorded.
+- **Carried to after 0.3.7** (`docs/handoff.md`): sidewalks at banks and the water; Fizz_Mechanic's remaining points
+  (road-to-bridge/tunnel joins, lake galleries, the dam's tunnel box, bridge width); long bridges in levels built in
+  pieces; slip roads at the outer lane (five points); Mesh Road joins and hairpins; the ride-alongs. Toma's notes of
+  2026-11-24: (a) road smoothing beside another ground road and (b) smoothing under paths are open, (c) done
+  (backlog area 1).
 
-**Before the 0.3.7 release:**
+## Before the 0.3.7 release
 
-- The 0.3.7 page lines: old batch jobs can no longer be opened; the Perth fixes; whatever else lands
-  (`public/updates/0.3.7/`).
-- The unproven very-large-level points: no level over 65,535 files built end to end; whether BeamNG loads a ZIP64
-  zip; the merged report holds every piece's report (70 MB at 442 pieces); the road end handle drags 20 km at most;
-  the game's own map screen for a level in pieces. `docs/handoff.md`; H > 0.3.7.
+- Release page `public/updates/0.3.7/`: batch-jobs line and the Perth fixes in (2026-11-25); add the large-level
+  proofs' outcome and the desktop memory fix (in).
+- Official test levels rebuilt with scenes F-H and uploaded (ask first).
+- Dependabot: open alerts on vite (1 high, 7 medium, 1 low) and esbuild (dev tools, not shipped in the app), and
+  minimatch in /desktop (medium, the 0.3.6 note). Not updated before the release: a vite major step is no
+  release-day change. After 0.3.7.
+- The user: run the signed Windows installer for the release (not run here since 0.3.6).
 
 ## Smaller open points from the moved sections
 
@@ -119,16 +103,9 @@ Each was open when its section moved. Detail in the H section named.
   the road levelling at Generate reaches the export as "survey"; road edges on steep ground (relax the seam);
   sidewalk tilt with shaping off; more jagged-edge examples wanted from the user. H > Before 0.3.5. (Check if still
   open.)
-- **LAZ uploads:** Toma to check the gap fill on a dev build; a two-sided outlier filter and Kriging left for later.
-  H > Before 0.3.5. (Check if still open.)
-- **Desktop Cancel report:** the export waited on a surroundings download, where downloads belong at Generate.
-  H > Fizz_Mechanic's 0.3.3 list. (Check if still open.)
-- **Dependabot:** a minimatch update check failed in /desktop on the 0.3.6 commit, not looked at. H > Priority
-  list. (Check if still open.)
-
-## Waiting on someone
-
 - **The user:** run the signed Windows installer (not run here for 0.3.6 or later). H > Priority list.
+- **Toma (LAZ uploads):** check the gap fill on a dev build; a two-sided outlier filter and Kriging left for later.
+  H > Before 0.3.5.
 - **The user (optional):** a second update key pair, so the first can be retired (its public half into
   `UPDATE_KEYS`). H > Now: security pass 2026-11-23.
 - **The user:** post the draft answers to Fizz (`scratch/fizz033/replies_draft.md`), and tell Toma and

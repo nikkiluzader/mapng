@@ -1034,7 +1034,17 @@ export const GROUND_TEXTURE_REL = 'art/terrains/terrain_b.color.png';
 // TerrainBlock added at runtime, even 30 km away, and they appeared within seconds). Out there nothing on the map
 // reads its height (core_terrain.getTerrainHeight, traffic's tunnel test) and it is past any view distance.
 export const GROUND_ANCHOR_SIZE = 256;
-export const GROUND_ANCHOR_OFFSET_M = 30000;
+// The anchor TerrainBlock's position (its corner) for a spawn at [x, y, z]: centred under it, GROUND_ANCHOR_DEPTH_M down.
+export function groundAnchorPosition(spawn) {
+  const half = (GROUND_ANCHOR_SIZE * GROUND_ANCHOR_SQUARE_M) / 2;
+  const [x, y, z] = Array.isArray(spawn) ? spawn : [0, 0, 0];
+  return [Number(x) - half || -half, Number(y) - half || -half, (Number(z) || 0) - GROUND_ANCHOR_DEPTH_M];
+}
+// (where it stands: GROUND_ANCHOR_DEPTH_M under the spawn, GROUND_ANCHOR_SQUARE_M a square, so 25.6 m a side. It
+// stood 30 km outside the map, and the game's map screen frames the TerrainBlock's box with the roads: a level's
+// roads sat at the edge of a 35 km view, the rest empty, 2026-11-25 on a road level in pieces)
+export const GROUND_ANCHOR_SQUARE_M = 0.1;
+export const GROUND_ANCHOR_DEPTH_M = 100;
 const groundMaterialName = (surface) => `mapng_ground_${String(surface).replace(/[^A-Za-z0-9_]/g, '_')}`;
 const GROUND_DETAIL_SIZE_M = 2;   // a terrain material's detail size when it names none
 
@@ -14404,7 +14414,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       : null;
     if (chunkOwnsActive) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Chunk: keeping only its core, pixels ${chunkCore.join(', ')} of ${N}² (ground, objects by position, roads cut at its edge).`);
   }
-  console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Ground: ${groundAsModels ? `as models (experimental): the ground in tiled models with collision (the only TerrainBlock a small flat anchor far outside the map)${groundKeepSquare ? ', only the shape\'s squares' : ''}; DecalRoads projected onto objects; no ground cover (it grows on TerrainBlock layers only)` : 'a TerrainBlock (the default)'}.`);
+  console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Ground: ${groundAsModels ? `as models (experimental): the ground in tiled models with collision (the only TerrainBlock a small flat anchor under the spawn)${groundKeepSquare ? ', only the shape\'s squares' : ''}; DecalRoads projected onto objects; no ground cover (it grows on TerrainBlock layers only)` : 'a TerrainBlock (the default)'}.`);
   // (raised sidewalks are built only in the mesh style; the decal style draws strips instead)
   const includeSidewalks = sidewalksWanted && sidewalkStyle !== 'decal';
   const sidewalkStrips = sidewalksWanted && sidewalkStyle === 'decal';
@@ -15987,7 +15997,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     layerMap: anchorTer ? null : terLayerMap,
     materialNames: anchorTer ? [(pbrResult?.materialNames ?? ['DefaultMaterial'])[0]] : (pbrResult?.materialNames ?? null),
   });
-  if (anchorTer) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Anchor terrain: terrain.ter is a flat ${GROUND_ANCHOR_SIZE}×${GROUND_ANCHOR_SIZE} placeholder ${GROUND_ANCHOR_OFFSET_M / 1000} km outside the map (the game draws DecalRoads only while a TerrainBlock exists); the ground itself is models.`);
+  if (anchorTer) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Anchor terrain: terrain.ter is a flat ${GROUND_ANCHOR_SIZE}×${GROUND_ANCHOR_SIZE} placeholder, ${(GROUND_ANCHOR_SIZE * GROUND_ANCHOR_SQUARE_M).toFixed(1)} m a side, ${GROUND_ANCHOR_DEPTH_M} m under the spawn (the game draws DecalRoads only while a TerrainBlock exists; the map screen frames its box with the roads); the ground itself is models.`);
 
   beginStep('heightmap', `Encoding the 16-bit heightmap PNG (${size}×${size})…`);
   await yield_();
@@ -18211,9 +18221,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     class: 'TerrainBlock',
     name: 'theTerrain',
     persistentId: generatePersistentId(),
-    // (the ground as models: the anchor terrain, flat, far outside the map: GROUND_ANCHOR_SIZE)
-    position: groundModels ? [halfExtent + GROUND_ANCHOR_OFFSET_M, halfExtent + GROUND_ANCHOR_OFFSET_M, -1000] : [-halfExtent, -halfExtent, terrainBlockZ],
-    squareSize: groundModels ? 1 : squareSize,
+    // (the ground as models: the anchor terrain, flat and small, out of sight under the spawn: GROUND_ANCHOR_SIZE)
+    position: groundModels ? groundAnchorPosition(spawnPosition) : [-halfExtent, -halfExtent, terrainBlockZ],
+    squareSize: groundModels ? GROUND_ANCHOR_SQUARE_M : squareSize,
     maxHeight: groundModels ? 1 : terrainBlockMaxHeight,
     baseTexSize: groundModels ? GROUND_ANCHOR_SIZE : size,
     terrainFile: terrainBinaryVirtualPath,
@@ -18243,7 +18253,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     }
     const terrainDefs = new Map(Object.values(pbrResult?.materialDefs || {}).filter((d) => d?.internalName).map((d) => [d.internalName, d]));
     zip.file(`${base}/${GROUND_MODEL_DIR}/main.materials.json`, JSON.stringify(groundModelMaterialDefs(levelName, groundModels.groundModels, terrainDefs, worldSize), null, 2));
-    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Ground models written: ${groundModels.tiles.length} TSStatic(s) in level_objects; the TerrainBlock is only the flat anchor ${GROUND_ANCHOR_OFFSET_M / 1000} km outside the map.`);
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Ground models written: ${groundModels.tiles.length} TSStatic(s) in level_objects; the TerrainBlock is only the small flat anchor at ${groundAnchorPosition(spawnPosition).map((v) => v.toFixed(1)).join(', ')} (${GROUND_ANCHOR_DEPTH_M} m under the spawn).`);
   }
 
   // the building tiles: lit windows at night as the old single shape had them

@@ -134,3 +134,19 @@ test('the merged level\'s map view has one picture tile per chunk, moved with it
   ]);
   for (const t of info.minimap) assert.ok(out.file(`levels/lv/${t.file}`), `picture ${t.file} is in the level`);
 });
+
+test('a chunked level: each chunk\'s report its own file, the level\'s report one line per chunk', async () => {
+  const { chunkReportLine } = await import('../services/chunkedExport.js');
+  const rep = '# MapNG BeamNG Level Export Report\n\n## Summary\n- Processing time before ZIP compression: 15.71 s\n\n## Terrain\n- Height range min/max: -10.11 m / 20.46 m\n- Terrain sample warning: none\n';
+  assert.equal(chunkReportLine(rep), 'heights -10.11 m / 20.46 m, 15.71 s');
+  assert.equal(chunkReportLine(rep.replace('warning: none', 'warning: 12% no data')), 'heights -10.11 m / 20.46 m, 15.71 s, warning: 12% no data');
+  assert.equal(chunkReportLine('nothing'), 'report kept');
+});
+
+test('the ground-as-models anchor terrain: small, under the spawn (the map screen frames it with the roads)', async () => {
+  const { groundAnchorPosition, GROUND_ANCHOR_SIZE, GROUND_ANCHOR_SQUARE_M, GROUND_ANCHOR_DEPTH_M } = await import('../services/exportBeamNGLevel.js');
+  const side = GROUND_ANCHOR_SIZE * GROUND_ANCHOR_SQUARE_M;
+  assert.ok(side < 30, `a side of ${side} m`);
+  const p = groundAnchorPosition([100, -2500, 22]);
+  assert.deepEqual(p.map((v) => Math.round(v * 10) / 10), [100 - side / 2, -2500 - side / 2, 22 - GROUND_ANCHOR_DEPTH_M].map((v) => Math.round(v * 10) / 10));
+});

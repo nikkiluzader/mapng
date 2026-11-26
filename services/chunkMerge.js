@@ -273,6 +273,10 @@ export function createChunkMerger(sink, levelName, { log = () => {}, bounds = nu
       }
       // level-wide files (info, terrain anchor, scripts, previews): from the first chunk, at the root
       const levelWide = !rel.includes('/') || rel.startsWith('art/terrains/terrain.') || rel === 'art/terrains/main.materials.json' || rel.startsWith('groundModels/');
+      // (the chunk's own report: kept under reports/ by services/chunkedExport.js, which writes the level's report at
+      // the root. Copied here first, the streamed zip kept it and refused the level's own: the level showed its first
+      // chunk's report as if it were the level's)
+      if (rel === 'export_report.md' || rel === 'export_report.txt') continue;
       if (levelWide) {
         if (first) {
           const isText = /\.(json|lua|txt|md)$/.test(rel);

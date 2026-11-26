@@ -58,6 +58,16 @@ export function seamBlendFor(chunk, finished, ease = SEAM_EASE_PX) {
   return { target, weight };
 }
 
+// One line of a chunk's report for the level's own: its heights, time and any warning it gave.
+export function chunkReportLine(text) {
+  const pick = (re) => (String(text).match(re) || [])[1]?.trim();
+  const parts = [];
+  const range = pick(/^- Height range min\/max: (.+)$/m); if (range) parts.push(`heights ${range}`);
+  const time = pick(/^- Processing time before ZIP compression: (.+)$/m); if (time) parts.push(time);
+  const warn = pick(/^- Terrain sample warning: (.+)$/m); if (warn && warn !== 'none') parts.push(`warning: ${warn}`);
+  return parts.join(', ') || 'report kept';
+}
+
 /**
  * The chunked level: { zip (JSZip), chunks: [{ key, ms }], log }. footprint: rects or { runs } on the level's W x H
  * grid around `center` at `mpp`; generateChunk(chunk, { bounds, center }) -> terrainData (the chunk's square, from the
@@ -104,7 +114,12 @@ export async function exportChunked({ JSZip, footprint, W, H, center, mpp, level
     }));
     // (the merge sets every chunk at its own height from this: without it a chunk would sit hundreds of metres off)
     if (!Number.isFinite(Number(res?.finalMinHeight))) throw new Error(`Chunk ${c.key} (${k + 1} of ${chunks.length}): the export gave no lowest height for it; the chunks cannot be set at their heights.`);
-    if (typeof res.report === 'string' && res.report) reports.push({ key: c.key, text: res.report });
+    // (each chunk's report into the level as it is done, under reports/, and only a line of it kept: holding every
+    // chunk's report for one file at the end made 70 MB for 442 chunks, report MR-VYQGBY)
+    if (typeof res.report === 'string' && res.report) {
+      await out.put(`levels/${levelName}/reports/chunk_${c.key}.md`, res.report);
+      reports.push({ key: c.key, line: chunkReportLine(res.report) });
+    }
     finished.push({ key: c.key, x0: c.x0, y0: c.y0, size: c.size, core: c.core, runs: c.runs, heights: res.finalHeights, roads: res.finalRoads || [], off });
     // (a finished chunk's heights are needed only while a later chunk can still touch it: rows two chunks back drop)
     for (let i = finished.length - 1; i >= 0; i--) if (finished[i].y0 + finished[i].size < c.y0 - overlap) finished.splice(i, 1);
@@ -122,13 +137,16 @@ export async function exportChunked({ JSZip, footprint, W, H, center, mpp, level
   const report = [
     `# MapNG export report: ${levelName} (built in ${chunks.length} chunks)`,
     '',
-    `A level of ${W} x ${H} squares at ${mpp} m, built as ${chunks.length} chunks of ${size} squares (${overlap} shared with each neighbour) and merged. Each chunk's own report follows; the map data bundled in this level (mapng_source) is the first chunk's.`,
+    `A level of ${W} x ${H} squares at ${mpp} m, built as ${chunks.length} chunks of ${size} squares (${overlap} shared with each neighbour) and merged. Each chunk's own report is in the level's reports folder (reports/chunk_<key>.md), one line of each below; the map data bundled in this level (mapng_source) is the first chunk's.`,
     '',
     '## How the chunks were put together',
     '',
     ...lines.map((l) => `- ${l}`),
     '',
-    ...reports.flatMap((r) => [`## Chunk ${r.key}`, '', r.text.replace(/^# /gm, '### ').replace(/^## /gm, '#### '), '']),
+    '## The chunks',
+    '',
+    ...reports.map((r) => `- ${r.key}: ${r.line} (reports/chunk_${r.key}.md)`),
+    '',
   ].join('\n');
   await out.put(`levels/${levelName}/export_report.md`, report);
   return { zip: own, chunks: times, report };
