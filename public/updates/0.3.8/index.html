@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MapNG 0.3.8: Sidewalks and Curbs</title>
+<meta name="description" content="MapNG 0.3.8 (draft): sidewalks and curbs that sit right in their streets.">
+<link rel="canonical" href="https://mapng.com/updates/0.3.8/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MapNG 0.3.8: more file formats, smoother curves, very large levels">
+<meta property="og:description" content="More OSM file formats, smoother rail and path curves, very large levels.">
+<meta property="og:url" content="https://mapng.com/updates/0.3.8/">
+<meta property="og:image" content="https://mapng.com/updates/0.3.8/images/sidewalk-back-edge.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<script>
+  // the theme before the first paint: the app's link (?theme=), else this visit's, else the app's own choice, else the system's
+  (function () { var t; try { var q = new URLSearchParams(location.search).get('theme'); if (q === 'dark' || q === 'light') sessionStorage.setItem('mapng_page_theme', q); t = sessionStorage.getItem('mapng_page_theme') || localStorage.getItem('theme'); } catch (e) { /* storage blocked */ } if (t !== 'dark' && t !== 'light') t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; document.documentElement.setAttribute('data-theme', t); })();
+</script>
+<style>
+  /* BeamNG.drive's UI fonts, as the app (public/fonts, SIL OFL) */
+  @font-face { font-family: "Noto Sans"; src: url(/fonts/noto-sans-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass"; src: url(/fonts/overpass-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass Mono"; src: url(/fonts/overpass-mono-latin-wght-normal.woff2) format("woff2"); font-weight: 300 700; font-display: swap; }
+  :root {
+    --bg: #f7f7f8; --surface: #ffffff; --surface-2: #f2f2f4; --border: #e3e3e8;
+    --text: #1d1d22; --text-2: #4a4a55; --muted: #6e6e7a;
+    --brand: #ff6600; --brand-ink: #c2410c; --brand-tint: #fff4ec;
+    --ok: #15803d; --code-bg: #1d1d22; --code-text: #f4f4f6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+      --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+      --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+      --ok: #4ade80; --code-bg: #0b0b0e; --code-text: #ececf0;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+    --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+    --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+    --ok: #4ade80; --code-bg: #0b0b0e; --code-text: #ececf0;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--brand-ink); }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 0 16px; }
+  header.top { background: linear-gradient(90deg, #ff6600, #f59e0b); color: #fff; }
+  header.top .wrap { padding-top: 20px; padding-bottom: 36px; }
+  .brand { display: inline-flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; opacity: .95; }
+  .brand img { width: 22px; height: 22px; }
+  h1, h2, h3 { font-family: "Overpass", "Noto Sans", system-ui, sans-serif; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.15; margin: 22px 0 10px; letter-spacing: -0.01em; }
+  .lede { font-size: 18px; max-width: 640px; margin: 0; color: rgba(255,255,255,.95); }
+  main { padding: 0 0 64px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: -22px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .card b { display: block; font-size: 15px; margin-bottom: 2px; }
+  .card span { color: var(--text-2); font-size: 14px; }
+  .card .tick { color: var(--ok); font-weight: 700; margin-right: 4px; }
+  section { margin-top: 44px; }
+  h2 { font-size: 24px; line-height: 1.25; margin: 0 0 10px; }
+  h3 { font-size: 17px; margin: 22px 0 6px; }
+  p, li { color: var(--text-2); }
+  .note { background: var(--brand-tint); border-left: 3px solid var(--brand); border-radius: 0 8px 8px 0; padding: 10px 14px; color: var(--text); font-size: 15px; }
+  pre { background: var(--code-bg); color: var(--code-text); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-size: 14px; line-height: 1.5; }
+  code { font-family: "Overpass Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; }
+  p code, li code, td code { background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; color: var(--text); }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; color: var(--text); white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  td { color: var(--text-2); }
+  .flow { list-style: none; padding: 0; margin: 14px 0 0; counter-reset: step; }
+  .flow li { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px 12px 52px; margin: 0 0 22px; counter-increment: step; }
+  .flow li::before { content: counter(step); position: absolute; left: 14px; top: 12px; width: 26px; height: 26px; border-radius: 50%; background: var(--brand); color: #fff; font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+  .flow li:not(:last-child)::after { content: ""; position: absolute; left: 26px; bottom: -22px; width: 2px; height: 22px; background: var(--border); }
+  .flow b { color: var(--text); }
+  .flow .where { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .02em; color: var(--brand-ink); background: var(--brand-tint); border-radius: 999px; padding: 1px 8px; margin-left: 6px; vertical-align: 1px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 12px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .stat .v { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
+  .stat .k { font-size: 13px; color: var(--muted); }
+  .usage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 12px; }
+  .usage-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
+  .usage-card h3 { font-size: 14px; margin: 0 0 6px; }
+  .usage-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; font-size: 13px; margin: 4px 0; }
+  .usage-row .bar { grid-column: 1 / -1; height: 4px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
+  .usage-row .bar span { display: block; height: 100%; background: var(--brand); border-radius: 2px; }
+  .usage-row .n { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .never { columns: 2 240px; column-gap: 24px; padding-left: 20px; }
+  .never li { break-inside: avoid; margin-bottom: 6px; }
+  footer { border-top: 1px solid var(--border); margin-top: 56px; padding-top: 18px; font-size: 14px; color: var(--muted); }
+  footer p { color: var(--muted); }
+
+  /* this page's own pieces */
+  .pill { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .02em; border-radius: 999px; padding: 1px 9px; margin-right: 6px; vertical-align: 1px; white-space: nowrap; }
+  .pill.desk { color: var(--brand-ink); background: var(--brand-tint); }
+  .pill.web { color: var(--text); background: var(--surface-2); border: 1px solid var(--border); }
+  .pill.both { color: #fff; background: var(--brand); }
+  .measures { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 14px; }
+  .measure { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .measure h3 { margin: 6px 0 4px; font-size: 16px; }
+  .measure p { margin: 0; font-size: 14.5px; }
+  .measure .how { margin-top: 8px; font-size: 13px; color: var(--muted); }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-top: 12px; }
+  .two > div { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .two h3 { margin-top: 0; }
+  .two ul { padding-left: 18px; margin: 6px 0 0; }
+  .two li { font-size: 14.5px; margin-bottom: 4px; }
+  .limits li { margin-bottom: 8px; }
+  .toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; padding: 0; list-style: none; }
+  .toc a { display: inline-block; font-size: 14px; text-decoration: none; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; color: var(--text); }
+  .toc a:hover { border-color: var(--brand); }
+
+  /* this page: pictures and the summary tiles */
+  section { padding-top: 34px; }
+  section h2 { font-size: 24px; line-height: 1.25; margin: 0 0 10px; }
+  section p, section li { color: var(--text-2); }
+  section p { margin: 0 0 12px; max-width: 70ch; }
+  section ul { margin: 0 0 12px; padding-left: 20px; max-width: 70ch; }
+  section li { margin-bottom: 6px; }
+  figure { margin: 16px 0 20px; }
+  figure img { display: block; width: 100%; height: auto; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+  figcaption { font-size: 13.5px; color: var(--muted); margin-top: 6px; max-width: 78ch; }
+  .kicker { font: 700 11px/1 "Overpass", "Noto Sans", sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--brand-ink); margin-bottom: 8px; }
+  .cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  .btn { display: inline-block; padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 14px; text-decoration: none; border: 1px solid var(--border); color: var(--text); background: var(--surface); }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .note { border-left: 3px solid var(--brand); background: var(--brand-tint); padding: 10px 14px; margin: 14px 0; color: var(--text-2); max-width: 74ch; }
+  footer { border-top: 1px solid var(--border); margin-top: 40px; padding: 20px 0 0; font-size: 13.5px; color: var(--muted); }
+
+  /* 0.3.5: pictures still to come (draft) */
+  .ph { border: 2px dashed var(--border); border-radius: 8px; background: var(--surface-2); color: var(--muted); padding: 34px 18px; text-align: center; font-size: 14px; }
+  .ph b { display: block; color: var(--text-2); margin-bottom: 4px; }
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+  .pair figure { margin: 0; }
+  .draft-tag { display: inline-block; margin: 14px 0 0; padding: 4px 10px; border-radius: 999px; background: rgba(0,0,0,.25); color: #fff; font-size: 13px; font-weight: 600; }
+</style>
+<link rel="stylesheet" href="/pages.css">
+<script src="/pages.js" defer></script>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/favicon.svg" alt="">MapNG</a>
+    <h1>MapNG 0.3.8: sidewalks and curbs</h1>
+    <p class="lede">Sidewalks that sit in their streets the way real ones do.</p>
+    <span class="draft-tag">Draft: not released yet</span>
+  </div>
+</header>
+<main class="wrap">
+
+  <section id="sidewalks" data-nav="Sidewalks">
+    <div class="kicker">From a tester's map of St. Augustine</div>
+    <h2>Sidewalks flush with their lawns</h2>
+    <ul>
+      <li><b>No more step down to the grass.</b> A sidewalk stood 10 to 20 cm proud of the lawn along its back edge, on nearly every street: the ground round the paving was graded from under the slab. The lawn now meets the sidewalk's back edge flush, as a real one sits in its grass. Banks and hillsides beside a sidewalk keep their slope.</li>
+    </ul>
+    <figure><img src="images/sidewalk-back-edge.jpg" alt="The same street corner in the game twice: left, the sidewalk's edge stands up from the lawn with a dark line along it; right, the grass runs up to the sidewalk flush." loading="lazy"><figcaption>The same corner, before (left) and after (right): the lawn now meets the sidewalk flush.</figcaption></figure>
+  </section>
+
+  <footer>
+    <p>MapNG is free and open source: <a href="https://github.com/nikkiluzader/mapng">github.com/nikkiluzader/mapng</a>. Thanks to everyone on Discord who sent maps, screenshots and reports. Earlier updates: <a href="/updates/0.3.7/">0.3.7</a>, <a href="/updates/0.3.6/">0.3.6</a>.</p>
+  </footer>
+</main>
+</body>
+</html>
