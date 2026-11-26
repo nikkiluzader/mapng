@@ -3841,11 +3841,17 @@ function getLayeredRoadDecals(centerNodes, highway, tags, styleHalfWidth, parent
   let layers = (ROAD_TEMPLATES[templateKey] || ROAD_TEMPLATES.default).filter((layer) => {
     // the asphalt-to-grass blend belongs to asphalt
     // (and to an open edge: a curb stands at a town street's)
-    if (layer.name.startsWith('edge_')) return grassEdgeBlendEnabled && !paving && !options.curbed;
+    // (nor to concrete: a concrete road's edge is a clean one into the grass. Blended, the asphalt's ragged edge lay as a
+    // dark strip between a concrete trunk road and its sidewalk (St. Augustine's Ponce de Leon Blvd, Mapillary))
+    if (layer.name.startsWith('edge_')) return grassEdgeBlendEnabled && !paving && !options.curbed && !concrete;
     return true;
   }).map((layer) => {
     if (!layer.name.startsWith('edge_') || options.edgeSeed === undefined) return layer;
     // some variety along the country roads, a road at a time, a side apart
+    // (in a town the verge is a lawn: asphalt into grass only. The dirt variety laid a strip of bare earth between an
+    // uncurbed road and the sidewalk beside it, where the street has grass (St. Augustine's Ponce de Leon Blvd, the
+    // user 2026-11-26, Mapillary))
+    if (options.urban) return { ...layer, material: GLOBAL_DECAL_MATERIALS.edgeAsphaltGrass };
     const pick = (hashString(`${options.edgeSeed}:${layer.name}`) >>> 0) / 4294967296;
     const material = pick < 0.45 ? GLOBAL_DECAL_MATERIALS.edgeAsphaltGrass : pick < 0.8 ? GLOBAL_DECAL_MATERIALS.edgeDirtGrass : GLOBAL_DECAL_MATERIALS.edgeDirt;
     return { ...layer, material };
