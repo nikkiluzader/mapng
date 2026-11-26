@@ -45,14 +45,23 @@ const parseWidths = (v) => {
  * width:lanes:forward / :backward (each listed from the left looking its own way); else null (per-lane widths not
  * mapped, or not one per lane). Right-hand traffic: the backward lanes to the left of the forward ones.
  */
-export function laneWidthsAcross(tags = {}, lanes = null, leftHand = false) {
+export function laneWidthsAcross(tags = {}, lanes = null, leftHand = false, at = null) {
   const lc = lanes || laneCounts(tags);
+  // (no end asked for, and the widths change along the way, :start / :end: the wider end, the road drawn as wide as its
+  // widest and narrowed along the way, laneWidthsAlong)
+  if (!at && hasAlongWidths(tags)) {
+    const s = laneWidthsAcross(tags, lc, leftHand, 'start'); const e = laneWidthsAcross(tags, lc, leftHand, 'end');
+    if (!s || !e) return s || e;
+    return e.reduce((a, l) => a + l.w, 0) > s.reduce((a, l) => a + l.w, 0) ? e : s;
+  }
+  // (at one end: width:lanes:start, width:lanes:forward:start, ..., each falling back to its plain key)
+  const tag = (key) => parseWidths(at && tags[`${key}:${at}`] !== undefined ? tags[`${key}:${at}`] : tags[key]);
   if (lc.oneway) {
-    const w = parseWidths(tags['width:lanes']) || parseWidths(tags['width:lanes:forward']);
+    const w = tag('width:lanes') || tag('width:lanes:forward');
     return w && w.length === lc.total ? w.map((x, i) => ({ dir: 'f', idx: i + 1, w: x })) : null;
   }
-  let f = parseWidths(tags['width:lanes:forward']); let b = parseWidths(tags['width:lanes:backward']);
-  const all = parseWidths(tags['width:lanes']);
+  let f = tag('width:lanes:forward'); let b = tag('width:lanes:backward');
+  const all = tag('width:lanes');
   if ((!f || !b) && all && all.length === lc.total) {
     // (listed along the way, left to right: right-hand traffic the backward lanes first)
     const left = leftHand ? lc.forward : lc.backward;
@@ -68,6 +77,26 @@ export function laneWidthsAcross(tags = {}, lanes = null, leftHand = false) {
   const B = b.map((x, i) => ({ dir: 'b', idx: i + 1, w: x })).reverse();
   return leftHand ? [...F, ...B] : [...B, ...F];
 }
+
+const ALONG_KEY = /^width:lanes(:forward|:backward)?:(start|end)$/;
+const hasAlongWidths = (tags) => Object.keys(tags).some((k) => ALONG_KEY.test(k));
+
+/**
+ * Lane widths changing along the way (width:lanes:start / :end, and :forward / :backward with them; wiki Key:width:lanes:
+ * the widths at the way's first and last node, varying in between, as placement:start / :end): { start, end }, each
+ * laneWidthsAcross at that end, the same lanes at both; null when they are not mapped or do not differ.
+ */
+export function laneWidthsAlong(tags = {}, lanes = null, leftHand = false) {
+  if (!hasAlongWidths(tags)) return null;
+  const lc = lanes || laneCounts(tags);
+  const start = laneWidthsAcross(tags, lc, leftHand, 'start'); const end = laneWidthsAcross(tags, lc, leftHand, 'end');
+  if (!start || !end || start.length !== end.length) return null;
+  if (start.every((l, i) => Math.abs(l.w - end[i].w) < 1e-3)) return null;
+  return { start, end };
+}
+
+/** The lanes across at a share t of the way (0 its first node, 1 its last): each lane's width blended. */
+export const laneWidthsAt = (along, t) => along.start.map((l, i) => ({ ...l, w: l.w + (along.end[i].w - l.w) * Math.max(0, Math.min(1, t)) }));
 
 /**
  * The carriageway's middle relative to the mapped line (m, left of the way's direction positive) for one placement
@@ -96,14 +125,17 @@ export function placementShift(tags = {}, { half = 3.5, extraShift = 0, leftHand
   const keys = Object.keys(tags).filter((k) => /^placement(:|$)/.test(k));
   if (!keys.length) return null;
   const lanes = laneCounts(tags, half);
-  // (the lanes across: their mapped widths, else equal lanes over the driving width)
-  const across = laneWidthsAcross(tags, lanes, leftHand) || (() => {
-    const w = (2 * half) / lanes.total; const out = [];
+  // (the lanes across: their mapped widths, else equal lanes over the driving width; at each end its own, the widths
+  // changing along the way, width:lanes:start / :end)
+  const equal = () => {
+    const w = (2 * half) / lanes.total;
     const F = Array.from({ length: lanes.forward }, (_, i) => ({ dir: 'f', idx: i + 1, w }));
     const B = Array.from({ length: lanes.backward }, (_, i) => ({ dir: 'b', idx: i + 1, w })).reverse();
     return lanes.oneway ? F : leftHand ? [...F, ...B] : [...B, ...F];
-  })();
-  const pick = (suffix) => {
+  };
+  const acrossAt = { start: laneWidthsAcross(tags, lanes, leftHand, 'start') || equal(), end: laneWidthsAcross(tags, lanes, leftHand, 'end') || equal() };
+  const pick = (suffix, at) => {
+    const across = acrossAt[at];
     // (two-way: forward first, then backward, then a plain placement counted over every lane)
     const cands = lanes.oneway
       ? [[`placement${suffix}`, 'all'], [`placement:forward${suffix}`, 'all']]
@@ -115,14 +147,13 @@ export function placementShift(tags = {}, { half = 3.5, extraShift = 0, leftHand
     }
     return null;
   };
-  const plain = pick('');
-  const start = pick(':start');
-  const end = pick(':end');
-  const a = start ?? plain; const b = end ?? plain;
+  const start = pick(':start', 'start');
+  const end = pick(':end', 'end');
+  const a = start ?? pick('', 'start'); const b = end ?? pick('', 'end');
   if (a === null && b === null) return null;
   const s0 = a ?? b; const s1 = b ?? a;
   // (never past the carriageway's edge: a line outside its own road is a tagging slip)
-  const lim = Math.max(half, across.reduce((a, l) => a + l.w, 0) / 2);
+  const lim = Math.max(half, ...[acrossAt.start, acrossAt.end].map((x) => x.reduce((a, l) => a + l.w, 0) / 2));
   const clamp = (v) => Math.max(-lim, Math.min(lim, v));
   // (the lanes' middle from the tag, then the carriageway's from the extras either side of the lanes)
   const out = { start: clamp(s0) + extraShift, end: clamp(s1) + extraShift };

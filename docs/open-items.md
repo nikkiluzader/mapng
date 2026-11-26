@@ -46,13 +46,15 @@ A new session starts with `docs/handoff.md` ("Work list").
     two-width T, 7 to 13 m); St. Augustine's grey strip under Ponce de Leon's verge is the terrain paint.
   Joins "sidewalks at banks and the water", the sidewalk order of 2026-11-24 and the stairs model (backlog 10).
 - **Discord feedback after 0.3.7 (2026-11-26), in the order agreed** (the user: "proceed with your recommendations"):
-  1. **Stop lines and zebra crossings ignore placement** (thecoachtoma): drawn across the mapped line, not the drawn
-     road. Probably the same missing placement shift as the signal poles (a1ba6bb). In progress.
+  1. **Stop lines and zebra crossings ignore placement** (thecoachtoma): done d551ff0 (centred on the drawn road;
+     roads scene G has a zebra; checked in game on his Savanoriu area).
   2. **A sideways shift at a joint does not blend** (thecoachtoma, screenshot + satellite in
      `scratch/discord/2026-11-26/`): the left lane ends as a right lane begins, same width, the road steps sideways with
-     grass at the step; the taper only starts on a width change. Ease each edge on its own over a taper run.
+     grass at the step; the taper only starts on a width change. Done 87db1e0 (shift-only taper; roads scene I).
   3. **`width:lanes:start` / `:end`** (and `:forward/:backward:start/:end`; thecoachtoma's stats: 6,198 / 3,121 / ~500-1,100
-     uses): lane widths blended along the way, as placement:start/end already are. With 2: the joint and lane-width code.
+     uses): lane widths blended along the way, as placement:start/end already are. Built (roads scene J, checked in game);
+     placement:start/end and these now measured along the whole way (a junction split restarted them). Commit after
+     its sweep.
   4. **A guide to manual improvements** (Splatplays): how to tag OSM or fix a level after export. Scope and place the user's.
   5. **Road mode: more points along the road** (glitter_shitter): keep via points instead of dragging one end handle
      again and again; touching the end handle by accident cleared the road. The user said they would add it.

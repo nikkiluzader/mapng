@@ -98,3 +98,27 @@ test('lane line shares: the mapped widths from the right edge', async () => {
   near(sh[1], 4 / 6, 'the 4 m right lane first'); near(sh[2], 1, 'all of it');
   assert.equal(laneLineShares({ oneway: 'yes', lanes: '2' }, { oneWay: true, lanes: 2, nF: 2, nB: 0 }), null);
 });
+
+test('width:lanes:start / :end: each end its own widths, the plain widths the wider end, placement from each end', async () => {
+  const { laneWidthsAcross, laneWidthsAlong, laneWidthsAt, placementShift } = await import('../services/lanePlacement.js');
+  const t = { highway: 'secondary', oneway: 'yes', lanes: '3', placement: 'left_of:1', 'width:lanes:start': '3|3|3', 'width:lanes:end': '3|3|5.5' };
+  assert.deepEqual(laneWidthsAcross(t, null, false, 'start').map((l) => l.w), [3, 3, 3]);
+  assert.deepEqual(laneWidthsAcross(t, null, false, 'end').map((l) => l.w), [3, 3, 5.5]);
+  assert.deepEqual(laneWidthsAcross(t).map((l) => l.w), [3, 3, 5.5]);
+  const al = laneWidthsAlong(t);
+  assert.ok(al);
+  assert.deepEqual(laneWidthsAt(al, 0.5).map((l) => l.w), [3, 3, 4.25]);
+  // (the line on the left edge at both ends: the road's middle 4.5 m to its right at the start, 5.75 m at the end)
+  assert.deepEqual(placementShift(t, { half: 5.75 }), { start: -4.5, end: -5.75 });
+});
+
+test('width:lanes:forward:start / :end on a two-way road; the backward lanes from their plain key', async () => {
+  const { laneWidthsAcross, laneWidthsAlong } = await import('../services/lanePlacement.js');
+  const t = { highway: 'secondary', lanes: '4', 'lanes:forward': '2', 'lanes:backward': '2', 'width:lanes:backward': '3.5|3.5', 'width:lanes:forward:start': '3.5|3.5', 'width:lanes:forward:end': '3.5|2.5' };
+  assert.deepEqual(laneWidthsAcross(t, null, false, 'end').map((l) => `${l.dir}${l.idx}:${l.w}`), ['b2:3.5', 'b1:3.5', 'f1:3.5', 'f2:2.5']);
+  assert.ok(laneWidthsAlong(t));
+  // (no change along the way, or only one end mapped with a lane count that does not match: nothing to blend)
+  assert.equal(laneWidthsAlong({ ...t, 'width:lanes:forward:end': '3.5|3.5' }), null);
+  assert.equal(laneWidthsAlong({ ...t, 'width:lanes:forward:end': '3.5|3.5|3' }), null);
+  assert.equal(laneWidthsAlong({ highway: 'secondary', 'width:lanes': '3|3' }), null);
+});

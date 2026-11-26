@@ -159,10 +159,12 @@
     <div class="kicker">From a tester's map of Kaunas</div>
     <h2>Markings on the road as drawn</h2>
     <ul>
+      <li><b>Lane widths that change along a road.</b> <code>width:lanes:start</code> and <code>width:lanes:end</code> (with <code>:forward</code> and <code>:backward</code>) are read: each lane widens or narrows from its width at the way's first node to its width at the last, the road's edges, its lane lines and its placement offset with it. A junction part way along no longer restarts the change, for these and for <code>placement:start/:end</code>. With them, a mapper can fix a lane that opens or closes along a road in OSM itself (a tester's suggestion).</li>
       <li><b>A road shifting sideways at a joint.</b> Where one lane ends on the left as another begins on the right, the road stays as wide but moves over. It stepped sideways at the joint with grass in the step; it now eases across over a lane-change run, its lane lines with it.</li>
       <li><b>Stop lines and zebra crossings on placed roads.</b> On a road drawn off its mapped line by placement tags, the stop lines at traffic lights and the zebra crossings were still laid across the mapped line, running over the median and onto the grass. They now cross the road where it is drawn, curb to curb.</li>
     </ul>
     <figure><img src="images/placement-markings.jpg" alt="A divided road at a signalled junction from above: a zebra crossing and stop lines spanning each carriageway from curb to median." loading="lazy"><figcaption>Savanorių prospektas, Kaunas: the zebra and stop lines across the carriageways as drawn.</figcaption></figure>
+    <figure><img src="images/lane-widths-along.jpg" alt="A three-lane one-way road from above whose right lane is visibly wider than the other two, mapped with width:lanes:start 3|3|3 and :end 3|3|5.5." loading="lazy"><figcaption>The roads test level's new scene: the right lane widening from 3 to 5.5 m along one way, the left edge straight on its mapped line.</figcaption></figure>
     <figure><img src="images/joint-shift.png" alt="Top view of a three-lane one-way road whose drawn surface moves one lane sideways over about 80 metres before a joint, its lane lines following." loading="lazy"><figcaption>Behind the scenes: the roads test level's new scene, one lane over at a joint, eased over the run.</figcaption></figure>
   </section>
 

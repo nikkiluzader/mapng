@@ -352,6 +352,13 @@ function roads(regionKey) {
     way(run(-450, -930, -250, -930, 20), { ...I, placement: 'left_of:1' });
     label('the road shifting one lane sideways at a joint: eased over the run', -450, -930, [55, 0]);
     drive('driver: placement I, through the sideways shift', -560, -930, 0);
+    // J: lane widths changing along one way, width:lanes:start / :end (thecoachtoma, Discord 2026-11-26: 6,198 and
+    // 3,121 uses worldwide). J1, one-way, mapped along its left edge: the right lane widening from 3 to 5.5 m, the left
+    // edge straight on. J2, two-way: one forward lane narrowing from 3.5 to 2.5 m (width:lanes:forward:start / :end)
+    way(run(-650, -965, -250, -965, 20), { highway: 'secondary', oneway: 'yes', lanes: '3', placement: 'left_of:1', 'width:lanes:start': '3|3|3', 'width:lanes:end': '3|3|5.5', name: 'Lane widths J1' });
+    label('width:lanes:start 3|3|3 -> :end 3|3|5.5, placement=left_of:1: the right lane widening', -450, -965, [55, 0]);
+    way(run(0, -930, 400, -930, 20), { highway: 'secondary', lanes: '4', 'lanes:forward': '2', 'lanes:backward': '2', 'width:lanes:backward': '3.5|3.5', 'width:lanes:forward:start': '3.5|3.5', 'width:lanes:forward:end': '3.5|2.5', name: 'Lane widths J2' });
+    label('width:lanes:forward:start 3.5|3.5 -> :end 3.5|2.5: a forward lane narrowing', 200, -930, [55, 0]);
   }
   return { b, size: SIZE, heightAt };
 }

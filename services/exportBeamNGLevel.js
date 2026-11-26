@@ -22,7 +22,7 @@ import { planPitches, pitchFootprints } from './sportsFields.js';
 import { levelCrossingBarriers, buildLevelCrossingMeshes } from './levelCrossingBarriers.js';
 import { planStepFlights, buildStepFlightMeshes, stepWidth } from './stepFlights.js';
 import { findCarriagewaySplits, splitShiftAt, splitTaperAt, splitHalfAt, splitLaneShiftAt, splitEdgeLineAt } from './carriagewaySplits.js';
-import { placementShift, placementShiftAt, laneCounts, laneWidthsAcross } from './lanePlacement.js';
+import { placementShift, placementShiftAt, laneCounts, laneWidthsAcross, laneWidthsAlong, laneWidthsAt } from './lanePlacement.js';
 import { findBridgeTowers, towerPierGeometry, towerHouseTags } from './bridgeTowers.js';
 import { buildTexturedBuildings, buildingContext, screenBuilding, getBuildingMaterialDefs, garageExtras, isGarageFeature, FACADE_EMISSIVE_FILE, BUILDING_TILE_M, letterName } from './beamngBuildings.js';
 import { isCarportFeature, planCarports } from './beamngCarports.js';
@@ -2974,6 +2974,9 @@ function getDecalMergeStyleKey(segment) {
     Object.keys(tags).filter((k) => /^placement(:|$)/.test(k)).sort().map((k) => `${k}=${tags[k]}`).join(';'),
     // (and its lanes' own widths: a turn lane narrowing on the next way is a different road layout)
     Object.keys(tags).filter((k) => /^width:lanes(:|$)/.test(k)).sort().map((k) => `${k}=${tags[k]}`).join(';'),
+    // (a way whose lanes change from its first node to its last, placement or width:lanes :start / :end, never joined to
+    // another: the change runs over its own length, measured along it)
+    Object.keys(tags).some((k) => /^(placement|width:lanes)(:forward|:backward)?:(start|end)$/.test(k)) ? String(segment?.sourceFeature?.id ?? segment?.id ?? '') : '',
     // (a drawbridge span stays its own segment: the structure solver keeps
     // the whole bridge low by it)
     tags.bridge === 'movable' || (!!tags['bridge:movable'] && tags['bridge:movable'] !== 'no'),
@@ -3340,9 +3343,13 @@ const shareOf = (f, k) => (f.shares && f.shares.length === f.lanes + 1 ? f.share
  * Each lane boundary's share of the way across the lanes from the right edge (forward lanes on the right, as the
  * painted lines are laid out), k = 0..lanes; the mapped lane widths summed (width:lanes), else null (equal lanes).
  */
-export function laneLineShares(tags, counts) {
-  const across = laneWidthsAcross(tags, { oneway: counts.oneWay, forward: counts.nF, backward: counts.nB, total: counts.lanes }, false);
+export function laneLineShares(tags, counts, at = null) {
+  const across = laneWidthsAcross(tags, { oneway: counts.oneWay, forward: counts.nF, backward: counts.nB, total: counts.lanes }, false, at);
   if (!across || across.length !== counts.lanes) return null;
+  return sharesFromAcross(across);
+}
+/** laneLineShares from the lanes across (laneWidthsAcross, left to right, right-hand order). */
+export function sharesFromAcross(across) {
   const fromRight = [...across].reverse().map((l) => l.w);
   const total = fromRight.reduce((a, w) => a + w, 0);
   const out = [0]; let sum = 0;
@@ -3398,6 +3405,9 @@ export function findWidthTapers(ways) {
     }
   });
   const plans = new Map();   // k -> [{ atStart, to, run }]
+  // (a way at one of its ends: its width and line frame there, the lanes' widths changing along it, width:lanes:start /
+  // :end; else the way's own)
+  const atEnd = (e) => { const w = ways[e.k]; const x = w.ends?.[e.atStart ? 'start' : 'end']; return x ? { ...w, ...x } : w; };
   for (const list of ends) {
     if (list.length !== 2) continue;
     const [a, b] = list;
@@ -3407,8 +3417,8 @@ export function findWidthTapers(ways) {
     const sameRoad = (wa.name && wa.name === wb.name) || (!wa.name && !wb.name && wa.cls && wa.cls === wb.cls) || (wa.ref && wa.ref === wb.ref);
     if (a.k === b.k || !sameRoad) continue;
     if (a.out[0] * b.out[0] + a.out[1] * b.out[1] > -WIDTH_TAPER_ON_COS) continue;
-    const [wide, narrow] = wa.half > wb.half ? [a, b] : [b, a];
-    const step = ways[wide.k].half - ways[narrow.k].half;
+    const [wide, narrow] = atEnd(a).half > atEnd(b).half ? [a, b] : [b, a];
+    const step = atEnd(wide).half - atEnd(narrow).half;
     // (the two ends' drawn middles across the joint: each way's offset off the line (placement) along its left normal in
     // its node order; their gap across the road, and whether the two left normals agree (+1) or the ways run opposite)
     const sideOf = (e) => { const w = ways[e.k]; const fwd = e.atStart ? e.out : [-e.out[0], -e.out[1]]; return { n: [-fwd[1], fwd[0]], s: (e.atStart ? w.shiftStart : w.shiftEnd) || 0 }; };
@@ -3424,13 +3434,13 @@ export function findWidthTapers(ways) {
       const perMetre = WIDTH_TAPER_RUN_BY_CLASS[ways[mover.k].cls] ?? WIDTH_TAPER_RUN;
       const run = Math.min(Math.max(WIDTH_TAPER_MIN_M, perMetre * sideways), WIDTH_TAPER_SHARE * lengthOf(ways[mover.k].xy));
       if (!plans.has(mover.k)) plans.set(mover.k, []);
-      plans.get(mover.k).push({ atStart: mover.atStart, to: ways[mover.k].half, toLines: linesFrame(ways[mover.k]), run, toK: still.k, sign, shiftOnly: true });
+      plans.get(mover.k).push({ atStart: mover.atStart, to: atEnd(mover).half, toLines: linesFrame(atEnd(mover)), own: linesFrame(atEnd(mover)), run, toK: still.k, sign, shiftOnly: true });
       continue;
     }
     const perMetre = WIDTH_TAPER_RUN_BY_CLASS[ways[wide.k].cls] ?? WIDTH_TAPER_RUN;
     const run = Math.min(Math.max(WIDTH_TAPER_MIN_M, perMetre * step), WIDTH_TAPER_SHARE * lengthOf(ways[wide.k].xy));
     if (!plans.has(wide.k)) plans.set(wide.k, []);
-    plans.get(wide.k).push({ atStart: wide.atStart, to: ways[narrow.k].half, toLines: linesFrame(ways[narrow.k]), run, toK: narrow.k, sign });
+    plans.get(wide.k).push({ atStart: wide.atStart, to: atEnd(narrow).half, toLines: linesFrame(atEnd(narrow)), own: linesFrame(atEnd(wide)), run, toK: narrow.k, sign });
   }
   const out = new Map();
   for (const [k, list] of plans) {
@@ -3459,7 +3469,7 @@ export function findWidthTapers(ways) {
     // A line's lateral offset o in the taper: carried from this piece's frame (its edges at +-half, its centre line at
     // shift) onto the next piece's, eased as the width is. At the joint the edge lines meet the next piece's edges and
     // the centre line its centre line, the lanes between converging, as a lane closes (they all jumped: coverage level).
-    const own = linesFrame(ways[k]);
+    const ownFrame = linesFrame(ways[k]);
     fn.mapOffset = (x, y, o) => {
       const st = stationOf(x, y);
       let best = null;
@@ -3467,6 +3477,8 @@ export function findWidthTapers(ways) {
       if (!best) return o;
       const e = 1 - best.f * best.f * (3 - 2 * best.f);   // 1 at the joint, 0 where the taper starts
       const n = best.toLines;
+      // (this piece's frame at that end: its lanes' widths there where they change along it)
+      const own = best.own || ownFrame;
       // (a lane divider: onto the next piece's own divider; one whose lane ends is cut back, dropTrim, and stays put)
       const k = dividerIndex(own, o);
       if (k) {
@@ -3494,9 +3506,11 @@ export function findWidthTapers(ways) {
     // dropped lane's dashed line ran on through the taper beside the edge closing in: the user, 2026-11-24)
     fn.dropTrim = (o) => {
       const t = { start: 0, end: 0 };
-      const kk = dividerIndex(own, o);
-      if (!kk) return t;
-      for (const p of list) if (!dividerOnto(own, p.toLines, kk)) t[p.atStart ? 'start' : 'end'] = Math.max(t[p.atStart ? 'start' : 'end'], p.run);
+      for (const p of list) {
+        const own = p.own || ownFrame;
+        const kk = dividerIndex(own, o);
+        if (kk && !dividerOnto(own, p.toLines, kk)) t[p.atStart ? 'start' : 'end'] = Math.max(t[p.atStart ? 'start' : 'end'], p.run);
+      }
       return t;
     };
     out.set(k, fn);
@@ -7362,14 +7376,93 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     const w = widthsOf(sf);
     const sh = placementShift(t, { half: w.drivingHalfWidth, extraShift: (w.crossSection.leftExtra - w.crossSection.rightExtra) / 2, leftHand: leftHandTraffic });
     if (!sh) return;
-    const xy = sf.geometry.map((pt) => geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0).slice(0, 2));
+    // (placement:start / :end measured along the whole mapped way, as above for widths: a junction part way along split it
+    // and each piece ran the whole move)
+    const xy = (sf.sourceFeature?.geometry?.length >= 2 ? sf.sourceFeature.geometry : sf.geometry).map((pt) => geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0).slice(0, 2));
     const cum = [0]; for (let i = 1; i < xy.length; i++) cum.push(cum[i - 1] + fastHypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]));
     placements.set(k, { shift: sh, xy, cum, wayId: sf.sourceFeature?.id });
   });
+  // (the shift at (x, y): by its share along the way, for a line moving across the lanes)
+  const placementAt = (pl, x, y) => {
+    if (Math.abs(pl.shift.start - pl.shift.end) < 1e-6) return pl.shift.start;
+    let best = Infinity; let at = 0;
+    for (let i = 0; i + 1 < pl.xy.length; i++) {
+      const [ax, ay] = pl.xy[i]; const [bx, by] = pl.xy[i + 1]; const ex = bx - ax; const ey = by - ay; const L2 = ex * ex + ey * ey || 1;
+      const t = Math.max(0, Math.min(1, ((x - ax) * ex + (y - ay) * ey) / L2)); const d = fastHypot(ax + ex * t - x, ay + ey * t - y);
+      if (d < best) { best = d; at = pl.cum[i] + t * Math.sqrt(L2); }
+    }
+    return placementShiftAt(pl.shift, at / (pl.cum[pl.cum.length - 1] || 1));
+  };
+  // Lane widths changing along a way (width:lanes:start / :end, lanePlacement.js laneWidthsAlong; thecoachtoma, Discord
+  // 2026-11-26): the road drawn as wide as its wider end and narrowed node by node, each lane line at the lanes' widths
+  // where it is, its placement offset from each end's widths (placementShift)
+  const alongs = new Map();
+  drivableRoads.forEach((sf, k) => {
+    const t = sf.sourceFeature?.tags || {};
+    const c = markingLaneCounts(sf.highway, t);
+    const al = laneWidthsAlong(t, { oneway: c.oneWay, forward: c.nF, backward: c.nB, total: c.lanes }, false);
+    if (!al || !lineFrameOf(sf).lineShares) return;
+    const sum = (a) => a.reduce((x, l) => x + l.w, 0);
+    // (measured along the whole mapped way: a junction part way along splits it into pieces, each a share of the change)
+    const xy = (sf.sourceFeature?.geometry?.length >= 2 ? sf.sourceFeature.geometry : sf.geometry).map((pt) => geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0).slice(0, 2));
+    const cum = [0]; for (let i = 1; i < xy.length; i++) cum.push(cum[i - 1] + fastHypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]));
+    alongs.set(k, { al, xy, cum, sumS: sum(al.start), sumE: sum(al.end) });
+  });
+  {
+    const list = [...alongs.entries()].map(([k, a]) => `${drivableRoads[k]?.sourceFeature?.tags?.name || drivableRoads[k]?.highway || '?'} ${a.sumS.toFixed(1)}->${a.sumE.toFixed(1)} m`);
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Lane widths along the way (width:lanes:start/end): ${alongs.size} way(s)${list.length ? ` (${list.slice(0, 12).join(', ')}${list.length > 12 ? ', ...' : ''})` : ''}; ways mapped with them but no matching lane count are drawn at their plain widths.`);
+  }
+  // (the share t of the way at (x, y), 0 at its first node, 1 at its last)
+  const alongShare = (a, x, y) => {
+    let best = Infinity; let at = 0;
+    for (let i = 0; i + 1 < a.xy.length; i++) {
+      const [ax, ay] = a.xy[i]; const [bx, by] = a.xy[i + 1]; const ex = bx - ax; const ey = by - ay; const L2 = ex * ex + ey * ey || 1;
+      const u = Math.max(0, Math.min(1, ((x - ax) * ex + (y - ay) * ey) / L2)); const d = fastHypot(ax + ex * u - x, ay + ey * u - y);
+      if (d < best) { best = d; at = a.cum[i] + u * (a.cum[i + 1] - a.cum[i]); }
+    }
+    const total = a.cum[a.cum.length - 1];
+    return total > 0 ? at / total : 0;
+  };
+  // (how much narrower than its wider end, a side, at share t)
+  const alongNarrow = (a, t) => (Math.max(a.sumS, a.sumE) - (a.sumS + (a.sumE - a.sumS) * t)) / 2;
+  // (the way's line frame at share t: lineFrameOf with the lanes' widths there)
+  const alongFrame = (sf, a, t) => {
+    const f = lineFrameOf(sf);
+    const lineEdge = Math.max(0.5, f.lineEdge - alongNarrow(a, t));
+    const lineShares = sharesFromAcross(laneWidthsAt(a.al, t));
+    const lineCentre = f.lineBase + (f.oneWay || !f.lanes ? 0 : -lineEdge + 2 * lineEdge * lineShares[f.nF]);
+    return { ...f, lineEdge, lineShares, lineCentre };
+  };
+  // (a line at offset o in the way's own frame, its wider end's, carried onto the lanes at (x, y): each lane boundary
+  // onto the same boundary there, between them in proportion, outside them moved with the edge)
+  const alongMapOffset = (sf, a, x, y, o) => {
+    const f0 = lineFrameOf(sf); const ft = alongFrame(sf, a, alongShare(a, x, y));
+    const at = (f, k) => f.lineBase - f.lineEdge + 2 * f.lineEdge * f.lineShares[k];
+    const L = f0.lineShares.length - 1;
+    if (o <= at(f0, 0)) return o + at(ft, 0) - at(f0, 0);
+    if (o >= at(f0, L)) return o + at(ft, L) - at(f0, L);
+    for (let k = 0; k < L; k++) {
+      const lo = at(f0, k); const hi = at(f0, k + 1);
+      if (o <= hi) return at(ft, k) + ((o - lo) * (at(ft, k + 1) - at(ft, k))) / ((hi - lo) || 1);
+    }
+    return o;
+  };
   const widthTapers = findWidthTapers(drivableRoads.map((sf, k) => (shouldGenerateDecalRoads(sf.highway, sf.sourceFeature.tags || {})
-    ? { name: sf.sourceFeature.tags?.name || '', cls: sf.highway || '', ref: sf.sourceFeature.tags?.ref || '', half: widthsOf(sf).styleHalfWidth, ...lineFrameOf(sf), xy: sf.geometry.map((pt) => geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0).slice(0, 2)),
-      // (the drawn road's offset off its mapped line at each end, placement tags: a joint shifting sideways is eased)
-      shiftStart: placements.get(k)?.shift.start ?? 0, shiftEnd: placements.get(k)?.shift.end ?? 0 }
+    ? (() => {
+      const xy = sf.geometry.map((pt) => geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0).slice(0, 2));
+      const ends = [['start', xy[0]], ['end', xy[xy.length - 1]]];
+      const pl = placements.get(k); const a = alongs.get(k);
+      return { name: sf.sourceFeature.tags?.name || '', cls: sf.highway || '', ref: sf.sourceFeature.tags?.ref || '', half: widthsOf(sf).styleHalfWidth, ...lineFrameOf(sf), xy,
+      // (the drawn road's offset off its mapped line at each end of the piece, placement tags: a joint shifting sideways
+      // is eased)
+      shiftStart: pl ? placementAt(pl, ...xy[0]) : 0, shiftEnd: pl ? placementAt(pl, ...xy[xy.length - 1]) : 0,
+      // (and its width and lines at each end, the lanes' widths changing along it)
+      ends: a ? Object.fromEntries(ends.map(([at, p]) => {
+        const t = alongShare(a, p[0], p[1]);
+        const f = alongFrame(sf, a, t);
+        return [at, { half: widthsOf(sf).styleHalfWidth - alongNarrow(a, t), lineEdge: f.lineEdge, lineCentre: f.lineCentre, lineShares: f.lineShares }];
+      })) : null };
+    })()
     : null)));
   {
     // (what the width step did: the roads narrowed to the next piece of themselves, by name or class and ref)
@@ -7386,17 +7479,6 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     // (lanes and the driving width: a split's branches start as their share of the trunk's lanes)
     return { oneway, cls: sf.highway || t.highway || '', half: w.styleHalfWidth, drive: w.drivingHalfWidth, lanes: laneCounts(t, w.drivingHalfWidth).total, xy: sf.geometry.map((pt) => geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0)) };
   }), { leftHand: leftHandTraffic });
-  // (the shift at (x, y): by its share along the way, for a line moving across the lanes)
-  const placementAt = (pl, x, y) => {
-    if (Math.abs(pl.shift.start - pl.shift.end) < 1e-6) return pl.shift.start;
-    let best = Infinity; let at = 0;
-    for (let i = 0; i + 1 < pl.xy.length; i++) {
-      const [ax, ay] = pl.xy[i]; const [bx, by] = pl.xy[i + 1]; const ex = bx - ax; const ey = by - ay; const L2 = ex * ex + ey * ey || 1;
-      const t = Math.max(0, Math.min(1, ((x - ax) * ex + (y - ay) * ey) / L2)); const d = fastHypot(ax + ex * t - x, ay + ey * t - y);
-      if (d < best) { best = d; at = pl.cum[i] + t * Math.sqrt(L2); }
-    }
-    return placementShiftAt(pl.shift, at / (pl.cum[pl.cum.length - 1] || 1));
-  };
   // (a placed way's own placement wins over a split's guess: the mapper said where its lanes are)
   for (const k of placements.keys()) splits.plans.delete(k);
   if (structureGraph && placements.size) {
@@ -7563,11 +7645,20 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
       const splitTaper = splits.tapers.get(segIndex);
       // (and a split's branch started as its share of the trunk, widened to its own over its run)
       const branchShare = splitPlan && Number.isFinite(splitPlan.s0) && splitPlan.s0 < styleHalfWidth - 1e-6;
-      const halfAt = (taper || splitTaper || branchShare) ? centerNodes.map((nd) => {
-        const own = splitTaperAt(splitTaper, nd[0], nd[1], taper ? taper(nd[0], nd[1], styleHalfWidth) : styleHalfWidth);
+      // (and narrowed node by node where the lanes' widths change along the way, width:lanes:start / :end)
+      const along = alongs.get(segIndex);
+      const halfAt = (taper || splitTaper || branchShare || along) ? centerNodes.map((nd) => {
+        const base = along ? styleHalfWidth - alongNarrow(along, alongShare(along, nd[0], nd[1])) : styleHalfWidth;
+        const own = splitTaperAt(splitTaper, nd[0], nd[1], taper ? taper(nd[0], nd[1], base) : base);
         return branchShare ? Math.min(own, splitHalfAt(splitPlan, nd[0], nd[1], styleHalfWidth)) : own;
       }) : null;
       if (halfAt) halfAt.forEach((h, k) => { centerNodes[k][3] = h; });
+      // (the lane lines: carried onto the lanes' widths where they change along the way, then onto the next piece's in a
+      // taper)
+      const lineMap = (taper?.mapOffset || along) ? (x, y, o) => {
+        const o1 = along ? alongMapOffset(segmentFeature, along, x, y, o) : o;
+        return taper?.mapOffset ? taper.mapOffset(x, y, o1) : o1;
+      } : null;
       // (a split's branch: its drawn line moved to its half of the two-way road near the split, eased onto its own)
       // (or a placed way: its drawn line moved off the mapped one by its placement tags)
       const placed = placements.get(segIndex);
@@ -7670,16 +7761,16 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
           halfAt,
           ...(splitPlan && Number.isFinite(splitPlan.laneHalf) ? { edgeLineAt: (k, o) => splitEdgeLineAt(splitPlan, centerNodes[k][0], centerNodes[k][1], o) } : {}),
           // (a split branch's lane lines on the trunk's lanes at the split, carriagewaySplits.js splitLaneShiftAt)
-          ...(!taper?.mapOffset && splitPlan?.laneIn > 0 ? {
+          ...(!lineMap && splitPlan?.laneIn > 0 ? {
             offsetAt: (k, o) => o + splitLaneShiftAt(splitPlan, centerNodes[k][0], centerNodes[k][1]),
           } : {}),
-          ...(taper?.mapOffset ? {
-            offsetAt: (k, o) => taper.mapOffset(centerNodes[k][0], centerNodes[k][1], o) + (splitPlan?.laneIn > 0 ? splitLaneShiftAt(splitPlan, centerNodes[k][0], centerNodes[k][1]) : 0),
-            dropTrim: taper.dropTrim,
+          ...(lineMap ? {
+            offsetAt: (k, o) => lineMap(centerNodes[k][0], centerNodes[k][1], o) + (splitPlan?.laneIn > 0 ? splitLaneShiftAt(splitPlan, centerNodes[k][0], centerNodes[k][1]) : 0),
+            dropTrim: taper?.dropTrim,
             // (the AI's path between the mapped edge lines, out to the driving edges: on the road's middle, not the centre line)
             aiAt: (k) => {
               const [x, y] = centerNodes[k]; const f = lineFrameOf(segmentFeature);
-              const lo = taper.mapOffset(x, y, f.lineBase - f.lineEdge); const hi = taper.mapOffset(x, y, f.lineBase + f.lineEdge);
+              const lo = lineMap(x, y, f.lineBase - f.lineEdge); const hi = lineMap(x, y, f.lineBase + f.lineEdge);
               return { offset: (lo + hi) / 2, width: hi - lo + 2 * EDGE_LINE_INSET_M };
             },
           } : {}),
