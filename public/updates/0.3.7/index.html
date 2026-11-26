@@ -161,6 +161,7 @@
     <div class="card"><b><span class="tick">✓</span>Kerbs and islands</b><span>Streets as wide as their mapped kerbs.</span></div>
     <div class="card"><b><span class="tick">✓</span>Path level crossings</b><span>Footpaths cross the tracks flush.</span></div>
     <div class="card"><b><span class="tick">✓</span>Turn lanes and lane widths</b><span>Roads widen on the side their lanes are added.</span></div>
+    <div class="card"><b><span class="tick">✓</span>Official test levels</b><span>Every case MapNG builds, labelled, to drive.</span></div>
   </div>
   <div class="cta">
     <a class="btn primary" href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>
@@ -260,6 +261,21 @@
     <figure><img src="images/traffic-islands.jpg" alt="A road splitting before a junction: short concrete islands and a teardrop island between the two carriageways, the road paved between them." loading="lazy"><figcaption>Islands only where the map draws them, the road paved between.</figcaption></figure>
     <figure><img src="images/bare-curb-verge.jpg" alt="A street with a bare curb along the left, the grass verge level with the top of the curb." loading="lazy"><figcaption>The verge behind a bare curb, level with its top.</figcaption></figure>
     <p>Every one of these cases is now in the official test levels (web: "Official test levels" at the foot of the page; desktop: the levels list), so they are checked in the game whenever the code changes.</p>
+  </section>
+
+  <section id="testlevels" data-nav="Test levels">
+    <div class="kicker">New: official test levels</div>
+    <h2>Test levels you can drive, and what they caught</h2>
+    <p>MapNG now has five official test levels, built from made-up map data that holds one of every case MapNG builds: roads and junctions, bridges and tunnels, terrain and water, sidewalks, and every map tag with a game model. Each case carries a label in the game. Get them from <b>Official test levels</b> at the foot of the website, or in the desktop app's levels list, which puts them straight into your mods folder (checked against their checksums). Driving them turned up these, now fixed:</p>
+    <ul>
+      <li><b>Water:</b> lakes reflect the sky from a driver's height; docks, fish ponds, wastewater, reflecting pools and salt pans are water (docks were bare ground); each kind of still water has its own look; a river gets a channel dug under it where terrain shaping is on; a river outline the river line leaves out is built as water where its ground is flat.</li>
+      <li><b>Coasts:</b> breakwaters and groynes mapped as lines are built as rock moles at their width; piers mapped as a line are kept (a short jetty was dropped, a longer one came back closed).</li>
+      <li><b>Trees:</b> with no satellite picture, the land cover's tree cells plant the tree cover; mapped woods are planted over their whole outline; shrubs mapped as points are planted.</li>
+      <li><b>Roads:</b> where a lane ends, the lines follow the taper and the closing lane's divider stops where it begins; mini roundabouts get a low painted dome; zebra and signalled crossings are painted; unpaved roads look and feel like their surface; speed hump chevrons sit on the hump's top; the road's edge blend reaches its shoulder, with no ground showing between.</li>
+      <li><b>Railways:</b> level crossings get barriers with the arm raised (none where the map says there are none); platforms mapped as lines are built and platform areas are paved, not grass.</li>
+      <li><b>Buildings and structures:</b> glass greenhouses, shipping containers, roofless ruins, open roofs on posts, hipped roofs on square churches; twin tunnel bores' wing walls meet as one.</li>
+      <li><b>In the game:</b> no black boxes at a distance on a first load (the level reloads its baked pictures); textures the game ships are linked, not copied, as BeamNG asks; where two power lines share a pole, it is the tall one.</li>
+    </ul>
   </section>
 
   <section id="fixes" data-nav="Fixes">
