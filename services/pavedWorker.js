@@ -47,14 +47,22 @@ export function pavedTile(item) {
   }
   // (nor over the sea the water step lowers: the coast's water is no mapped area, the terrain under it a pixel mask)
   if (item.sea) {
+    // (the mask smoothed and blended between its pixels, cleared where it is more than half sea: read pixel by pixel, the paving
+    // stopped in 1 m steps along the shore, a sawtooth of teeth on a bayfront promenade with their sides showing as
+    // dark triangles (St. Augustine's seawall, the user 2026-11-26))
     const { mask, c0, r0, w, h, W, H, ws } = item.sea;
+    // (smoothed over 3 x 3 pixels first: blended alone, a diagonal shore's steps only lost their corners)
+    const sm = new Float32Array(w * h);
+    for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) { let s = 0; let n = 0; for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) { const rr = r + dr; const cc = c + dc; if (rr < 0 || cc < 0 || rr >= h || cc >= w) continue; s += mask[rr * w + cc] ? 1 : 0; n++; } sm[r * w + c] = s / n; }
+    const px = (tc, tr) => (tc >= 0 && tc < w && tr >= 0 && tr < h ? sm[tr * w + tc] : 0);
     for (let r = 0; r < g.h; r++) {
-      const y = g.y1 - (r + 0.5) * g.res; const tr = Math.round((0.5 - y / ws) * H - 1) - r0;
-      if (tr < 0 || tr >= h) continue;
+      const y = g.y1 - (r + 0.5) * g.res; const v = (0.5 - y / ws) * H - 1 - r0; const tr = Math.floor(v); const fy = v - tr;
+      if (tr < -1 || tr >= h) continue;
       for (let c = 0; c < g.w; c++) {
         const i = r * g.w + c; if (!(cells[i] & (WALK | GAP))) continue;
-        const x = g.x0 + (c + 0.5) * g.res; const tc = Math.round((x / ws + 0.5) * W) - c0;
-        if (tc >= 0 && tc < w && mask[tr * w + tc]) cells[i] &= ~(WALK | GAP);
+        const x = g.x0 + (c + 0.5) * g.res; const u = (x / ws + 0.5) * W - c0; const tc = Math.floor(u); const fx = u - tc;
+        const s = (px(tc, tr) * (1 - fx) + px(tc + 1, tr) * fx) * (1 - fy) + (px(tc, tr + 1) * (1 - fx) + px(tc + 1, tr + 1) * fx) * fy;
+        if (s > 0.5) cells[i] &= ~(WALK | GAP);
       }
     }
   }

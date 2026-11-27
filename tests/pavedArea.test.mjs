@@ -237,3 +237,26 @@ test('buildPavedGrid: a sidewalk mapped well back from the road (no houses near)
   for (let t = -20; t <= 20; t += 0.5) { m++; if (at(-4.5, t) & GAP) gap++; }
   assert.ok(gap > 0.9 * m, `the near sidewalk paved to the curb (${gap} of ${m})`);
 });
+
+test('pavedTile: paving along a diagonal shore stops on a straight edge, not in the sea mask\'s 1 m steps', async () => {
+  // (St. Augustine's bayfront: the paving by the seawall stopped pixel by pixel on the terrain's sea mask, a sawtooth of
+  // 1 m teeth whose sides showed as dark triangles, the user 2026-11-26)
+  const { pavedTile } = await import('../services/pavedWorker.js');
+  // a 64 m terrain of 1 m pixels, sea where y > x + 6 (pixel (c, r) at ((c / W) - 0.5) * ws, (0.5 - (r + 1) / H) * ws)
+  const W = 64; const H = 64; const ws = 64;
+  const mask = new Uint8Array(W * H);
+  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) { const x = (c / W - 0.5) * ws; const y = (0.5 - (r + 1) / H) * ws; if (y > x + 6) mask[r * W + c] = 1; }
+  // a walk along the shore, 12 m wide, its seaward half over the sea
+  const item = { box: [-20, -20, 20, 20], roads: [], walks: [{ pts: [[-30, -24], [30, 36]], half: 6 }], sea: { mask, c0: 0, r0: 0, w: W, h: H, W, H, ws } };
+  const t = pavedTile(item); const g = t.g;
+  // along the shore, the paving's last cell toward the sea on each cross line: its distance from the line y = x + 6
+  const ends = [];
+  for (let s = -10; s <= 10; s += 0.25) {
+    let last = null;
+    for (let k = 0; k <= 80; k++) { const d = k * 0.1; const x = s - d * Math.SQRT1_2; const y = s + d * Math.SQRT1_2; const c = Math.floor((x - g.x0) / g.res); const r = Math.floor((g.y1 - y) / g.res); if (c < 0 || r < 0 || c >= g.w || r >= g.h) break; if (t.cells[r * g.w + c] & 6) last = (y - x - 6) / Math.SQRT2; }
+    if (last !== null) ends.push(last);
+  }
+  const spread = Math.max(...ends) - Math.min(...ends);
+  assert.ok(ends.length > 60, 'paving along the shore');
+  assert.ok(spread < 0.6, `the edge along the shore wanders ${spread.toFixed(2)} m (1 m steps: about 0.7 m)`);
+});
