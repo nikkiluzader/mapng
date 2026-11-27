@@ -359,6 +359,15 @@ function roads(regionKey) {
     label('width:lanes:start 3|3|3 -> :end 3|3|5.5, placement=left_of:1: the right lane widening', -450, -965, [55, 0]);
     way(run(0, -930, 400, -930, 20), { highway: 'secondary', lanes: '4', 'lanes:forward': '2', 'lanes:backward': '2', 'width:lanes:backward': '3.5|3.5', 'width:lanes:forward:start': '3.5|3.5', 'width:lanes:forward:end': '3.5|2.5', name: 'Lane widths J2' });
     label('width:lanes:forward:start 3.5|3.5 -> :end 3.5|2.5: a forward lane narrowing', 200, -930, [55, 0]);
+    // K: thecoachtoma's apartment-complex streets (Discord 2026-11-27). K1: a one-lane residential street tagged width=2.8,
+    // drawn 2.8 m (the class's 4.4 m floor overrode the tag). K2: a service road off it, width=2.8 with sidewalk=left
+    // (its own sidewalk, built as along a street). K3: a service road turning 90 degrees (drawn in two pieces at the
+    // corner). All in the AI's road graph now (service roads were kept out of traffic before)
+    way(run(440, -935, 620, -935, 20, [[520, -935], [600, -935]]), { highway: 'residential', lanes: '1', width: '2.8', name: 'Narrow K1' });
+    way([[600, -935], [600, -962], [460, -962]], { highway: 'service', width: '2.8', sidewalk: 'left', 'sidewalk:surface': 'paving_stones' });
+    way([[520, -935], [520, -980], [580, -980]], { highway: 'service' });
+    label('one-lane residential width=2.8; service roads off it (width=2.8 + sidewalk=left; one turning 90 degrees), all in nav', 530, -950, [55, 0]);
+    drive('driver: narrow K1, the 2.8 m street', 450, -935, 0);
   }
   return { b, size: SIZE, heightAt };
 }

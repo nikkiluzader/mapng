@@ -6356,7 +6356,7 @@ function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = [],
     if (isUrban(feature)) return false;
     return ![g[0], g[g.length >> 1], g[g.length - 1]].some(inPavedArea);
   };
-  let serviceCount = 0; let serviceLength = 0;
+  let serviceCount = 0; let serviceLength = 0; let serviceNavCount = 0;
   // vertices shared by two or more roads: a service road's square end there
   // is carried on half its width, closing the corner where aisles meet
   const nodeKey = (p) => `${p.lat.toFixed(7)},${p.lng.toFixed(7)}`;
@@ -6398,6 +6398,25 @@ function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = [],
         const [x, y, z] = geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0.1);
         if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)) {
           world.push([Math.round(x * 1000) / 1000, Math.round(y * 1000) / 1000, Math.round(z * 1000) / 1000, fullWidth / 2]);
+        }
+      }
+      // (a service road in the AI's road graph: an invisible drivable road along its own nodes, from junction node to
+      // junction node, carrying the nav data a street's surface does. Drawn below in pieces split at sharp corners and
+      // carried past the nodes, its surface could not join the graph; it was left out of traffic on purpose before,
+      // the user's decision 2026-11-27: "let's not leave service roads out on purpose anymore" (thecoachtoma's
+      // apartment-complex roads, wanted in nav). Lower drivability than streets (beamngMapNavigation.js: 0.6), so the
+      // AI keeps to the streets; driveways and private ones gated and hidden from the navigation display)
+      if (service && world.length >= 2) {
+        // (the decal's node width is the road's full width; the drawing points here hold half of it)
+        const navNodes = world.map((q) => [q[0], q[1], q[2], fullWidth]);
+        const nav = makeRoadDecal(navNodes, 'Base', street, {
+          material: GLOBAL_DECAL_MATERIALS.invisible, renderPriority: PEDESTRIAN_RENDER_PRIORITY, textureLength: 10, breakAngle: 2,
+          startEndFade: [0, 0], ...getDecalRoadNavMetadata('service', tags, { leftHandTraffic: !!terrainData.roadRules?.leftHandTraffic }),
+        });
+        if (nav) {
+          if (!(nav.drivability > 0)) nav.drivability = 0.6;
+          nav.name = sanitizeBeamNGObjectName(`dr_${street}_nav${(perStreet.get(street) || 0) + 1}`);
+          decals.push({ decal: nav, street }); serviceNavCount++;
         }
       }
       if (service && world.length >= 2) {
@@ -6520,7 +6539,7 @@ function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = [],
       }
     }
   }
-  return { decals, ways, footpaths, sidewalkWays, services: { count: serviceCount, length: serviceLength }, sidewalkStrips: { count: stripCount, length: stripLength } };
+  return { decals, ways, footpaths, sidewalkWays, services: { count: serviceCount, length: serviceLength, nav: serviceNavCount }, sidewalkStrips: { count: stripCount, length: stripLength } };
 }
 
 const EASE_ROOF_TOL_M = 0.15;   // a street's ground this little under a tunnel's roof still counts as on it
@@ -7860,6 +7879,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     if (turningCircles.length) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Cul-de-sacs: ${turningCircles.length} of ${points.length} mapped turning circle(s) built at a street's dead end (${turningCircles.filter((r) => r.tc.loop).length} loop(s) round an island).`);
   }
   const pedestrianStreets = buildPedestrianStreetDecals(terrainData, squareSize, carriageways, { raisedFootways: !!opts.raisedFootways, sidewalkStrips: !!opts.sidewalkStrips });
+  console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Service roads: ${pedestrianStreets.services.count} piece(s) drawn, ${pedestrianStreets.services.nav} invisible nav road(s) along them put the service roads in the AI road graph (drivability 0.6, below the streets; driveways and access=private gated and hidden from the navigation display).`);
   yield 'junctions';
   // A service road, a path or a pedestrian street along a dam's crest rides on it, as a road for traffic does
   // (splitAtDams, the pins above): these follow the ground everywhere else, and across a dam the survey left out
@@ -9467,7 +9487,7 @@ function buildDetailedReportSections(d) {
   const footpathCount = (groups.footpaths || []).length;
   const serviceCount = groups.serviceRoads?.count || 0;
   lines.push(`- Pedestrian streets drawn (highway=pedestrian, no traffic): ${(groups.pedestrianStreets || []).length - footpathCount - serviceCount} piece(s)`);
-  lines.push(`- Service roads drawn (driveways, parking aisles, alleys; no traffic): ${serviceCount} piece(s), ${formatNumber((groups.serviceRoads?.length || 0) / 1000, 2)} km`);
+  lines.push(`- Service roads drawn (driveways, parking aisles, alleys): ${serviceCount} piece(s), ${formatNumber((groups.serviceRoads?.length || 0) / 1000, 2)} km; in the AI road graph by ${groups.serviceRoads?.nav || 0} invisible nav road(s) along them (drivability 0.6, below the streets; driveways and private ones gated and hidden from the navigation display)`);
   if (groups.sidewalkStrips?.count) lines.push(`- Sidewalks drawn as decals (flat strips beside the lanes, no curbs): ${groups.sidewalkStrips.count} strip(s), ${formatNumber(groups.sidewalkStrips.length / 1000, 2)} km`);
   lines.push(`- Footpaths, cycleways and trails drawn (beside a street's raised sidewalk left out): ${footpathCount} piece(s), ${formatNumber((groups.footpaths || []).reduce((n, f) => n + pathLength(f.nodes), 0) / 1000, 2)} km`);
   lines.push('- Stone and brick paving (surface=sett/cobblestone/unhewn_cobblestone/paving_stones/bricks) is laid in strips about one texture tile wide: mapng_road_* materials, art/roads/main.materials.json.');
