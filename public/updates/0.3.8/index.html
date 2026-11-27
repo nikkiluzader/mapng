@@ -159,6 +159,8 @@
     <div class="kicker">From a tester's map of Kaunas</div>
     <h2>Markings on the road as drawn</h2>
     <ul>
+      <li><b>Junctions shaped as one.</b> The ground under a junction took each spot's height from the nearest road alone, so where roads meet at slightly different grades it stepped along lines running out from the junction's middle, ridges under the asphalt. The roads' heights are now blended across the junction (a tester's junction in Kaunas).</li>
+      <li><b>No trench beside a raised road.</b> Where a road is built above the ground it was first levelled into (a main road held to its grade down a steep valley side on 30 m data), the old levelled strip was left as a trench along its uphill side. That strip is now filled up to the road (found on our own test in Sabile, Latvia).</li>
       <li><b>Parking that changes along a street.</b> A street mapped as several ways took the first way's parking all the way along: perpendicular parking, then parallel, then perpendicular again came out perpendicular throughout. Each way now keeps its own, wide and striped where the cars park across, narrower where they park along (a tester's apartment-block street in Kaunas).</li>
       <li><b>Service roads in the AI's road graph.</b> Driveways, alleys, car-park aisles and estate roads were kept out of traffic on purpose; now the AI can drive them, preferring the streets. Driveways and private roads stay gated and hidden from the navigation display (a tester's apartment-complex roads).</li>
       <li><b>Tagged widths kept.</b> A road's <code>width</code> tag is kept down to 2.5 m whatever its class: a one-lane residential street tagged 2.8 m came out 4.4 m, the class's minimum.</li>
@@ -170,6 +172,8 @@
     <figure><img src="images/lane-widths-along.jpg" alt="A three-lane one-way road from above whose right lane is visibly wider than the other two, mapped with width:lanes:start 3|3|3 and :end 3|3|5.5." loading="lazy"><figcaption>The roads test level's new scene: the right lane widening from 3 to 5.5 m along one way, the left edge straight on its mapped line.</figcaption></figure>
     <figure><img src="images/joint-shift.png" alt="Top view of a three-lane one-way road whose drawn surface moves one lane sideways over about 80 metres before a joint, its lane lines following." loading="lazy"><figcaption>Behind the scenes: the roads test level's new scene, one lane over at a joint, eased over the run.</figcaption></figure>
     <figure><img src="images/parking-per-way.png" alt="Two top views of a street with parking on one side: on the left perpendicular stall lines all along, on the right stall lines only at the two ends with a narrower middle stretch." loading="lazy"><figcaption>Behind the scenes: the tester's street before (left) and after (right).</figcaption></figure>
+    <figure><img src="images/junction-blend.png" alt="Hillshades and height differences of a junction's ground: above, sharp lines running out from the junction's middle; below, a smooth junction." loading="lazy"><figcaption>Behind the scenes: the tester's junction before (top) and after (bottom).</figcaption></figure>
+  <figure><img src="images/bench-fill.png" alt="Cross sections of a street across a valley side: the ground beside the road on its uphill side meets the road level instead of dipping into a trench." loading="lazy"><figcaption>Behind the scenes: cross sections of the raised street after the fix; the uphill side comes up to the road.</figcaption></figure>
   </section>
 
   <section id="sidewalks" data-nav="Sidewalks">

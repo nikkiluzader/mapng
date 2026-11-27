@@ -143,3 +143,44 @@ test('a ground road\'s rounded end does not lie over the end of the bridge it ru
   // the ground road itself stands on its ground from its first point on
   for (const x of [0, 1, 3, 10]) assert.ok(Math.abs(out.heightAt(x, 0) - zOf(x)) < 0.06, `ground road at x ${x}: ${out.heightAt(x, 0).toFixed(2)} against ${zOf(x).toFixed(2)}`);
 });
+
+test('road cores meeting at one level are blended: no step along the bisector at a junction', () => {
+  // (thecoachtoma's Kaunas junction, 2026-11-27: the nearer centreline's height taken outright left a step along each
+  // bisector, rays out of the junction node). Flat ground at 10; road A along x rising 3% from the node, road B along y
+  // falling 3% from it, both at 10 at the node (0, 0)
+  const width = 241; const height = 241; const worldSize = 60;   // (0.25 m squares: a step shows between neighbours)
+  const hm = new Float32Array(width * height).fill(10);
+  const lineOf = (dx, dy, grade) => {
+    const n = 11; const x = []; const y = []; const s = [];
+    for (let i = 0; i < n; i++) { x.push(dx * i * 2); y.push(dy * i * 2); s.push(i * 2); }
+    return { e: { x: Float64Array.from(x), y: Float64Array.from(y), s: Float64Array.from(s), g: new Float64Array(n).fill(10), half: 4, highway: 'residential' }, z: Float64Array.from(s.map((v) => 10 + grade * v)) };
+  };
+  const A = lineOf(1, 0, 0.03); const B = lineOf(0, 1, -0.03);
+  const graph = { edges: [A.e, B.e], profile: { z: [A.z, B.z] }, classes: { segments: [0, 1].map((k) => ({ edge: k, i0: 0, i1: 10, kind: 'ground' })) } };
+  const out = composeTerrain(graph, { heightMap: hm, width, height, worldSize, minHeight: 0 });
+  // across the bisector (the line x = y) inside both cores, 0.5 m apart: smooth (a few cm), not the step between the two
+  // roads' heights there (0.2 m at 3.5 m out, nearest centreline taking all)
+  let worst = 0;
+  for (let k = 1; k <= 3.5; k += 0.5) {
+    const a = out.heightAt(k + 0.25, k - 0.25); const b = out.heightAt(k - 0.25, k + 0.25);
+    worst = Math.max(worst, Math.abs(a - b));
+  }
+  assert.ok(worst < 0.08, `step across the bisector ${worst.toFixed(3)} m (0.5 m apart)`);
+});
+
+test('a road raised over a bench on an uphill side: the bench is filled flush, no trench beside the road', () => {
+  // (Sabile's Meza iela on 30 m data, 2026-11-27). The ground rises 10% across y; a bench levelled into it at 10 for
+  // |y| <= 6 (an older line of the road); the road along x at 10.8, 0.8 m over the bench
+  const width = 121; const height = 121; const worldSize = 120;
+  const hm = new Float32Array(width * height);
+  for (let r = 0; r < height; r++) for (let c = 0; c < width; c++) { const y = ((height - 1 - r) - height / 2) * 1; hm[r * width + c] = Math.abs(y) <= 6 ? 10 : 10 + 0.1 * y; }
+  const n = 31; const x = []; const yy = []; const s = [];
+  for (let i = 0; i < n; i++) { x.push((i - 15) * 2); yy.push(0); s.push(i * 2); }
+  const e = { x: Float64Array.from(x), y: Float64Array.from(yy), s: Float64Array.from(s), g: new Float64Array(n).fill(10), half: 3, highway: 'secondary' };
+  const graph = { edges: [e], profile: { z: [new Float64Array(n).fill(10.8)] }, classes: { segments: [{ edge: 0, i0: 0, i1: n - 1, kind: 'embankment' }] } };
+  const out = composeTerrain(graph, { heightMap: hm, width, height, worldSize, minHeight: 0 });
+  // uphill (y > 0): from the road's edge out to where the slope climbs past the road, never under the road
+  let low = Infinity;
+  for (let y = 4.5; y <= 9; y += 0.5) low = Math.min(low, out.heightAt(0, y));
+  assert.ok(low >= 10.75, `the uphill side dips to ${low.toFixed(2)} (road 10.8): a trench`);
+});

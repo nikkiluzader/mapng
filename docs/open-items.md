@@ -65,6 +65,15 @@ A new session starts with `docs/handoff.md` ("Work list").
   run out to the ground outside the generation bench (or the bench re-graded to the export profile), and junction
   corridors blended as one envelope. Tools: `scratch/kaunas/` rough.py, ditch.py (trench count), sections.py,
   longsec.py, junction_view.py; plots in `scratch/kaunas/lv/`.
+- **Sidewalks beside a road the solver raised stay at the old ground** (found with the trench fix, 2026-11-27): the
+  carriageways the sidewalks read keep the height they were laid at; on Sabile's Meza iela the sidewalks sit 0.9 m under
+  the road, a slot along both edges (15 of the old 26 trenches > 0.5 m are this). Moving the carriageways to the solved
+  heights (applySolvedHeights on them) fixed it there but the composed core covers only road + 1 m shoulder: the lifted
+  sidewalks overhung the side slopes (Naldo spikes +4, deckpark 30 m floating sidewalks +15, Zion creases +85). Design:
+  widen the composed core by each side's sidewalk (cw.left / cw.right) where they are lifted, then move them. Not done.
+- **MapNG-only tags (thecoachtoma 2026-11-27):** `mng_flat=true` on an area (flatten the whole polygon, e.g. a
+  parking lot) and `mng_no_lane_smoothing=true` on a way (no width taper, e.g. a square parking bay). Needs the user's
+  call on a tag namespace (outside OSM: tagging for the renderer if uploaded; fine in a local file).
 - **Smoke check's intermittent 404:** a Mapterhorn z17 tile over the app's Flagstaff start (no lidar there); upstream,
   harmless; the smoke script could ignore /api/mapterhorn 404s.
 - **From thecoachtoma 2026-11-27:** his service roads with sidewalk=left came out bare; the code builds them since 0.3.7

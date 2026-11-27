@@ -29,6 +29,17 @@ const DECK_REACH_M = 1.5;      // past a deck's half width
 const ABUTMENT_M = 8;
 const CORE_STEP_M = 2;          // road cores this far apart in height are on two levels
 const SIDE_BLEND_EPS_M = 0.25;  // side slopes blended by 1 / (distance past the core + this)^2
+// An uphill side where the ground beside the road lies below it (a bench the terrain was levelled into before, for an
+// older line of the road) and climbs back to the road's height within BENCH_REJOIN_M of its edge: filled flush to the
+// road out to there, not sloped down into the bench and left a trench along the road (Sabile's Meza iela on 30 m data:
+// a secondary road held to its grade 1.4 m over the levelled ground, trenches up to 0.97 m beside it, 2026-11-27)
+const BENCH_MIN_M = 0.2;        // the edge's ground this far under the road before a side counts as a bench
+const BENCH_REJOIN_M = 12;      // the ground climbing back to the road's height within this far past its edge
+const BENCH_DEPTH_MAX_M = 1.5;  // a dip deeper than this beside the road is no bench (a ditch, a stream): left
+// Road cores overlapping at one level (a junction's roads, each at its own grade a few metres out from the node):
+// their heights blended by how deep the pixel lies in each core, not the nearer centreline's taken outright, which left
+// a step along every bisector, rays out of the junction node (thecoachtoma's Kaunas junction, 2026-11-27)
+const CORE_BLEND_EPS = 0.05;
 // (which of two roads keeps its surface where a tunnel road left on the ground passes under another)
 const ROAD_RANK = { motorway: 9, trunk: 8, primary: 7, secondary: 6, tertiary: 5, unclassified: 4, residential: 4, living_street: 3, service: 2 };
 const END_UNDER_DECK_M = 0.06;     // the ground a ground road's end shapes under the deck it runs on from: this far under the road's line
@@ -115,7 +126,7 @@ export function composeTerrain(graph, grid) {
     const key = Math.floor(c / TILE) * 65536 + Math.floor(r / TILE);
     let t = tiles.get(key);
     if (!t) {
-      t = { sh: new Float32Array(TILE * TILE), sw: new Float32Array(TILE * TILE), h: new Float32Array(TILE * TILE), w: new Float32Array(TILE * TILE).fill(Infinity), q: new Float32Array(TILE * TILE).fill(1), n: new Uint8Array(TILE * TILE), tn: new Uint8Array(TILE * TILE), rk: new Uint8Array(TILE * TILE), cap: new Float32Array(TILE * TILE).fill(Infinity) };
+      t = { sh: new Float32Array(TILE * TILE), sw: new Float32Array(TILE * TILE), h: new Float32Array(TILE * TILE), w: new Float32Array(TILE * TILE).fill(Infinity), q: new Float32Array(TILE * TILE).fill(1), n: new Uint8Array(TILE * TILE), tn: new Uint8Array(TILE * TILE), rk: new Uint8Array(TILE * TILE), cap: new Float32Array(TILE * TILE).fill(Infinity), ch: new Float32Array(TILE * TILE), cw: new Float32Array(TILE * TILE), clo: new Float32Array(TILE * TILE).fill(Infinity), chi: new Float32Array(TILE * TILE).fill(-Infinity), cx: new Uint8Array(TILE * TILE) };
       tiles.set(key, t);
     }
     return t;
@@ -317,7 +328,27 @@ export function composeTerrain(graph, grid) {
         return Math.abs(zk[j] - dropAt(j) - (abutmentOff(kind, k, j)) - (raw(cc, rr) - minHeight));
       };
       const off = Math.max(offAt(i), offAt(i + 1)) + 1;
-      const reach = deck ? e.half + DECK_REACH_M : core + Math.min(SLOPE_MAX_M, Math.max(blendM, off * FILL_RUN + 2));
+      // (an uphill bench each side, at the piece's middle: how far past the core the ground climbs back to the road's height,
+      // or 0. BENCH_* above)
+      const bench = [0, 0];
+      // (a ground road or an embankment: a road the solver lifted over the levelled ground is classed an embankment)
+      if (!deck && !abutment && (kind === 'ground' || kind === 'embankment')) {
+        const L = Math.sqrt(L2); const nx = -vy / L; const ny = vx / L; const mx = (ax + bx) / 2; const my = (ay + by) / 2;
+        const zm = (zk[i] + zk[i + 1]) / 2 - (dropAt(i) + dropAt(i + 1)) / 2;
+        const gAt = (x, y) => { const [pc, pr] = toPixel(x, y); return raw(Math.max(0, Math.min(width - 1, Math.round(pc))), Math.max(0, Math.min(height - 1, Math.round(pr)))) - minHeight; };
+        const step = Math.max(0.5, squareM);
+        for (const [sideIdx, sg] of [[0, 1], [1, -1]]) {
+          if (gAt(mx + sg * nx * core, my + sg * ny * core) > zm - BENCH_MIN_M) continue;
+          let lowest = Infinity;
+          for (let dd = core; dd <= core + BENCH_REJOIN_M; dd += step) {
+            const g = gAt(mx + sg * nx * dd, my + sg * ny * dd);
+            if (g >= zm) { if (zm - lowest <= BENCH_DEPTH_MAX_M) bench[sideIdx] = dd; break; }
+            if (g < lowest) lowest = g;
+          }
+        }
+      }
+      const reach0 = deck ? e.half + DECK_REACH_M : core + Math.min(SLOPE_MAX_M, Math.max(blendM, off * FILL_RUN + 2));
+      const reach = Math.max(reach0, bench[0] + squareM, bench[1] + squareM);
       const [c0, r0] = toPixel(Math.min(ax, bx) - reach, Math.max(ay, by) + reach);
       const [c1, r1] = toPixel(Math.max(ax, bx) + reach, Math.min(ay, by) - reach);
       stats.corridors++;
@@ -403,7 +434,10 @@ export function composeTerrain(graph, grid) {
           // the bridge crosses.
           if (wingFill && zc > hEdge) slope = slopeMinM;
           const tt = d <= core ? 0 : (d - core) / slope;
-          if (tt >= 1) continue;
+          // (the pixel's side of the road, and its bench there: BENCH_* above)
+          const benchR = d > core && (bench[0] || bench[1]) ? bench[((x - ax) * -vy + (y - ay) * vx) >= 0 ? 0 : 1] : 0;
+          const onBench = benchR > 0 && d < benchR;
+          if (tt >= 1 && !onBench) continue;
           // ground over a built tube is the tunnel's: only a road's own
           // surface on it (a street over the box) is composed, not a road's
           // rounded end or side slope reaching over it (a cutting's end, its
@@ -417,7 +451,7 @@ export function composeTerrain(graph, grid) {
           // ground another builder shaped (a tunnel's cutting): its own
           // except under the road's surface
           if (keep && d > core && keep(r * width + c)) { left.add(r * width + c); continue; }
-          const target = zc + (h0 - zc) * smoothstep(tt);
+          const target = onBench ? Math.max(zc + (h0 - zc) * smoothstep(Math.min(1, tt)), zc) : zc + (h0 - zc) * smoothstep(tt);
           // the road whose core is physically nearest owns the pixel (inside
           // two cores, the nearer centreline; equal: averaged). Two roads side by side at different
           // heights then meet in a step midway between them, where a
@@ -444,6 +478,13 @@ export function composeTerrain(graph, grid) {
           // ran on the grid's squares: a sawtooth of drops metres high between the arms of every hairpin (stelvio),
           // and between the pieces of one road at a bend)
           if (out > 0) { const wgt = 1 / ((out + SIDE_BLEND_EPS_M) * (out + SIDE_BLEND_EPS_M)); t.sw[j] += wgt; t.sh[j] += target * wgt; }
+          // (every road core over the pixel, by how deep it lies in each: CORE_BLEND_EPS above. Only plain ground stretches:
+          // not a side road's piece under its through road's lanes (those stay the through road's), nor an abutment's fill,
+          // nor an embankment, cutting or a road carried on past a deck's end (blended there, ground rose into decks))
+          if (d <= core) {
+            // (a core that may not be blended over the pixel at all: then none is, the pixel keeps its owner's height)
+            if (!yielding && !abutment && kind === 'ground' && !overDeck) { const wc = smoothstep(1 - q) + CORE_BLEND_EPS; t.cw[j] += wc; t.ch[j] += target * wc; if (target < t.clo[j]) t.clo[j] = target; if (target > t.chi[j]) t.chi[j] = target; } else t.cx[j] = 1;
+          }
           const underRoad = bothCores && (sunkRoad === 1) !== (t.tn[j] === 1) && Math.abs(target - t.h[j]) > SUNK_UNDER_M
             && (sunkRoad === 1) === (target < t.h[j]);
           const twoLevels = bothCores && !underRoad && Math.abs(target - t.h[j]) > CORE_STEP_M;
@@ -477,7 +518,11 @@ export function composeTerrain(graph, grid) {
     const t = lastTile;
     if (!t) return NaN;
     const j = (r % TILE) * TILE + (c % TILE);
-    const base = Number.isFinite(t.w[j]) ? (t.w[j] > 0 && t.sw[j] > 0 ? t.sh[j] / t.sw[j] : t.h[j]) : raw(c, r) - minHeight;
+    // (inside a road core: the cores over it blended, where they are all at one level, within SUNK_UNDER_M of each other;
+    // cores further apart (a road beside it behind a wall, a road passing over or under it) keep the owner's height)
+    // (never under a deck: a blend there lifted the ground into the deck's underside)
+    const coreH = t.w[j] <= 0 && t.cw[j] > 0 && !t.cx[j] && t.chi[j] - t.clo[j] <= SUNK_UNDER_M && !Number.isFinite(t.cap[j]) ? t.ch[j] / t.cw[j] : t.h[j];
+    const base = Number.isFinite(t.w[j]) ? (t.w[j] > 0 && t.sw[j] > 0 ? t.sh[j] / t.sw[j] : coreH) : raw(c, r) - minHeight;
     if (!Number.isFinite(t.w[j]) && !Number.isFinite(t.cap[j])) return NaN;
     // a road's own core is never dug below its surface by a deck over it
     // (too little room there is the crossing's problem, counted, not a trench)
