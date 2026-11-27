@@ -15,6 +15,7 @@ import {
 } from './beamngBiomeCatalog.js';
 import { TERRAIN_MATERIAL_LIBRARY } from './beamngTerrainMaterialLibrary.js';
 import { buildUrbanRoadClassifier, estimateRoadCrossSection, isOneWayRoad } from './roadWidth.js';
+import { placeRoadFeatures } from './placedRoads.js';
 import { getEffectiveRoadLayer } from './roadNetwork.js';
 import { CURB_ONLY_M, sidewalkSides } from './beamngSidewalks.js';
 import { osmRockAllowed, steepRockFrom } from './worldCover.js';
@@ -954,6 +955,13 @@ function paintRoadFootprints(layerMap, terrainData, worldSize) {
   const metersPerPixel = worldSize / size;
   const toPx = (lat, lng) => geoToTerrainPx(lat, lng, bounds, size);
   const isUrbanRoad = buildUrbanRoadClassifier(osmFeatures);
+  // (roads where the export builds them: placed ways moved off their mapped line, transitions joined to their
+  // neighbours (placedRoads.js). On the mapped line the asphalt ran half off the drawn road and the grass, and its
+  // foliage, grew over the other half (thecoachtoma, Discord 2026-11-27))
+  const placedFeatures = placeRoadFeatures(osmFeatures, {
+    leftHand: !!terrainData.roadRules?.leftHandTraffic,
+    crossSectionOf: (f) => estimateRoadCrossSection(f.tags || {}, f.tags?.highway, isOneWayRoad(f.tags || {}), { urban: isUrbanRoad(f) }),
+  });
   const roads = [];
   const squares = [];
   // Tunnel roads in the open air (terrainData.openTunnelRoads, from the
@@ -976,7 +984,9 @@ function paintRoadFootprints(layerMap, terrainData, worldSize) {
     if (getEffectiveRoadLayer(feature.tags) !== 0) continue;
     squares.push({ mat: ROAD_STYLE.pedestrian.mat, ring: feature.geometry.map((pt) => toPx(pt.lat, pt.lng)) });
   }
-  for (const feature of osmFeatures) {
+  let movedRoads = 0;
+  for (let fi = 0; fi < placedFeatures.length; fi++) {
+    const feature = placedFeatures[fi];
     if (feature.type !== 'road' || !feature.geometry?.length) continue;
     const tags = feature.tags || {};
     const highway = tags.highway;
@@ -1003,12 +1013,16 @@ function paintRoadFootprints(layerMap, terrainData, worldSize) {
       const urban = isUrbanRoad(feature);
       const { carriagewayHalfWidth } = estimateRoadCrossSection(tags, highway, isOneWayRoad(tags), { urban });
       if (Number.isFinite(carriagewayHalfWidth)) halfWidthM = Math.max(halfWidthM, carriagewayHalfWidth);
+      // (a transition: as wide as the wider neighbour it joins)
+      if (Array.isArray(feature.builtHalfWidth)) halfWidthM = Math.max(halfWidthM, ...feature.builtHalfWidth);
       const sides = sidewalkSides({ tags, highway, urban });
       sidewalkM = Math.max(sides.left, sides.right);
       if (sidewalkM <= CURB_ONLY_M) sidewalkM = 0;
     }
+    if (feature !== osmFeatures[fi]) movedRoads++;
     roads.push({ style: { ...style, mat: roadGroundMat(tags, style.mat) }, halfWidthM, sidewalkM, pts: feature.geometry.map((pt) => toPx(pt.lat, pt.lng)) });
   }
+  console.log(`[Terrain Materials] Road ground: ${movedRoads} road(s) painted where the export builds them (placement tags: moved off the mapped line, transitions joined to their neighbours); the rest on their mapped line.`);
   const paint = (road, halfM, mat, onlyOver = null) => {
     const halfPx = Math.max(1, halfM / metersPerPixel);
     const { pts } = road;

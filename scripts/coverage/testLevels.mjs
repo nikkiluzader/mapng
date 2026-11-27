@@ -314,6 +314,13 @@ function roads(regionKey) {
     // E: a way mapped along its left lane all the way, beside an untagged one for comparison
     way(run(620, -40, 940, -40, 20), { ...P, lanes: '2', placement: 'middle_of:1', name: 'Placement E' });
     label('placement=middle_of:1: the road to the right of the line', 780, -40, [45, 0]);
+    // G: placement=transition (thecoachtoma, 2026-11-27): a short way linking two ways whose placements do not line up,
+    // its line running across the lanes. Drawn on its line it was a diagonal stub; joined to its neighbours' drawn
+    // roads it runs straight on (left_of:1 puts the road 3.5 m right of its line, right_of:2 3.5 m left of its own)
+    way(run(740, -100, 840, -100, 20), { ...P, lanes: '2', placement: 'left_of:1', name: 'Placement G' });
+    way([[840, -100], [860, -107]], { ...P, lanes: '2', placement: 'transition', name: 'Placement G' });
+    way(run(860, -107, 950, -107, 20), { ...P, lanes: '2', placement: 'right_of:2', name: 'Placement G' });
+    label('placement=transition between left_of:1 and right_of:2: one straight road', 845, -103, [45, 0]);
     drive('driver: placement A, the turn lane opening', 700, 198.4, 0);
   }
   // 12. placement with tagged widths and signals (x 620-950, y -960..-780; thecoachtoma's Savanoriu pr., 2026-11-25)

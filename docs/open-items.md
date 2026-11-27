@@ -94,6 +94,11 @@ A new session starts with `docs/handoff.md` ("Work list").
      double-click to remove; a click never replaces the road). scratch/verify-pw/e2e_road_via.mjs.
   6. **"Surrounding tiles" and "include backdrop" together crashed a computer** (recklessandfeckless): to reproduce
      (which build, web or desktop, map size).
+- **Placed roads in the ground + placement=transition** (thecoachtoma, Discord 2026-11-27; his roundabout area
+  `tsm_rb`, plots `scratch/transition/`). Done 2026-11-27: the ground's materials (and so the grass foliage) painted
+  where placed roads are built; transition ways joined to their neighbours' drawn roads (services/placedRoads.js), the
+  neighbours no longer eased into them; roads test level scene G. Open: an in-game look at his roundabout, the north
+  spot where four pieces meet.
 - **Turned areas (0.3.8 target).** thecoachtoma's rotated box; plan `refs/output/rotation-plan.md`, scope one tile
   (decided 2026-11-27). Status 2026-11-27: on dev (d3fae10 + the 2D preview commit): map handle + angle field, Generate,
   OSM clip, export, sky turned (checked in game: sun 30 degrees off at a 30 degree turn), 2D preview overlays, 3D preview checked; web
