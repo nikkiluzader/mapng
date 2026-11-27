@@ -1,3 +1,4 @@
+import { frameUV, isTurned } from './mapFrame.js';
 // The terrain heights the exporter and its worker threads look up: a
 // geographic point to level coordinates on the ground, and the ground as
 // the game draws it. Pure functions of terrainData { bounds, width, height,
@@ -6,8 +7,9 @@
 export function getTerrainHeightWorld(lat, lng, terrainData) {
   const { bounds, width, height, heightMap, minHeight } = terrainData;
   const sanitizeHeight = (h) => (Number.isFinite(h) && h > -10000 ? h : minHeight);
-  const u = Math.max(0, Math.min(1, (lng - bounds.west) / (bounds.east - bounds.west)));
-  const v = Math.max(0, Math.min(1, (bounds.north - lat) / (bounds.north - bounds.south)));
+  const uv = isTurned(bounds) ? frameUV(bounds, lat, lng) : null;
+  const u = Math.max(0, Math.min(1, uv ? uv.u : (lng - bounds.west) / (bounds.east - bounds.west)));
+  const v = Math.max(0, Math.min(1, uv ? uv.v : (bounds.north - lat) / (bounds.north - bounds.south)));
   // on the game's grid, as terrainGroundAt below (the level is width squares wide, sample c at
   // (c - width / 2) squares, rows from the south): the (width - 1)-span lookup this was drifted
   // up to a square across the map, and at 10 m squares on a hillside stood trees 5 m in the air
@@ -74,8 +76,10 @@ export function terrainDrape(terrainData, squareSize) {
 export function geoToWorldPoint(lat, lng, terrainData, squareSize, zOffset = 0) {
   const { bounds, width } = terrainData;
   const worldSize = width * squareSize;
-  const u = Math.max(0, Math.min(1, (lng - bounds.west) / (bounds.east - bounds.west)));
-  const v = Math.max(0, Math.min(1, (bounds.north - lat) / (bounds.north - bounds.south)));
+  // (a turned map's along its own axes: services/mapFrame.js frameUV)
+  const uv = isTurned(bounds) ? frameUV(bounds, lat, lng) : null;
+  const u = Math.max(0, Math.min(1, uv ? uv.u : (lng - bounds.west) / (bounds.east - bounds.west)));
+  const v = Math.max(0, Math.min(1, uv ? uv.v : (bounds.north - lat) / (bounds.north - bounds.south)));
   return [
     (u - 0.5) * worldSize,
     (0.5 - v) * worldSize,

@@ -1,3 +1,4 @@
+import { frameUV, isTurned } from './mapFrame.js';
 import proj4 from 'proj4';
 
 // ─── Shared Projection Utilities ─────────────────────────────────────────────
@@ -42,6 +43,8 @@ export const createWGS84ToLocal = (centerLat, centerLng) =>
 export const createGridProjector = (bounds, width, height) => {
     const lngSpan = bounds.east - bounds.west;
     const latSpan = bounds.north - bounds.south;
+    // (a turned map's along its own axes: services/mapFrame.js frameUV)
+    if (isTurned(bounds)) return (lat, lng) => { const { u, v } = frameUV(bounds, lat, lng); return { x: u * width, y: v * height - 1 }; };
     return (lat, lng) => ({
         // the game's grid (services/terrainLookup.js): a level is `width` squares across its
         // bounds, sample c at c squares from the west edge, rows counted from the south. The

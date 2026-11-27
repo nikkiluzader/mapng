@@ -18,10 +18,17 @@
 // to the pixel everywhere. Against the real world the scale is exact at the centre; east-west it follows the cosine
 // of the latitude, so a map's top and bottom rows are off by (their distance from the centre) x tan(latitude) / R:
 // 0.13 % (10 m at the corners) on a 16 km map at latitude 45. That is the price of a grid that is linear in degrees.
+//
+// A turned map (refs/output/rotation-plan.md): the bounds carry `angle` (degrees clockwise from north: the map's own
+// "up" points that far east of north) and `frame` ({ lat, lng, wM, hM }: its centre and size in metres). Its
+// north/south/east/west are then the north-up box round the turned square (what to fetch), and positions are linear
+// in metres along the map's own axes, from the centre, by the centre's metres per degree, the same rule as above. With
+// no angle every function here is the unturned one exactly.
 
 const A = 6378137;                 // WGS84 semi-major axis, metres
 const E2 = 0.00669437999014;       // WGS84 first eccentricity squared
 const RAD = Math.PI / 180;
+const lngSpanOf = (b) => { let s = b.east - b.west; if (s > 180) s -= 360; if (s < -180) s += 360; return s; };
 
 /** Metres in one degree of latitude and of longitude at `lat` (WGS84 ellipsoid): { lat, lng }. */
 export function metresPerDegree(lat) {
@@ -31,11 +38,56 @@ export function metresPerDegree(lat) {
   return { lat: meridian * RAD, lng: normal * Math.cos(lat * RAD) * RAD };
 }
 
-/** The bounds of a map widthM by heightM metres centred on `center`: { north, south, east, west } (east may pass 180). */
-export function frameBounds(center, widthM, heightM) {
+/**
+ * The bounds of a map widthM by heightM metres centred on `center`: { north, south, east, west } (east may pass 180).
+ * Turned by `angle` degrees (clockwise from north): the north-up box round the turned map, with { angle, frame }.
+ */
+export function frameBounds(center, widthM, heightM, angle = 0) {
   const k = metresPerDegree(center.lat);
-  const dLat = heightM / 2 / k.lat; const dLng = widthM / 2 / k.lng;
-  return { north: center.lat + dLat, south: center.lat - dLat, west: center.lng - dLng, east: center.lng + dLng };
+  const a = normAngle(angle);
+  if (!a) {
+    const dLat = heightM / 2 / k.lat; const dLng = widthM / 2 / k.lng;
+    return { north: center.lat + dLat, south: center.lat - dLat, west: center.lng - dLng, east: center.lng + dLng };
+  }
+  const t = a * RAD; const c = Math.abs(Math.cos(t)); const sn = Math.abs(Math.sin(t));
+  // (the turned rectangle's half extents east and north)
+  const hx = (widthM / 2) * c + (heightM / 2) * sn; const hy = (widthM / 2) * sn + (heightM / 2) * c;
+  return {
+    north: center.lat + hy / k.lat, south: center.lat - hy / k.lat, west: center.lng - hx / k.lng, east: center.lng + hx / k.lng,
+    angle: a, frame: { lat: center.lat, lng: center.lng, wM: widthM, hM: heightM },
+  };
+}
+
+/** An angle in degrees as (-180, 180], 0 for none or not a number. */
+export function normAngle(angle) {
+  let a = Number(angle);
+  if (!Number.isFinite(a)) return 0;
+  a = ((a % 360) + 360) % 360; if (a > 180) a -= 360;
+  return Math.abs(a) < 1e-9 ? 0 : a;
+}
+/** Whether the bounds are of a turned map. */
+export const isTurned = (b) => !!(b && b.angle && b.frame);
+
+/**
+ * A point's place on the map as fractions: { u, v }, u from the west edge, v from the north edge (0..1 inside). On a
+ * turned map, along its own axes: u from its left edge, v from its top edge.
+ */
+export function frameUV(bounds, lat, lng) {
+  if (!isTurned(bounds)) return { u: (lng - bounds.west) / lngSpanOf(bounds), v: (bounds.north - lat) / (bounds.north - bounds.south) };
+  const f = bounds.frame; const k = metresPerDegree(f.lat); const t = bounds.angle * RAD;
+  let dl = lng - f.lng; if (dl > 180) dl -= 360; if (dl < -180) dl += 360;
+  const x = dl * k.lng; const y = (lat - f.lat) * k.lat;
+  // (the map's own right and up: right = (cos t, -sin t), up = (sin t, cos t) in east, north)
+  const xr = x * Math.cos(t) - y * Math.sin(t); const yu = x * Math.sin(t) + y * Math.cos(t);
+  return { u: xr / f.wM + 0.5, v: 0.5 - yu / f.hM };
+}
+/** The reverse: the point at fractions (u, v) of the map, as { lat, lng }. */
+export function frameLatLngAt(bounds, u, v) {
+  if (!isTurned(bounds)) return { lat: bounds.north - v * (bounds.north - bounds.south), lng: bounds.west + u * lngSpanOf(bounds) };
+  const f = bounds.frame; const k = metresPerDegree(f.lat); const t = bounds.angle * RAD;
+  const xr = (u - 0.5) * f.wM; const yu = (0.5 - v) * f.hM;
+  const x = xr * Math.cos(t) + yu * Math.sin(t); const y = -xr * Math.sin(t) + yu * Math.cos(t);
+  return { lat: f.lat + y / k.lat, lng: f.lng + x / k.lng };
 }
 
 /** A point `x` metres east and `y` metres north of `center`, in the frame's own (linear) terms: { lat, lng }. */
@@ -49,7 +101,6 @@ export function offsetMetres(center, p) {
   return { x: (p.lng - center.lng) * k.lng, y: (p.lat - center.lat) * k.lat };
 }
 
-const lngSpanOf = (b) => { let s = b.east - b.west; if (s > 180) s -= 360; if (s < -180) s += 360; return s; };
 
 /**
  * The position (in squares from the bounds' north-west corner: gx east, gy south, fractions allowed) as [lng, lat].
@@ -57,6 +108,7 @@ const lngSpanOf = (b) => { let s = b.east - b.west; if (s > 180) s -= 360; if (s
  * ((i + 0.5) * W / N, (j + 0.5) * H / M).
  */
 export function gridLngLat(bounds, width, height, gx, gy) {
+  if (isTurned(bounds)) { const p = frameLatLngAt(bounds, gx / width, gy / height); return [p.lng, p.lat]; }
   return [bounds.west + (gx / width) * lngSpanOf(bounds), bounds.north - (gy / height) * (bounds.north - bounds.south)];
 }
 /** Height sample (column c, row r from the north) as { lat, lng }. */
@@ -66,6 +118,7 @@ export function vertexLatLng(bounds, width, height, c, r) {
 }
 /** A point's position in squares from the north-west corner: { gx, gy } (the reverse of gridLngLat). */
 export function gridPosition(bounds, width, height, lat, lng) {
+  if (isTurned(bounds)) { const { u, v } = frameUV(bounds, lat, lng); return { gx: u * width, gy: v * height }; }
   return { gx: ((lng - bounds.west) / lngSpanOf(bounds)) * width, gy: ((bounds.north - lat) / (bounds.north - bounds.south)) * height };
 }
 
