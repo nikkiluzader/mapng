@@ -368,6 +368,15 @@ function roads(regionKey) {
     way([[520, -935], [520, -980], [580, -980]], { highway: 'service' });
     label('one-lane residential width=2.8; service roads off it (width=2.8 + sidewalk=left; one turning 90 degrees), all in nav', 530, -950, [55, 0]);
     drive('driver: narrow K1, the 2.8 m street', 450, -935, 0);
+    // L: one street mapped as three ways, the parking on its right switching perpendicular -> parallel -> perpendicular
+    // (thecoachtoma's apartment-block street, Kaunas, Discord 2026-11-27: merged into one road it took the first way's
+    // perpendicular parking all the way). Each way keeps its own: wide and striped at the ends, narrower in the middle
+    const L = { highway: 'residential', lanes: '1', 'parking:right': 'street_side' };
+    way(run(-220, -965, -140, -965, 20), { ...L, 'parking:right:orientation': 'perpendicular' });
+    way(run(-140, -965, -40, -965, 20), { ...L, 'parking:right:orientation': 'parallel' });
+    way(run(-40, -965, 40, -965, 20), { ...L, 'parking:right:orientation': 'perpendicular' });
+    label('parking:right perpendicular | parallel | perpendicular on one street (three ways)', -90, -965, [55, 0]);
+    drive('driver: parking L, past the parking switching sides', -210, -965, 0);
   }
   return { b, size: SIZE, heightAt };
 }

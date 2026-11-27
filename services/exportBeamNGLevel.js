@@ -2974,6 +2974,10 @@ function getDecalMergeStyleKey(segment) {
     Object.keys(tags).filter((k) => /^placement(:|$)/.test(k)).sort().map((k) => `${k}=${tags[k]}`).join(';'),
     // (and its lanes' own widths: a turn lane narrowing on the next way is a different road layout)
     Object.keys(tags).filter((k) => /^width:lanes(:|$)/.test(k)).sort().map((k) => `${k}=${tags[k]}`).join(';'),
+    // (and its street parking: a merged run took its first way's, and a street mapped perpendicular, parallel,
+    // perpendicular came out perpendicular all the way, the parallel stretch as wide and striped as the rest
+    // (thecoachtoma's apartment-block street, Kaunas, Discord 2026-11-27))
+    Object.keys(tags).filter((k) => /^parking(:|$)/.test(k)).sort().map((k) => `${k}=${tags[k]}`).join(';'),
     // (a way whose lanes change from its first node to its last, placement or width:lanes :start / :end, never joined to
     // another: the change runs over its own length, measured along it)
     Object.keys(tags).some((k) => /^(placement|width:lanes)(:forward|:backward)?:(start|end)$/.test(k)) ? String(segment?.sourceFeature?.id ?? segment?.id ?? '') : '',
