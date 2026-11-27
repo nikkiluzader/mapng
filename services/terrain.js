@@ -111,9 +111,10 @@ const unwrapLngNearRef = (lng, refLng) => {
 // A map's bounds: exactly its size through its centre (services/mapFrame.js: the one definition of where a map's
 // pixels are). Until 2026-11 this was the map plus 4 m each side, which the game then drew at the map's own size:
 // every level a little small (1.5 % on a 512 m map).
-const computeMetricFetchBounds = (normalizedCenter, width, height) => {
-  const b = frameBounds(normalizedCenter, width, height);
-  return { north: b.north, south: b.south, ...continuousLngRange(b.west, b.east) };
+// (turned by `angle` degrees: the box round the turned map, with { angle, frame } for every lookup after: mapFrame.js)
+const computeMetricFetchBounds = (normalizedCenter, width, height, angle = 0) => {
+  const b = frameBounds(normalizedCenter, width, height, angle);
+  return { north: b.north, south: b.south, ...continuousLngRange(b.west, b.east), ...(b.angle ? { angle: b.angle, frame: b.frame } : {}) };
 };
 
 /**
@@ -2086,6 +2087,8 @@ export const fetchTerrainData = async (
         normalizedCenter,
         width * effectiveMetersPerPixel,
         height * effectiveMetersPerPixel,
+        // (a turned area: one map in tile mode, refs/output/rotation-plan.md)
+        Number(generationOptions?.angle) || 0,
       );
 
   // the footprint as lat/lng boxes (a margin of FOOTPRINT_MARGIN_PX round each tile, so a source tile is skipped only

@@ -2266,5 +2266,11 @@
     "bigDesktop": "Groß: Diese Form umfasst {km2} km², mehr als die Website erlaubt ({maxKm2} km²). Die Desktop-App baut sie, das kann aber lange dauern und viel Speicherplatz brauchen.",
     "manyPieces": "Wird in {n} Teilen gebaut. Generieren und Export können jeweils eine Stunde oder länger dauern, und ein so großes Level kann zu viel sein, als dass das Spiel es lädt. Du kannst es trotzdem versuchen: Wenn etwas fehlschlägt, hilft ein Bericht, MapNG zu verbessern.",
     "via": "Wegpunkt {n}: ziehen, um die Straße über eine andere Stelle zu führen, Doppelklick zum Entfernen"
+  },
+  "area": {
+    "turn": "Bereich drehen",
+    "turnUnit": "° von Norden",
+    "turnHint": "Ziehe den runden Griff an der Ecke des Rahmens oder gib einen Winkel ein: Das Oben des Levels zeigt dorthin (0 ist nordausgerichtet). Vorerst nur mit einer Kachel.",
+    "turnHandle": "Bereich drehen ({deg}°): um die Mitte ziehen"
   }
 }

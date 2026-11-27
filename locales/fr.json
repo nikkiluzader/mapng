@@ -2266,5 +2266,11 @@
     "bigDesktop": "Grand : cette forme couvre {km2} km², plus que ce que permet le site ({maxKm2} km²). L'application de bureau la construit, mais cela peut prendre longtemps et demander beaucoup d'espace disque.",
     "manyPieces": "Construit en {n} morceaux. La génération et l'export peuvent prendre chacun une heure ou plus, et un niveau aussi grand peut être trop lourd à charger pour le jeu. Vous pouvez quand même essayer : si quelque chose échoue, un rapport aide à améliorer MapNG.",
     "via": "Point de passage {n} : faites-le glisser pour faire passer la route ailleurs, double-cliquez pour le retirer"
+  },
+  "area": {
+    "turn": "Tourner la zone",
+    "turnUnit": "° depuis le nord",
+    "turnHint": "Faites glisser la poignée ronde au coin du cadre ou saisissez un angle : le haut du niveau pointe dans cette direction (0 = nord en haut). Une seule tuile pour l'instant.",
+    "turnHandle": "Tourner la zone ({deg}°) : faites glisser autour du centre"
   }
 }

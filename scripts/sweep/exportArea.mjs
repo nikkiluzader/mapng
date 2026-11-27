@@ -49,9 +49,35 @@ if (process.env.BACKDROP === '1' || process.env.SHIMS === '1') {
   const { installBrowserShims } = await import('../../desktop/runner/browserShims.mjs');
   installBrowserShims({ assetsDir: new URL('../../public', import.meta.url).pathname });
 }
-const meta = JSON.parse(fs.readFileSync(path.join(dir, 'meta.json')));
-const osmFeatures = JSON.parse(fs.readFileSync(path.join(dir, 'osm.json')));
-const heightMap = new Float32Array(fs.readFileSync(path.join(dir, `${dem}.f32`)).buffer.slice(0));
+let meta = JSON.parse(fs.readFileSync(path.join(dir, 'meta.json')));
+let osmFeatures = JSON.parse(fs.readFileSync(path.join(dir, 'osm.json')));
+let heightMap = new Float32Array(fs.readFileSync(path.join(dir, `${dem}.f32`)).buffer.slice(0));
+// ANGLE=<degrees> [TURN_SIZE=<px>]: a turned map (refs/output/rotation-plan.md) cut from the area: the area's north-up
+// grid read at the turned grid's samples (bilinear, through services/mapFrame.js), the map data clipped to the turned
+// square as Generate's parse does (osm.js clipFeaturesToBounds). The area must be big enough to hold the turned square
+// (side x (|cos| + |sin|)); TURN_SIZE defaults to half the area's size
+const TURN = Number(process.env.ANGLE) || 0;
+if (TURN) {
+  const { frameBounds, vertexLatLng, gridPosition } = await import('../../services/mapFrame.js');
+  const { clipFeaturesToBounds } = await import('../../services/osm.js');
+  const N = meta.size; const out = Number(process.env.TURN_SIZE) || N / 2;
+  const c = { lat: (meta.bounds.north + meta.bounds.south) / 2, lng: (meta.bounds.east + meta.bounds.west) / 2 };
+  const tb = frameBounds(c, out * meta.mpp, out * meta.mpp, TURN);
+  const src = heightMap; const hm = new Float32Array(out * out);
+  for (let r = 0; r < out; r++) {
+    for (let col = 0; col < out; col++) {
+      const p = vertexLatLng(tb, out, out, col, r); const g = gridPosition(meta.bounds, N, N, p.lat, p.lng);
+      const x = Math.max(0, Math.min(N - 1.001, g.gx)); const y = Math.max(0, Math.min(N - 1.001, g.gy - 1));
+      const x0 = Math.floor(x); const y0 = Math.floor(y); const fx = x - x0; const fy = y - y0;
+      const v = (cc, rr) => src[rr * N + cc];
+      hm[r * out + col] = (v(x0, y0) * (1 - fx) + v(x0 + 1, y0) * fx) * (1 - fy) + (v(x0, y0 + 1) * (1 - fx) + v(x0 + 1, y0 + 1) * fx) * fy;
+    }
+  }
+  heightMap = hm;
+  osmFeatures = clipFeaturesToBounds(osmFeatures, tb);
+  meta = { ...meta, size: out, bounds: tb, turned: TURN };
+  console.log(`turned ${TURN} degrees: a ${out} px map cut from the ${N} px area, ${osmFeatures.length} features inside the turned square`);
+}
 // as the app: fine terrain: roads onto its cut, then the light fine-mode
 // smoothing; coarse (30 m): the full smoothing
 // (RAW=1: as the app's raw terrain, the elevation left as fetched)
@@ -77,10 +103,11 @@ for (const v of heightMap) { if (v < minHeight) minHeight = v; if (v > maxHeight
 // (the land cover, as the app attaches at Generate: WorldCover, cached beside the area's data)
 const landCoverFile = path.join(dir, 'landcover.bin');
 const lcN = Math.ceil(meta.size * meta.mpp / 10);
-if (!fs.existsSync(landCoverFile)) {
+if (!TURN && !fs.existsSync(landCoverFile)) {
   try { const { fetchWorldCoverGrid } = await import('../../services/worldCover.js'); fs.writeFileSync(landCoverFile, await fetchWorldCoverGrid(meta.bounds, lcN, lcN)); } catch (e) { console.warn('no land cover:', e?.message || e); }
 }
-const landCover = fs.existsSync(landCoverFile) ? { grid: new Uint8Array(fs.readFileSync(landCoverFile)), n: lcN } : null;
+// (a turned cut: the area's cached land cover is the north-up box's: none)
+const landCover = !TURN && fs.existsSync(landCoverFile) ? { grid: new Uint8Array(fs.readFileSync(landCoverFile)), n: lcN } : null;
 const terrainData = {
   width: meta.size, height: meta.size, minHeight, maxHeight, bounds: meta.bounds, heightMap, osmFeatures: osmRoads,
   processingMetersPerPixel: meta.mpp, raw,
@@ -92,7 +119,8 @@ const terrainData = {
 // painted in Node by the app's own generateGameTexture (gametexnode.mjs, a
 // real canvas: NAPI_CANVAS = @napi-rs/canvas) once per area, cached beside
 // the area's data; BASE=none for none
-const baseTexture = process.env.BASE || 'game';
+// (a turned cut: no base texture unless asked; the area's cached one is the north-up box's)
+const baseTexture = process.env.BASE || (TURN ? 'none' : 'game');
 if (baseTexture === 'game') {
   const png = path.join(dir, 'gametex.png');
   if (!fs.existsSync(png)) execFileSync('node', [path.join(REPO, 'scripts/sweep/gametexnode.mjs'), area, png], { stdio: 'inherit' });

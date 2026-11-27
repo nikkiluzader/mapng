@@ -2266,5 +2266,11 @@
     "bigDesktop": "Grande: questa forma copre {km2} km², più di quanto consenta il sito ({maxKm2} km²). L'app desktop la costruisce, ma può richiedere molto tempo e molto spazio su disco.",
     "manyPieces": "Costruito in {n} pezzi. Generazione ed esportazione possono richiedere un'ora o più ciascuna, e un livello così grande potrebbe essere troppo pesante da caricare per il gioco. Puoi comunque provare: se qualcosa va storto, un report aiuta a migliorare MapNG.",
     "via": "Punto di passaggio {n}: trascinalo per far passare la strada da un altro punto, doppio clic per rimuoverlo"
+  },
+  "area": {
+    "turn": "Ruota l'area",
+    "turnUnit": "° dal nord",
+    "turnHint": "Trascina la maniglia rotonda sull'angolo del riquadro o inserisci un angolo: l'alto del livello punta in quella direzione (0 è nord in alto). Per ora solo con una tessera.",
+    "turnHandle": "Ruota l'area ({deg}°): trascina attorno al centro"
   }
 }

@@ -215,6 +215,13 @@ export const useMainStore = defineStore('main', () => {
     try { if (road.value) localStorage.setItem('mapng_road', JSON.stringify(road.value)); else localStorage.removeItem('mapng_road'); } catch { /* full storage: kept for this session */ }
   }
   function setRoadHalfWidthM(v) { roadHalfWidthM.value = Number(v) || 250; localStorage.setItem('mapng_road_half_width', String(roadHalfWidthM.value)); }
+  // a turned area (refs/output/rotation-plan.md): degrees clockwise from north, whole degrees, -179..180; one tile only
+  const areaAngle = ref((() => { const a = Math.round(Number(localStorage.getItem('mapng_area_angle')) || 0); return a > 180 || a <= -180 ? 0 : a; })());
+  function setAreaAngle(v) {
+    let a = Math.round(Number(v) || 0); a = ((a % 360) + 360) % 360; if (a > 180) a -= 360;
+    areaAngle.value = a;
+    try { localStorage.setItem('mapng_area_angle', String(a)); } catch { /* private mode */ }
+  }
 
   function setTilesTogether(v) { tilesTogether.value = !!v; localStorage.setItem('mapng_tiles_together', String(!!v)); }
   function setTilesSnap(v) { tilesSnap.value = !!v; localStorage.setItem('mapng_tiles_snap', String(!!v)); }
@@ -325,6 +332,6 @@ export const useMainStore = defineStore('main', () => {
     rawTerrainActive,
     setRawTerrain,
     tiles, tilesTogether, tilesSnap, tileAnchor, setTiles, setTilesTogether, setTilesSnap, setTileAnchor,
-    areaMode, road, roadHalfWidthM, setAreaMode, setRoad, setRoadHalfWidthM
+    areaMode, road, roadHalfWidthM, setAreaMode, setRoad, setRoadHalfWidthM, areaAngle, setAreaAngle
   };
 });

@@ -82,6 +82,8 @@ const getOutputBounds = (toWGS84, width, height, targetBounds) => {
             north: targetBounds.north,
             south: targetBounds.south,
             ...continuousLngRange(targetBounds.west, targetBounds.east),
+            // (a turned map's angle and frame kept: every lookup after reads them, services/mapFrame.js)
+            ...(targetBounds.angle && targetBounds.frame ? { angle: targetBounds.angle, frame: { ...targetBounds.frame } } : {}),
         };
     }
 

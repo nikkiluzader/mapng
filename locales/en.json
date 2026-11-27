@@ -2266,5 +2266,11 @@
     "bigDesktop": "Big: this shape covers {km2} km², more than the website allows ({maxKm2} km²). The desktop app builds it, but it may take a long time and need a lot of disk space.",
     "manyPieces": "Built in {n} pieces. Generate and the export can each take an hour or more, and a level this big may be too much for the game to load. You can still try it: if something fails, a report helps make MapNG better.",
     "via": "Waypoint {n}: drag it to lead the road through another spot, double-click to remove it"
+  },
+  "area": {
+    "turn": "Turn the area",
+    "turnUnit": "° from north",
+    "turnHint": "Drag the round handle on the box's corner, or type an angle: the level's own up points that way (0 is north-up). One tile only for now.",
+    "turnHandle": "Turn the area ({deg}°): drag round the centre"
   }
 }

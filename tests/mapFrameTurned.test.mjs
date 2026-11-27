@@ -44,3 +44,27 @@ test('a turned frame in the projectors: a point east of the centre lands along t
   const pj = createGridProjector(b, 1024, 1024)(C.lat, C.lng + 100 * k);
   assert.ok(Math.abs(pj.x - 512) < 1e-6 && Math.abs(pj.y - (412 - 1)) < 1e-6, `grid ${pj.x.toFixed(3)}, ${pj.y.toFixed(3)}`);
 });
+
+test('clipFeaturesToBounds on a turned map: features clipped to the turned square, not the north-up box round it', async () => {
+  const { clipFeaturesToBounds } = await import('../services/osm.js');
+  const { frameLatLngAt } = await import('../services/mapFrame.js');
+  const b = frameBounds(C, 1000, 1000, 45);
+  const at = (u, v) => frameLatLngAt(b, u, v);
+  // a point inside the turned square, and one in the north-up box's corner but outside the turned square
+  const inside = at(0.5, 0.5); const corner = { lat: b.north - 1e-6, lng: b.west + 1e-6 };
+  // a road across the whole box: kept only between the turned square's edges
+  const road = { id: 'r', type: 'road', tags: { highway: 'residential' }, geometry: [{ lat: C.lat, lng: b.west }, { lat: C.lat, lng: b.east }] };
+  const out = clipFeaturesToBounds([
+    { id: 'p1', type: 'tree', tags: {}, geometry: [inside] },
+    { id: 'p2', type: 'tree', tags: {}, geometry: [corner] },
+    road,
+  ], b);
+  assert.deepEqual(out.filter((f) => f.type === 'tree').map((f) => f.id), ['p1']);
+  const seg = out.find((f) => f.type === 'road');
+  assert.ok(seg, 'the road kept inside');
+  // its ends on the turned square's edge: u or v at 0 or 1
+  for (const p of [seg.geometry[0], seg.geometry[seg.geometry.length - 1]]) {
+    const q = frameUV(b, p.lat, p.lng);
+    assert.ok([q.u, q.v].some((x) => Math.abs(x) < 1e-6 || Math.abs(x - 1) < 1e-6), `end at u ${q.u.toFixed(4)}, v ${q.v.toFixed(4)}`);
+  }
+});

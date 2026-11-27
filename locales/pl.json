@@ -2266,5 +2266,11 @@
     "bigDesktop": "Duże: powierzchnia kształtu: {km2} km², więcej niż pozwala strona ({maxKm2} km²). Aplikacja desktopowa go zbuduje, ale może to długo trwać i wymagać dużo miejsca na dysku.",
     "manyPieces": "Budowane w {n} częściach. Generowanie i eksport mogą trwać godzinę lub dłużej każde, a tak duży poziom może być za ciężki do wczytania przez grę. Nadal możesz spróbować: jeśli coś się nie uda, raport pomoże ulepszyć MapNG.",
     "via": "Punkt pośredni {n}: przeciągnij, aby poprowadzić drogę przez inne miejsce, kliknij dwukrotnie, aby usunąć"
+  },
+  "area": {
+    "turn": "Obróć obszar",
+    "turnUnit": "° od północy",
+    "turnHint": "Przeciągnij okrągły uchwyt w rogu ramki lub wpisz kąt: góra poziomu wskazuje w tę stronę (0 to północ u góry). Na razie tylko z jednym kafelkiem.",
+    "turnHandle": "Obróć obszar ({deg}°): przeciągnij wokół środka"
   }
 }

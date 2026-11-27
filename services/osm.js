@@ -7,6 +7,7 @@ import { fetchOsmFromManifest, fetchOsmFromTiles, getOsmTileManifest, planTileSo
 import { isRacingTrackLine } from "./roadWidth.js";
 import { isGateBarrier } from "./gates.js";
 import { isTagObjectNode } from "./tagModels.js";
+import { frameUV, frameLatLngAt, isTurned } from "./mapFrame.js";
 import {
   OVERTURE_ATTRIBUTION, OVERTURE_RELEASE, fetchOsmFromOverture, fetchOvertureBuildingRecords, mergeOvertureBuildings,
 } from "./overtureTiles.js";
@@ -318,6 +319,58 @@ const joinWays = (wayNodesList) => {
 
 const NOT_A_ROUTE = new Set(["via_ferrata"]);
 
+/**
+ * Features clipped to the map: points inside kept, lines cut into the pieces inside, areas cut at its edge (their
+ * holes too). A turned map (bounds with { angle, frame }) is clipped to the turned square itself.
+ */
+export const clipFeaturesToBounds = (rawFeatures, bounds) => {
+  const clippedFeatures = [];
+  // (a turned map, refs/output/rotation-plan.md: clipped to the turned square itself, in its own unit square (u east
+  // along the map, v down it), not to the north-up box round it: a building past the square's edge was clamped onto
+  // it by every lookup after. clipLineString / clipPolygon then work on { lat: 1 - v, lng: u } in a 0..1 box)
+  const turned = isTurned(bounds);
+  const unitBox = { north: 1, south: 0, west: 0, east: 1 };
+  const toUnit = (pts) => pts.map((p) => { const q = frameUV(bounds, p.lat, p.lng); return { ...p, lat: 1 - q.v, lng: q.u }; });
+  const fromUnit = (pts) => pts.map((p) => { const q = frameLatLngAt(bounds, p.lng, 1 - p.lat); return { ...p, lat: q.lat, lng: q.lng }; });
+  const clipLine = (pts) => (turned ? clipLineString(toUnit(pts), unitBox).map(fromUnit) : clipLineString(pts, bounds));
+  const clipPoly = (pts) => (turned ? fromUnit(clipPolygon(toUnit(pts), unitBox)) : clipPolygon(pts, bounds));
+  for (const f of rawFeatures) {
+    if (f.geometry.length === 1) {
+      const p = f.geometry[0];
+      const inside = turned
+        ? (() => { const q = frameUV(bounds, p.lat, p.lng); return q.u >= 0 && q.u <= 1 && q.v >= 0 && q.v <= 1; })()
+        : p.lat >= bounds.south && p.lat <= bounds.north && p.lng >= bounds.west && p.lng <= bounds.east;
+      if (inside) clippedFeatures.push(f);
+      continue;
+    }
+    const isLinearWaterway = f.type === "water" && !!f.tags?.waterway && f.tags?.area !== "yes" && !isClosedRing(f.geometry);
+    const isLinearPlatform = f.type === "platform" && !isClosedRing(f.geometry);
+    // (a pier is a line too, man_made=pier on an open way: clipped as a polygon, a two-node jetty was dropped
+    // and a longer one came back closed. Found by the coverage level, scripts/coverage, 2026-11-24)
+    if (f.type === "road" || f.type === "railway" || f.type === "barrier" || f.type === "coastline" || f.type === "power_line" || f.type === "cliff" || f.type === "pier" || f.type === "breakwater" || isLinearWaterway || isLinearPlatform) {
+      const clippedSegments = clipLine(f.geometry);
+      clippedSegments.forEach((segment, index) => {
+        if (segment.length > 1) {
+          clippedFeatures.push({ ...f, id: `${f.id}_seg_${index}`, geometry: segment });
+        }
+      });
+    } else {
+      const clippedPoly = clipPoly(f.geometry);
+      if (clippedPoly.length > 2) {
+        const clippedHoles = [];
+        if (f.holes) {
+          for (const hole of f.holes) {
+            const clippedHole = clipPoly(hole);
+            if (clippedHole.length > 2) clippedHoles.push(clippedHole);
+          }
+        }
+        clippedFeatures.push({ ...f, geometry: clippedPoly, holes: clippedHoles.length > 0 ? clippedHoles : undefined });
+      }
+    }
+  }
+  return clippedFeatures;
+};
+
 export const parseOverpassResponse = (data, bounds) => {
   const ways = {};
   const relations = [];
@@ -610,40 +663,7 @@ export const parseOverpassResponse = (data, bounds) => {
     });
   }
 
-  const clippedFeatures = [];
-  for (const f of rawFeatures) {
-    if (f.geometry.length === 1) {
-      const p = f.geometry[0];
-      if (p.lat >= bounds.south && p.lat <= bounds.north && p.lng >= bounds.west && p.lng <= bounds.east) {
-        clippedFeatures.push(f);
-      }
-      continue;
-    }
-    const isLinearWaterway = f.type === "water" && !!f.tags?.waterway && f.tags?.area !== "yes" && !isClosedRing(f.geometry);
-    const isLinearPlatform = f.type === "platform" && !isClosedRing(f.geometry);
-    // (a pier is a line too, man_made=pier on an open way: clipped as a polygon, a two-node jetty was dropped
-    // and a longer one came back closed. Found by the coverage level, scripts/coverage, 2026-11-24)
-    if (f.type === "road" || f.type === "railway" || f.type === "barrier" || f.type === "coastline" || f.type === "power_line" || f.type === "cliff" || f.type === "pier" || f.type === "breakwater" || isLinearWaterway || isLinearPlatform) {
-      const clippedSegments = clipLineString(f.geometry, bounds);
-      clippedSegments.forEach((segment, index) => {
-        if (segment.length > 1) {
-          clippedFeatures.push({ ...f, id: `${f.id}_seg_${index}`, geometry: segment });
-        }
-      });
-    } else {
-      const clippedPoly = clipPolygon(f.geometry, bounds);
-      if (clippedPoly.length > 2) {
-        const clippedHoles = [];
-        if (f.holes) {
-          for (const hole of f.holes) {
-            const clippedHole = clipPolygon(hole, bounds);
-            if (clippedHole.length > 2) clippedHoles.push(clippedHole);
-          }
-        }
-        clippedFeatures.push({ ...f, geometry: clippedPoly, holes: clippedHoles.length > 0 ? clippedHoles : undefined });
-      }
-    }
-  }
+  const clippedFeatures = clipFeaturesToBounds(rawFeatures, bounds);
 
   const isPointInPolygon = (point, vs) => {
     let x = point.lng, y = point.lat, inside = false;

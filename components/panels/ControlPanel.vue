@@ -111,6 +111,20 @@
           >
           </ResolutionSelector>
         </fieldset>
+        <!-- a turned area (refs/output/rotation-plan.md): one tile, no uploaded elevation; the handle on the box's corner
+             turns it too -->
+        <fieldset v-if="!nativeDims && store.areaMode !== 'road' && store.tiles.length === 1" :disabled="store.boxLocked || isGenerating" :class="store.boxLocked ? 'opacity-60' : ''" data-testid="area-turn">
+          <label class="block text-xs text-gray-700 dark:text-gray-300">
+            <span class="flex items-center justify-between gap-2">
+              <span>{{ t('area.turn') }}</span>
+              <span class="flex items-center gap-1">
+                <input type="number" min="-179" max="180" step="1" class="w-16 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-1.5 py-0.5 text-right text-xs" :value="store.areaAngle" data-testid="area-turn-input" :aria-label="t('area.turn')" @change="store.setAreaAngle(Number($event.target.value))" />
+                <span class="text-micro text-gray-500 dark:text-gray-400">{{ t('area.turnUnit') }}</span>
+              </span>
+            </span>
+          </label>
+          <p class="mt-1 text-micro leading-snug text-gray-500 dark:text-gray-400">{{ t('area.turnHint') }}</p>
+        </fieldset>
         <!-- (the website only: big maps belong in the desktop app) -->
         <!-- (8192 and up: every website crash report so far is one of these, on machines with 16 to 32 GB: the
              tab's own memory limit, about 4 GB, not the machine's) -->

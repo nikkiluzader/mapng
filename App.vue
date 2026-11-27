@@ -949,6 +949,11 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         generationOptions.tiles = { list: store.tiles.map((t) => ({ dx: t.dx, dy: t.dy })), tilePx: R, anchor: { lat: center.value.lat, lng: center.value.lng }, anchorAt: store.tileAnchor, together: !!store.tilesTogether, snap: !!store.tilesSnap };
         console.log(`[Tiles] ${store.tiles.length} tiles: a ${g.width}×${g.height} grid, ${g.terrainBlock ? 'a power-of-two square (TerrainBlock)' : `ground models${generationOptions.footprint ? ', footprint ' + g.areaPx + ' px' : ''}`}${g.overlaps ? ', overlaps fetched once' : ''}${g.islands ? ', islands' : ''}.`);
       }
+      // a turned area (refs/output/rotation-plan.md): one tile in tile mode, no uploaded elevation
+      if (store.areaMode !== 'road' && store.tiles.length === 1 && store.areaAngle && !uploadedElevationFile.value) {
+        generationOptions.angle = store.areaAngle;
+        console.log(`[Area] turned ${store.areaAngle}° from north.`);
+      }
       // (the desktop app fetches and processes in a Node process: no 4 GB
       // window limit; the website does it here)
       // (a note that a Generate is running: services/sessionGuard.js)

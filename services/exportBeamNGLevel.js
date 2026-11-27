@@ -9965,7 +9965,8 @@ function buildBeamNGExportReport({
     `- World size: ${formatNumber(worldSize, 2)} m x ${formatNumber(worldSize, 2)} m`,
     `- Total area: ${formatNumber(totalAreaM2, 2)} m^2 (${metersToKm2(totalAreaM2)} km^2)`,
     `- Center coordinates: ${formatNumber(center?.lat, 6)}, ${formatNumber(center?.lng, 6)}`,
-    `- Bounds north/south/east/west: ${formatNumber(bounds.north, 6)}, ${formatNumber(bounds.south, 6)}, ${formatNumber(bounds.east, 6)}, ${formatNumber(bounds.west, 6)}`,
+    `- Bounds north/south/east/west: ${formatNumber(bounds.north, 6)}, ${formatNumber(bounds.south, 6)}, ${formatNumber(bounds.east, 6)}, ${formatNumber(bounds.west, 6)}${bounds.angle ? ' (the box round the turned map)' : ''}`,
+    ...(bounds.angle ? [`- Turned: the level's up points ${bounds.angle} degrees east of true north (map ${Math.round(bounds.frame?.wM || 0)} x ${Math.round(bounds.frame?.hM || 0)} m along its own axes); the sun, moon and stars turned to match on load`] : []),
     `- Elevation source used: ${resolveElevationSourceLabel(originalTerrainData, options?.elevationSource)}`,
     ...(originalTerrainData?.groundFilterInfo ? [`- Ground under buildings (global 30 m): ${(() => { const g = originalTerrainData.groundFilterInfo;
       if (g.applied) return `taken out: ${(g.share * 100).toFixed(0)}% of the area lowered, mean ${g.meanCut.toFixed(1)} m, up to ${g.maxCut.toFixed(1)} m (rooftop signal ${g.dsmSlope.toFixed(2)}; GEDTM30, OpenGeoHub, CC-BY 4.0${g.copMixed ? '; averaged with Copernicus GLO-30, DLR e.V. / Airbus, EU and ESA, via Mapterhorn' : ''})`;
@@ -17467,6 +17468,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // Lua initialization script executed on level load. Expected by BeamNG's
   // level subsystem and the World Editor.
   const heroRoads = roadSurface === 'hero';
+  // (a turned level: its angle from north, services/mapFrame.js)
+  const levelTurnDeg = Number(exportTerrainData?.bounds?.angle) || 0;
+  if (levelTurnDeg) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Turned level: its up is ${levelTurnDeg} degrees east of north; the sun, moon and stars turned by ${-levelTurnDeg} degrees on load (core_celestial.setNorthOffset).`);
   // (each export's script carries its own mark: a bake left by another export of a level of this name is not used)
   if (heroRoads) zip.file(`${base}/${HERO_ROADS_FILE}`, HERO_ROADS_LUA.replace('__MAPNG_BUILD__', generatePersistentId()));
   zip.file(`${base}/mainLevel.lua`, [
@@ -17635,6 +17639,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     'end',
     '',
     'function M.onClientStartMission()',
+    // (a turned level, refs/output/rotation-plan.md: its +y points the angle east of true north, so the sun, moon and
+    // stars are turned back by it, core_celestial's own north offset (the game's photo mode uses it); set back on leaving)
+    ...(levelTurnDeg ? [`  if core_celestial and core_celestial.setNorthOffset then core_celestial.setNorthOffset(${-levelTurnDeg}) end`] : []),
     '  raAutoLoadPending = true',
     '  raAutoLoadWait = 0',
     '  spriteWatch = { age = 0, nextCheck = 0.5, seen = countSprites() }',
@@ -17680,6 +17687,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     '-- The game keeps this script loaded when the map changes, and the next map',
     '-- would run our copy instead of its own.',
     'function M.onClientEndMission()',
+    ...(levelTurnDeg ? ['  if core_celestial and core_celestial.setNorthOffset then core_celestial.setNorthOffset(0) end'] : []),
     ...(heroRoads ? ['  if hero then hero.remove() end'] : []),
     '  releaseHold(spriteWatch, "level ended")',
     '  spriteWatch = nil',

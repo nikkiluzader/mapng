@@ -104,8 +104,28 @@
         :keyboard="false"
       />
 
+      <!-- a turned area (refs/output/rotation-plan.md): its four corners, and a handle on its top-right corner to turn it -->
+      <l-polygon
+        v-if="turnedCorners && !showUploadedCoverageBounds && !roadModeOn"
+        :lat-lngs="turnedCorners"
+        color="#FF6600"
+        :weight="2"
+        :fill-opacity="0.1"
+        :interactive="false"
+        :options="{ dashArray: '2, 8', lineCap: 'round' }"
+      />
+      <l-marker
+        v-if="turnHandleAt"
+        :lat-lng="turnHandleAt"
+        :draggable="true"
+        :icon="turnHandleIcon"
+        @drag="dragTurnHandle"
+        @dragend="dropTurnHandle"
+      >
+        <l-tooltip :permanent="false" direction="top" :offset="[0, -8]">{{ t('area.turnHandle', { deg: store.areaAngle }) }}</l-tooltip>
+      </l-marker>
       <l-rectangle 
-        v-if="selectionBounds && !showUploadedCoverageBounds && !roadModeOn"
+        v-if="selectionBounds && !turnedCorners && !showUploadedCoverageBounds && !roadModeOn"
         :bounds="[[selectionBounds.south, selectionBounds.west], [selectionBounds.north, selectionBounds.east]]" 
         color="#FF6600"
         :weight="2"
@@ -381,6 +401,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n';
 import { LMap, LTileLayer, LRectangle, LMarker, LTooltip, LPolygon, LPolyline } from '@vue-leaflet/vue-leaflet';
 import { useRoadMode } from '../../composables/useRoadMode.js';
+import { frameBounds, frameLatLngAt, offsetMetres } from '../../services/mapFrame.js';
 import { Layers, ChevronDown, Star, Navigation } from 'lucide-vue-next';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -639,6 +660,44 @@ const bounds = computed(() => {
   const nw = L.latLng(metricBounds.north, metricBounds.west);
   const se = L.latLng(metricBounds.south, metricBounds.east);
   return L.latLngBounds(nw, se);
+});
+
+// A turned area (refs/output/rotation-plan.md): one tile in tile mode, no uploaded elevation (the rest come later).
+const turnAllowed = computed(() => store.areaMode !== 'road' && store.tiles.length === 1 && !props.uploadedElevationFile && !showUploadedCoverageBounds.value);
+const turnFrame = computed(() => {
+  if (!turnAllowed.value || !store.areaAngle) return null;
+  const c = props.boxLocked ? props.center : currentCenter.value;
+  if (!c || !Number.isFinite(c.lat) || !Number.isFinite(c.lng)) return null;
+  return frameBounds(c, activeSelectionSizeMeters.value, activeSelectionSizeMeters.value, store.areaAngle);
+});
+const turnedCorners = computed(() => {
+  const f = turnFrame.value; if (!f) return null;
+  return [[0, 0], [1, 0], [1, 1], [0, 1]].map(([u, v]) => { const p = frameLatLngAt(f, u, v); return [p.lat, p.lng]; });
+});
+// (the handle: the top-right corner, turned or not, while turning is possible and the box follows the map)
+const turnHandleAt = computed(() => {
+  if (!turnAllowed.value || props.boxLocked) return null;
+  const c = currentCenter.value; if (!c || !Number.isFinite(c.lat)) return null;
+  const f = frameBounds(c, activeSelectionSizeMeters.value, activeSelectionSizeMeters.value, store.areaAngle);
+  const p = frameLatLngAt(f, 1, 0); return [p.lat, p.lng];
+});
+// (dragged: the angle from the centre to the pointer, less the corner's own 45 degrees, in whole degrees)
+const turnAngleFor = (ll) => {
+  const c = currentCenter.value; if (!c || !ll) return store.areaAngle;
+  const o = offsetMetres(c, { lat: ll.lat, lng: ll.lng });
+  return Math.round((Math.atan2(o.x, o.y) * 180) / Math.PI - 45);
+};
+const dragTurnHandle = (event) => { const ll = event?.target?.getLatLng?.(); if (ll) store.setAreaAngle(turnAngleFor(ll)); };
+const dropTurnHandle = (event) => {
+  const ll = event?.target?.getLatLng?.(); if (ll) store.setAreaAngle(turnAngleFor(ll));
+  const marker = event.target;
+  nextTick(() => { if (turnHandleAt.value) marker.setLatLng(turnHandleAt.value); });
+};
+const turnHandleIcon = L.divIcon({
+  className: 'mapng-drag-handle mapng-turn-handle',
+  html: '<div style="width:16px;height:16px;border-radius:9999px;background:white;border:2px solid var(--brand);box-shadow:0 0 0 1px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;color:var(--brand);font-size:11px;line-height:1;">&#x21bb;</div>',
+  iconSize: [16, 16],
+  iconAnchor: [8, 8],
 });
 
 const selectionBounds = computed(() => {
@@ -933,7 +992,8 @@ const selectionMask = computed(() => {
   if (!b || boxScreenPx.value < 48) return null;
   return [
     [[-89.9, -900], [89.9, -900], [89.9, 900], [-89.9, 900]],
-    [[b.south, b.west], [b.north, b.west], [b.north, b.east], [b.south, b.east]],
+    // (a turned area: its own four corners)
+    turnedCorners.value && maskedBox.value === selectionBounds.value ? turnedCorners.value : [[b.south, b.west], [b.north, b.west], [b.north, b.east], [b.south, b.east]],
   ];
 });
 const selectionLabel = computed(() => {
@@ -941,8 +1001,10 @@ const selectionLabel = computed(() => {
   const size = activeSelectionSizeMeters.value;
   const text = formatSelectionSize(size, size);
   if (!b || !text || boxScreenPx.value < 48) return null;
+  // (a turned area: the middle of its own top edge)
+  const top = turnFrame.value && maskedBox.value === selectionBounds.value ? frameLatLngAt(turnFrame.value, 0.5, 0) : null;
   return {
-    at: [b.north, (b.east + b.west) / 2],
+    at: top ? [top.lat, top.lng] : [b.north, (b.east + b.west) / 2],
     icon: L.divIcon({
       className: 'mapng-selection-size',
       html: `<span>${text}</span>`,
