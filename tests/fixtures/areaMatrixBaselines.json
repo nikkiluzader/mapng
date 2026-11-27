@@ -1,7 +1,7 @@
 {
  "_note": "Area baselines for scripts/sweep/runSweep.mjs: re-record with --save after a change that improves an area (commit the file with it).",
- "recorded": "2026-11-24",
- "commit": "d4a5d59",
+ "recorded": "2026-11-27",
+ "commit": "f0d7888",
  "areas": {
   "normandy_flat@gpxz/untouched": {
    "steps": 0,
@@ -1057,10 +1057,10 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 14
+   "seconds": 17
   },
   "w_barcelona@gpxz/untouched": {
-   "steps": 0,
+   "steps": 1,
    "steepStruct": 0,
    "steepGround": 0,
    "shortX": 0,
@@ -1068,7 +1068,7 @@
    "thruDeck": 0,
    "spikes": 0,
    "bumps": 0,
-   "cross": 23,
+   "cross": 22,
    "junctions": 0,
    "creases": 0,
    "swFloat": 2,
@@ -1081,7 +1081,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 13
+   "seconds": 17
   },
   "w_barcelona@gpxz/ready": {
    "steps": 0,
@@ -1095,8 +1095,8 @@
    "cross": 0,
    "junctions": 0,
    "creases": 0,
-   "swFloat": 11,
-   "swBuried": 6,
+   "swFloat": 15,
+   "swBuried": 10,
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 0,
@@ -1105,7 +1105,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 14
+   "seconds": 17
   },
   "w_barcelona@t30/noshape": {
    "steps": 0,
@@ -1116,11 +1116,11 @@
    "thruDeck": 0,
    "spikes": 0,
    "bumps": 1,
-   "cross": 3,
-   "junctions": 5,
+   "cross": 5,
+   "junctions": 4,
    "creases": 11,
    "swFloat": 0,
-   "swBuried": 0,
+   "swBuried": 5,
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 0,
@@ -1129,7 +1129,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 14
+   "seconds": 16
   },
   "w_barcelona@t30/ready": {
    "steps": 0,
@@ -1142,9 +1142,9 @@
    "bumps": 0,
    "cross": 3,
    "junctions": 3,
-   "creases": 16,
-   "swFloat": 3,
-   "swBuried": 10,
+   "creases": 14,
+   "swFloat": 0,
+   "swBuried": 7,
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 0,
@@ -1156,7 +1156,7 @@
    "seconds": 13
   },
   "w_barcelona@t30/untouched": {
-   "steps": 0,
+   "steps": 2,
    "steepStruct": 0,
    "steepGround": 12,
    "shortX": 0,
@@ -1164,7 +1164,7 @@
    "thruDeck": 0,
    "spikes": 0,
    "bumps": 0,
-   "cross": 40,
+   "cross": 42,
    "junctions": 3,
    "creases": 0,
    "swFloat": 0,
@@ -1177,7 +1177,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 14
+   "seconds": 13
   },
   "w_amsterdam@gpxz/noshape": {
    "steps": 0,
@@ -2238,8 +2238,8 @@
    "bumps": 0,
    "cross": 1,
    "junctions": 0,
-   "creases": 15,
-   "swFloat": 2,
+   "creases": 16,
+   "swFloat": 1,
    "swBuried": 0,
    "snapMovedPct": 0,
    "snapP90cm": 0,
@@ -2251,7 +2251,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 12
+   "seconds": 13
   },
   "w_barcelona@mh/untouched": {
    "steps": 0,
@@ -2261,11 +2261,11 @@
    "groundGaps": 0,
    "thruDeck": 0,
    "spikes": 0,
-   "bumps": 2,
-   "cross": 35,
+   "bumps": 3,
+   "cross": 38,
    "junctions": 0,
    "creases": 14,
-   "swFloat": 9,
+   "swFloat": 7,
    "swBuried": 0,
    "lintErrors": 0,
    "lintWarnings": 0,
@@ -2275,7 +2275,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 13
+   "seconds": 15
   },
   "w_barcelona@mh/noshape": {
    "steps": 0,
@@ -2286,9 +2286,9 @@
    "thruDeck": 0,
    "spikes": 0,
    "bumps": 0,
-   "cross": 0,
+   "cross": 2,
    "junctions": 0,
-   "creases": 18,
+   "creases": 19,
    "swFloat": 0,
    "swBuried": 0,
    "snapMovedPct": 0,
@@ -2301,7 +2301,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 13
+   "seconds": 16
   },
   "w_amsterdam@mh/ready": {
    "steps": 0,
@@ -3369,7 +3369,7 @@
    "maxDeckLen": 201,
    "tunnels": 0,
    "tunnelsLeft": 1,
-   "seconds": 6
+   "seconds": 7
   },
   "dev_pilchowice@gpxz/noshape": {
    "steps": 0,
@@ -3380,20 +3380,20 @@
    "thruDeck": 19,
    "spikes": 0,
    "bumps": 4,
-   "cross": 6,
+   "cross": 5,
    "junctions": 8,
-   "creases": 100,
+   "creases": 99,
    "swFloat": 0,
    "swBuried": 0,
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 3,
-   "maxDeckH": 33.46,
+   "maxDeckH": 33.39,
    "deckKm": 0.4,
-   "maxDeckLen": 203,
+   "maxDeckLen": 202,
    "tunnels": 0,
    "tunnelsLeft": 1,
-   "seconds": 7
+   "seconds": 9
   },
   "dev_pilchowice@mh/ready": {
    "steps": 0,
@@ -3409,8 +3409,8 @@
    "creases": 410,
    "swFloat": 0,
    "swBuried": 0,
-   "snapMovedPct": 18,
-   "snapP90cm": 102,
+   "snapMovedPct": 17,
+   "snapP90cm": 100,
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 4,
@@ -3419,7 +3419,7 @@
    "maxDeckLen": 152,
    "tunnels": 1,
    "tunnelsLeft": 0,
-   "seconds": 8
+   "seconds": 9
   },
   "dev_pilchowice@mh/untouched": {
    "steps": 0,
@@ -3443,7 +3443,7 @@
    "maxDeckLen": 152,
    "tunnels": 1,
    "tunnelsLeft": 0,
-   "seconds": 6
+   "seconds": 7
   },
   "dev_pilchowice@mh/noshape": {
    "steps": 0,
@@ -3454,13 +3454,13 @@
    "thruDeck": 2,
    "spikes": 0,
    "bumps": 23,
-   "cross": 506,
+   "cross": 507,
    "junctions": 5,
    "creases": 176,
    "swFloat": 0,
    "swBuried": 0,
-   "snapMovedPct": 18,
-   "snapP90cm": 102,
+   "snapMovedPct": 17,
+   "snapP90cm": 100,
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 3,
@@ -3469,7 +3469,7 @@
    "maxDeckLen": 152,
    "tunnels": 1,
    "tunnelsLeft": 0,
-   "seconds": 7
+   "seconds": 8
   },
   "dev_pilchowice@t30/ready": {
    "steps": 0,
@@ -3478,19 +3478,19 @@
    "shortX": 0,
    "groundGaps": 0,
    "thruDeck": 0,
-   "spikes": 4,
+   "spikes": 5,
    "bumps": 8,
    "cross": 5,
    "junctions": 3,
-   "creases": 197,
+   "creases": 195,
    "swFloat": 0,
-   "swBuried": 4,
+   "swBuried": 2,
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 4,
-   "maxDeckH": 13.45,
+   "maxDeckH": 13.55,
    "deckKm": 0.77,
-   "maxDeckLen": 537,
+   "maxDeckLen": 541,
    "tunnels": 1,
    "tunnelsLeft": 0,
    "seconds": 9
@@ -3517,7 +3517,7 @@
    "maxDeckLen": 344,
    "tunnels": 0,
    "tunnelsLeft": 1,
-   "seconds": 6
+   "seconds": 7
   },
   "dev_pilchowice@t30/noshape": {
    "steps": 0,
@@ -3525,18 +3525,18 @@
    "steepGround": 232,
    "shortX": 0,
    "groundGaps": 0,
-   "thruDeck": 29,
+   "thruDeck": 32,
    "spikes": 0,
    "bumps": 4,
-   "cross": 3,
+   "cross": 2,
    "junctions": 2,
-   "creases": 21,
+   "creases": 20,
    "swFloat": 0,
    "swBuried": 0,
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 3,
-   "maxDeckH": 23.12,
+   "maxDeckH": 22.96,
    "deckKm": 0.53,
    "maxDeckLen": 347,
    "tunnels": 0,
@@ -3549,20 +3549,20 @@
    "steepGround": 337,
    "shortX": 0,
    "groundGaps": 0,
-   "thruDeck": 6,
-   "spikes": 5,
+   "thruDeck": 1,
+   "spikes": 6,
    "bumps": 11,
    "cross": 8,
    "junctions": 7,
-   "creases": 360,
+   "creases": 359,
    "swFloat": 0,
-   "swBuried": 3,
+   "swBuried": 1,
    "lintErrors": 0,
    "lintWarnings": 0,
    "decks": 6,
-   "maxDeckH": 32.2,
-   "deckKm": 0.75,
-   "maxDeckLen": 194,
+   "maxDeckH": 32.18,
+   "deckKm": 0.74,
+   "maxDeckLen": 201,
    "tunnels": 1,
    "tunnelsLeft": 0,
    "seconds": 10
