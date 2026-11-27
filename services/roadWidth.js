@@ -103,6 +103,7 @@ export function getDefaultLaneCount(highway, isOneWay) {
 // A width measured between a street's buildings (streetWidths.js) may be
 // narrower than the class minimum: an old town's or Tokyo's one-lane street.
 const MEASURED_MIN_HALF_M = 1.5;
+const TAGGED_MIN_WIDTH_M = 2.5;   // a tagged width is kept down to this, whatever the class
 
 export function getRoadHalfWidthClamp(highway) {
   if (['motorway', 'motorway_link', 'trunk', 'trunk_link'].includes(highway)) {
@@ -163,8 +164,11 @@ export function taggedWidthCapHalf(tags = {}, highway, classMax) {
 export function estimateRoadHalfWidth(tags = {}, highway, isOneWay = false, fallbackHalfWidth = 3.5) {
   const explicitWidth = parseRoadWidthMeters(tags.width);
   const limits = getRoadHalfWidthClamp(highway);
+  // (a tagged width is a measurement: kept down to TAGGED_MIN_WIDTH_M on every class, the class's minimum only for the
+  // widths estimated here. Clamped to it, a one-lane residential street tagged width=2.8 came out 4.4 m while the same
+  // width through width:lanes was kept (thecoachtoma, Discord 2026-11-27))
   if (Number.isFinite(explicitWidth) && explicitWidth > 0) {
-    return clamp(explicitWidth / 2, limits.min, taggedWidthCapHalf(tags, highway, limits.max));
+    return clamp(explicitWidth / 2, Math.min(limits.min, TAGGED_MIN_WIDTH_M / 2), taggedWidthCapHalf(tags, highway, limits.max));
   }
   // a raceway by its kind (a circuit 12 m, a dirt oval 16, a kart track 8), not by lanes
   if (highway === 'raceway') return clamp(racewayHalfWidth(tags), limits.min, limits.max);
@@ -378,7 +382,9 @@ export function estimateRoadCrossSection(tags = {}, highway, isOneWay = false, {
     // width= is the whole carriageway. Keep only TAGGED extras inside it;
     // defaults would invent parking the mapper already measured.
     const limits = getRoadHalfWidthClamp(highway);
-    carriagewayHalfWidth = clamp(explicitWidth / 2, limits.min, Math.max(limits.max + PARKING_LANE_M, taggedWidthCapHalf(tags, highway, limits.max)));
+    // (kept down to TAGGED_MIN_WIDTH_M, whatever the class: estimateRoadHalfWidth)
+    const minHalf = Math.min(limits.min, TAGGED_MIN_WIDTH_M / 2);
+    carriagewayHalfWidth = clamp(explicitWidth / 2, minHalf, Math.max(limits.max + PARKING_LANE_M, taggedWidthCapHalf(tags, highway, limits.max)));
     const taggedExtra = (side) => {
       const parking = parseParkingSideMeters(tags, side);
       if (parking !== null) return parking;
@@ -386,7 +392,7 @@ export function estimateRoadCrossSection(tags = {}, highway, isOneWay = false, {
     };
     leftExtra = taggedExtra('left');
     rightExtra = taggedExtra('right');
-    drivingHalfWidth = Math.max(limits.min, carriagewayHalfWidth - (leftExtra + rightExtra) / 2);
+    drivingHalfWidth = Math.max(minHalf, carriagewayHalfWidth - (leftExtra + rightExtra) / 2);
     carriagewayHalfWidth = drivingHalfWidth + (leftExtra + rightExtra) / 2;
   } else {
     carriagewayHalfWidth = drivingHalfWidth + (leftExtra + rightExtra) / 2;
