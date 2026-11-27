@@ -94,8 +94,15 @@ A new session starts with `docs/handoff.md` ("Work list").
      double-click to remove; a click never replaces the road). scratch/verify-pw/e2e_road_via.mjs.
   6. **"Surrounding tiles" and "include backdrop" together crashed a computer** (recklessandfeckless): to reproduce
      (which build, web or desktop, map size).
-- **Tile rotation on the 2D map (0.3.8 target).** Rotating the tiles in step 1 (backlog 0 and area 1, thecoachtoma's
-  rotated box). Big.
+- **Turned areas (0.3.8 target).** thecoachtoma's rotated box; plan `refs/output/rotation-plan.md`, scope one tile
+  (decided 2026-11-27). Status 2026-11-27: on dev (d3fae10 + the 2D preview commit): map handle + angle field, Generate,
+  OSM clip, export, sky turned (checked in game: sun 30 degrees off at a 30 degree turn), 2D preview overlays, 3D preview checked; web
+  end-to-end `scratch/verify-pw/e2e_turned.mjs` (Kaunas 512 m at 30 degrees, every road check zero); test exporter
+  `ANGLE`/`TURN_SIZE`. Open:
+  - an in-game walk round an app-built turned level (spawn heading, map screen picture, minimap);
+  - desktop end-to-end (the job carries generationOptions, untested);
+  - a turned scene in the synthetic test levels (they are north-up by build: needs a turned coverage export);
+  - later: tile groups, uploads, levels in pieces.
 - **Carried from 0.3.7** (`docs/handoff.md`): Fizz_Mechanic's remaining points (road-to-bridge/tunnel joins, lake
   galleries, the dam's tunnel box, bridge width: needs the place); long bridges in levels built in pieces; slip roads
   at the outer lane (five points); Mesh Road joins and hairpins; the ride-alongs. Toma's notes of 2026-11-24 (a)

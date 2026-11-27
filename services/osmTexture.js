@@ -1921,10 +1921,8 @@ export const generateOSMTexture = async (terrainData, options = {}) => {
   // px-per-world-metre of this mapping because squareSize == processingMpp.) A
   // metric projection here would drift from the placed decals/objects by ~cos(lat).
   const { north: bNorth, south: bSouth, east: bEast, west: bWest } = terrainData.bounds;
-  const toPixel = (lat, lng) => ({
-    x: ((lng - bWest) / (bEast - bWest)) * canvas.width,
-    y: ((bNorth - lat) / (bNorth - bSouth)) * canvas.height,
-  });
+  // (along a turned map's own axes: services/mapFrame.js frameUV)
+  const toPixel = (lat, lng) => { const q = frameUV(terrainData.bounds, lat, lng); return { x: q.u * canvas.width, y: q.v * canvas.height }; };
 
   // Use noise pattern for background instead of solid color
   const noisePattern = ctx.createPattern(
@@ -2581,10 +2579,8 @@ export const generateGameTexture = async (terrainData, options = {}) => {
   // when there was a satellite image), roads, paths, buildings
   onProgress?.("Drawing land cover and roads on the game map...");
   const { north: bNorth, south: bSouth, east: bEast, west: bWest } = terrainData.bounds;
-  const toPixel = (lat, lng) => ({
-    x: ((lng - bWest) / (bEast - bWest)) * canvas.width,
-    y: ((bNorth - lat) / (bNorth - bSouth)) * canvas.height,
-  });
+  // (along a turned map's own axes: services/mapFrame.js frameUV)
+  const toPixel = (lat, lng) => { const q = frameUV(terrainData.bounds, lat, lng); return { x: q.u * canvas.width, y: q.v * canvas.height }; };
   // car parks mapped only by their aisles: a bay's depth of parking each side
   // of every parking aisle (the export lays its bays there), under the rest
   // (an aisle in a mapped car park: that outline is painted instead)
@@ -2872,10 +2868,8 @@ export function renderRoadOverlayOnCanvas(canvas, terrainData, options = {}) {
   // Linear lat/lng → pixel box-stretch (matches geoToWorld + the satellite
   // background this overlays). Metric projection would drift by ~cos(lat).
   const { north: bNorth, south: bSouth, east: bEast, west: bWest } = terrainData.bounds;
-  const toPixel = (lat, lng) => ({
-    x: ((lng - bWest) / (bEast - bWest)) * canvas.width,
-    y: ((bNorth - lat) / (bNorth - bSouth)) * canvas.height,
-  });
+  // (along a turned map's own axes: services/mapFrame.js frameUV)
+  const toPixel = (lat, lng) => { const q = frameUV(terrainData.bounds, lat, lng); return { x: q.u * canvas.width, y: q.v * canvas.height }; };
 
   const roadFeatures = terrainData.osmFeatures.filter(
     (f) => f.type === "road" || f.type === "bridge_infra",

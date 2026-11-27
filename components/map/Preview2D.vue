@@ -118,6 +118,7 @@ import { useI18n } from 'vue-i18n';
 import { CHECKBOX, SELECT_XS } from '../base/controlStyles.js';
 import L from 'leaflet';
 import { squareOfDrag } from '../../services/modelArea.js';
+import { frameUV, frameLatLngAt, metresPerDegree } from '../../services/mapFrame.js';
 import { footprintMaskPixels } from '../../services/batchShape.js';
 import 'leaflet/dist/leaflet.css';
 import { attachContentLayer } from './contentLayer.js';
@@ -195,7 +196,7 @@ const bounds = () => { const b = td()?.bounds; return b ? L.latLngBounds([b.sout
 // The 3D model's area on the map (the export panel's Area: a square picked here by a drag).
 const AREA_STYLE = { color: '#ff6600', weight: 2, dashArray: '6 4', fill: true, fillColor: '#ff6600', fillOpacity: 0.08, interactive: false };
 let areaLayer = null; let dragFrom = null; let dragLayer = null;
-const toSample = (ll) => { const d = td(); const b = d.bounds; return { c: ((ll.lng - b.west) / (b.east - b.west)) * d.width, r: ((b.north - ll.lat) / (b.north - b.south)) * d.height }; };
+const toSample = (ll) => { const d = td(); const q = frameUV(d.bounds, ll.lat, ll.lng); return { c: q.u * d.width, r: q.v * d.height }; };
 const areaBounds = (a) => { const d = td(); const b = d.bounds; const lng = (c) => b.west + (c / d.width) * (b.east - b.west); const lat = (r) => b.north - (r / d.height) * (b.north - b.south); return L.latLngBounds([lat(a.r0 + a.size), lng(a.c0)], [lat(a.r0), lng(a.c0 + a.size)]); };
 const drawArea = () => {
   if (areaLayer) { map?.removeLayer(areaLayer); areaLayer = null; }
@@ -303,7 +304,43 @@ const openInOsm = () => {
 // place, which is every frame while the Satellite detail slider moves. An
 // image overlay from a URL would need the texture encoded again each time.
 const DISPLAY_MAX_PX = 2048;
-const CanvasOverlay = L.ImageOverlay.extend({
+// A turned level (refs/output/rotation-plan.md): its pictures are in the level's own frame, so an overlay is drawn at
+// the map's own size round its centre and turned by its angle, not stretched over the north-up box round it.
+const turnedOf = () => { const b = td()?.bounds; return b && b.angle && b.frame ? b : null; };
+const TurnedMixin = {
+  _turnedLayout() {
+    const b = turnedOf(); if (!b || !this._map) return null;
+    const c = this._map.latLngToLayerPoint([b.frame.lat, b.frame.lng]);
+    // (screen pixels per metre at the centre, east-west: 1 m east of the centre)
+    const k = metresPerDegree(b.frame.lat);
+    const e = this._map.latLngToLayerPoint([b.frame.lat, b.frame.lng + 1 / k.lng]);
+    const ppm = Math.abs(e.x - c.x);
+    return { c, w: b.frame.wM * ppm, h: b.frame.hM * ppm, angle: b.angle };
+  },
+  _reset() {
+    const t = this._turnedLayout();
+    if (!t) { L.ImageOverlay.prototype._reset.call(this); return; }
+    const el = this._image;
+    el.style.width = `${t.w}px`; el.style.height = `${t.h}px`;
+    el.style.transformOrigin = '50% 50%';
+    L.DomUtil.setPosition(el, L.point(t.c.x - t.w / 2, t.c.y - t.h / 2));
+    el.style.transform += ` rotate(${t.angle}deg)`;
+  },
+  _animateZoom(e) {
+    const t = this._turnedLayout();
+    if (!t) { L.ImageOverlay.prototype._animateZoom.call(this, e); return; }
+    const scale = this._map.getZoomScale(e.zoom);
+    const c = this._map._latLngToNewLayerPoint(L.latLng(turnedOf().frame.lat, turnedOf().frame.lng), e.zoom, e.center);
+    const el = this._image;
+    L.DomUtil.setTransform(el, L.point(c.x - (t.w * scale) / 2, c.y - (t.h * scale) / 2), scale);
+    el.style.transformOrigin = '0 0';
+    el.style.transform += ` rotate(${t.angle}deg)`;
+  },
+};
+const TurnedImageOverlay = L.ImageOverlay.extend(TurnedMixin);
+// (the outline: the turned square's corners on a turned level, else the box)
+const outlineShape = (b, opts) => { const tb = turnedOf(); return tb ? L.polygon([[0, 0], [1, 0], [1, 1], [0, 1]].map(([u, v]) => { const q = frameLatLngAt(tb, u, v); return [q.lat, q.lng]; }), opts) : L.rectangle(b, opts); };
+const CanvasOverlay = TurnedImageOverlay.extend({
   _initImage() {
     const el = this._image = this._url;   // (a canvas element)
     L.DomUtil.addClass(el, 'leaflet-image-layer');
@@ -361,7 +398,7 @@ const drawTexture = () => {
     }
     shownKind = `cloud:${cloudView.value}`;
     overlay = new CanvasOverlay(cloudCanvas, b, { interactive: false, className: 'mapng-preview2d-texture mapng-preview2d-cloud', pane: 'mapngTexture' }).addTo(map);
-    if (!outline) outline = L.rectangle(b, { color: '#f97316', weight: 1.5, fill: false, interactive: false }).addTo(map); else outline.setStyle({ fill: false });
+    if (!outline) outline = outlineShape(b, { color: '#f97316', weight: 1.5, fill: false, interactive: false }).addTo(map); else outline.setStyle({ fill: false });
     return;
   }
   // (a terrain view: the land's shape in place of its photo)
@@ -372,7 +409,7 @@ const drawTexture = () => {
     shadeCanvas = canvasOf(shadeTerrain(shape, terrainView.value, { minHeight: Number(d.minHeight) || 0, maxHeight: Number(d.maxHeight) || 1 }), shape.w, shape.hgt, shadeCanvas);
     shownKind = `view:${terrainView.value}`;
     overlay = new CanvasOverlay(shadeCanvas, b, { interactive: false, className: 'mapng-preview2d-texture', pane: 'mapngTexture' }).addTo(map);
-    if (!outline) outline = L.rectangle(b, { color: '#f97316', weight: 1.5, fill: false, interactive: false }).addTo(map); else outline.setStyle({ fill: false });
+    if (!outline) outline = outlineShape(b, { color: '#f97316', weight: 1.5, fill: false, interactive: false }).addTo(map); else outline.setStyle({ fill: false });
     return;
   }
   const kind = texture.value;
@@ -385,9 +422,9 @@ const drawTexture = () => {
   // (its own pane, under the features' canvas: Leaflet's overlay pane lies over it)
   const opts = { interactive: false, className: 'mapng-preview2d-texture', pane: 'mapngTexture' };
   if (fromCanvas) { display = display || document.createElement('canvas'); paintDisplay(); overlay = new CanvasOverlay(display, b, opts).addTo(map); }
-  else if (url) overlay = L.imageOverlay(url, b, opts).addTo(map);
+  else if (url) overlay = new TurnedImageOverlay(url, b, opts).addTo(map);
   const shown = fromCanvas || !!url;
-  if (!outline) outline = L.rectangle(b, { color: '#f97316', weight: 1.5, fill: !shown, fillColor: '#9ca3af', fillOpacity: 0.25, interactive: false }).addTo(map);
+  if (!outline) outline = outlineShape(b, { color: '#f97316', weight: 1.5, fill: !shown, fillColor: '#9ca3af', fillOpacity: 0.25, interactive: false }).addTo(map);
   else outline.setStyle({ fill: !shown });
 };
 

@@ -63,8 +63,9 @@ function estimateMetersPerPixel(terrainData) {
   const latRad = (centerLat * Math.PI) / 180;
   const metersPerDegreeLng = 111320 * Math.cos(latRad);
   const metersPerDegreeLat = 110574;
-  const widthMeters = Math.abs(bounds.east - bounds.west) * metersPerDegreeLng;
-  const heightMeters = Math.abs(bounds.north - bounds.south) * metersPerDegreeLat;
+  // (a turned map's own size, not the north-up box round it: services/mapFrame.js)
+  const widthMeters = bounds.angle && bounds.frame ? bounds.frame.wM : Math.abs(bounds.east - bounds.west) * metersPerDegreeLng;
+  const heightMeters = bounds.angle && bounds.frame ? bounds.frame.hM : Math.abs(bounds.north - bounds.south) * metersPerDegreeLat;
   const avgMeters = (widthMeters + heightMeters) / 2;
   return Math.max(0.01, avgMeters / width);
 }

@@ -788,9 +788,12 @@ const clampSatelliteZoomForOutput = (fetchBounds, requestedZoom, outputPx, tall 
   const outPx = Math.min(Number(outputPx) || SAT_TEXTURE_MAX_SIZE, SAT_TEXTURE_MAX_SIZE);
   const latRad = ((fetchBounds.north + fetchBounds.south) / 2) * Math.PI / 180;
   // (the texture's long side spans the grid's long side: north-south on a tall grid)
-  const widthMeters = tall
-    ? Math.abs(fetchBounds.north - fetchBounds.south) * 111320
-    : Math.abs(fetchBounds.east - fetchBounds.west) * 111320 * Math.cos(latRad);
+  // (a turned map: its own width, the picture is resampled along its axes)
+  const widthMeters = fetchBounds.angle && fetchBounds.frame
+    ? (tall ? fetchBounds.frame.hM : fetchBounds.frame.wM)
+    : tall
+      ? Math.abs(fetchBounds.north - fetchBounds.south) * 111320
+      : Math.abs(fetchBounds.east - fetchBounds.west) * 111320 * Math.cos(latRad);
   if (!(widthMeters > 0) || !(outPx > 0)) return requestedZoom;
   const neededMpp = widthMeters / outPx;
   // Web-mercator ground resolution at zoom z: 156543.03392 · cos(lat) / 2^z.
