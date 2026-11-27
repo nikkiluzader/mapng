@@ -24,6 +24,7 @@
 // roads are not smoothed or levelled into the terrain: the elevation stays as downloaded
 // there (on: true), or smoothed again (on: false, over earlier strokes). They change no
 // objects and fetch nothing differently. Pure: no DOM, no Vue.
+import { frameUV, frameLatLngAt, levelXY, levelLatLng } from './mapFrame.js';
 import { fastHypot } from './fastMath.js';
 
 export const MASK_VERSION = 1;
@@ -47,10 +48,10 @@ export function maskHasAreas(mask) {
 
 /** lat/lng ↔ cell coordinates of an n×n grid over bounds (x east, y south, both 0..n). */
 export function makeProjector(bounds, n) {
-  const { north, south, east, west } = bounds;
+  // (along a turned map's own axes: services/mapFrame.js)
   return {
-    toCell: ([lat, lng]) => [((lng - west) / (east - west)) * n, ((north - lat) / (north - south)) * n],
-    toLatLng: ([x, y]) => [north - (y / n) * (north - south), west + (x / n) * (east - west)],
+    toCell: ([lat, lng]) => { const q = frameUV(bounds, lat, lng); return [q.u * n, q.v * n]; },
+    toLatLng: ([x, y]) => { const p = frameLatLngAt(bounds, x / n, y / n); return [p.lat, p.lng]; },
   };
 }
 
@@ -388,8 +389,7 @@ const LINE_TYPES = new Set(['road', 'barrier', 'power_line', 'pier', 'bridge_inf
 /** Drop the features background areas don't get. at: backgroundLookup(); bounds: the square's lat/lng box. */
 export function filterFeaturesByBackground(features, at, bounds) {
   if (!at || !Array.isArray(features) || !bounds) return features;
-  const { north, south, east, west } = bounds;
-  const uv = (p) => [(p.lng - west) / (east - west), (north - p.lat) / (north - south)];
+  const uv = (p) => { const q = frameUV(bounds, p.lat, p.lng); return [q.u, q.v]; };
   const inBg = (p) => { const [u, v] = uv(p); return at(u, v); };
   return features.filter((f) => {
     if (!f || KEEP_TYPES.has(f.type)) return true;
@@ -414,10 +414,11 @@ export function filterFeaturesByBackground(features, at, bounds) {
 /** A lat/lng box → true when its part inside the square is all background (a tile not worth fetching). */
 export function makeSkipBox(at, maskBounds, steps = 8) {
   if (!at || !maskBounds) return null;
-  const { north, south, east, west } = maskBounds;
   return (box) => {
-    const u0 = Math.max(0, (box.west - west) / (east - west)), u1 = Math.min(1, (box.east - west) / (east - west));
-    const v0 = Math.max(0, (north - box.north) / (north - south)), v1 = Math.min(1, (north - box.south) / (north - south));
+    // (the box's corners on the mask: on a turned map the box is a turned square there, its corners' range taken)
+    const cs = [[box.north, box.west], [box.north, box.east], [box.south, box.west], [box.south, box.east]].map(([la, ln]) => frameUV(maskBounds, la, ln));
+    const u0 = Math.max(0, Math.min(...cs.map((q) => q.u))), u1 = Math.min(1, Math.max(...cs.map((q) => q.u)));
+    const v0 = Math.max(0, Math.min(...cs.map((q) => q.v))), v1 = Math.min(1, Math.max(...cs.map((q) => q.v)));
     if (u1 <= u0 || v1 <= v0) return false;
     return boxAllBackground(at, u0, v0, u1, v1, steps);
   };

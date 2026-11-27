@@ -7,6 +7,7 @@
 // edge; the backdrop's ground (its coarse 30 m elevations) gives the rest.
 // Without it the map's lakes stopped dead at its edge, the backdrop's
 // satellite photo of the same lake in a different colour beyond.
+import { frameUV, frameLatLngAt, levelXY, levelLatLng } from './mapFrame.js';
 import { planLakes, planRivers, LAKE_TILE_OVERLAP_M } from './beamngWater.js';
 
 /** Height at world (x, y) from the backdrop tiles' coarse elevations (world z: elevation - minHeight), or NaN. */
@@ -15,7 +16,7 @@ export function backdropHeightSampler(heights, { bounds, worldSize, minHeight = 
   if (!tiles.length) return () => NaN;
   return (x, y) => {
     const lat = bounds.north - (0.5 - y / worldSize) * (bounds.north - bounds.south);
-    const lng = bounds.west + (x / worldSize + 0.5) * (bounds.east - bounds.west);
+    const lng = levelLatLng(bounds, x, y, worldSize).lng;
     for (const t of tiles) {
       const b = t.bounds;
       if (lat > b.north || lat < b.south || lng < b.west || lng > b.east) continue;
@@ -71,7 +72,7 @@ export const BACKDROP_MIN_AREA_M2 = 2500;   // a pond wholly outside the map and
  */
 export function planBackdropWater({ features = [], bounds, worldSize, groundAt, mapLakes = [], seaZ = null }) {
   const half = worldSize / 2;
-  const toWorld = (lat, lng) => [((lng - bounds.west) / (bounds.east - bounds.west) - 0.5) * worldSize, (0.5 - (bounds.north - lat) / (bounds.north - bounds.south)) * worldSize];
+  const toWorld = (lat, lng) => levelXY(bounds, lat, lng, worldSize);
   const heightAt = (x, y) => { const h = groundAt(x, y); return Number.isFinite(h) ? h : 0; };
   // (only water that reaches out past the map's square)
   const outside = (f) => (f.geometry || []).some((p) => { const [x, y] = toWorld(p.lat, p.lng); return Math.abs(x) > half || Math.abs(y) > half; });

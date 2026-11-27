@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { frameUV, isTurned, levelXY, levelLatLng } from './mapFrame.js';
 import { backgroundLookup, filterFeaturesByBackground, rawWeightLookup } from './backgroundMask.js';
 import { replayingSources } from './sourceWording.js';
 import JSZip from 'jszip';
@@ -272,7 +273,8 @@ function computeSquareSize(terrainData) {
   const centerLat = (bounds.north + bounds.south) / 2;
   const latRad = (centerLat * Math.PI) / 180;
   const metersPerDegreeLng = 111320 * Math.cos(latRad);
-  const realWidthMeters = (bounds.east - bounds.west) * metersPerDegreeLng;
+  // (a turned map's own width: services/mapFrame.js)
+  const realWidthMeters = isTurned(bounds) ? bounds.frame.wM : (bounds.east - bounds.west) * metersPerDegreeLng;
   return Math.round((realWidthMeters / width) * 100) / 100;
 }
 
@@ -398,9 +400,11 @@ function geoToWorld(lat, lng, terrainData, squareSize, zOffset = 3) {
   const size = width;
   const worldSize = size * squareSize;
 
-  const u = Math.max(0, Math.min(1, (lng - bounds.west) / (bounds.east - bounds.west)));
+  // (along a turned map's own axes: services/mapFrame.js frameUV)
+  const uv = frameUV(bounds, lat, lng);
+  const u = Math.max(0, Math.min(1, uv.u));
   // v=0 is north (top of heightMap), v=1 is south
-  const v = Math.max(0, Math.min(1, (bounds.north - lat) / (bounds.north - bounds.south)));
+  const v = Math.max(0, Math.min(1, uv.v));
 
   // Bilinear interpolation — matches BeamNG's own terrain height calculation,
   // preventing spawn/road positions from landing inside terrain peaks that fall
@@ -2284,10 +2288,8 @@ function lerpLatLng(a, b, t) {
  */
 function clipGeometryToMargin(geometry, bounds, margin = ROAD_EDGE_MARGIN) {
   const lo = margin, hi = 1 - margin;
-  const uvOf = pt => [
-    (pt.lng  - bounds.west)  / (bounds.east  - bounds.west),
-    (bounds.north - pt.lat)  / (bounds.north - bounds.south),
-  ];
+  // (along a turned map's own axes: the clip is to the turned square, services/mapFrame.js frameUV)
+  const uvOf = pt => { const q = frameUV(bounds, pt.lat, pt.lng); return [q.u, q.v]; };
   const inside = (u, v) => u >= lo && u <= hi && v >= lo && v <= hi;
 
   const segments = [];
@@ -5934,7 +5936,7 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
     const planZ = (p) => {
       if (!levelTunnels?.zAt || !isFreeEnd(p[0], p[1])) return null;
       const ws = terrainData.width * squareSize; const b = terrainData.bounds;
-      const z = levelTunnels.zAt(b.north - (0.5 - p[1] / ws) * (b.north - b.south), b.west + (p[0] / ws + 0.5) * (b.east - b.west));
+      const ll = levelLatLng(b, p[0], p[1], ws); const z = levelTunnels.zAt(ll.lat, ll.lng);
       return Number.isFinite(z) ? z - terrainData.minHeight : null;
     };
     const freeZ = levelTunnels ? [planZ(bore[0]), planZ(bore[bore.length - 1])] : null;
@@ -8165,8 +8167,7 @@ export function generateJunctionMarkingDecals(terrainData, squareSize, { carriag
   const { bounds } = terrainData;
   const margin = ROAD_EDGE_MARGIN * 4 / 3;
   const insideMargin = (pt) => {
-    const u = (pt.lng - bounds.west) / (bounds.east - bounds.west);
-    const v = (bounds.north - pt.lat) / (bounds.north - bounds.south);
+    const { u, v } = frameUV(bounds, pt.lat, pt.lng);
     return u >= margin && u <= 1 - margin && v >= margin && v <= 1 - margin;
   };
 
@@ -10273,8 +10274,8 @@ export function exportDataInputs(terrainData, options = {}) {
  */
 export async function prefetchLidarDecks(terrainData, squareSize, options, onProgress) {
   const { bounds, width } = terrainData; const ws = width * squareSize;
-  const toLocal = (lat, lng) => [((lng - bounds.west) / (bounds.east - bounds.west) - 0.5) * ws, (0.5 - (bounds.north - lat) / (bounds.north - bounds.south)) * ws];
-  const toGeo = (x, y) => [bounds.north - (0.5 - y / ws) * (bounds.north - bounds.south), bounds.west + (x / ws + 0.5) * (bounds.east - bounds.west)];
+  const toLocal = (lat, lng) => levelXY(bounds, lat, lng, ws);
+  const toGeo = (x, y) => { const ll = levelLatLng(bounds, x, y, ws); return [ll.lat, ll.lng]; };
   const bridgeLines = [];
   for (const f of terrainData.osmFeatures || []) {
     const t = f.tags || {};
@@ -10319,10 +10320,7 @@ function inRingXY(x, y, ring) {
 export function getTerrainHeightAtWorldXY(worldX, worldY, terrainData, squareSize) {
   const { bounds, width } = terrainData;
   const worldSize = width * squareSize;
-  const u = worldX / worldSize + 0.5;
-  const v = 0.5 - worldY / worldSize;
-  const lat = bounds.north - v * (bounds.north - bounds.south);
-  const lng = bounds.west + u * (bounds.east - bounds.west);
+  const { lat, lng } = levelLatLng(bounds, worldX, worldY, worldSize);
   return getTerrainHeightWorld(lat, lng, terrainData);
 }
 
@@ -14464,7 +14462,7 @@ async function exportChunkedFromOverview(overview, center, options) {
     const plan = planLevelTunnels(overview.osmFeatures || [], {
       center: { lat: (b.north + b.south) / 2, lng: (b.east + b.west) / 2 },
       groundAt: (lat, lng) => { const h = getTerrainHeightWorld(lat, lng, overview); return Number.isFinite(h) ? h + overview.minHeight : null; },
-      inLevel: (lat, lng) => { const u = (lng - b.west) / (b.east - b.west); const v = (b.north - lat) / (b.north - b.south); return u > 0 && u < 1 && v > 0 && v < 1 && (!inShape || inShape(u, v)); },
+      inLevel: (lat, lng) => { const { u, v } = frameUV(b, lat, lng); return u > 0 && u < 1 && v > 0 && v < 1 && (!inShape || inShape(u, v)); },
       edgeProbeM: 3 * ovMpp, minLength: LEVEL_TUNNEL_MIN_M,
     });
     if (plan.tunnels.length) levelTunnels = plan;
@@ -14750,7 +14748,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       // a chunk: buildings made by the chunk whose core holds their middle (each building's mesh exactly once)
       if (Array.isArray(chunkCore)) {
         const b = terrainData.bounds; const N = groundShape.size; let dropped = 0;
-        const inCore = (lat, lng) => { const px = (lng - b.west) / (b.east - b.west) * N; const py = (b.north - lat) / (b.north - b.south) * N; return px >= chunkCore[0] && px < chunkCore[2] && py >= chunkCore[1] && py < chunkCore[3]; };
+        const inCore = (lat, lng) => { const q = frameUV(b, lat, lng); const px = q.u * N; const py = q.v * N; return px >= chunkCore[0] && px < chunkCore[2] && py >= chunkCore[1] && py < chunkCore[3]; };
         const kept = terrainData.osmFeatures.filter((f) => {
           if (f?.type !== 'building' || !Array.isArray(f.geometry) || !f.geometry.length) return true;
           let la = 0; let ln = 0; for (const q of f.geometry) { la += q.lat; ln += q.lng; }
@@ -14816,18 +14814,16 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const rawAtWorld = rawLook ? (() => {
     const b = td.bounds; const mb = bgMask.bounds; const ws = td.width * computeSquareSize(td);
     return (x, y) => {
-      const lat = b.north - (0.5 - y / ws) * (b.north - b.south);
-      const lng = b.west + (x / ws + 0.5) * (b.east - b.west);
-      return rawLook.full((lng - mb.west) / (mb.east - mb.west), (mb.north - lat) / (mb.north - mb.south));
+      const { lat, lng } = levelLatLng(b, x, y, ws);
+      const mq = frameUV(mb, lat, lng); return rawLook.full(mq.u, mq.v);
     };
   })() : null;
   const bgAtWorld = (() => {
     if (!bgLook) return () => false;
     const b = td.bounds; const mb = bgMask.bounds; const ws = td.width * computeSquareSize(td);
     return (x, y) => {
-      const lat = b.north - (0.5 - y / ws) * (b.north - b.south);
-      const lng = b.west + (x / ws + 0.5) * (b.east - b.west);
-      return bgLook((lng - mb.west) / (mb.east - mb.west), (mb.north - lat) / (mb.north - mb.south));
+      const { lat, lng } = levelLatLng(b, x, y, ws);
+      const mq = frameUV(mb, lat, lng); return bgLook(mq.u, mq.v);
     };
   })();
   // (a list of scene objects or spots, in place: those standing in background go)
@@ -14845,14 +14841,14 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   if (sidewalksWanted && boundedFeatures?.length) {
     const b = td.bounds; const ws = td.width * computeSquareSize(td);
     const before = boundedFeatures;
-    boundedFeatures = inferCrossingSidewalks(boundedFeatures, (p) => [((p.lng - b.west) / (b.east - b.west) - 0.5) * ws, (0.5 - (b.north - p.lat) / (b.north - b.south)) * ws]);
+    boundedFeatures = inferCrossingSidewalks(boundedFeatures, (p) => levelXY(b, p.lat, p.lng, ws));
     const n = boundedFeatures.filter((f, i) => f !== before[i]).length;
     if (n) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Sidewalks: ${n} untagged street way(s) given sidewalks where crossings end beside them.`);
   }
   // (a short bridge carries no parking lanes)
   if (boundedFeatures?.length) {
     const b = td.bounds; const ws = td.width * computeSquareSize(td);
-    boundedFeatures = markShortSpans(boundedFeatures, (p) => [((p.lng - b.west) / (b.east - b.west) - 0.5) * ws, (0.5 - (b.north - p.lat) / (b.north - b.south)) * ws]);
+    boundedFeatures = markShortSpans(boundedFeatures, (p) => levelXY(b, p.lat, p.lng, ws));
   }
   // (a bridge's towers and gatehouses mapped as buildings are left to the bridge: services/bridgeBuildings.js)
   if (includeBuildings && boundedFeatures?.length) {
@@ -14863,8 +14859,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   }
   if (includeBuildings && boundedFeatures?.length) {
     const b = td.bounds; const ws = td.width * computeSquareSize(td);
-    const project = (lat, lng) => [((lng - b.west) / (b.east - b.west) - 0.5) * ws, (0.5 - (b.north - lat) / (b.north - b.south)) * ws];
-    const unproject = (x, y) => ({ lat: b.north - (0.5 - y / ws) * (b.north - b.south), lng: b.west + (x / ws + 0.5) * (b.east - b.west) });
+    const project = (lat, lng) => levelXY(b, lat, lng, ws);
+    const unproject = (x, y) => levelLatLng(b, x, y, ws);
     buildingConflicts = resolveBuildingRoadConflicts(boundedFeatures, { project, unproject, urbanAt: buildUrbanRoadClassifier(boundedFeatures) });
     boundedFeatures = buildingConflicts.features;
     if (buildingConflicts.dropped.length || buildingConflicts.clipped.length || buildingConflicts.flagged.length) {
@@ -16548,7 +16544,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         const b = exportTerrainData.bounds; const ws = exportTerrainData.width * squareSize;
         return {
           type: 'barrier', id: 'dam_rail', tags: { barrier: 'guard_rail' },
-          geometry: pts.map(([x, y]) => ({ lat: b.north - (0.5 - y / ws) * (b.north - b.south), lng: b.west + (x / ws + 0.5) * (b.east - b.west) })),
+          geometry: pts.map(([x, y]) => levelLatLng(b, x, y, ws)),
           __zAt: (x, y) => { let best = Infinity; let zz = z[0]; pts.forEach(([px, py], i) => { const d = (px - x) ** 2 + (py - y) ** 2; if (d < best) { best = d; zz = z[i]; } }); return zz; },
         };
       }),

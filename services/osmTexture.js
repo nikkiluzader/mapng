@@ -1,3 +1,4 @@
+import { frameUV, frameLatLngAt, levelXY, levelLatLng } from './mapFrame.js';
 import { parallelMap, parallelThreads } from './parallel.js';
 import { blendStrip } from './satelliteDetailStrip.js';
 import { buildRoadNetwork, getEffectiveRoadLayer, mergeLinearRoadSegments } from "./roadNetwork.js";
@@ -2232,7 +2233,7 @@ export function osmRockOnBareGround(cls, w, h, terrainData) {
   const c = document.createElement("canvas"); c.width = w; c.height = h;
   const ctx = c.getContext("2d");
   ctx.fillStyle = "#fff";
-  const px = (p) => [((p.lng - b.west) / (b.east - b.west)) * w, ((b.north - p.lat) / (b.north - b.south)) * h];
+  const px = (p) => { const q = frameUV(b, p.lat, p.lng); return [q.u * w, q.v * h]; };
   for (const f of rocks) {
     ctx.beginPath();
     for (const ring of [f.geometry, ...(f.holes || [])]) ring.forEach((p, i) => { const [x, y] = px(p); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); });

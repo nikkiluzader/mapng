@@ -1,4 +1,4 @@
-import { frameBounds, vertexLatLng } from './mapFrame.js';
+import { frameBounds, frameLatLngAt, frameUV, vertexLatLng } from './mapFrame.js';
 import { gpxzChunkGrid } from './gpxzChunks.js';
 import { attachLandCover } from './worldCover.js';
 import { attachTreeSpecies, includeTreeSpeciesEarly } from './treeSpecies.js';
@@ -3577,14 +3577,12 @@ export const addOSMToTerrain = async (
 export function restoreRawAreas(heightMap, before, width, height, bounds, maskBounds, weightAt) {
   let cells = 0; let eased = 0;
   const mb = maskBounds || bounds;
-  const lngSpan = mb.east - mb.west; const latSpan = mb.north - mb.south;
   for (let y = 0; y < height; y++) {
-    // (the samples' grid as the road smoother's: geoUtils createGridProjector)
-    const lat = bounds.north - (y / Math.max(1, height - 1)) * (bounds.north - bounds.south);
-    const v = (mb.north - lat) / latSpan;
+    // (the samples' grid as the road smoother's: geoUtils createGridProjector; along a turned map's axes: mapFrame.js)
     for (let x = 0; x < width; x++) {
-      const lng = bounds.west + (x / Math.max(1, width - 1)) * (bounds.east - bounds.west);
-      const w = weightAt((lng - mb.west) / lngSpan, v);
+      const p = frameLatLngAt(bounds, x / Math.max(1, width - 1), y / Math.max(1, height - 1));
+      const q = frameUV(mb, p.lat, p.lng);
+      const w = weightAt(q.u, q.v);
       if (w <= 0) continue;
       const i = y * width + x;
       const a = heightMap[i]; const b = before[i];

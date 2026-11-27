@@ -1,3 +1,4 @@
+import { frameUV, frameLatLngAt, levelXY, levelLatLng } from './mapFrame.js';
 import { placementShift, placementShiftAt } from './lanePlacement.js';
 import {
   findSignalApproaches,
@@ -66,8 +67,9 @@ export function geoToWorld(lat, lng, terrainData, squareSize, zOffset = 2.5) {
   const { bounds, width, height, heightMap, minHeight } = terrainData;
   const worldSize = width * squareSize;
 
-  const u = Math.max(0, Math.min(1, (lng - bounds.west) / (bounds.east - bounds.west)));
-  const v = Math.max(0, Math.min(1, (bounds.north - lat) / (bounds.north - bounds.south)));
+  const q = frameUV(bounds, lat, lng);
+  const u = Math.max(0, Math.min(1, q.u));
+  const v = Math.max(0, Math.min(1, q.v));
 
   // (the game's grid: services/terrainLookup.js)
   const fx = Math.max(0, Math.min(width - 1, u * width));

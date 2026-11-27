@@ -1,7 +1,7 @@
 <script setup>
 import { computed, shallowRef, reactive, watch, toRaw, markRaw, onUnmounted, ref } from 'vue';
 import * as THREE from 'three';
-import { metresPerDegree, heightAtFraction } from '../../services/mapFrame.js';
+import { metresPerDegree, heightAtFraction, frameUV } from '../../services/mapFrame.js';
 import { footprintTest } from '../../services/batchShape.js';
 import { useTresContext, useLoop } from '@tresjs/core';
 import { useMainStore } from '../../stores/mainStore';
@@ -335,7 +335,8 @@ function buildLakes(data, upm) {
   if (!feats.length || !data.bounds || !data.heightMap) return null;
   const { north, south, east, west } = data.bounds;
   const W = data.width; const H = data.height;
-  const toXY = (p) => [((p.lng - west) / (east - west)) * SCENE_SIZE - SCENE_SIZE / 2, -(((north - p.lat) / (north - south)) * SCENE_SIZE - SCENE_SIZE / 2)];
+  // (along a turned map's own axes: services/mapFrame.js)
+  const toXY = (p) => { const q = frameUV(data.bounds, p.lat, p.lng); return [q.u * SCENE_SIZE - SCENE_SIZE / 2, -(q.v * SCENE_SIZE - SCENE_SIZE / 2)]; };
   const groundAt = (u, v) => {
     if (!(u >= 0 && u <= 1 && v >= 0 && v <= 1)) return NaN;
     const x = Math.round(u * (W - 1)); const y = Math.round(v * (H - 1));

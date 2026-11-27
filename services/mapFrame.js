@@ -140,3 +140,13 @@ export function heightAtFraction(heightMap, W, H, u, v, { noData = -10000, fallb
   }
   return wsum > 0 ? sum / wsum : fallback;
 }
+
+/** A point's level coordinates (metres, x right, y up, the level's centre at 0) on a map worldSize metres across. */
+export function levelXY(bounds, lat, lng, worldSize) {
+  const { u, v } = frameUV(bounds, lat, lng);
+  return [(u - 0.5) * worldSize, (0.5 - v) * worldSize];
+}
+/** The reverse: level coordinates (x, y) as { lat, lng }. */
+export function levelLatLng(bounds, x, y, worldSize) {
+  return frameLatLngAt(bounds, x / worldSize + 0.5, 0.5 - y / worldSize);
+}

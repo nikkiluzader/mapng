@@ -1,3 +1,4 @@
+import { frameLatLngAt } from './mapFrame.js';
 import { createGridProjector } from './geoUtils.js';
 import { makeRoadNodeKey } from './roadNetwork.js';
 import { buildUrbanRoadClassifier, estimateRoadCrossSection, isOneWayRoad } from './roadWidth.js';
@@ -134,10 +135,8 @@ export function snapRoadsToTerrain(heightMap, width, height, bounds, osmFeatures
     if (!osmFeatures?.length || !(metersPerPixel > 0) || metersPerPixel > MAX_GRID_MPP) return { features: osmFeatures, stats };
 
     const project = createGridProjector(bounds, width, height);
-    const unproject = (x, y) => ({
-        lng: bounds.west + (x / width) * (bounds.east - bounds.west),
-        lat: bounds.north - ((y + 1) / height) * (bounds.north - bounds.south),
-    });
+    // (along a turned map's own axes: services/mapFrame.js)
+    const unproject = (x, y) => frameLatLngAt(bounds, x / width, (y + 1) / height);
     const isUrbanRoad = buildUrbanRoadClassifier(osmFeatures);
 
     // Nodes used by more than one way (of any kind) stay where they are.
