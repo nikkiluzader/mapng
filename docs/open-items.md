@@ -54,6 +54,17 @@ A new session starts with `docs/handoff.md` ("Work list").
   dev.1). **Smoothing between roads** (his screenshot `scratch/discord/2026-11-27/smoothing_0224.png`, "road by road
   instead of the local road layout"; and a wish to level road and sidewalk together): asked for a report of a small area
   like the parking one; goes with the smoothing follow-ups.
+- **Trenches beside roads raised above a generation-time bench (own tests, Latvia, 2026-11-27; likely Toma's
+  smoothing lumps).** Five hilly Latvian areas on 30 m (`lv_sigulda`, `lv_cesis`, `lv_sabile`, `lv_gaizins`,
+  `lv_sigulda03`); only Sabile shows it: 26 uphill-side samples with a trench > 0.5 m, deepest 0.97 m, all on Meža iela
+  (secondary, down the Abava valley at up to ~14% on 30 m), plus a junction centre 0.54 m low (Kandavas / Talsu / Meža)
+  and 7 creases. Cause: on coarse data main roads keep their class grade (profileSolve `allowedRise`, secondary ~11.6%),
+  so the export bridges the concave stretch up to 1.4 m above ground, and its side slopes stop at the bench the
+  generation step (`smoothRoadsInHeightmap`) cut under the old line, leaving that bench as a trench; each road's corridor
+  ends at its own edge, so junctions dip. RAW (export shaping only) has none (deepest 0.22 m). Fix to design: side slopes
+  run out to the ground outside the generation bench (or the bench re-graded to the export profile), and junction
+  corridors blended as one envelope. Tools: `scratch/kaunas/` rough.py, ditch.py (trench count), sections.py,
+  longsec.py, junction_view.py; plots in `scratch/kaunas/lv/`.
 - **Smoke check's intermittent 404:** a Mapterhorn z17 tile over the app's Flagstaff start (no lidar there); upstream,
   harmless; the smoke script could ignore /api/mapterhorn 404s.
 - **From thecoachtoma 2026-11-27:** his service roads with sidewalk=left came out bare; the code builds them since 0.3.7
