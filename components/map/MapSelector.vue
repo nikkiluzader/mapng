@@ -123,6 +123,10 @@
         <l-marker v-for="h in roadHandles" :key="'road-' + h.which" :lat-lng="h.at" :draggable="true" :icon="dragHandleIcon" @dragend="(event) => dropRoadHandle(h.which, event)">
           <l-tooltip :permanent="false" direction="top" :offset="[0, -8]">{{ t(h.which === 'start' ? 'road.start' : 'road.end') }}</l-tooltip>
         </l-marker>
+        <!-- (its waypoints: dragged, the road is led through the new spot; double-clicked, past it) -->
+        <l-marker v-for="(v, k) in roadVias" :key="'via-' + k + '-' + v.lat + '-' + v.lng" :lat-lng="[v.lat, v.lng]" :draggable="true" :icon="viaHandleIcon" @dragend="(event) => dropRoadVia(k, event)" @dblclick="() => roadApi.removeVia(k)">
+          <l-tooltip :permanent="false" direction="top" :offset="[0, -6]">{{ t('road.via', { n: k + 1 }) }}</l-tooltip>
+        </l-marker>
       </template>
 
       <!-- tiles in step 1 beyond the first (services/tileLayout.js): each a box with a handle; dropped, it is placed by
@@ -533,6 +537,13 @@ const corridorPx = computed(() => {
   const mPerPx = (156543.03392 * Math.cos((s[0].lat * Math.PI) / 180)) / 2 ** (currentZoom.value || 13);
   return Math.max(2, (2 * store.roadHalfWidthM) / mPerPx);
 });
+const roadVias = computed(() => (roadShown.value ? store.road?.via || [] : []));
+const dropRoadVia = async (k, event) => {
+  const ll = event?.target?.getLatLng?.(); if (!ll) return;
+  await roadApi.moveVia(k, { lat: ll.lat, lng: ll.lng });
+  const marker = event.target;
+  nextTick(() => { const v = roadVias.value[k]; if (v) marker.setLatLng([v.lat, v.lng]); });
+};
 const dropRoadHandle = async (which, event) => {
   const ll = event?.target?.getLatLng?.(); if (!ll) return;
   // ("on the line" is what looks on it at this zoom: 18 pixels either side)
@@ -542,6 +553,13 @@ const dropRoadHandle = async (which, event) => {
   nextTick(() => { const h = roadHandles.value.find((x) => x.which === which); if (h) marker.setLatLng(h.at); });
 };
 
+// (a waypoint: smaller, white with the brand's ring, so it reads apart from the two ends)
+const viaHandleIcon = L.divIcon({
+  className: 'mapng-drag-handle',
+  html: '<div style="width:11px;height:11px;border-radius:9999px;background:white;border:3px solid var(--brand);box-shadow:0 0 0 1px rgba(0,0,0,0.25);"></div>',
+  iconSize: [11, 11],
+  iconAnchor: [5.5, 5.5],
+});
 const dragHandleIcon = L.divIcon({
   className: 'mapng-drag-handle',
   html: '<div style="width:14px;height:14px;border-radius:9999px;background:var(--brand);border:2px solid white;box-shadow:0 0 0 1px rgba(0,0,0,0.25);"></div>',
@@ -1224,7 +1242,9 @@ const onMapReady = (map) => {
   // road mode: a click picks the road there (not while a point tool places points)
   map.on('click', (e) => {
     if (!roadModeOn.value || store.pointTool) return;
-    roadApi.pickAt({ lat: e.latlng.lat, lng: e.latlng.lng });
+    // (with a road on the map a click leads it on to there, a waypoint left; it never replaces the road, useRoadMode.js)
+    const mPerPx = (156543.03392 * Math.cos((e.latlng.lat * Math.PI) / 180)) / 2 ** (currentZoom.value || 13);
+    roadApi.clickAt({ lat: e.latlng.lat, lng: e.latlng.lng }, 18 * mPerPx);
   });
   map.on('contextmenu', (e) => {
     copiedNotice.value = false;

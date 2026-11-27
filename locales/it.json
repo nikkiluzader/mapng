@@ -2246,7 +2246,7 @@
     "mode_road": "Modalità strada",
     "clickHint": "Fai clic su una strada della mappa: viene seguita in entrambe le direzioni per nome o numero.",
     "reading": "Lettura delle strade qui…",
-    "handlesHint": "Trascina una maniglia lungo la strada per accorciare il tratto, o lasciala più avanti: il tratto segue le strade fin lì (fino a 20 km alla volta), restando su questa strada.",
+    "handlesHint": "Fai clic più avanti per prolungare la strada fin lì lungo la rete stradale (fino a 20 km alla volta): la vecchia estremità resta come punto di passaggio trascinabile. Trascina una maniglia indietro lungo la strada per accorciare il tratto. Per ricominciare con un'altra strada, usa il pulsante qui sotto.",
     "width": "Larghezza per lato",
     "widthValue": "{m} m",
     "gridLine": "{km} km di strada · mappa {w} × {h} px · {area} km²",
@@ -2264,6 +2264,7 @@
     "error_noRoute": "Nessun percorso stradale fin lì: lascia la maniglia su una strada collegata a questa.",
     "chunked": "Costruito a pezzi (sperimentale): questa forma è troppo lunga o diagonale per una sola griglia, quindi viene creata in pezzi uniti in un unico livello. Genera scarica prima ogni pezzo; le anteprime mostrano una panoramica più grossolana.",
     "bigDesktop": "Grande: questa forma copre {km2} km², più di quanto consenta il sito ({maxKm2} km²). L'app desktop la costruisce, ma può richiedere molto tempo e molto spazio su disco.",
-    "manyPieces": "Costruito in {n} pezzi. Generazione ed esportazione possono richiedere un'ora o più ciascuna, e un livello così grande potrebbe essere troppo pesante da caricare per il gioco. Puoi comunque provare: se qualcosa va storto, un report aiuta a migliorare MapNG."
+    "manyPieces": "Costruito in {n} pezzi. Generazione ed esportazione possono richiedere un'ora o più ciascuna, e un livello così grande potrebbe essere troppo pesante da caricare per il gioco. Puoi comunque provare: se qualcosa va storto, un report aiuta a migliorare MapNG.",
+    "via": "Punto di passaggio {n}: trascinalo per far passare la strada da un altro punto, doppio clic per rimuoverlo"
   }
 }

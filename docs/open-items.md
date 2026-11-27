@@ -90,8 +90,8 @@ A new session starts with `docs/handoff.md` ("Work list").
      placement:start/end and these now measured along the whole way (a junction split restarted them). Commit after
      its sweep.
   4. **A guide to manual improvements** (Splatplays): how to tag OSM or fix a level after export. Scope and place the user's.
-  5. **Road mode: more points along the road** (glitter_shitter): keep via points instead of dragging one end handle
-     again and again; touching the end handle by accident cleared the road. The user said they would add it.
+  5. **Road mode: more points along the road** (glitter_shitter): done (waypoints: click on to extend, drag to re-route,
+     double-click to remove; a click never replaces the road). scratch/verify-pw/e2e_road_via.mjs.
   6. **"Surrounding tiles" and "include backdrop" together crashed a computer** (recklessandfeckless): to reproduce
      (which build, web or desktop, map size).
 - **Tile rotation on the 2D map (0.3.8 target).** Rotating the tiles in step 1 (backlog 0 and area 1, thecoachtoma's

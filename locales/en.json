@@ -2246,7 +2246,7 @@
     "mode_road": "Road mode",
     "clickHint": "Click a road on the map: it is followed both ways by its name or number.",
     "reading": "Reading the roads here…",
-    "handlesHint": "Drag a handle along the road to shorten the stretch, or drop it farther along: the stretch follows the roads to it (up to 20 km at a time), keeping to this road.",
+    "handlesHint": "Click farther along to lead the road on to there along the roads (up to 20 km at a time): the old end stays as a waypoint you can drag. Drag a handle back along the road to shorten the stretch. To start again on another road, use the button below.",
     "width": "Width either side",
     "widthValue": "{m} m",
     "gridLine": "{km} km of road · map {w} × {h} px · {area} km²",
@@ -2264,6 +2264,7 @@
     "error_noRoute": "No way along the roads to there: drop the handle on a road connected to this one.",
     "chunked": "Built in pieces (experimental): this shape is too long or diagonal for one grid, so it is made in chunks that are joined into one level. Generate downloads every chunk first; the previews show a coarser overview.",
     "bigDesktop": "Big: this shape covers {km2} km², more than the website allows ({maxKm2} km²). The desktop app builds it, but it may take a long time and need a lot of disk space.",
-    "manyPieces": "Built in {n} pieces. Generate and the export can each take an hour or more, and a level this big may be too much for the game to load. You can still try it: if something fails, a report helps make MapNG better."
+    "manyPieces": "Built in {n} pieces. Generate and the export can each take an hour or more, and a level this big may be too much for the game to load. You can still try it: if something fails, a report helps make MapNG better.",
+    "via": "Waypoint {n}: drag it to lead the road through another spot, double-click to remove it"
   }
 }

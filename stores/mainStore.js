@@ -178,7 +178,9 @@ export const useMainStore = defineStore('main', () => {
   // a cut-off or hand-edited entry, is no road: the corridor's maths would run on it at start)
   const validRoad = (r) => !!r && Array.isArray(r.pts) && r.pts.length >= 2 && r.pts.length <= 50000
     && r.pts.every((p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lng) && Math.abs(p.lat) <= 90 && Math.abs(p.lng) <= 360)
-    && Number.isFinite(r.startM) && Number.isFinite(r.endM) && r.startM >= 0 && r.endM >= r.startM;
+    && Number.isFinite(r.startM) && Number.isFinite(r.endM) && r.startM >= 0 && r.endM >= r.startM
+    // (its waypoints, when it has them: points the route was led through, useRoadMode.js)
+    && (r.via === undefined || (Array.isArray(r.via) && r.via.length <= 200 && r.via.every((p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lng))));
   const tiles = ref((() => {
     try {
       const saved = JSON.parse(localStorage.getItem('mapng_tiles') || 'null');

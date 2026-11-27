@@ -2246,7 +2246,7 @@
     "mode_road": "Modo carretera",
     "clickHint": "Haz clic en una carretera del mapa: se sigue en ambos sentidos por su nombre o número.",
     "reading": "Leyendo las carreteras de aquí…",
-    "handlesHint": "Arrastra un asa a lo largo de la carretera para acortar el tramo, o suéltala más adelante: el tramo sigue las carreteras hasta allí (hasta 20 km cada vez), sin salir de esta carretera.",
+    "handlesHint": "Haz clic más adelante para prolongar la carretera hasta allí por la red de carreteras (hasta 20 km cada vez): el extremo anterior queda como punto de paso que puedes arrastrar. Arrastra un tirador hacia atrás por la carretera para acortar el tramo. Para empezar con otra carretera, usa el botón de abajo.",
     "width": "Ancho a cada lado",
     "widthValue": "{m} m",
     "gridLine": "{km} km de carretera · mapa {w} × {h} px · {area} km²",
@@ -2264,6 +2264,7 @@
     "error_noRoute": "No hay camino por carretera hasta allí: suelta el asa sobre una carretera conectada con esta.",
     "chunked": "Construido por partes (experimental): esta forma es demasiado larga o diagonal para una sola cuadrícula, así que se crea en trozos que se unen en un solo nivel. Generar descarga primero cada trozo; las vistas previas muestran una vista general más gruesa.",
     "bigDesktop": "Grande: esta forma cubre {km2} km², más de lo que permite la web ({maxKm2} km²). La aplicación de escritorio la construye, pero puede tardar mucho y necesitar mucho espacio en disco.",
-    "manyPieces": "Se construye en {n} piezas. Generar y exportar pueden tardar una hora o más cada uno, y un nivel tan grande puede ser demasiado para que el juego lo cargue. Aun así puedes intentarlo: si algo falla, un informe ayuda a mejorar MapNG."
+    "manyPieces": "Se construye en {n} piezas. Generar y exportar pueden tardar una hora o más cada uno, y un nivel tan grande puede ser demasiado para que el juego lo cargue. Aun así puedes intentarlo: si algo falla, un informe ayuda a mejorar MapNG.",
+    "via": "Punto de paso {n}: arrástralo para llevar la carretera por otro sitio, doble clic para quitarlo"
   }
 }

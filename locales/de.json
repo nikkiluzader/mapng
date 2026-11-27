@@ -2246,7 +2246,7 @@
     "mode_road": "Straßenmodus",
     "clickHint": "Klicke auf der Karte auf eine Straße: Sie wird über ihren Namen oder ihre Nummer in beide Richtungen verfolgt.",
     "reading": "Die Straßen hier werden gelesen…",
-    "handlesHint": "Zieh einen Griff an der Straße entlang, um den Abschnitt zu kürzen, oder setz ihn weiter vorn ab: Der Abschnitt folgt den Straßen dorthin (bis 20 km auf einmal) und bleibt auf dieser Straße.",
+    "handlesHint": "Klicke weiter entlang, um die Straße über das Straßennetz bis dorthin zu verlängern (bis zu 20 km auf einmal): Das alte Ende bleibt als verschiebbarer Wegpunkt. Ziehe einen Griff die Straße zurück, um den Abschnitt zu kürzen. Für eine andere Straße nutze die Schaltfläche unten.",
     "width": "Breite zu beiden Seiten",
     "widthValue": "{m} m",
     "gridLine": "{km} km Straße · Karte {w} × {h} px · {area} km²",
@@ -2264,6 +2264,7 @@
     "error_noRoute": "Kein Weg entlang der Straßen dorthin: Setz den Griff auf eine Straße, die mit dieser verbunden ist.",
     "chunked": "In Teilen gebaut (experimentell): Diese Form ist für ein einzelnes Raster zu lang oder zu schräg, daher wird sie in Stücken erstellt, die zu einem Level zusammengefügt werden. Generieren lädt zuerst jedes Stück herunter; die Vorschauen zeigen eine gröbere Übersicht.",
     "bigDesktop": "Groß: Diese Form umfasst {km2} km², mehr als die Website erlaubt ({maxKm2} km²). Die Desktop-App baut sie, das kann aber lange dauern und viel Speicherplatz brauchen.",
-    "manyPieces": "Wird in {n} Teilen gebaut. Generieren und Export können jeweils eine Stunde oder länger dauern, und ein so großes Level kann zu viel sein, als dass das Spiel es lädt. Du kannst es trotzdem versuchen: Wenn etwas fehlschlägt, hilft ein Bericht, MapNG zu verbessern."
+    "manyPieces": "Wird in {n} Teilen gebaut. Generieren und Export können jeweils eine Stunde oder länger dauern, und ein so großes Level kann zu viel sein, als dass das Spiel es lädt. Du kannst es trotzdem versuchen: Wenn etwas fehlschlägt, hilft ein Bericht, MapNG zu verbessern.",
+    "via": "Wegpunkt {n}: ziehen, um die Straße über eine andere Stelle zu führen, Doppelklick zum Entfernen"
   }
 }
