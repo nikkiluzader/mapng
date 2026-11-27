@@ -50,6 +50,12 @@ A new session starts with `docs/handoff.md` ("Work list").
   joint shift 87db1e0, width:lanes:start/end 1da6525, service roads in nav 12d9231, tagged widths to 2.5 m f0d7888
   (sweep baselines for w_barcelona and dev_pilchowice re-recorded, accepted by the user). Test levels not re-uploaded
   yet (roads G/I/J/K, sidewalks "set back"): ask first.
+- **Parking per way** (thecoachtoma 2026-11-27, his report pramon_s_pr, area `toma_parking`): done eedc9e9 (after
+  dev.1). **Smoothing between roads** (his screenshot `scratch/discord/2026-11-27/smoothing_0224.png`, "road by road
+  instead of the local road layout"; and a wish to level road and sidewalk together): asked for a report of a small area
+  like the parking one; goes with the smoothing follow-ups.
+- **Smoke check's intermittent 404:** a Mapterhorn z17 tile over the app's Flagstaff start (no lidar there); upstream,
+  harmless; the smoke script could ignore /api/mapterhorn 404s.
 - **From thecoachtoma 2026-11-27:** his service roads with sidewalk=left came out bare; the code builds them since 0.3.7
   (on level ground, pieces of 8 m+). Waiting on his way ID or coordinates to see which rule dropped them.
 - **Discord feedback after 0.3.7 (2026-11-26), in the order agreed** (the user: "proceed with your recommendations"):
