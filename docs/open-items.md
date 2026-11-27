@@ -45,6 +45,13 @@ A new session starts with `docs/handoff.md` ("Work list").
   - Found on the way, not sidewalk work: a hole in the road surface where a street's width steps at a junction (the
     two-width T, 7 to 13 m); St. Augustine's grey strip under Ponce de Leon's verge is the terrain paint.
   Joins "sidewalks at banks and the water", the sidewalk order of 2026-11-24 and the stairs model (backlog 10).
+- **v0.3.8-dev.1 cut 2026-11-27 (6e8d5f8)**, the user's go-ahead: the St. Augustine sidewalk fixes (back edges, verges,
+  corners, courtyard mesh 4eadc23, set-back verges 334b05c, shore edge 5271c23), markings on placed roads d551ff0,
+  joint shift 87db1e0, width:lanes:start/end 1da6525, service roads in nav 12d9231, tagged widths to 2.5 m f0d7888
+  (sweep baselines for w_barcelona and dev_pilchowice re-recorded, accepted by the user). Test levels not re-uploaded
+  yet (roads G/I/J/K, sidewalks "set back"): ask first.
+- **From thecoachtoma 2026-11-27:** his service roads with sidewalk=left came out bare; the code builds them since 0.3.7
+  (on level ground, pieces of 8 m+). Waiting on his way ID or coordinates to see which rule dropped them.
 - **Discord feedback after 0.3.7 (2026-11-26), in the order agreed** (the user: "proceed with your recommendations"):
   1. **Stop lines and zebra crossings ignore placement** (thecoachtoma): done d551ff0 (centred on the drawn road;
      roads scene G has a zebra; checked in game on his Savanoriu area).
