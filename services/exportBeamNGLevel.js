@@ -6543,6 +6543,35 @@ function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = [],
       }
     }
   }
+  // (and the own sidewalks of cycleways and service roads (sidewalk=* on the way: sidewalkWays, above), as strips too: in
+  // decal mode the raised builder that lays them never runs, and a cycleway's sidewalk did not render at all
+  // (thecoachtoma, Discord 2026-11-27))
+  if (sidewalkStrips) {
+    for (const w of sidewalkWays) {
+      if (!(w.nodes?.length >= 2)) continue;
+      const sides = sidewalkSides({ tags: w.tags, highway: w.highway });
+      const street = sanitizeBeamNGObjectName(w.tags?.name || `${w.highway}_${w.wayId}`, `way_${w.wayId}`);
+      for (const [side, sign] of [['left', 1], ['right', -1]]) {
+        const width = sides[side];
+        if (!(width > CURB_ONLY_M)) continue;
+        const surface = w.tags?.[`sidewalk:${side}:surface`] || w.tags?.['sidewalk:both:surface'] || w.tags?.['sidewalk:surface'] || (americas ? 'concrete' : 'paving_stones');
+        const base = w.nodes.map((n) => [n[0], n[1], n[2], width / 2]);
+        const n = (perStreet.get(street) || 0) + 1;
+        perStreet.set(street, n);
+        pedestrianSurfaceLayers(surface, width, { americas }).forEach((layer, k) => {
+          const nodes = offsetNodes(base, sign * (w.half + SIDEWALK_STRIP_GAP_M + width / 2) + layer.offset, layer.width);
+          const decal = makeRoadDecal(nodes, 'Base', street, {
+            material: layer.material, renderPriority: SIDEWALK_STRIP_RENDER_PRIORITY, breakAngle: layer.breakAngle,
+            textureLength: layer.textureLength, startEndFade: [0, 0], distanceFade: layer.distanceFade,
+          });
+          if (!decal) return;
+          decal.name = sanitizeBeamNGObjectName(`dr_${street}_sw${n}_${side[0]}${k + 1}`);
+          decals.push({ decal, street });
+          if (k === 0) { ways.push({ nodes: nodes.map((q) => [q[0], q[1], q[2]]), half: width / 2 }); stripCount++; stripLength += pathLength(nodes); }
+        });
+      }
+    }
+  }
   return { decals, ways, footpaths, sidewalkWays, services: { count: serviceCount, length: serviceLength, nav: serviceNavCount }, sidewalkStrips: { count: stripCount, length: stripLength } };
 }
 
@@ -15030,6 +15059,15 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     const drawnHalf = new Map();
     for (const cw of decalRoads.carriageways || []) drawnHalf.set(cw.owner, Math.max(drawnHalf.get(cw.owner) || 0, cw.half || 0));
     for (const e of sg.edges) { const h = drawnHalf.get(e.seg); if (h > e.half) e.half = h; }
+    // (the carriageways with a sidewalk or a curb built along them, for their heights below: streetSides; a town street
+    // with a sidewalk or a bare curb, a curbed one only with a sidewalk (bare curbs outside town floated, the deck car park); a footway beside a mountain highway counted as its sidewalk
+    // moved the highway's edges, creases all along it (Zion in the sweep))
+    const sidewalkOwners = new Set();
+    if (includeSidewalks && shapingOptions.terrain && shapingOptions.roads && Array.isArray(decalRoads.carriageways)) {
+      const open = decalRoads.carriageways.filter((cw) => !cw.bridge && !cw.tunnel && cw.nodes?.length >= 2);
+      const sides = streetSides(open, sidewalkFootways(exportTerrainData.osmFeatures, (p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0)));
+      for (const cw of open) { const sd = sides.get(cw); const w = sd ? Math.max(sd.left || 0, sd.right || 0) : 0; if ((cw.urban && w > 0) || (cw.curbed && w > CURB_ONLY_M)) sidewalkOwners.add(cw.owner); }
+    }
     // (a dam with a road on it shaped round that road: services/dams.js)
     // (and one nothing drives over: the path or service road along its crest, else its own line: dams.js)
     if (sg.dams?.length) {
@@ -15053,7 +15091,14 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     }
     // (tunnels still come from today's builder: their roads keep its heights)
     const applied = applySolvedHeights(decalRoads, sg, { skipOwners: new Set(decalRoads.tunnels?.bySeg?.keys?.() || []) });
-    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Structure solver v2: ${decks.length} deck(s) of ${parts.length} part(s); ${applied.nodes} road nodes in ${applied.decals} decals at their solved heights.`);
+    // (and the carriageways with sidewalks along them (only those: the curbs, verges and edges of other roads read them
+    // too, and moved they made spikes and creases in the sweep; not on decks or in tunnels), where the ground is composed to the
+    // solved heights: left at the ground they were laid on, a road the solver lifted over the levelled ground had its
+    // sidewalks 0.9 m under it, a slot along both edges (Sabile's Meza iela on 30 m data, 2026-11-27))
+    const cwApplied = Array.isArray(decalRoads.carriageways) && shapingOptions.terrain && shapingOptions.roads
+      ? applySolvedHeights([{ __items: decalRoads.carriageways.filter((cw) => !cw.bridge && !cw.tunnel && !cw.carried && sidewalkOwners.has(cw.owner)).map((cw) => ({ __owner: cw.owner, nodes: cw.nodes })) }], sg, { skipOwners: new Set(decalRoads.tunnels?.bySeg?.keys?.() || []), groundOnly: true })
+      : { nodes: 0 };
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Structure solver v2: ${decks.length} deck(s) of ${parts.length} part(s); ${applied.nodes} road nodes in ${applied.decals} decals at their solved heights; ${cwApplied.nodes} carriageway node(s) with them (sidewalks and curbs follow).`);
     await yield_();
   }
   if ((options.structureSolver === 'v2-terrain' || options.structureSolver === 'v2') && sg?.classes) {

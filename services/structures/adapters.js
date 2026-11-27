@@ -118,7 +118,11 @@ const TRACK_JUMP_M = 4;   // a node this much farther from its station than its 
  * owners another builder places (today's tunnels until stage G covers them).
  * Returns { decals, nodes } changed.
  */
-export function applySolvedHeights(groups, graph, { deckLift = 0.02, skipOwners = null } = {}) {
+// groundOnly: only stations on the ground (ground, embankment, cutting) at least NEAR_DECK_M from any deck station are
+// moved; the rest keep their height (the carriageways the sidewalks read: beside a deck's approach, between its wing
+// walls, a sidewalk lifted with the road overhung the walls, the sweep's deck car park on 30 m data, 2026-11-27)
+const NEAR_DECK_M = 40;
+export function applySolvedHeights(groups, graph, { deckLift = 0.02, skipOwners = null, groundOnly = false } = {}) {
   const { edges } = graph;
   const z = graph.profile?.z;
   if (!z) return { decals: 0, nodes: 0 };
@@ -126,6 +130,17 @@ export function applySolvedHeights(groups, graph, { deckLift = 0.02, skipOwners 
   for (const seg of graph.classes?.segments || []) for (let i = seg.i0; i <= seg.i1; i++) kindOf[seg.edge][i] = seg.kind;
   const bySeg = new Map();
   edges.forEach((e, k) => { if (!bySeg.has(e.seg)) bySeg.set(e.seg, []); bySeg.get(e.seg).push(k); });
+  // (groundOnly: the deck stations in a grid, for the distance test)
+  let nearDeck = null;
+  if (groundOnly) {
+    const CELL = NEAR_DECK_M; const grid = new Map();
+    edges.forEach((e, k) => { for (let i = 0; i < e.s.length; i++) if (kindOf[k][i] === 'deck') { const key = `${Math.floor(e.x[i] / CELL)},${Math.floor(e.y[i] / CELL)}`; if (!grid.has(key)) grid.set(key, []); grid.get(key).push(e.x[i], e.y[i]); } });
+    nearDeck = (x, y) => {
+      const cx = Math.floor(x / CELL); const cy = Math.floor(y / CELL);
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) { const l = grid.get(`${cx + dx},${cy + dy}`); if (l) for (let q = 0; q < l.length; q += 2) if ((l[q] - x) ** 2 + (l[q + 1] - y) ** 2 < NEAR_DECK_M * NEAR_DECK_M) return true; }
+      return false;
+    };
+  }
   let decals = 0; let nodes = 0;
   // a grass / dirt edge blend hangs past the deck: clipped over objects it
   // smears down the parapets and walls (and over a stacked deck under it),
@@ -191,6 +206,7 @@ export function applySolvedHeights(groups, graph, { deckLift = 0.02, skipOwners 
           const dd = (e.x[j] + vx * t - node[0]) ** 2 + (e.y[j] + vy * t - node[1]) ** 2;
           if (dd < bestD) { bestD = dd; bz = zk[j] + (zk[j + 1] - zk[j]) * t; bk = t < 0.5 ? kindOf[acc.k][j] : kindOf[acc.k][j + 1]; }
         }
+        if (groundOnly && (!['ground', 'embankment', 'cutting'].includes(bk) || nearDeck(node[0], node[1]))) continue;
         node[2] = Math.round((bz + (bk === 'deck' ? deckLift : 0)) * 1000) / 1000;
         // (a dam's crest too: without overObjects the game lays the decal on the terrain)
         if (bk === 'deck' || bk === 'dam') { onDeck = true; if (deckNode) deckNode[ni] = 1; }

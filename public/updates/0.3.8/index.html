@@ -180,6 +180,8 @@
     <div class="kicker">From a tester's map of St. Augustine</div>
     <h2>Sidewalks flush with their lawns</h2>
     <ul>
+      <li><b>Sidewalks beside a raised road.</b> Where a street is built above the ground it was first levelled into, its sidewalks stayed at the old ground, in a slot almost a metre under the road along both edges. They now sit at the road's height. Near a bridge's wing walls they keep the ground for now.</li>
+      <li><b>Bike-path sidewalks in decal mode.</b> With sidewalks drawn as decals, a sidewalk tagged on a cycleway or service road (<code>sidewalk=left</code> and the like) did not render; it is drawn as a strip now (a tester's report).</li>
       <li><b>Paving along a shore ends in a straight line.</b> Paving by the sea was trimmed pixel by pixel on the terrain's 1 m sea mask: along a diagonal seawall it stopped in a sawtooth of 1 m teeth whose sides showed as dark triangles. The mask is now smoothed and blended, and the edge follows the coast.</li>
       <li><b>Sidewalks set back from the road get a verge.</b> A sidewalk mapped on its own more than 6 m from the road's edge has grass in front of it, houses near or not; nearer, the strip is paved to the curb as before (it is mostly a parking lane). St. Augustine's bayfront sidewalk along the seawall came out a wide paved strip with a sawtooth edge where the real ground is grass and palms.</li>
       <li><b>Paths round a lawn mesh cleanly.</b> Where sidewalks and paths close a loop round a lawn or a bed, the paving came out in spikes and gaps in places: the slab mesh is cut into 4 m squares, and a square holding part of the enclosed lawn was triangulated wrong. Those squares are now worked out as the paving less the lawn first. Found in a college courtyard in St. Augustine, once the street corners beside it were joined.</li>
@@ -193,6 +195,7 @@
     <figure><img src="images/paved-loop-mesh.png" alt="Two top views of a courtyard's paths as mesh triangles: on the left jagged spikes and gaps round two circular paths, on the right clean paths." loading="lazy"><figcaption>Behind the scenes: the courtyard's paving mesh before (left) and after (right), coloured by height.</figcaption></figure>
     <figure><img src="images/sidewalk-setback-verge.png" alt="Two top views of cell types along a bayfront street: on the left orange paving with a ragged edge between the road and the sidewalk, on the right a green verge." loading="lazy"><figcaption>Behind the scenes: the bayfront's paving before (left, orange fill with a sawtooth edge) and after (right, a grass verge to the sidewalk).</figcaption></figure>
     <figure><img src="images/paving-shore-edge.png" alt="Two top views of paving mesh along a seawall: on the left its seaward edge in 1 m steps, on the right a straight edge." loading="lazy"><figcaption>Behind the scenes: the bayfront paving's seaward edge before (left) and after (right).</figcaption></figure>
+    <figure><img src="images/sidewalks-raised-road.png" alt="Cross sections of a street across a valley side: the ground under the sidewalks at the road's level on both sides, and the uphill side rising from there." loading="lazy"><figcaption>Behind the scenes: the raised street's cross sections after the fix; the sidewalks at road level.</figcaption></figure>
   </section>
 
   <footer>
