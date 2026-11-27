@@ -1,7 +1,7 @@
 {
  "_note": "Area baselines for scripts/sweep/runSweep.mjs: re-record with --save after a change that improves an area (commit the file with it).",
  "recorded": "2026-11-27",
- "commit": "1814590",
+ "commit": "a291d6f",
  "areas": {
   "normandy_flat@gpxz/untouched": {
    "steps": 0,
@@ -1203,7 +1203,7 @@
    "maxDeckLen": 254,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 13
+   "seconds": 16
   },
   "w_amsterdam@gpxz/untouched": {
    "steps": 0,
@@ -1227,7 +1227,7 @@
    "maxDeckLen": 389,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 15
+   "seconds": 16
   },
   "w_amsterdam@gpxz/ready": {
    "steps": 0,
@@ -1240,9 +1240,9 @@
    "bumps": 1,
    "cross": 4,
    "junctions": 0,
-   "creases": 23,
+   "creases": 26,
    "swFloat": 6,
-   "swBuried": 20,
+   "swBuried": 14,
    "snapMovedPct": 0,
    "snapP90cm": 0,
    "lintErrors": 0,
@@ -1253,7 +1253,7 @@
    "maxDeckLen": 50,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 14
+   "seconds": 17
   },
   "w_amsterdam@t30/ready": {
    "steps": 0,
@@ -1277,7 +1277,7 @@
    "maxDeckLen": 48,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 13
+   "seconds": 14
   },
   "w_amsterdam@t30/untouched": {
    "steps": 0,
@@ -1301,7 +1301,7 @@
    "maxDeckLen": 208,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 12
+   "seconds": 14
   },
   "w_amsterdam@t30/noshape": {
    "steps": 0,
@@ -1325,7 +1325,7 @@
    "maxDeckLen": 212,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 12
+   "seconds": 15
   },
   "val_disere@gpxz/ready": {
    "steps": 0,
@@ -2327,7 +2327,7 @@
    "maxDeckLen": 48,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 14
+   "seconds": 15
   },
   "w_amsterdam@mh/noshape": {
    "steps": 0,
@@ -2353,7 +2353,7 @@
    "maxDeckLen": 221,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 14
+   "seconds": 12
   },
   "w_amsterdam@mh/untouched": {
    "steps": 0,
@@ -2377,7 +2377,7 @@
    "maxDeckLen": 107,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 12
+   "seconds": 14
   },
   "normandy_flat@mh/ready": {
    "steps": 0,
